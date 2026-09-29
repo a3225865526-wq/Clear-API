@@ -143,6 +143,24 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	})
 
 	info.StreamStatus.RequireTerminal()
+	if outcome := info.StreamStatus.OutcomeSnapshot(); outcome.ExpectsTerminal && outcome.EndReason != relaycommon.StreamEndReasonDone {
+		const incompleteMessage = "upstream stream ended before the terminal event"
+		info.StreamStatus.MarkFailed("incomplete_stream", "upstream_error", http.StatusBadGateway)
+		info.StreamStatus.RecordError(incompleteMessage)
+		logger.LogError(c, incompleteMessage)
+
+		// The last chunk is normally held until the stream's terminal marker so
+		// usage can be extracted from it. Preserve that partial output, but never
+		// turn an EOF, timeout, or scanner error into a successful [DONE].
+		if lastStreamData != "" {
+			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
+				logger.LogError(c, "error forwarding final partial stream chunk: "+err.Error())
+				info.StreamStatus.RecordError("failed to forward final partial stream chunk")
+			}
+		}
+		writeIncompleteStreamError(c, info, incompleteMessage)
+		return &dto.Usage{}, nil
+	}
 
 	// 处理最后的响应
 	shouldSendLastResp := true
@@ -194,6 +212,28 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
 
 	return usage, nil
+}
+
+func writeIncompleteStreamError(c *gin.Context, info *relaycommon.RelayInfo, message string) {
+	switch info.RelayFormat {
+	case types.RelayFormatClaude:
+		_ = helper.ClaudeData(c, dto.ClaudeResponse{
+			Type:  "error",
+			Error: types.ClaudeError{Type: "api_error", Message: message},
+		})
+	case types.RelayFormatGemini:
+		_ = helper.ObjectData(c, gin.H{"error": gin.H{
+			"code":    http.StatusBadGateway,
+			"message": message,
+			"status":  "UNAVAILABLE",
+		}})
+	default:
+		_ = helper.ObjectData(c, gin.H{"error": types.OpenAIError{
+			Message: message,
+			Type:    "upstream_error",
+			Code:    "incomplete_stream",
+		}})
+	}
 }
 
 // observeStreamChoices collects billable function call names and records the

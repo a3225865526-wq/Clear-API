@@ -17,18 +17,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { useTranslation } from 'react-i18next'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import { getClearApiSystemName } from '@/lib/clearapi-branding'
 
 type AuthLayoutProps = {
   children: React.ReactNode
 }
 
 export function AuthLayout({ children }: AuthLayoutProps) {
-  const { t } = useTranslation()
   const { systemName, logo, loading } = useSystemConfig()
+  const displayName = getClearApiSystemName(systemName)
 
   return (
     <div className='relative grid h-svh max-w-none'>
@@ -42,7 +42,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
           ) : (
             <img
               src={logo}
-              alt={t('Logo')}
+              alt={displayName}
               className='h-8 w-8 rounded-full object-cover'
             />
           )}
@@ -50,7 +50,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         {loading ? (
           <Skeleton className='h-6 w-24' />
         ) : (
-          <h1 className='text-xl font-medium'>{systemName}</h1>
+          <h1 className='text-xl font-medium'>{displayName}</h1>
         )}
       </Link>
       <div className='container flex items-center pt-16 sm:pt-0'>

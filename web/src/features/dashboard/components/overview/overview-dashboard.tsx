@@ -111,6 +111,9 @@ interface QuickAction {
 interface RequestExample {
   endpoint: string
   model: string
+  modelAvailable: boolean
+  modelLoading: boolean
+  modelLoadFailed: boolean
   keyName: string
   keyId?: number
   displayKey: string
@@ -292,6 +295,46 @@ function RequestPreview(props: {
     model: props.example.model,
   })
   const previewLines = previewCurl.split('\n')
+  const getRequestStatusMessage = () => {
+    if (!props.example.keyId) {
+      return t('Create an API key to unlock the real request')
+    }
+    if (props.example.modelLoading) return t('Loading')
+    if (props.example.modelLoadFailed) return t('Failed to load')
+    if (props.example.modelAvailable) return props.example.keyName
+    return t('No models available')
+  }
+
+  const renderRequestAction = () => {
+    if (props.example.ready) {
+      return (
+        <Button
+          variant='outline'
+          size='sm'
+          className='h-7 gap-1.5 px-2 text-xs'
+          disabled={isCopying}
+          onClick={handleCopyRequest}
+          aria-label={t('Copy ready-to-run curl')}
+        >
+          <Copy data-icon='inline-start' />
+          {isCopying ? t('Loading') : t('Copy')}
+        </Button>
+      )
+    }
+    if (props.example.keyId) {
+      return (
+        <Button size='sm' variant='outline' render={<Link to='/pricing' />}>
+          {t('Pricing')}
+        </Button>
+      )
+    }
+    return (
+      <Button size='sm' variant='outline' render={<Link to='/keys' />}>
+        {t('Create API Key')}
+      </Button>
+    )
+  }
+
   const handleCopyRequest = async () => {
     if (!props.example.keyId || isCopying) return
 
@@ -348,29 +391,11 @@ function RequestPreview(props: {
               {t('First API request')}
             </div>
             <div className='text-muted-foreground truncate text-xs'>
-              {props.example.ready
-                ? props.example.keyName
-                : t('Create an API key to unlock the real request')}
+              {getRequestStatusMessage()}
             </div>
           </div>
         </div>
-        {props.example.ready ? (
-          <Button
-            variant='outline'
-            size='sm'
-            className='h-7 gap-1.5 px-2 text-xs'
-            disabled={isCopying}
-            onClick={handleCopyRequest}
-            aria-label={t('Copy ready-to-run curl')}
-          >
-            <Copy data-icon='inline-start' />
-            {isCopying ? t('Loading') : t('Copy')}
-          </Button>
-        ) : (
-          <Button size='sm' variant='outline' render={<Link to='/keys' />}>
-            {t('Create API Key')}
-          </Button>
-        )}
+        {renderRequestAction()}
       </div>
 
       <div className='bg-foreground/[0.035] my-3 rounded-xl p-3 font-mono text-xs'>
@@ -567,39 +592,43 @@ export function OverviewDashboard() {
     [isAdmin, quickActions]
   )
 
+  let modelStatus = t('No models available')
+  if (modelsQuery.isLoading) modelStatus = t('Loading')
+  else if (modelsQuery.isError) modelStatus = t('Failed to load')
+  else if (modelsQuery.data?.length) {
+    modelStatus = String(modelsQuery.data.length)
+  }
+
   const heroSignals = useMemo<HeroSignal[]>(
     () => [
       {
-        label: t('Route active'),
-        value: apiInfoItems.length > 0 ? t('Online') : t('Current domain'),
-        icon: RadioTower,
-        tone: 'info',
-      },
-      {
-        label: t('Auth configured'),
+        label: t('API Keys'),
         value: preferredKey ? t('Secured') : t('Needs API key'),
         icon: ShieldCheck,
         tone: 'success',
       },
       {
-        label: t('Model selected'),
-        value: modelsQuery.data?.[0] ?? t('Loading'),
+        label: t('Models'),
+        value: modelStatus,
         icon: Timer,
-        tone: 'chart-4',
+        tone: modelsQuery.isError ? 'warning' : 'chart-4',
       },
     ],
-    [apiInfoItems.length, modelsQuery.data, preferredKey, t]
+    [modelStatus, modelsQuery.isError, preferredKey, t]
   )
 
   const requestExample = useMemo<RequestExample>(() => {
     const endpoint = normalizeEndpoint(apiInfoItems[0]?.url)
-    const model = modelsQuery.data?.[0] ?? 'gpt-4o-mini'
+    const selectedModel = modelsQuery.data?.[0]
     const keyName = preferredKey?.name ?? t('No API key yet')
-    const ready = Boolean(preferredKey?.id && model)
+    const ready = Boolean(preferredKey?.id && selectedModel)
 
     return {
       endpoint,
-      model,
+      model: selectedModel ?? 'MODEL_NAME_FROM_CATALOG',
+      modelAvailable: Boolean(selectedModel),
+      modelLoading: modelsQuery.isLoading,
+      modelLoadFailed: modelsQuery.isError,
       keyName,
       keyId: preferredKey?.id,
       displayKey: preferredKey
@@ -607,7 +636,14 @@ export function OverviewDashboard() {
         : 'sk-...',
       ready,
     }
-  }, [apiInfoItems, modelsQuery.data, preferredKey, t])
+  }, [
+    apiInfoItems,
+    modelsQuery.data,
+    modelsQuery.isError,
+    modelsQuery.isLoading,
+    preferredKey,
+    t,
+  ])
 
   const completedStepCount = startSteps.filter((step) => step.completed).length
   const setupComplete = completedStepCount === startSteps.length

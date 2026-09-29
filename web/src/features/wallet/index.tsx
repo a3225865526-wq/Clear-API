@@ -47,6 +47,7 @@ import {
   getMinTopupAmount,
   dispatchSelectedPayment,
 } from './lib'
+import { disableOnlinePayments } from './lib/disable-online-payments'
 import type {
   UserWalletData,
   PaymentMethod,
@@ -83,6 +84,10 @@ export function Wallet(props: WalletProps) {
   const { status } = useStatus()
   const { currency } = useSystemConfig()
   const { topupInfo, presetAmounts, loading: topupLoading } = useTopupInfo()
+  const checkoutDisabledTopupInfo = useMemo(
+    () => disableOnlinePayments(topupInfo),
+    [topupInfo]
+  )
 
   // Calculate effective exchange rate - when display type is USD, use rate of 1
   const effectiveUsdExchangeRate = useMemo(() => {
@@ -299,7 +304,7 @@ export function Wallet(props: WalletProps) {
             >
               <div id='wallet-add-funds' className='scroll-mt-4'>
                 <RechargeFormCard
-                  topupInfo={topupInfo}
+                  topupInfo={checkoutDisabledTopupInfo}
                   presetAmounts={presetAmounts}
                   selectedPreset={selectedPreset}
                   onSelectPreset={handleSelectPreset}
@@ -313,26 +318,30 @@ export function Wallet(props: WalletProps) {
                   onRedemptionCodeChange={setRedemptionCode}
                   onRedeem={handleRedeem}
                   redeeming={redeeming}
-                  topupLink={topupInfo?.topup_link}
                   loading={topupLoading}
                   priceRatio={(status?.price as number) || 1}
                   usdExchangeRate={effectiveUsdExchangeRate}
                   onOpenBilling={() => setBillingDialogOpen(true)}
-                  creemProducts={topupInfo?.creem_products}
-                  enableCreemTopup={topupInfo?.enable_creem_topup}
+                  creemProducts={checkoutDisabledTopupInfo?.creem_products}
+                  enableCreemTopup={
+                    checkoutDisabledTopupInfo?.enable_creem_topup
+                  }
                   onCreemProductSelect={handleCreemProductSelect}
-                  enableWaffoTopup={topupInfo?.enable_waffo_topup}
-                  waffoPayMethods={topupInfo?.waffo_pay_methods}
-                  waffoMinTopup={topupInfo?.waffo_min_topup}
+                  enableWaffoTopup={
+                    checkoutDisabledTopupInfo?.enable_waffo_topup
+                  }
+                  waffoPayMethods={checkoutDisabledTopupInfo?.waffo_pay_methods}
+                  waffoMinTopup={checkoutDisabledTopupInfo?.waffo_min_topup}
                   onWaffoMethodSelect={handleWaffoMethodSelect}
                   enableWaffoPancakeTopup={
-                    topupInfo?.enable_waffo_pancake_topup
+                    checkoutDisabledTopupInfo?.enable_waffo_pancake_topup
                   }
                 />
               </div>
 
               <SubscriptionPlansCard
-                topupInfo={topupInfo}
+                topupInfo={checkoutDisabledTopupInfo}
+                purchaseEnabled={false}
                 onAvailabilityChange={handleSubscriptionAvailabilityChange}
                 userQuota={user?.quota}
                 onPurchaseSuccess={fetchUser}

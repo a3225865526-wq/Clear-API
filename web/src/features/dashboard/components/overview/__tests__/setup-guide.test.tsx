@@ -36,6 +36,8 @@ import { OverviewDashboard } from '../overview-dashboard'
 const storageKey = 'dashboard_overview_setup_guide_expanded'
 let client: QueryClient
 let keyLookupError: Error | null
+let modelLookupError: Error | null
+let userModels: string[]
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -52,6 +54,8 @@ beforeEach(() => {
     defaultOptions: { queries: { retry: false } },
   })
   keyLookupError = null
+  modelLookupError = null
+  userModels = ['gpt-4o-mini']
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     switch (url) {
       case '/api/token/?p=1&size=10':
@@ -76,7 +80,8 @@ beforeEach(() => {
           },
         }
       case '/api/user/models':
-        return { data: { success: true, data: ['gpt-4o-mini'] } }
+        if (modelLookupError) throw modelLookupError
+        return { data: { success: true, data: userModels } }
       case '/api/data/self':
         return { data: { success: true, data: [] } }
       default:
@@ -125,6 +130,36 @@ describe('overview setup guide', () => {
     )
     expect(panel).toBeInTheDocument()
     expect(panel).not.toBeVisible()
+  })
+
+  it('shows a real empty model state and a clearly named model placeholder', async () => {
+    const user = userEvent.setup()
+    userModels = []
+    await renderOverview()
+
+    await user.click(await screen.findByRole('button', { name: 'Setup guide' }))
+
+    expect(await screen.findByText('No models available')).toBeVisible()
+    expect(screen.queryByText('gpt-4o-mini')).not.toBeInTheDocument()
+    expect(screen.getByText(/MODEL_NAME_FROM_CATALOG/)).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: 'Copy ready-to-run curl' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.getAllByRole('button', { name: /Pricing/ }).length
+    ).toBeGreaterThan(0)
+  })
+
+  it('reports a model lookup failure without substituting a made-up model', async () => {
+    const user = userEvent.setup()
+    modelLookupError = new Error('Model lookup unavailable')
+    await renderOverview()
+
+    await user.click(await screen.findByRole('button', { name: 'Setup guide' }))
+
+    expect(await screen.findByText('Failed to load')).toBeVisible()
+    expect(screen.queryByText('gpt-4o-mini')).not.toBeInTheDocument()
+    expect(screen.getByText(/MODEL_NAME_FROM_CATALOG/)).toBeVisible()
   })
 
   it('toggles the completed guide with the keyboard and restores focus after hiding it', async () => {

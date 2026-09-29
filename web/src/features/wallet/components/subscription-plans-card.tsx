@@ -65,6 +65,7 @@ import type { PaymentMethod, TopupInfo } from '../types'
 
 interface SubscriptionPlansCardProps {
   topupInfo: TopupInfo | null
+  purchaseEnabled?: boolean
   onAvailabilityChange?: (available: boolean) => void
   userQuota?: number
   onPurchaseSuccess?: () => void | Promise<void>
@@ -96,6 +97,7 @@ function getBillingPreferenceLabel(
 
 export function SubscriptionPlansCard({
   topupInfo,
+  purchaseEnabled = true,
   onAvailabilityChange,
   userQuota,
   onPurchaseSuccess,
@@ -548,6 +550,43 @@ export function SubscriptionPlansCard({
                   ? `${t('Upgrade Group')}: ${plan.upgrade_group}`
                   : null,
               ].filter(Boolean) as string[]
+              const renderPurchaseAction = () => {
+                if (!purchaseEnabled) {
+                  return (
+                    <Button variant='outline' className='w-full' disabled>
+                      {t('Online plan purchases are disabled')}
+                    </Button>
+                  )
+                }
+
+                if (reached) {
+                  return (
+                    <Tooltip>
+                      <TooltipTrigger render={<div />}>
+                        <Button variant='outline' className='w-full' disabled>
+                          {t('Limit Reached')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {t('Purchase limit reached')} ({count}/{limit})
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                }
+
+                return (
+                  <Button
+                    variant='outline'
+                    className='w-full'
+                    onClick={() => {
+                      setSelectedPlan(p)
+                      setPurchaseOpen(true)
+                    }}
+                  >
+                    {t('Subscribe Now')}
+                  </Button>
+                )
+              }
 
               return (
                 <Card
@@ -599,29 +638,7 @@ export function SubscriptionPlansCard({
 
                     <Separator className='mb-3' />
 
-                    {reached ? (
-                      <Tooltip>
-                        <TooltipTrigger render={<div />}>
-                          <Button variant='outline' className='w-full' disabled>
-                            {t('Limit Reached')}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {t('Purchase limit reached')} ({count}/{limit})
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <Button
-                        variant='outline'
-                        className='w-full'
-                        onClick={() => {
-                          setSelectedPlan(p)
-                          setPurchaseOpen(true)
-                        }}
-                      >
-                        {t('Subscribe Now')}
-                      </Button>
-                    )}
+                    {renderPurchaseAction()}
                   </CardContent>
                 </Card>
               )

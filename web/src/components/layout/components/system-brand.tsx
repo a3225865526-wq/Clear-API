@@ -26,6 +26,10 @@ import {
 } from '@/components/ui/sidebar'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
+import {
+  getClearApiSystemName,
+  isDefaultNewApiName,
+} from '@/lib/clearapi-branding'
 import { cn } from '@/lib/utils'
 
 type SystemBrandProps = {
@@ -51,9 +55,14 @@ export function SystemBrand(props: SystemBrandProps) {
   const { logo } = useSystemConfig()
 
   const variant = props.variant ?? 'sidebar'
-  const name = status?.system_name || props.defaultName || 'New API'
+  const configuredName = status?.system_name || props.defaultName
+  const usesDefaultNewApiName = isDefaultNewApiName(configuredName)
+  const name = getClearApiSystemName(configuredName)
   const version =
     status?.version || props.defaultVersion || t('Unknown version')
+  const detail = usesDefaultNewApiName
+    ? t('Based on New API · {{version}}', { version })
+    : version
 
   if (variant === 'inline') {
     return (
@@ -94,7 +103,7 @@ export function SystemBrand(props: SystemBrandProps) {
           </div>
           <div className='grid flex-1 text-start text-sm leading-tight group-data-[collapsible=icon]:hidden'>
             <span className='truncate font-semibold'>{name}</span>
-            <span className='truncate text-xs'>{version}</span>
+            <span className='truncate text-xs'>{detail}</span>
           </div>
         </SidebarMenuButton>
       </SidebarMenuItem>
