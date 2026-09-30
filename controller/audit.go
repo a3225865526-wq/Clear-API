@@ -65,8 +65,10 @@ var auditContentTemplates = map[string]string{
 	"channel.upstream_apply":     "Applied upstream model changes to channel (ID: ${id})",
 	"channel.upstream_apply_all": "Applied upstream model changes to ${count} channels",
 
-	"redemption.create":       "Created ${count} redemption codes named ${name} (${quota} each)",
-	"redemption.delete_batch": "Batch deleted ${count} redemption codes",
+	"redemption.create":             "Created ${count} redemption codes named ${name} (${quota} each)",
+	"clearapi.offline_order_create": "Recorded paid offline order ${order_no} with ${count} codes",
+	"clearapi.offline_order_void":   "Voided offline order ${order_id}",
+	"redemption.delete_batch":       "Batch deleted ${count} redemption codes",
 
 	"subscription.plan_reset":      "Reset active subscriptions for plan ${plan_id}",
 	"subscription.user_plan_reset": "Reset active plan ${plan_id} subscriptions for user ${target_user_id}",

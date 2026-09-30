@@ -308,6 +308,15 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.DELETE("/invalid", controller.DeleteInvalidRedemption)
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
 		}
+		clearAPIOfflineRoute := apiRouter.Group("/clearapi")
+		clearAPIOfflineRoute.POST("/redeem", middleware.UserAuth(), middleware.CriticalRateLimit(), controller.RedeemClearAPIOfflineCode)
+		clearAPIOfflineAdminRoute := clearAPIOfflineRoute.Group("/offline-orders")
+		clearAPIOfflineAdminRoute.Use(middleware.AdminAuth())
+		{
+			clearAPIOfflineAdminRoute.GET("/", controller.ListClearAPIOfflineOrders)
+			clearAPIOfflineAdminRoute.POST("/", controller.CreateClearAPIOfflineOrder)
+			clearAPIOfflineAdminRoute.POST("/:id/void", controller.VoidClearAPIOfflineOrder)
+		}
 		apiRouter.GET("/audit", middleware.DisableCache(), middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), controller.GetAuditLogs)
 		apiRouter.GET("/audit/self", middleware.DisableCache(), middleware.UserAuth(), controller.GetAuditLogs)
 		logRoute := apiRouter.Group("/log")

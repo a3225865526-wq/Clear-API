@@ -345,6 +345,8 @@ func migrateDB() error {
 		&Option{},
 		&LoginEncryptionKey{},
 		&Redemption{},
+		&OfflineOrder{},
+		&OfflineOrderCode{},
 		&Ability{},
 		&Log{},
 		&Midjourney{},

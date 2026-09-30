@@ -69,6 +69,25 @@ describe('disableOnlinePayments', () => {
     expect(source.pay_methods).toHaveLength(1)
   })
 
+  it('keeps ClearAPI offline redemption available when original payment compliance is pending', () => {
+    const source = {
+      enable_online_topup: false,
+      enable_stripe_topup: false,
+      pay_methods: [],
+      min_topup: 10,
+      stripe_min_topup: 10,
+      amount_options: [],
+      discount: {},
+      enable_redemption: false,
+      payment_compliance_confirmed: false,
+    } as TopupInfo
+
+    expect(disableOnlinePayments(source)?.enable_redemption).toBe(true)
+    expect(disableOnlinePayments(source)?.payment_compliance_confirmed).toBe(
+      false
+    )
+  })
+
   it('keeps a missing wallet configuration as an empty state', () => {
     expect(disableOnlinePayments(null)).toBeNull()
   })

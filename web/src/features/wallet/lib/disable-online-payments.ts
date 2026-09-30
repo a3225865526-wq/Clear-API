@@ -38,5 +38,6 @@ export function disableOnlinePayments(
     enable_waffo_topup: false,
     waffo_pay_methods: [],
     enable_waffo_pancake_topup: false,
+    enable_redemption: true,
   }
 }

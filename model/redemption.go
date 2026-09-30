@@ -135,6 +135,14 @@ func GetRedemptionById(id int) (*Redemption, error) {
 }
 
 func Redeem(key string, userId int) (quota int, err error) {
+	return redeem(key, userId, false)
+}
+
+func RedeemOffline(key string, userId int) (quota int, err error) {
+	return redeem(key, userId, true)
+}
+
+func redeem(key string, userId int, offlineOnly bool) (quota int, err error) {
 	if key == "" {
 		return 0, errors.New("未提供兑换码")
 	}
@@ -152,6 +160,14 @@ func Redeem(key string, userId int) (quota int, err error) {
 		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
 		if err != nil {
 			return errors.New("无效的兑换码")
+		}
+		if offlineOnly {
+			var link OfflineOrderCode
+			if err := tx.Joins("JOIN offline_orders ON offline_orders.id = offline_order_codes.order_id").
+				Where("offline_order_codes.redemption_id = ? AND offline_orders.status = ?", redemption.Id, OfflineOrderPaid).
+				First(&link).Error; err != nil {
+				return errors.New("无效的离线兑换码")
+			}
 		}
 		if redemption.Status != common.RedemptionCodeStatusEnabled {
 			return errors.New("该兑换码已被使用")
@@ -205,6 +221,9 @@ func (redemption *Redemption) SelectUpdate() error {
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (redemption *Redemption) Update() error {
+	if err := rejectOfflineOrderCodeChanges([]int{redemption.Id}); err != nil {
+		return err
+	}
 	if redemption.Quota <= 0 {
 		return errors.New("redemption quota must be positive")
 	}
@@ -217,6 +236,9 @@ func (redemption *Redemption) Update() error {
 }
 
 func (redemption *Redemption) Delete() error {
+	if err := rejectOfflineOrderCodeChanges([]int{redemption.Id}); err != nil {
+		return err
+	}
 	var err error
 	err = DB.Delete(redemption).Error
 	return err
@@ -236,7 +258,8 @@ func DeleteRedemptionById(id int) (err error) {
 
 func DeleteInvalidRedemptions() (int64, error) {
 	now := common.GetTimestamp()
-	result := DB.Where("status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)", []int{common.RedemptionCodeStatusUsed, common.RedemptionCodeStatusDisabled}, common.RedemptionCodeStatusEnabled, now).Delete(&Redemption{})
+	result := DB.Where("status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)", []int{common.RedemptionCodeStatusUsed, common.RedemptionCodeStatusDisabled}, common.RedemptionCodeStatusEnabled, now).
+		Where("id NOT IN (SELECT redemption_id FROM offline_order_codes)").Delete(&Redemption{})
 	return result.RowsAffected, result.Error
 }
 
@@ -250,6 +273,23 @@ func BatchDeleteRedemptions(ids []int) (int64, error) {
 			return 0, errors.New("redemption IDs must be positive")
 		}
 	}
+	if err := rejectOfflineOrderCodeChanges(ids); err != nil {
+		return 0, err
+	}
 	result := DB.Where("id IN ?", ids).Delete(&Redemption{})
 	return result.RowsAffected, result.Error
+}
+
+func rejectOfflineOrderCodeChanges(ids []int) error {
+	if len(ids) == 0 || ids[0] <= 0 {
+		return errors.New("invalid redemption id")
+	}
+	var count int64
+	if err := DB.Model(&OfflineOrderCode{}).Where("redemption_id IN ?", ids).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return errors.New("offline order codes must be managed through offline orders")
+	}
+	return nil
 }
