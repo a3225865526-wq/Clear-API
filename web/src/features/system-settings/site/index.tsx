@@ -26,7 +26,7 @@ import {
 
 const defaultSiteSettings: SiteSettings = {
   Notice: '',
-  SystemName: 'New API',
+  SystemName: '澄光 API / ClearAPI',
   Logo: '',
   Footer: '',
   About: '',

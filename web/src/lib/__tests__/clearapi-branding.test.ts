@@ -21,6 +21,8 @@ import { describe, expect, it } from 'vitest'
 import {
   CLEARAPI_BRAND_NAME,
   getClearApiSystemName,
+  getClearApiLogo,
+  getClearApiDocsLink,
   isDefaultNewApiName,
 } from '../clearapi-branding'
 
@@ -34,5 +36,29 @@ describe('ClearAPI system branding', () => {
   it('keeps a custom system name and trims surrounding whitespace', () => {
     expect(getClearApiSystemName(' Example Gateway ')).toBe('Example Gateway')
     expect(isDefaultNewApiName('Example Gateway')).toBe(false)
+  })
+})
+
+
+describe('ClearAPI assets and documentation', () => {
+  it('maps legacy logo paths while retaining a configured logo', () => {
+    expect(getClearApiLogo()).toBe('/clearapi.svg')
+    expect(getClearApiLogo('/logo.png')).toBe('/clearapi.svg')
+    expect(getClearApiLogo('/favicon.ico')).toBe('/clearapi.svg')
+    expect(getClearApiLogo('/custom.svg')).toBe('/custom.svg')
+  })
+
+  it('normalizes both ClearAPI brand aliases', () => {
+    expect(getClearApiSystemName('ClearAPI')).toBe(CLEARAPI_BRAND_NAME)
+    expect(getClearApiSystemName('澄光 API')).toBe(CLEARAPI_BRAND_NAME)
+    expect(getClearApiSystemName('new-api')).toBe(CLEARAPI_BRAND_NAME)
+  })
+
+  it('hides default upstream documentation without inventing a replacement', () => {
+    expect(getClearApiDocsLink()).toBeUndefined()
+    expect(getClearApiDocsLink('https://docs.newapi.pro/wiki/')).toBeUndefined()
+    expect(getClearApiDocsLink('https://newapi.pro')).toBeUndefined()
+    expect(getClearApiDocsLink('/#quickstart')).toBe('/#quickstart')
+    expect(getClearApiDocsLink('https://example.com/help')).toBe('https://example.com/help')
   })
 })

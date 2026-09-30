@@ -16,7 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { getClearApiLogo } from '@/lib/clearapi-branding'
+
 export function applyFaviconToDom(url: string) {
+  url = getClearApiLogo(url)
   if (typeof document === 'undefined' || !url) return
   try {
     const next = new URL(url, window.location.href).href

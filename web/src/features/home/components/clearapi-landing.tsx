@@ -41,8 +41,7 @@ function ClearApiMark() {
       aria-hidden='true'
       className='relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-gradient-to-br from-teal-500 to-cyan-700 shadow-sm shadow-teal-900/20'
     >
-      <span className='absolute -right-1 -bottom-1 size-5 rounded-full border-2 border-white/80' />
-      <span className='absolute top-1 left-1 size-2 rounded-full bg-white' />
+      <span className='text-xs font-semibold text-white'>CA</span>
     </span>
   )
 }
@@ -74,7 +73,7 @@ export function ClearApiLanding(props: ClearApiLandingProps) {
   return (
     <PublicLayout
       showMainContainer={false}
-      siteName='澄光 API'
+      siteName='澄光 API / ClearAPI'
       logo={<ClearApiMark />}
       navLinks={navLinks}
     >
@@ -190,7 +189,7 @@ export function ClearApiLanding(props: ClearApiLandingProps) {
         <QuickstartSection isAuthenticated={props.isAuthenticated} />
       </main>
       <Footer
-        name='澄光 API'
+        name='澄光 API / ClearAPI'
         description='clearapi.landing.footer.description'
       />
     </PublicLayout>

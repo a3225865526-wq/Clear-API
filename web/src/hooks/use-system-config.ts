@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useCallback } from 'react'
 
+import { getClearApiLogo, getClearApiSystemName } from '@/lib/clearapi-branding'
 import { DEFAULT_LOGO } from '@/lib/constants'
 import { applyFaviconToDom } from '@/lib/dom-utils'
 import { ensureStatus } from '@/lib/status-query'
@@ -84,7 +85,7 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
 
   // Preload logo image when URL changes
   useEffect(() => {
-    const { logo } = config
+    const logo = getClearApiLogo(config.logo)
 
     // Skip if logo is already loaded
     if (!logo || logo === loadedLogoUrl) return
@@ -110,7 +111,9 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
 
   return {
     ...config,
+    systemName: getClearApiSystemName(config.systemName),
+    logo: getClearApiLogo(config.logo),
     loading,
-    logoLoaded: config.logo === loadedLogoUrl && !!loadedLogoUrl,
+    logoLoaded: getClearApiLogo(config.logo) === loadedLogoUrl && !!loadedLogoUrl,
   }
 }

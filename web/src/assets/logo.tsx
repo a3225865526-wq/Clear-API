@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { type SVGProps } from 'react'
+import type { SVGProps } from 'react'
 
 import { cn } from '@/lib/utils'
 
@@ -36,8 +36,8 @@ export function Logo({ className, ...props }: SVGProps<SVGSVGElement>) {
       className={cn('size-6', className)}
       {...props}
     >
-      <title>New API</title>
-      <path d='M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3' />
+      <title>ClearAPI</title>
+      <text x='12' y='16' textAnchor='middle' fontFamily='sans-serif' fontSize='12' fontWeight='600' fill='currentColor' stroke='none'>CA</text>
     </svg>
   )
 }

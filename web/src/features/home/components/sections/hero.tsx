@@ -22,6 +22,7 @@ import { ArrowRight, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { getClearApiDocsLink } from '@/lib/clearapi-branding'
 import { useStatus } from '@/hooks/use-status'
 
 import { HeroTerminalDemo } from '../hero-terminal-demo'
@@ -48,10 +49,10 @@ const MoreIcon = () => (
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
   const { status } = useStatus()
-  const docsUrl =
-    (status?.docs_link as string | undefined) || 'https://docs.newapi.pro'
+  const docsUrl = getClearApiDocsLink(status?.docs_link as string | undefined)
 
   const renderDocsButton = () => {
+    if (!docsUrl) return null
     const isExternal = docsUrl.startsWith('http')
     if (isExternal) {
       return (
@@ -180,7 +181,7 @@ export function Hero(props: HeroProps) {
               </span>
               <p className='text-muted-foreground/60 text-xs leading-relaxed'>
                 {t(
-                  'Supports one-click configuration and perfectly adapts to NewAPI multi-protocol configuration.'
+                  'Supports one-click configuration and perfectly adapts to ClearAPI multi-protocol configuration.'
                 )}
               </p>
             </div>

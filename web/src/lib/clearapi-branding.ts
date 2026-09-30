@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export const CLEARAPI_BRAND_NAME = '澄光 API'
+export const CLEARAPI_BRAND_NAME = '澄光 API / ClearAPI'
+export const CLEARAPI_LOGO = '/clearapi.svg'
 
 export function isDefaultNewApiName(name?: string | null): boolean {
   return !name?.trim() || name.trim().toLowerCase() === 'new api'
@@ -24,8 +25,30 @@ export function isDefaultNewApiName(name?: string | null): boolean {
 
 export function getClearApiSystemName(name?: string | null): string {
   const trimmedName = name?.trim()
-  if (!trimmedName || trimmedName.toLowerCase() === 'new api') {
+  if (!trimmedName || /^(new[ -]?api|clearapi|澄光 API)( \/ ClearAPI)?$/i.test(trimmedName)) {
     return CLEARAPI_BRAND_NAME
   }
   return trimmedName
+}
+
+export function getClearApiLogo(logo?: string | null): string {
+  const value = logo?.trim()
+  if (!value || /^\/?(?:logo\.png|favicon\.ico)$/.test(value)) {
+    return CLEARAPI_LOGO
+  }
+  return value
+}
+
+export function getClearApiDocsLink(link?: string | null): string | undefined {
+  const value = link?.trim()
+  if (!value) return undefined
+  try {
+    const url = new URL(value, 'https://clearapi.invalid')
+    if (url.hostname === 'newapi.pro' || url.hostname.endsWith('.newapi.pro')) {
+      return undefined
+    }
+  } catch {
+    return undefined
+  }
+  return value
 }

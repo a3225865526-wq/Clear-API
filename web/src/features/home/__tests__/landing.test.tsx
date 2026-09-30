@@ -38,7 +38,6 @@ vi.mock('@/components/layout/components/footer', () => ({
   Footer: (props: { name: string }) => (
     <footer>
       <span>{props.name}</span>
-      <a href='https://github.com/QuantumNous/new-api'>New API</a>
     </footer>
   ),
 }))
