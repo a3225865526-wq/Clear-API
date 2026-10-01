@@ -23,6 +23,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
@@ -126,6 +127,8 @@ func TestFinanceStageOne(t *testing.T) {
 		assert.ErrorIs(t, model.FinanceReady(db), model.ErrFinanceUnavailable)
 		assert.Equal(t, http.StatusServiceUnavailable, request("GET", "/api/owner/finance/expenses", owner, nil).Code)
 		assert.False(t, db.Migrator().HasTable(&model.FinanceExpense{}))
+		assert.Equal(t, http.StatusServiceUnavailable, request("GET", "/api/owner/finance/profit-summary?from=1&to=2", owner, nil).Code)
+		assert.Equal(t, http.StatusServiceUnavailable, request("GET", "/api/owner/finance/sync-events", owner, nil).Code)
 	})
 	t.Run("owner revenue preview is stateless and uncached", func(t *testing.T) {
 		body := map[string]any{"events": []map[string]any{
@@ -155,9 +158,10 @@ func TestFinanceStageOne(t *testing.T) {
 			{"POST", "/revenue/preview"},
 			{"POST", "/wallets/5/events"}, {"GET", "/wallets/5/events"}, {"GET", "/wallets/5/summary"}, {"GET", "/wallets/5/allocations?event_id=1"},
 			{"GET", "/request-events"}, {"GET", "/capture-health"},
+			{"GET", "/profit-summary?from=1&to=2"},
 			{"POST", "/supplier-bills"}, {"GET", "/supplier-bills?channel_id=91"}, {"GET", "/supplier-bills/reconciliation?channel_id=91&from=100&to=300"},
 			{"POST", "/cash-receipts"}, {"GET", "/cash-receipts"}, {"GET", "/cash-receipts/summary?from=1&to=2"},
-			{"POST", "/cash-refunds"}, {"GET", "/cash-refunds"}, {"GET", "/sync-health"},
+			{"POST", "/cash-refunds"}, {"GET", "/cash-refunds"}, {"GET", "/sync-health"}, {"GET", "/sync-events"},
 			{"POST", "/wallets/5/offline-sources/preview"}, {"POST", "/wallets/5/offline-sources/import"},
 			{"POST", "/wallets/5/consumptions/preview"}, {"POST", "/wallets/5/consumptions/import"}, {"GET", "/wallets/5/balance-check"},
 			{"POST", "/wallets/5/rebuild/preview"}, {"POST", "/wallets/5/rebuild/apply"},
@@ -2066,6 +2070,62 @@ func TestFinanceStageOne(t *testing.T) {
 		require.NoError(t, db.First(&unchanged, bill.ID).Error)
 		assert.Equal(t, "10", unchanged.Amount)
 	})
+	t.Run("owner profit API preserves null totals and rejects invalid selection", func(t *testing.T) {
+		for _, path := range []string{"?from=100&to=300", "?period=today", "?period=month"} {
+			response := request("GET", "/api/owner/finance/profit-summary"+path, owner, nil)
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+			var decoded struct {
+				Data service.FinanceProfitSummary `json:"data"`
+			}
+			require.NoError(t, common.Unmarshal(response.Body.Bytes(), &decoded))
+			assert.False(t, decoded.Data.Complete)
+			assert.Nil(t, decoded.Data.Metrics["operating_profit"].Total)
+			assert.Len(t, decoded.Data.Snapshot, 64)
+		}
+		for _, path := range []string{"", "?from=abc&to=300", "?period=month&from=0", "?from=300&to=100", "?period=year", "?from=100&to=300&trend=hour"} {
+			assert.Equal(t, http.StatusBadRequest, request("GET", "/api/owner/finance/profit-summary"+path, owner, nil).Code, path)
+		}
+	})
+	t.Run("owner sync discovery is paginated filtered metadata only and read only", func(t *testing.T) {
+		for _, status := range []string{model.FinanceSyncBlocked, model.FinanceSyncNeedsReview} {
+			require.NoError(t, db.Create(&model.FinanceSyncEvent{EventKey: "ui-discovery-" + status, Topic: "consumption", UserID: 12345, RefID: 321, At: 100, Payload: `{"marker":"synthetic-private-payload-marker"}`, Status: status, ErrorClass: "out_of_order", NextAttemptAt: 200}).Error)
+		}
+		var auditBefore, auditAfter int64
+		require.NoError(t, db.Model(&model.FinanceAudit{}).Count(&auditBefore).Error)
+		response := request("GET", "/api/owner/finance/sync-events?user_id=12345&p=1&page_size=1", owner, nil)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+		assert.NotContains(t, response.Body.String(), "payload")
+		assert.NotContains(t, response.Body.String(), "synthetic-private-payload-marker")
+		var decoded struct {
+			Data struct {
+				Items []model.FinanceSyncEvent `json:"items"`
+				Total int64                    `json:"total"`
+			} `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &decoded))
+		assert.Equal(t, int64(2), decoded.Data.Total)
+		require.Len(t, decoded.Data.Items, 1)
+		assert.Equal(t, model.FinanceSyncNeedsReview, decoded.Data.Items[0].Status)
+		assert.Equal(t, int64(321), decoded.Data.Items[0].RefID)
+		response = request("GET", "/api/owner/finance/sync-events?user_id=12345&status=blocked", owner, nil)
+		require.Equal(t, http.StatusOK, response.Code)
+		decoded.Data.Items = nil
+		require.NoError(t, common.Unmarshal(response.Body.Bytes(), &decoded))
+		assert.Equal(t, int64(1), decoded.Data.Total)
+		require.Len(t, decoded.Data.Items, 1)
+		assert.Equal(t, model.FinanceSyncBlocked, decoded.Data.Items[0].Status)
+		for _, path := range []string{"?user_id=0", "?user_id=abc", "?user_id=2147483648", "?status=invalid", "?page_size=-1"} {
+			assert.Equal(t, http.StatusBadRequest, request("GET", "/api/owner/finance/sync-events"+path, owner, nil).Code)
+		}
+		require.NoError(t, db.Model(&model.FinanceAudit{}).Count(&auditAfter).Error)
+		assert.Equal(t, auditBefore, auditAfter)
+		var unchanged model.FinanceSyncEvent
+		require.NoError(t, db.Where("event_key = ?", "ui-discovery-blocked").First(&unchanged).Error)
+		assert.Equal(t, model.FinanceSyncBlocked, unchanged.Status)
+		assert.Zero(t, unchanged.Attempts)
+	})
 }
 
 func TestFinanceCalendarAccrual(t *testing.T) {
@@ -2282,4 +2342,154 @@ func TestFinanceFreshSchema(t *testing.T) {
 	require.NoError(t, model.FinanceRebuildsReady(db))
 	assert.True(t, db.Migrator().HasTable(&model.FinanceRebuildSnapshot{}))
 	assert.False(t, db.Migrator().HasTable(&model.User{}))
+	require.NoError(t, model.MigrateFinanceSupplierLines(db))
+	require.NoError(t, model.MigrateFinanceSupplierLines(db))
+	t.Run("profit snapshot stock flows gates and reconciliation", func(t *testing.T) {
+		previousDB := model.DB
+		model.DB = db
+		defer func() { model.DB = previousDB }()
+		t.Setenv("CLEARAPI_FINANCE_ENABLED", "true")
+		t.Setenv("CLEARAPI_FINANCE_OWNER_USER_ID", "5")
+		common.InitFinanceConfig()
+		require.NoError(t, db.AutoMigrate(&model.User{}))
+		require.NoError(t, db.Create(&model.User{Id: 5, Username: "synthetic-profit-owner", AffCode: "profit-aff", Quota: 777}).Error)
+		beijing := time.FixedZone("Asia/Shanghai", 8*3600)
+		from := time.Date(2024, 1, 31, 0, 0, 0, 0, beijing).Unix()
+		to := from + 2*86400
+		value := func(text string) *string { return &text }
+		empty, err := service.SummarizeFinanceProfit(db, from, to, "")
+		require.NoError(t, err)
+		assert.Nil(t, empty.Metrics["operating_expenses"].RecordedTotal)
+		assert.Nil(t, empty.Metrics["operating_profit"].Total)
+		assert.Nil(t, empty.RecordedMargin)
+		assert.False(t, empty.Complete)
+		for i, event := range []service.FinanceRevenueEvent{
+			{Key: "profit-source", At: from - 1, Kind: "credit", Source: "paid", Quota: 100, ValueCNY: value("100")},
+			{Key: "profit-consume", At: from, Kind: "consume", Quota: 30},
+			{Key: "profit-reverse", At: from + 86400, Kind: "reverse", Quota: 10, Reverses: "profit-consume"},
+			{Key: "profit-outside", At: to, Kind: "consume", Quota: 15},
+		} {
+			_, err := service.AppendFinanceRevenue(db, 5, 5, service.FinanceRevenueWrite{ExpectedRevision: int64(i), Event: event, Evidence: "synthetic profit test"}, "profit-test")
+			require.NoError(t, err)
+		}
+		require.NoError(t, db.Create(&model.FinanceCashReceipt{OrderID: 1, AmountCNY: "150", PaidAt: from, Evidence: "synthetic receipt"}).Error)
+		require.NoError(t, db.Create(&model.FinanceCashReceipt{OrderID: 2, AmountCNY: "999", PaidAt: to, Evidence: "outside period"}).Error)
+		require.NoError(t, db.Create(&model.FinanceCashRefund{EventKey: "profit-refund", ReceiptID: 1, State: "succeeded", AmountCNY: "5", RefundedAt: from + 86400}).Error)
+		require.NoError(t, db.Create(&model.FinanceCashRefund{EventKey: "profit-pending", ReceiptID: 1, State: "pending", AmountCNY: "9", RefundedAt: from}).Error)
+		fx := model.FinanceVersion{Kind: "fx", RecordKey: "profit-fx", Revision: 1, EffectiveFrom: from - 86400, EffectiveTo: to + 86400, Active: true, Payload: `{"currency":"USD","cny_per_unit":"7"}`}
+		require.NoError(t, db.Create(&fx).Error)
+		require.NoError(t, db.Create(&model.FinanceVersion{Kind: "fx", RecordKey: "profit-fx", Revision: 2, EffectiveFrom: from, EffectiveTo: to + 86400, Active: true, Payload: `{"currency":"USD","cny_per_unit":"9"}`}).Error)
+		require.NoError(t, db.Create(&model.FinanceVersion{Kind: "pool", RecordKey: "profit-pool", Revision: 1, EffectiveFrom: from, EffectiveTo: to, Active: true, Payload: `{"name":"synthetic pool","platform":"synthetic","channel_ids":[91]}`}).Error)
+		require.NoError(t, db.Create(&model.FinanceExpense{EventKey: "profit-pool-fee", Ledger: "direct", PoolKey: "profit-pool", Category: "pool", Amount: "2", Currency: "CNY", PeriodFrom: from, PeriodTo: to, Recurrence: "once"}).Error)
+		require.NoError(t, db.Create(&model.FinanceExpense{EventKey: "profit-operating", Ledger: "operating", Category: "hosting", Amount: "3", Currency: "USD", FXVersionID: fx.ID, PeriodFrom: from, PeriodTo: to + 86400, Recurrence: "once"}).Error)
+		original := model.FinanceSupplierBill{EventKey: "profit-bill-old", Scope: "all_channel_request_costs", ChannelID: 91, Revision: 1, PeriodFrom: from, PeriodTo: to, Currency: "CNY", Amount: "40", AmountCNY: value("40")}
+		require.NoError(t, db.Create(&original).Error)
+		bill := model.FinanceSupplierBill{EventKey: "profit-bill", Scope: "all_channel_request_costs", ChannelID: 91, Revision: 2, ReplacesID: original.ID, PeriodFrom: from, PeriodTo: to, Currency: "CNY", Amount: "30", AmountCNY: value("30")}
+		require.NoError(t, db.Create(&bill).Error)
+		require.NoError(t, db.Create(&model.FinanceSupplierBillLine{EventKey: "profit-usage-line", BillID: bill.ID, ChannelID: 91, Category: "usage", UsageFrom: from, UsageTo: to, Currency: "CNY", Amount: "30", AmountCNY: value("30")}).Error)
+		require.NoError(t, db.Create(&model.FinanceRequestEvent{EventKey: "profit-attempt", RequestID: "profit-request", AttemptID: "profit-attempt", ChannelID: 91, UpstreamModel: "synthetic-model", Phase: "attempt_start", At: from, Payload: `{"pool_key":"profit-pool"}`}).Error)
+		require.NoError(t, db.Create(&model.FinanceRequestEvent{EventKey: "profit-usage", RequestID: "profit-request", AttemptID: "profit-attempt", ChannelID: 91, UpstreamModel: "synthetic-model", Phase: "usage", At: to + 100, Payload: `{"estimated_cost_cny":"99"}`}).Error)
+		var auditCount int64
+		require.NoError(t, db.Model(&model.FinanceAudit{}).Count(&auditCount).Error)
+		result, err := service.SummarizeFinanceProfit(db, from, to, "day")
+		require.NoError(t, err)
+		for key, expected := range map[string]string{"cash_receipts": "150", "cash_refunds": "5", "net_cash_receipts": "145", "opening_source_value": "100", "closing_source_value": "80", "consumption_gross": "30", "consumption_adjustments": "-10", "consumption_revenue": "20", "direct_cost": "32", "gross_profit": "-12", "operating_expenses": "14", "operating_profit": "-26", "request_cost_estimate": "99"} {
+			assert.Equal(t, expected, result.Metrics[key].KnownSubtotal, key)
+			require.NotNil(t, result.Metrics[key].RecordedTotal, key)
+			assert.Equal(t, expected, *result.Metrics[key].RecordedTotal, key)
+			assert.Nil(t, result.Metrics[key].Total, key)
+		}
+		require.NotNil(t, result.RecordedMargin)
+		assert.Equal(t, "-1.3", *result.RecordedMargin)
+		assert.Nil(t, result.ProfitMargin)
+		require.Len(t, result.Trend, 2)
+		assert.Nil(t, result.Trend[0].Metrics["direct_cost"].RecordedTotal) // cannot prorate the bill
+		assert.Equal(t, "30", result.Trend[0].Metrics["consumption_revenue"].KnownSubtotal)
+		assert.Equal(t, "-10", result.Trend[1].Metrics["consumption_revenue"].KnownSubtotal)
+		operatingTrend := decimal.Zero
+		for _, bucket := range result.Trend {
+			amount, err := decimal.NewFromString(bucket.Metrics["operating_expenses"].KnownSubtotal)
+			require.NoError(t, err)
+			operatingTrend = operatingTrend.Add(amount)
+		}
+		assert.Equal(t, "14", operatingTrend.String())
+		for _, dimension := range []string{"channel", "upstream_model", "pool"} {
+			total := decimal.Zero
+			for _, entry := range result.Dimensions {
+				if entry.Dimension == dimension {
+					amount, err := decimal.NewFromString(entry.Metrics["direct_cost"].KnownSubtotal)
+					require.NoError(t, err)
+					total = total.Add(amount)
+				}
+			}
+			assert.Equal(t, "32", total.String(), dimension)
+		}
+		same, err := service.SummarizeFinanceProfit(db, from, to, "")
+		require.NoError(t, err)
+		assert.Equal(t, result.Snapshot, same.Snapshot)
+		var afterAudit int64
+		require.NoError(t, db.Model(&model.FinanceAudit{}).Count(&afterAudit).Error)
+		assert.Equal(t, auditCount, afterAudit)
+		var user struct{ Quota int }
+		require.NoError(t, db.Model(&model.User{}).Select("quota").Where("id = ?", 5).Scan(&user).Error)
+		assert.Equal(t, 777, user.Quota)
+		// Unreferenced direct expense cannot be summed with a bill safely.
+		require.NoError(t, db.Create(&model.FinanceExpense{EventKey: "profit-duplicate-risk", Ledger: "direct", Category: "request", Amount: "30", Currency: "CNY", PeriodFrom: from, PeriodTo: to, Recurrence: "once"}).Error)
+		require.NoError(t, db.Create(&model.FinanceExpense{EventKey: "profit-unknown-fx", Ledger: "operating", Category: "support", Amount: "1", Currency: "EUR", PeriodFrom: from, PeriodTo: to, Recurrence: "once"}).Error)
+		require.NoError(t, db.Create(&model.FinanceRequestEvent{EventKey: "profit-unbilled", RequestID: "unbilled", AttemptID: "unbilled", ChannelID: 92, Phase: "attempt_start", At: from + 10, Payload: `{}`}).Error)
+		partial, err := service.SummarizeFinanceProfit(db, from, to, "")
+		require.NoError(t, err)
+		assert.Equal(t, "32", partial.Metrics["direct_cost"].KnownSubtotal)
+		assert.Equal(t, 2, partial.Metrics["direct_cost"].UnknownItems)
+		assert.Nil(t, partial.Metrics["gross_profit"].RecordedTotal)
+		assert.Nil(t, partial.Metrics["operating_profit"].RecordedTotal)
+		assert.Equal(t, 1, partial.Metrics["operating_expenses"].UnknownItems)
+		assert.NotEqual(t, result.Snapshot, partial.Snapshot)
+		// Lateness changes the report hash and period posting, never cash.
+		require.NoError(t, db.Create(&model.FinanceExpense{EventKey: "profit-late-adjustment", Ledger: "operating", Category: "hosting", Amount: "-1", Currency: "USD", FXVersionID: fx.ID, AdjustsID: 2, PeriodFrom: from, PeriodTo: to, Recurrence: "once"}).Error)
+		late, err := service.SummarizeFinanceProfit(db, from, to, "")
+		require.NoError(t, err)
+		assert.Equal(t, "7", late.Metrics["operating_expenses"].KnownSubtotal)
+		assert.Equal(t, "145", late.Metrics["net_cash_receipts"].KnownSubtotal)
+		assert.NotEqual(t, partial.Snapshot, late.Snapshot)
+		// A partially remaining unknown lot poisons stock and consumption.
+		_, err = service.AppendFinanceRevenue(db, 5, 5, service.FinanceRevenueWrite{ExpectedRevision: 4, Event: service.FinanceRevenueEvent{Key: "profit-unknown-source", At: to + 1, Kind: "credit", Source: "unknown", Quota: 100}, Evidence: "synthetic"}, "profit")
+		require.NoError(t, err)
+		_, err = service.AppendFinanceRevenue(db, 5, 5, service.FinanceRevenueWrite{ExpectedRevision: 5, Event: service.FinanceRevenueEvent{Key: "profit-unknown-consume", At: to + 2, Kind: "consume", Quota: 70}, Evidence: "synthetic"}, "profit")
+		require.NoError(t, err)
+		unknown, err := service.SummarizeFinanceProfit(db, to, to+3, "")
+		require.NoError(t, err)
+		assert.Equal(t, 1, unknown.Metrics["consumption_revenue"].UnknownItems)
+		assert.Nil(t, unknown.Metrics["consumption_revenue"].RecordedTotal)
+		assert.Nil(t, unknown.Metrics["closing_source_value"].RecordedTotal)
+		historical, err := service.SummarizeFinanceProfit(db, from, to, "")
+		require.NoError(t, err)
+		assert.Equal(t, "80", historical.Metrics["closing_source_value"].KnownSubtotal)
+		// Idle pools remain a fee gap even when no request was sent.
+		require.NoError(t, db.Create(&model.FinanceVersion{Kind: "pool", RecordKey: "profit-idle", Revision: 1, EffectiveFrom: from, EffectiveTo: to, Active: true, Payload: `{"name":"idle","platform":"synthetic","channel_ids":[93]}`}).Error)
+		require.NoError(t, db.Create(&model.FinanceExpense{EventKey: "profit-rounding", Ledger: "operating", Category: "rounding", Amount: "1", Currency: "CNY", PeriodFrom: from, PeriodTo: to + 86400, Recurrence: "once"}).Error)
+		rounded, err := service.SummarizeFinanceProfit(db, from, to, "day")
+		require.NoError(t, err)
+		assert.Contains(t, rounded.Metrics["direct_cost"].Coverage, "pool_expense_registration_missing")
+		trendTotal := decimal.Zero
+		for _, bucket := range rounded.Trend {
+			amount, err := decimal.NewFromString(bucket.Metrics["operating_expenses"].KnownSubtotal)
+			require.NoError(t, err)
+			trendTotal = trendTotal.Add(amount)
+		}
+		assert.Equal(t, rounded.Metrics["operating_expenses"].KnownSubtotal, trendTotal.String())
+		// Beijing calendar selection and strict half-open boundaries.
+		start, end, err := service.FinanceProfitRange("today", 0, 0, time.Unix(from+3600, 0))
+		require.NoError(t, err)
+		assert.Equal(t, from, start)
+		assert.Equal(t, from+86400, end)
+		start, end, err = service.FinanceProfitRange("month", 0, 0, time.Unix(from, 0))
+		require.NoError(t, err)
+		assert.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, beijing).Unix(), start)
+		assert.Equal(t, from+86400, end)
+		_, _, err = service.FinanceProfitRange("today", from, to, time.Now())
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		_, err = service.SummarizeFinanceProfit(db, from, to, "hour")
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+	})
 }

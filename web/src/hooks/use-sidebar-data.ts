@@ -40,6 +40,7 @@ import {
 import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
+import { useFinanceAccess } from '@/features/owner-finance/access'
 import { ROLE } from '@/lib/roles'
 
 /**
@@ -50,6 +51,7 @@ import { ROLE } from '@/lib/roles'
  */
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
+  const finance = useFinanceAccess()
 
   return {
     navGroups: [
@@ -132,6 +134,9 @@ export function useSidebarData(): SidebarData {
         id: 'admin',
         title: t('Admin'),
         items: [
+          ...(finance.allowed
+            ? [{ title: t('Owner finance'), url: '/finance', icon: Wallet }]
+            : []),
           {
             title: t('Channels'),
             url: '/channels',

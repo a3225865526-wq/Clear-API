@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -48,7 +49,42 @@ func financeError(c *gin.Context, err error) {
 }
 
 func FinanceCapability(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"can_access": true, "currency": "CNY", "timezone": "Asia/Shanghai", "allocation": "fifo", "package_value": "total_quota", "stage": 10, "revenue_preview_available": true, "schema_ready": model.FinanceReady(model.DB) == nil, "source_ledger_ready": model.FinanceRevenueReady(model.DB) == nil, "source_ledger_coverage": "partial_confirmed_facts", "request_capture_ready": model.FinanceRequestsReady(model.DB) == nil, "cash_receipts_ready": model.FinanceReceiptsReady(model.DB) == nil, "cash_refunds_ready": model.FinanceRefundsReady(model.DB) == nil, "supplier_bills_ready": model.FinanceSupplierReady(model.DB) == nil, "supplier_bill_lines_ready": model.FinanceSupplierLinesReady(model.DB) == nil, "sync_events_ready": model.FinanceSyncReady(model.DB) == nil, "rebuilds_ready": model.FinanceRebuildsReady(model.DB) == nil, "pool_cost_summary_available": true}})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"can_access": true, "currency": "CNY", "timezone": "Asia/Shanghai", "allocation": "fifo", "package_value": "total_quota", "stage": 11, "revenue_preview_available": true, "schema_ready": model.FinanceReady(model.DB) == nil, "source_ledger_ready": model.FinanceRevenueReady(model.DB) == nil, "source_ledger_coverage": "partial_confirmed_facts", "request_capture_ready": model.FinanceRequestsReady(model.DB) == nil, "cash_receipts_ready": model.FinanceReceiptsReady(model.DB) == nil, "cash_refunds_ready": model.FinanceRefundsReady(model.DB) == nil, "supplier_bills_ready": model.FinanceSupplierReady(model.DB) == nil, "supplier_bill_lines_ready": model.FinanceSupplierLinesReady(model.DB) == nil, "sync_events_ready": model.FinanceSyncReady(model.DB) == nil, "rebuilds_ready": model.FinanceRebuildsReady(model.DB) == nil, "pool_cost_summary_available": true, "profit_summary_available": true, "complete_site_profit_available": false}})
+}
+
+func GetFinanceProfitSummary(c *gin.Context) {
+	var from, to int64
+	if text, supplied := c.GetQuery("from"); supplied {
+		value, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			financeError(c, model.ErrFinanceInvalid)
+			return
+		}
+		from = value
+	}
+	if text, supplied := c.GetQuery("to"); supplied {
+		value, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			financeError(c, model.ErrFinanceInvalid)
+			return
+		}
+		to = value
+	}
+	if c.Query("period") != "" && (c.Request.URL.Query().Has("from") || c.Request.URL.Query().Has("to")) {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	from, to, err := service.FinanceProfitRange(c.Query("period"), from, to, time.Now())
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	result, err := service.SummarizeFinanceProfit(model.DB, from, to, c.Query("trend"))
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
 }
 
 func GetFinancePoolCostSummary(c *gin.Context) {
@@ -532,6 +568,59 @@ func GetFinanceSyncHealth(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+}
+
+// Discovery for owner preview/import/rebuild actions. Select only the bounded
+// review metadata; never read or serialize the outbox payload.
+func ListFinanceSyncEvents(c *gin.Context) {
+	if err := model.FinanceSyncReady(model.DB); err != nil {
+		financeError(c, err)
+		return
+	}
+	page, err := financePage(c)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	query := model.DB.Model(&model.FinanceSyncEvent{})
+	if text, supplied := c.GetQuery("user_id"); supplied {
+		id, err := strconv.ParseInt(text, 10, 32)
+		if err != nil || id <= 0 {
+			financeError(c, model.ErrFinanceInvalid)
+			return
+		}
+		query = query.Where("user_id = ?", id)
+	}
+	if status := c.Query("status"); status != "" {
+		switch status {
+		case model.FinanceSyncPending, model.FinanceSyncProcessing, model.FinanceSyncDone, model.FinanceSyncBlocked, model.FinanceSyncNeedsReview:
+			query = query.Where("status = ?", status)
+		default:
+			financeError(c, model.ErrFinanceInvalid)
+			return
+		}
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		financeError(c, err)
+		return
+	}
+	var entries []struct {
+		ID            int64  `json:"id"`
+		Topic         string `json:"topic"`
+		UserID        int    `json:"user_id"`
+		RefID         int64  `json:"ref_id"`
+		At            int64  `json:"at"`
+		Status        string `json:"status"`
+		Attempts      int    `json:"attempts"`
+		NextAttemptAt int64  `json:"next_attempt_at"`
+		ErrorClass    string `json:"error_class"`
+	}
+	if err := query.Select("id, topic, user_id, ref_id, at, status, attempts, next_attempt_at, error_class").Order("id desc").Offset(page.GetStartIdx()).Limit(page.GetPageSize()).Find(&entries).Error; err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"items": entries, "total": total}})
 }
 
 func ListFinanceRequestEvents(c *gin.Context) {
