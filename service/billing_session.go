@@ -36,6 +36,7 @@ type BillingSession struct {
 	fundingSettled   bool // funding.Settle 已成功，资金来源已提交
 	settled          bool // Settle 全部完成（资金 + 令牌）
 	refunded         bool // Refund 已调用
+	chargedQuota     int
 	mu               sync.Mutex
 }
 
@@ -50,6 +51,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	delta := actualQuota - s.preConsumedQuota
 	if delta == 0 {
+		s.chargedQuota = actualQuota
 		s.settled = true
 		return nil
 	}
@@ -59,6 +61,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 			return err
 		}
 		s.fundingSettled = true
+		s.chargedQuota = actualQuota
 	}
 	// 2) 调整令牌额度
 	var tokenErr error
@@ -80,6 +83,13 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	s.settled = true
 	return tokenErr
+}
+
+// ChargedQuota reports the amount committed to the primary funding source.
+func (s *BillingSession) ChargedQuota() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.chargedQuota
 }
 
 // Refund 退还所有预扣费，幂等安全，异步执行。
@@ -111,6 +121,16 @@ func (s *BillingSession) Refund(c *gin.Context) {
 		// 1) 退还资金来源
 		if err := funding.Refund(); err != nil {
 			common.SysLog("error refunding billing source: " + err.Error())
+			CaptureFinanceBilling(s.relayInfo, "funding_refund", nil, funding.Source(), "refund_failed_unresolved")
+		} else {
+			if funding.Source() == BillingSourceWallet && common.BatchUpdateEnabled {
+				CaptureFinanceBilling(s.relayInfo, "funding_refund", nil, funding.Source(), "refund_queued_unverified")
+			} else if funding.Source() == BillingSourceWallet {
+				zero := 0
+				CaptureFinanceBilling(s.relayInfo, "funding_refund", &zero, funding.Source(), "preconsume_refunded")
+			} else {
+				CaptureFinanceBilling(s.relayInfo, "funding_refund", nil, funding.Source(), "primary_subscription_refund_extra_unverified")
+			}
 		}
 		if extraReserved > 0 && funding.Source() == BillingSourceSubscription && subscriptionId > 0 {
 			if err := model.PostConsumeUserSubscriptionDelta(subscriptionId, -int64(extraReserved)); err != nil {
@@ -180,6 +200,7 @@ func (s *BillingSession) Reserve(targetQuota int) error {
 	}
 
 	s.preConsumedQuota += delta
+	s.chargedQuota = s.preConsumedQuota
 	s.tokenConsumed += delta
 	s.extraReserved += delta
 	if imageRequest {
@@ -244,6 +265,7 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 	}
 
 	s.preConsumedQuota = effectiveQuota
+	s.chargedQuota = effectiveQuota
 
 	// ---- 同步 RelayInfo 兼容字段 ----
 	s.syncRelayInfo()

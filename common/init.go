@@ -31,6 +31,7 @@ func printHelp() {
 
 func InitEnv() {
 	flag.Parse()
+	InitFinanceConfig()
 
 	envVersion := os.Getenv("VERSION")
 	if envVersion != "" {

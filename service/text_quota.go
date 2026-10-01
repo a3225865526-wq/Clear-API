@@ -391,6 +391,7 @@ func usageSemanticFromUsage(relayInfo *relaycommon.RelayInfo, usage *dto.Usage) 
 }
 
 func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent []string) {
+	CaptureFinanceTextUsage(ctx, relayInfo, usage)
 	originUsage := usage
 	billingUsage := effectiveBillingUsage(usage)
 	if usage == nil {
@@ -457,9 +458,19 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
 	}
 
+	financeCharged := &summary.Quota
+	financeStatus := "settled"
 	if err := SettleBilling(ctx, relayInfo, summary.Quota); err != nil {
 		logger.LogError(ctx, "error settling billing: "+err.Error())
+		financeCharged = nil
+		financeStatus = "settlement_unknown"
+		if session, ok := relayInfo.Billing.(*BillingSession); ok {
+			charged := session.ChargedQuota()
+			financeCharged = &charged
+			financeStatus = "settlement_failed_charge_observed"
+		}
 	}
+	CaptureFinanceBilling(relayInfo, "text_settlement", financeCharged, relayInfo.BillingSource, financeStatus)
 
 	logModel := summary.ModelName
 	if strings.HasPrefix(logModel, "gpt-4-gizmo") {

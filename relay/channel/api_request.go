@@ -559,7 +559,13 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		}
 	}
 
+	financeAttempt := service.BeginFinanceAttempt(c, info)
 	resp, err := relayClient.Do(req)
+	financeStatus := 0
+	if resp != nil {
+		financeStatus = resp.StatusCode
+	}
+	service.CaptureFinanceTransport(info, financeAttempt, financeStatus, err != nil)
 	if err != nil {
 		logger.LogError(c, "do request failed: "+err.Error())
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
