@@ -155,6 +155,7 @@ func TestFinanceStageOne(t *testing.T) {
 			{"POST", "/revenue/preview"},
 			{"POST", "/wallets/5/events"}, {"GET", "/wallets/5/events"}, {"GET", "/wallets/5/summary"}, {"GET", "/wallets/5/allocations?event_id=1"},
 			{"GET", "/request-events"}, {"GET", "/capture-health"},
+			{"POST", "/supplier-bills"}, {"GET", "/supplier-bills?channel_id=91"}, {"GET", "/supplier-bills/reconciliation?channel_id=91&from=100&to=300"},
 			{"POST", "/cash-receipts"}, {"GET", "/cash-receipts"}, {"GET", "/cash-receipts/summary?from=1&to=2"},
 			{"POST", "/wallets/5/offline-sources/preview"}, {"POST", "/wallets/5/offline-sources/import"},
 			{"POST", "/wallets/5/consumptions/preview"}, {"POST", "/wallets/5/consumptions/import"}, {"GET", "/wallets/5/balance-check"},
@@ -874,6 +875,156 @@ func TestFinanceStageOne(t *testing.T) {
 		assert.Equal(t, int64(4), wallet.Revision)
 		assert.Equal(t, "1", wallet.KnownBackingCNY)
 	})
+	t.Run("supplier bills replace estimates with immutable corrections", func(t *testing.T) {
+		assert.Equal(t, http.StatusServiceUnavailable, request("POST", "/api/owner/finance/supplier-bills", owner, nil).Code)
+		require.NoError(t, model.MigrateFinanceSupplier(db))
+		require.NoError(t, model.MigrateFinanceSupplier(db))
+		require.NoError(t, model.MigrateFinanceReceipts(db))
+		require.NoError(t, model.FinanceReceiptsReady(db))
+		var schema model.FinanceSchema
+		require.NoError(t, db.First(&schema, 1).Error)
+		assert.Equal(t, 5, schema.Version)
+		var fx model.FinanceVersion
+		require.NoError(t, db.Where("kind = ?", "fx").Order("id asc").First(&fx).Error)
+		input := service.FinanceSupplierInput{Scope: "all_channel_request_costs", EventKey: "supplier-original", ChannelID: 91, PeriodFrom: 100, PeriodTo: 200, Currency: "USD", Amount: "10", FXVersionID: fx.ID, Evidence: "synthetic complete request-cost invoice"}
+		created := request("POST", "/api/owner/finance/supplier-bills", owner, input)
+		require.Equal(t, http.StatusCreated, created.Code, created.Body.String())
+		assert.Contains(t, created.Header().Get("Cache-Control"), "no-store")
+		var first model.FinanceSupplierBill
+		require.NoError(t, db.Where("event_key = ?", input.EventKey).First(&first).Error)
+		require.NotNil(t, first.AmountCNY)
+		assert.Equal(t, "70", *first.AmountCNY) // Newer FX is 9; frozen original is 7.
+		assert.Equal(t, http.StatusConflict, request("POST", "/api/owner/finance/supplier-bills", owner, input).Code)
+		input.ExpectedID, input.EventKey = first.ID, "supplier-overlap"
+		assert.Equal(t, http.StatusConflict, request("POST", "/api/owner/finance/supplier-bills", owner, input).Code)
+		input.EventKey, input.ReplacesID, input.Amount = "supplier-correction", first.ID, "8"
+		replacement, err := service.RegisterFinanceSupplierBill(db, input, 5, "synthetic")
+		require.NoError(t, err)
+		assert.Equal(t, "56", *replacement.AmountCNY)
+		assert.Equal(t, first.ID, replacement.ReplacesID)
+		input.ExpectedID = replacement.ID
+		_, err = service.RegisterFinanceSupplierBill(db, input, 5, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceConflict) // Same key even with current expected ID.
+		input.ExpectedID, input.EventKey = replacement.ID, "supplier-stale-original"
+		_, err = service.RegisterFinanceSupplierBill(db, input, 5, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceConflict)
+		input.ReplacesID, input.PeriodTo = replacement.ID, 201
+		_, err = service.RegisterFinanceSupplierBill(db, input, 5, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		input.PeriodTo, input.FXVersionID = 200, 0
+		_, err = service.RegisterFinanceSupplierBill(db, input, 5, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		input.FXVersionID, input.EventKey = fx.ID, "supplier-audit-failure"
+		require.NoError(t, db.Callback().Create().Before("gorm:create").Register("synthetic_supplier_audit_failure", func(tx *gorm.DB) {
+			if tx.Statement.Table == "finance_audits" {
+				tx.AddError(fmt.Errorf("synthetic audit failure"))
+			}
+		}))
+		_, err = service.RegisterFinanceSupplierBill(db, input, 5, "synthetic")
+		assert.Error(t, err)
+		require.NoError(t, db.Callback().Create().Remove("synthetic_supplier_audit_failure"))
+		var count int64
+		require.NoError(t, db.Model(&model.FinanceSupplierBill{}).Where("channel_id = ?", 91).Count(&count).Error)
+		assert.EqualValues(t, 2, count)
+		forty, three, ninetyNine := "40", "3", "99"
+		for _, observation := range []struct {
+			at     int64
+			amount *string
+		}{{100, &forty}, {199, nil}, {200, &three}, {250, nil}, {300, &ninetyNine}} {
+			id := fmt.Sprintf("supplier-at-%d", observation.at)
+			require.NoError(t, db.Create(&model.FinanceRequestEvent{EventKey: id + "-start", RequestID: id, AttemptID: id, Phase: "attempt_start", ChannelID: 91, At: observation.at, Payload: "{}"}).Error)
+			if observation.amount != nil {
+				payload, err := common.Marshal(service.FinanceUsageSnapshot{CostCNY: observation.amount})
+				require.NoError(t, err)
+				// Late usage still belongs to the send's original period.
+				require.NoError(t, db.Create(&model.FinanceRequestEvent{EventKey: id + "-usage", RequestID: id, AttemptID: id, Phase: "usage", ChannelID: 91, At: 400, Payload: string(payload)}).Error)
+			}
+		}
+		summary, err := service.ReconcileFinanceSupplier(db, 91, 100, 300)
+		require.NoError(t, err)
+		assert.Equal(t, "59", summary.KnownSelectedCNY)
+		assert.Equal(t, "56", summary.KnownBilledCNY)
+		assert.Equal(t, "43", summary.KnownObservedEstimateCNY)
+		assert.Equal(t, "3", summary.KnownUncoveredEstimateCNY)
+		assert.Equal(t, 4, summary.ObservedAttempts)
+		assert.Equal(t, 2, summary.UnknownEstimateAttempts)
+		assert.Equal(t, 1, summary.UnknownSelectedItems)
+		assert.Equal(t, int64(100), summary.UncoveredSeconds)
+		assert.Nil(t, summary.TotalCNY)
+		assert.Equal(t, "partial", summary.Status)
+		require.Len(t, summary.Bills, 1)
+		assert.Equal(t, replacement.ID, summary.Bills[0].Bill.ID)
+		clipped, err := service.ReconcileFinanceSupplier(db, 91, 150, 200)
+		require.NoError(t, err)
+		assert.Equal(t, "0", clipped.KnownSelectedCNY)
+		assert.Equal(t, 1, clipped.UnknownSelectedItems)
+		assert.Equal(t, "partial_period_amount_unknown", clipped.Bills[0].Status)
+		empty, err := service.ReconcileFinanceSupplier(db, 92, 100, 300)
+		require.NoError(t, err)
+		assert.Nil(t, empty.TotalCNY)
+		assert.Equal(t, int64(200), empty.UncoveredSeconds)
+		unknown := service.FinanceSupplierInput{Scope: "all_channel_request_costs", EventKey: "supplier-unknown-fx", ChannelID: 92, PeriodFrom: 100, PeriodTo: 300, Amount: "1", Currency: "EUR", Evidence: "synthetic"}
+		unknownBill, err := service.RegisterFinanceSupplierBill(db, unknown, 5, "synthetic")
+		require.NoError(t, err)
+		assert.Nil(t, unknownBill.AmountCNY)
+		unknownSummary, err := service.ReconcileFinanceSupplier(db, 92, 100, 300)
+		require.NoError(t, err)
+		assert.Equal(t, 1, unknownSummary.UnknownSelectedItems)
+		assert.Equal(t, "unknown_fx", unknownSummary.Bills[0].Status)
+		for _, amount := range []string{"-1", "NaN", "1e100"} {
+			unknown.Amount = amount
+			_, err := service.RegisterFinanceSupplierBill(db, unknown, 5, "synthetic")
+			assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		}
+		zero := service.FinanceSupplierInput{Scope: "all_channel_request_costs", EventKey: "supplier-zero", ChannelID: 93, PeriodFrom: 100, PeriodTo: 300, Amount: "0", Currency: "CNY", Evidence: "synthetic explicit zero bill"}
+		zero.Scope = "partial_model_costs"
+		_, err = service.RegisterFinanceSupplierBill(db, zero, 5, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		zero.Scope = "all_channel_request_costs"
+		_, err = service.RegisterFinanceSupplierBill(db, zero, 5, "synthetic")
+		require.NoError(t, err)
+		// Re-running additive v5 and older migrations retains bills and indexes.
+		require.NoError(t, model.MigrateFinanceSupplier(db))
+		require.NoError(t, model.MigrateFinance(db))
+		require.NoError(t, model.FinanceSupplierReady(db))
+		require.NoError(t, db.Model(&model.FinanceSupplierBill{}).Where("channel_id = ?", 91).Count(&count).Error)
+		assert.EqualValues(t, 2, count)
+		zero.ChannelID, zero.EventKey = 94, "supplier-concurrent-base"
+		base, err := service.RegisterFinanceSupplierBill(db, zero, 5, "synthetic")
+		require.NoError(t, err)
+		if dialect := os.Getenv("FINANCE_TEST_DIALECT"); dialect == "mysql" || dialect == "postgres" {
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			sqlDB.SetMaxOpenConns(2)
+			defer sqlDB.SetMaxOpenConns(1)
+		}
+		results := make(chan error, 2)
+		for _, key := range []string{"supplier-concurrent-one", "supplier-concurrent-two"} {
+			go func(eventKey string) {
+				change := zero
+				change.EventKey, change.ExpectedID, change.ReplacesID = eventKey, base.ID, base.ID
+				_, err := service.RegisterFinanceSupplierBill(db, change, 5, "synthetic")
+				results <- err
+			}(key)
+		}
+		committed := 0
+		for range 2 {
+			if err := <-results; err == nil {
+				committed++
+			}
+		}
+		assert.Equal(t, 1, committed)
+		require.NoError(t, db.Model(&model.FinanceSupplierBill{}).Where("channel_id = ?", 94).Count(&count).Error)
+		assert.EqualValues(t, 2, count)
+		assert.Equal(t, http.StatusOK, request("GET", "/api/owner/finance/supplier-bills?channel_id=91", owner, nil).Code)
+		assert.Equal(t, http.StatusOK, request("GET", "/api/owner/finance/supplier-bills/reconciliation?channel_id=91&from=100&to=300", owner, nil).Code)
+		var retained model.FinanceSupplierBill
+		require.NoError(t, db.First(&retained, first.ID).Error)
+		assert.Equal(t, "70", *retained.AmountCNY)
+		var ownerRecord model.User
+		require.NoError(t, db.First(&ownerRecord, 5).Error)
+		assert.Equal(t, 1234567, ownerRecord.Quota)
+	})
 	t.Run("captured consumption imports FIFO without touching business balance", func(t *testing.T) {
 		userID := 12
 		require.NoError(t, db.Create(&model.User{Id: userID, Username: "synthetic-consumption-bridge", AffCode: "synthetic-aff-12", Quota: 140, Status: common.UserStatusEnabled}).Error)
@@ -1152,5 +1303,9 @@ func TestFinanceFreshSchema(t *testing.T) {
 	require.NoError(t, model.MigrateFinanceReceipts(db))
 	require.NoError(t, model.FinanceReceiptsReady(db))
 	assert.True(t, db.Migrator().HasTable(&model.FinanceCashReceipt{}))
+	require.NoError(t, model.MigrateFinanceSupplier(db))
+	require.NoError(t, model.MigrateFinanceSupplier(db))
+	require.NoError(t, model.FinanceSupplierReady(db))
+	assert.True(t, db.Migrator().HasTable(&model.FinanceSupplierBill{}))
 	assert.False(t, db.Migrator().HasTable(&model.User{}))
 }

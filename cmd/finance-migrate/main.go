@@ -21,9 +21,10 @@ func main() {
 	approvedV2 := flag.Bool("apply-approved-finance-v2", false, "apply source ledger only after separate v2 migration approval and a verified backup")
 	approvedV3 := flag.Bool("apply-approved-finance-v3", false, "apply request observations only after separate v3 migration approval and a verified backup")
 	approvedV4 := flag.Bool("apply-approved-finance-v4", false, "apply manual cash receipts only after separate v4 migration approval and a verified backup")
+	approvedV5 := flag.Bool("apply-approved-finance-v5", false, "apply supplier bills only after separate v5 migration approval and a verified backup")
 	flag.Parse()
 	approvalCount := 0
-	for _, choice := range []bool{*approved, *approvedV2, *approvedV3, *approvedV4} {
+	for _, choice := range []bool{*approved, *approvedV2, *approvedV3, *approvedV4, *approvedV5} {
 		if choice {
 			approvalCount++
 		}
@@ -69,6 +70,9 @@ func main() {
 	}
 	if *approvedV4 {
 		migrate, version = model.MigrateFinanceReceipts, 4
+	}
+	if *approvedV5 {
+		migrate, version = model.MigrateFinanceSupplier, 5
 	}
 	if err := migrate(db); err != nil {
 		_ = sqlDB.Close()

@@ -48,7 +48,67 @@ func financeError(c *gin.Context, err error) {
 }
 
 func FinanceCapability(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"can_access": true, "currency": "CNY", "timezone": "Asia/Shanghai", "allocation": "fifo", "package_value": "total_quota", "stage": 4, "revenue_preview_available": true, "schema_ready": model.FinanceReady(model.DB) == nil, "source_ledger_ready": model.FinanceRevenueReady(model.DB) == nil, "source_ledger_coverage": "partial_confirmed_facts", "request_capture_ready": model.FinanceRequestsReady(model.DB) == nil, "cash_receipts_ready": model.FinanceReceiptsReady(model.DB) == nil}})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"can_access": true, "currency": "CNY", "timezone": "Asia/Shanghai", "allocation": "fifo", "package_value": "total_quota", "stage": 5, "revenue_preview_available": true, "schema_ready": model.FinanceReady(model.DB) == nil, "source_ledger_ready": model.FinanceRevenueReady(model.DB) == nil, "source_ledger_coverage": "partial_confirmed_facts", "request_capture_ready": model.FinanceRequestsReady(model.DB) == nil, "cash_receipts_ready": model.FinanceReceiptsReady(model.DB) == nil, "supplier_bills_ready": model.FinanceSupplierReady(model.DB) == nil}})
+}
+
+func CreateFinanceSupplierBill(c *gin.Context) {
+	var input service.FinanceSupplierInput
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8192)
+	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	entry, err := service.RegisterFinanceSupplierBill(model.DB, input, c.GetInt("id"), c.GetString(common.RequestIdKey))
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": entry})
+}
+
+func ListFinanceSupplierBills(c *gin.Context) {
+	if err := model.FinanceSupplierReady(model.DB); err != nil {
+		financeError(c, err)
+		return
+	}
+	page, err := financePage(c)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	channelID, err := strconv.Atoi(c.Query("channel_id"))
+	if err != nil || channelID <= 0 {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	query := model.DB.Model(&model.FinanceSupplierBill{}).Where("channel_id = ?", channelID)
+	var total int64
+	var entries []model.FinanceSupplierBill
+	if err := query.Count(&total).Error; err != nil {
+		financeError(c, err)
+		return
+	}
+	if err := query.Order("revision desc").Offset(page.GetStartIdx()).Limit(page.GetPageSize()).Find(&entries).Error; err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"items": entries, "total": total}})
+}
+
+func GetFinanceSupplierReconciliation(c *gin.Context) {
+	channelID, errChannel := strconv.Atoi(c.Query("channel_id"))
+	from, errFrom := strconv.ParseInt(c.Query("from"), 10, 64)
+	to, errTo := strconv.ParseInt(c.Query("to"), 10, 64)
+	if errChannel != nil || errFrom != nil || errTo != nil {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	result, err := service.ReconcileFinanceSupplier(model.DB, channelID, from, to)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
 }
 
 func PreviewFinanceConsumptions(c *gin.Context) {

@@ -75,7 +75,7 @@ func MigrateFinance(db *gorm.DB) error {
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if err == nil && (existing.Version < 1 || existing.Version > 4) {
+		if err == nil && (existing.Version < 1 || existing.Version > 5) {
 			return ErrFinanceUnavailable
 		}
 	}
@@ -90,7 +90,7 @@ func FinanceReady(db *gorm.DB) error {
 		return ErrFinanceUnavailable
 	}
 	var schema FinanceSchema
-	if err := db.First(&schema, 1).Error; err != nil || schema.Version < 1 || schema.Version > 4 {
+	if err := db.First(&schema, 1).Error; err != nil || schema.Version < 1 || schema.Version > 5 {
 		return ErrFinanceUnavailable
 	}
 	return nil
