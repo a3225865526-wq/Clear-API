@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -77,6 +78,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	)
 
 	if relayFormat == types.RelayFormatOpenAIRealtime {
+		if os.Getenv("CLEARAPI_ENABLE_REALTIME") != "true" {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"message": "Realtime is not enabled for this deployment", "type": "service_unavailable"}})
+			return
+		}
 		var err error
 		ws, err = upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
@@ -142,6 +147,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 	defer func() {
+		if recovered := recover(); recovered != nil {
+			newAPIError = types.NewError(fmt.Errorf("relay processing failed"), types.ErrorCodeBadResponse)
+			newAPIError = relay.RefundFailedRequestBilling(c, relayInfo, newAPIError)
+			panic(recovered)
+		}
 		newAPIError = relay.RefundFailedRequestBilling(c, relayInfo, newAPIError)
 	}()
 
@@ -194,7 +204,6 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		default:
 			newAPIError = relayHandler(c, relayInfo)
 		}
-
 		service.FinishFinanceAttempt(c, relayInfo, newAPIError != nil)
 
 		if newAPIError == nil {
@@ -483,7 +492,11 @@ func executeTaskSubmissionWith(
 	var taskErr *taskdto.TaskError
 	durable := false
 	stage := "start"
+	// Tracks the upstream attempt outcome only: once a submit is accepted,
+	// local persistence or settlement failures do not mark the send as failed.
+	upstreamAttemptFailed := true
 	defer func() {
+		service.FinishFinanceAttempt(c, relayInfo, upstreamAttemptFailed)
 		if !durable && relayInfo.Billing != nil {
 			diagnostics.refund(stage)
 			relayInfo.Billing.Refund(c)
@@ -553,6 +566,7 @@ func executeTaskSubmissionWith(
 			break
 		}
 		if taskErr == nil {
+			upstreamAttemptFailed = false
 			diagnostics.attemptSucceeded(retryParam.GetRetry()+1, result)
 			break
 		}
@@ -632,6 +646,7 @@ func executeTaskSubmissionWith(
 		PerCallBilling:  common.StringsContains(constant.TaskPricePatches, relayInfo.OriginModelName) || relayInfo.PriceData.UsePrice,
 		TieredSnapshot:  relayInfo.TieredBillingSnapshot,
 	}
+	task.PrivateData.FinanceAttemptID = service.FinanceAttemptIDFromContext(c)
 	task.Quota = result.Quota
 	task.Data = result.TaskData
 	if len(result.PluginState) > 0 {
@@ -698,6 +713,7 @@ func executeTaskSubmissionWith(
 		diagnostics.failed("settle", "billing_error", taskErr, true)
 		return nil, taskErr
 	}
+	service.CaptureFinanceTaskSubmission(task, &result.Quota, relayInfo.BillingSource, "settled", task.PrivateData.FinanceAttemptID)
 	if task.Status != model.TaskStatusFailure {
 		service.MarkRequestPolicySuccess(c, nil)
 	} else {

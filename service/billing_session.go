@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 
@@ -37,6 +38,7 @@ type BillingSession struct {
 	settled          bool // Settle 全部完成（资金 + 令牌）
 	refunded         bool // Refund 已调用
 	chargedQuota     int
+	settlementErr    error
 	mu               sync.Mutex
 }
 
@@ -47,7 +49,10 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.settled {
-		return nil
+		return s.settlementErr
+	}
+	if s.refunded || actualQuota < 0 {
+		return errors.New("invalid billing settlement")
 	}
 	delta := actualQuota - s.preConsumedQuota
 	if delta == 0 {
@@ -57,7 +62,20 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	// 1) 调整资金来源（仅在尚未提交时执行，防止重复调用）
 	if !s.fundingSettled {
+		// Reserve a limited token's additional charge before touching its wallet.
+		if delta > 0 {
+			if err := s.reserveToken(delta); err != nil {
+				s.settled, s.settlementErr = true, err
+				return err
+			}
+		}
 		if err := s.funding.Settle(delta); err != nil {
+			if delta > 0 && !s.relayInfo.IsPlayground {
+				if rollbackErr := model.IncreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, delta); rollbackErr != nil {
+					common.SysError("failed to roll back settlement token reservation: " + rollbackErr.Error())
+				}
+			}
+			s.settled, s.settlementErr = true, err
 			return err
 		}
 		s.fundingSettled = true
@@ -66,9 +84,7 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	// 2) 调整令牌额度
 	var tokenErr error
 	if !s.relayInfo.IsPlayground {
-		if delta > 0 {
-			tokenErr = model.DecreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, delta)
-		} else {
+		if delta < 0 {
 			tokenErr = model.IncreaseTokenQuota(s.relayInfo.TokenId, s.relayInfo.TokenKey, -delta)
 		}
 		if tokenErr != nil {
@@ -82,10 +98,11 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		s.relayInfo.SubscriptionPostDelta += int64(delta)
 	}
 	s.settled = true
+	s.settlementErr = tokenErr
 	return tokenErr
 }
 
-// ChargedQuota reports the amount committed to the primary funding source.
+// ChargedQuota is the amount actually committed to the funding source.
 func (s *BillingSession) ChargedQuota() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -276,7 +293,7 @@ func (s *BillingSession) preConsume(c *gin.Context, quota int) *types.NewAPIErro
 func (s *BillingSession) reserveFunding(delta int, requireAvailableQuota bool) error {
 	switch funding := s.funding.(type) {
 	case *WalletFunding:
-		if requireAvailableQuota {
+		if requireAvailableQuota || os.Getenv("CLEARAPI_STRICT_PREPAID") != "false" {
 			// Image quantity is known before submission, including retries and
 			// overrides. Reserve atomically instead of admitting wallet debt.
 			if err := funding.PreConsume(delta); err != nil {
@@ -339,6 +356,10 @@ func (s *BillingSession) reserveToken(delta int) error {
 
 // shouldTrust 统一信任额度检查，适用于钱包和订阅。
 func (s *BillingSession) shouldTrust(c *gin.Context) bool {
+	// Persisted legacy trust settings must not bypass the prepaid deployment policy.
+	if os.Getenv("CLEARAPI_STRICT_PREPAID") != "false" {
+		return false
+	}
 	// 异步任务（ForcePreConsume=true）必须预扣全额，不允许信任旁路
 	if s.relayInfo.ForcePreConsume {
 		return false

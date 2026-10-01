@@ -58,6 +58,7 @@ func ConfirmFinanceOfflineReceipt(db *gorm.DB, actorID int, input FinanceReceipt
 	if err != nil {
 		return nil, err
 	}
+	RequeueFinanceSyncForReceipt(db, &receipt)
 	return &receipt, nil
 }
 
@@ -195,10 +196,12 @@ func ImportFinanceOfflineSources(db *gorm.DB, userID, actorID int, input Finance
 }
 
 type FinanceCashSummary struct {
-	KnownReceiptsCNY string   `json:"known_receipts_cny"`
-	TotalReceiptsCNY *string  `json:"total_receipts_cny"`
-	Status           string   `json:"status"`
-	Warnings         []string `json:"warnings"`
+	KnownReceiptsCNY    string   `json:"known_receipts_cny"`
+	KnownRefundsCNY     string   `json:"known_refunds_succeeded_cny"`
+	NetKnownReceiptsCNY string   `json:"net_known_receipts_cny"`
+	TotalReceiptsCNY    *string  `json:"total_receipts_cny"`
+	Status              string   `json:"status"`
+	Warnings            []string `json:"warnings"`
 }
 
 func SummarizeFinanceCash(db *gorm.DB, from, to int64) (*FinanceCashSummary, error) {
@@ -208,7 +211,7 @@ func SummarizeFinanceCash(db *gorm.DB, from, to int64) (*FinanceCashSummary, err
 	if from < 0 || to <= from {
 		return nil, model.ErrFinanceInvalid
 	}
-	result := &FinanceCashSummary{Status: "partial", Warnings: []string{"owner_confirmed_manual_offline_only", "cash_refunds_not_connected", "other_payment_sources_not_connected", "not_bank_reconciled"}}
+	result := &FinanceCashSummary{Status: "partial", Warnings: []string{"owner_confirmed_manual_offline_only", "other_payment_sources_not_connected", "refunds_owner_confirmed_manual_not_bank_reconciled", "refunds_attributed_to_refund_period_no_restatement", "not_bank_reconciled"}}
 	total := decimal.Zero
 	var lastID int64
 	for {
@@ -227,6 +230,18 @@ func SummarizeFinanceCash(db *gorm.DB, from, to int64) (*FinanceCashSummary, err
 			total = total.Add(amount)
 			lastID = receipt.ID
 		}
+	}
+	if model.FinanceRefundsReady(db) == nil {
+		refunds, err := financeRefundTotals(db, from, to)
+		if err != nil {
+			return nil, err
+		}
+		result.KnownRefundsCNY = refunds.String()
+		result.NetKnownReceiptsCNY = total.Sub(refunds).String()
+	} else {
+		result.KnownRefundsCNY = "0"
+		result.NetKnownReceiptsCNY = total.String()
+		result.Warnings = append(result.Warnings, "cash_refund_table_not_migrated")
 	}
 	result.KnownReceiptsCNY = total.String()
 	return result, nil

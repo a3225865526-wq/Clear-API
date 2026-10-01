@@ -157,11 +157,13 @@ func ImportFinanceConsumptions(db *gorm.DB, userID, actorID int, input FinanceCo
 }
 
 type FinanceBalanceCheck struct {
-	BusinessQuota int64    `json:"business_quota"`
-	LedgerQuota   *int64   `json:"ledger_quota"`
-	Difference    *int64   `json:"business_minus_ledger"`
-	Status        string   `json:"status"`
-	Warnings      []string `json:"warnings"`
+	BusinessQuota         int64    `json:"business_quota"`
+	LedgerQuota           *int64   `json:"ledger_quota"`
+	Difference            *int64   `json:"business_minus_ledger"`
+	PendingSyncEvents     *int64   `json:"unprocessed_sync_events"`
+	NeedsReviewSyncEvents *int64   `json:"needs_review_sync_events"`
+	Status                string   `json:"status"`
+	Warnings              []string `json:"warnings"`
 }
 
 func CheckFinanceBalance(db *gorm.DB, userID int) (*FinanceBalanceCheck, error) {
@@ -178,7 +180,19 @@ func CheckFinanceBalance(db *gorm.DB, userID int) (*FinanceBalanceCheck, error) 
 	if user.Quota < 0 || int64(user.Quota) > common.MaxWalletQuota {
 		return nil, model.ErrFinanceInvalid
 	}
-	result := &FinanceBalanceCheck{BusinessQuota: int64(user.Quota), Status: "unknown", Warnings: []string{"point_in_time_non_atomic_reads", "matching_does_not_prove_source_or_capture_completeness", "in_flight_reservations_and_batch_updates_not_reconciled"}}
+	result := &FinanceBalanceCheck{BusinessQuota: int64(user.Quota), Status: "unknown", Warnings: []string{"point_in_time_non_atomic_reads", "matching_does_not_prove_source_or_capture_completeness", "in_flight_reservations_and_batch_updates_not_reconciled", "unprocessed_sync_events_may_explain_difference"}}
+	if model.FinanceSyncReady(db) != nil {
+		result.Warnings = append(result.Warnings, "sync_table_not_migrated")
+	} else {
+		var unprocessed, needsReview int64
+		if err := db.Model(&model.FinanceSyncEvent{}).Where("user_id = ? AND status IN ?", userID, []string{model.FinanceSyncPending, model.FinanceSyncProcessing, model.FinanceSyncBlocked}).Count(&unprocessed).Error; err != nil {
+			return nil, err
+		}
+		if err := db.Model(&model.FinanceSyncEvent{}).Where("user_id = ? AND status = ?", userID, model.FinanceSyncNeedsReview).Count(&needsReview).Error; err != nil {
+			return nil, err
+		}
+		result.PendingSyncEvents, result.NeedsReviewSyncEvents = &unprocessed, &needsReview
+	}
 	var wallet model.FinanceWallet
 	if err := db.First(&wallet, "user_id = ?", userID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
 		return result, nil

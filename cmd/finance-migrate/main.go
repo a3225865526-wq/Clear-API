@@ -22,9 +22,13 @@ func main() {
 	approvedV3 := flag.Bool("apply-approved-finance-v3", false, "apply request observations only after separate v3 migration approval and a verified backup")
 	approvedV4 := flag.Bool("apply-approved-finance-v4", false, "apply manual cash receipts only after separate v4 migration approval and a verified backup")
 	approvedV5 := flag.Bool("apply-approved-finance-v5", false, "apply supplier bills only after separate v5 migration approval and a verified backup")
+	approvedV6 := flag.Bool("apply-approved-finance-v6", false, "apply cash refunds and partial reversal support only after separate v6 migration approval and a verified backup")
+	approvedV7 := flag.Bool("apply-approved-finance-v7", false, "apply the finance sync outbox only after separate v7 migration approval and a verified backup")
+	approvedV8 := flag.Bool("apply-approved-finance-v8", false, "apply controlled rebuild snapshots only after separate v8 migration approval and a verified backup")
+	approvedV9 := flag.Bool("apply-approved-finance-v9", false, "apply supplier bill lines only after separate v9 migration approval and a verified backup")
 	flag.Parse()
 	approvalCount := 0
-	for _, choice := range []bool{*approved, *approvedV2, *approvedV3, *approvedV4, *approvedV5} {
+	for _, choice := range []bool{*approved, *approvedV2, *approvedV3, *approvedV4, *approvedV5, *approvedV6, *approvedV7, *approvedV8, *approvedV9} {
 		if choice {
 			approvalCount++
 		}
@@ -73,6 +77,18 @@ func main() {
 	}
 	if *approvedV5 {
 		migrate, version = model.MigrateFinanceSupplier, 5
+	}
+	if *approvedV6 {
+		migrate, version = model.MigrateFinanceRefunds, 6
+	}
+	if *approvedV7 {
+		migrate, version = model.MigrateFinanceSync, 7
+	}
+	if *approvedV8 {
+		migrate, version = model.MigrateFinanceRebuilds, 8
+	}
+	if *approvedV9 {
+		migrate, version = model.MigrateFinanceSupplierLines, 9
 	}
 	if err := migrate(db); err != nil {
 		_ = sqlDB.Close()

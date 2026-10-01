@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -28,7 +29,21 @@ func WssHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types.
 	//requestBody = bytes.NewBuffer(firstWssRequest.([]byte))
 
 	statusCodeMappingStr := c.GetString("status_code_mapping")
+	financeAttempt := service.BeginFinanceAttempt(c, info)
 	resp, err := adaptor.DoRequest(c, info, nil)
+	// A WebSocket handshake has no response body: 101 marks the accepted
+	// upgrade, a rejected dial keeps its mapped status, and a pure transport
+	// failure stays at zero.
+	transportStatus := 0
+	if err != nil {
+		var apiErr *types.NewAPIError
+		if errors.As(err, &apiErr) {
+			transportStatus = apiErr.StatusCode
+		}
+	} else if resp != nil {
+		transportStatus = 101
+	}
+	service.CaptureFinanceTransport(info, financeAttempt, transportStatus, err != nil)
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeDoRequestFailed)
 	}

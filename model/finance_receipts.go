@@ -22,7 +22,7 @@ func FinanceReceiptsReady(db *gorm.DB) error {
 		return ErrFinanceUnavailable
 	}
 	var schema FinanceSchema
-	if err := db.First(&schema, 1).Error; err != nil || schema.Version < 4 || schema.Version > 5 {
+	if err := db.First(&schema, 1).Error; err != nil || schema.Version < 4 || schema.Version > 9 {
 		return ErrFinanceUnavailable
 	}
 	return nil

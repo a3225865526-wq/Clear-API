@@ -20,6 +20,10 @@ func InitFinanceConfig() {
 
 func FinanceEnabled() bool { return financeEnabled && financeOwnerUserID > 0 }
 
+// FinanceOwnerID is the system actor for automatic ledger applications. The
+// auto sync worker only runs when finance is enabled, so it is positive then.
+func FinanceOwnerID() int { return financeOwnerUserID }
+
 func IsFinanceOwner(userID int) bool {
 	return FinanceEnabled() && userID == financeOwnerUserID
 }

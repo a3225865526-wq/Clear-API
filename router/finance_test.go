@@ -157,8 +157,10 @@ func TestFinanceStageOne(t *testing.T) {
 			{"GET", "/request-events"}, {"GET", "/capture-health"},
 			{"POST", "/supplier-bills"}, {"GET", "/supplier-bills?channel_id=91"}, {"GET", "/supplier-bills/reconciliation?channel_id=91&from=100&to=300"},
 			{"POST", "/cash-receipts"}, {"GET", "/cash-receipts"}, {"GET", "/cash-receipts/summary?from=1&to=2"},
+			{"POST", "/cash-refunds"}, {"GET", "/cash-refunds"}, {"GET", "/sync-health"},
 			{"POST", "/wallets/5/offline-sources/preview"}, {"POST", "/wallets/5/offline-sources/import"},
 			{"POST", "/wallets/5/consumptions/preview"}, {"POST", "/wallets/5/consumptions/import"}, {"GET", "/wallets/5/balance-check"},
+			{"POST", "/wallets/5/rebuild/preview"}, {"POST", "/wallets/5/rebuild/apply"},
 		} {
 			for _, actor := range []struct {
 				token  string
@@ -379,20 +381,23 @@ func TestFinanceStageOne(t *testing.T) {
 		assert.Equal(t, http.StatusConflict, request("POST", "/api/owner/finance/wallets/8/events", owner, stale).Code)
 		duplicate := service.FinanceRevenueWrite{ExpectedRevision: 6, Event: facts[5], Evidence: "synthetic duplicate"}
 		assert.Equal(t, http.StatusConflict, request("POST", "/api/owner/finance/wallets/8/events", owner, duplicate).Code)
-		invalid := service.FinanceRevenueWrite{ExpectedRevision: 6, Event: service.FinanceRevenueEvent{Key: "partial", At: 7, Kind: "reverse", Quota: 1, Reverses: "usage-again"}, Evidence: "synthetic partial"}
-		assert.Equal(t, http.StatusBadRequest, request("POST", "/api/owner/finance/wallets/8/events", owner, invalid).Code)
-		invalid.Event.Key, invalid.Event.Quota, invalid.Event.Reverses = "double-reversal", 80, "usage"
-		assert.Equal(t, http.StatusConflict, request("POST", "/api/owner/finance/wallets/8/events", owner, invalid).Code)
+		// Partial reversal of one captured consumption is now a supported fact.
+		partial := service.FinanceRevenueWrite{ExpectedRevision: 6, Event: service.FinanceRevenueEvent{Key: "partial-undo", At: 7, Kind: "reverse", Quota: 1, Reverses: "usage-again"}, Evidence: "synthetic partial"}
+		require.Equal(t, http.StatusCreated, request("POST", "/api/owner/finance/wallets/8/events", owner, partial).Code)
+		overReverse := service.FinanceRevenueWrite{ExpectedRevision: 7, Event: service.FinanceRevenueEvent{Key: "double-reversal", At: 8, Kind: "reverse", Quota: 80, Reverses: "usage"}, Evidence: "synthetic over-reversal"}
+		assert.Equal(t, http.StatusBadRequest, request("POST", "/api/owner/finance/wallets/8/events", owner, overReverse).Code)
 		var count int64
 		require.NoError(t, db.Model(&model.FinanceRevenueRecord{}).Where("user_id = ?", 8).Count(&count).Error)
-		assert.Equal(t, int64(6), count)
+		assert.Equal(t, int64(7), count)
+		summary, err = service.SummarizeFinanceWallet(db, 8)
+		require.NoError(t, err)
 		callbackName := "synthetic_revenue_audit_failure"
 		require.NoError(t, db.Callback().Create().Before("gorm:create").Register(callbackName, func(tx *gorm.DB) {
 			if tx.Statement.Table == "finance_audits" {
 				tx.AddError(fmt.Errorf("synthetic audit failure"))
 			}
 		}))
-		rollback := service.FinanceRevenueWrite{ExpectedRevision: 6, Event: service.FinanceRevenueEvent{Key: "rollback", At: 7, Kind: "consume", Quota: 10}, Evidence: "synthetic"}
+		rollback := service.FinanceRevenueWrite{ExpectedRevision: 7, Event: service.FinanceRevenueEvent{Key: "rollback", At: 9, Kind: "consume", Quota: 10}, Evidence: "synthetic"}
 		failed := request("POST", "/api/owner/finance/wallets/8/events", owner, rollback)
 		require.NoError(t, db.Callback().Create().Remove(callbackName))
 		assert.Equal(t, http.StatusServiceUnavailable, failed.Code)
@@ -400,10 +405,10 @@ func TestFinanceStageOne(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, summary.Wallet, after.Wallet)
 		require.NoError(t, db.Model(&model.FinanceRevenueRecord{}).Where("user_id = ?", 8).Count(&count).Error)
-		assert.Equal(t, int64(6), count)
+		assert.Equal(t, int64(7), count)
 		var audits int64
 		require.NoError(t, db.Model(&model.FinanceAudit{}).Where("action = ?", "revenue.append").Count(&audits).Error)
-		assert.Equal(t, int64(6), audits)
+		assert.Equal(t, int64(7), audits)
 		require.NoError(t, model.MigrateFinance(db)) // old approval cannot downgrade v2
 		require.NoError(t, model.MigrateFinanceRevenue(db))
 		require.NoError(t, model.FinanceRevenueReady(db))
@@ -1146,6 +1151,921 @@ func TestFinanceStageOne(t *testing.T) {
 			}
 		}
 	})
+	t.Run("persistent partial reversals conserve cumulative value", func(t *testing.T) {
+		userID := 13
+		require.NoError(t, db.Create(&model.User{Id: userID, Username: "synthetic-partial-reversal", AffCode: "synthetic-aff-13", Quota: 555, Status: common.UserStatusEnabled}).Error)
+		three := "3"
+		facts := []service.FinanceRevenueEvent{
+			{Key: "package", At: 1, Kind: "credit", Source: "paid", Quota: 30, ValueCNY: &three},
+			{Key: "use", At: 2, Kind: "consume", Quota: 30},
+			{Key: "undo-first", At: 3, Kind: "reverse", Quota: 10, Reverses: "use"},
+			{Key: "undo-second", At: 4, Kind: "reverse", Quota: 10, Reverses: "use"},
+		}
+		for i, event := range facts {
+			_, err := service.AppendFinanceRevenue(db, userID, 5, service.FinanceRevenueWrite{ExpectedRevision: int64(i), Event: event, Evidence: "synthetic partial reversal"}, "synthetic")
+			require.NoError(t, err)
+		}
+		summary, err := service.SummarizeFinanceWallet(db, userID)
+		require.NoError(t, err)
+		assert.Equal(t, "1", *summary.ConsumptionCNY) // 3 recognized, 2 restored
+		assert.Equal(t, "3", summary.Wallet.KnownBackingCNY)
+		assert.Equal(t, int64(20), summary.Wallet.RemainingQuota)
+		over := service.FinanceRevenueWrite{ExpectedRevision: 4, Event: service.FinanceRevenueEvent{Key: "undo-too-much", At: 5, Kind: "reverse", Quota: 20, Reverses: "use"}, Evidence: "synthetic"}
+		_, err = service.AppendFinanceRevenue(db, userID, 5, over, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		_, err = service.AppendFinanceRevenue(db, userID, 5, service.FinanceRevenueWrite{ExpectedRevision: 4, Event: service.FinanceRevenueEvent{Key: "undo-rest", At: 5, Kind: "reverse", Quota: 10, Reverses: "use"}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		summary, err = service.SummarizeFinanceWallet(db, userID)
+		require.NoError(t, err)
+		assert.Equal(t, "0", *summary.ConsumptionCNY)
+		assert.Equal(t, int64(30), summary.Wallet.RemainingQuota)
+		var lot model.FinanceRevenueLot
+		require.NoError(t, db.Where("user_id = ?", userID).First(&lot).Error)
+		assert.Equal(t, "0", lot.RecognizedCNY)
+		// Re-consuming the restored quota recognizes exactly the original values.
+		_, err = service.AppendFinanceRevenue(db, userID, 5, service.FinanceRevenueWrite{ExpectedRevision: 5, Event: service.FinanceRevenueEvent{Key: "reconsume", At: 6, Kind: "consume", Quota: 30}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		summary, err = service.SummarizeFinanceWallet(db, userID)
+		require.NoError(t, err)
+		assert.Equal(t, "3", *summary.ConsumptionCNY)
+		var negative int64
+		require.NoError(t, db.Model(&model.FinanceRevenueAllocation{}).Joins("JOIN finance_revenue_records ON finance_revenue_records.id = finance_revenue_allocations.event_id").Where("finance_revenue_records.user_id = ? AND finance_revenue_allocations.quota < 0", userID).Count(&negative).Error)
+		assert.Equal(t, int64(3), negative)
+		var user model.User
+		require.NoError(t, db.First(&user, userID).Error)
+		assert.Equal(t, 555, user.Quota)
+	})
+	t.Run("manual adjusts never create cash revenue or business balance", func(t *testing.T) {
+		userID := 14
+		require.NoError(t, db.Create(&model.User{Id: userID, Username: "synthetic-adjust-facts", AffCode: "synthetic-aff-14", Quota: 777, Status: common.UserStatusEnabled}).Error)
+		zero, one := "0", "1"
+		facts := []service.FinanceRevenueEvent{
+			{Key: "grant-gift", At: 1, Kind: "adjust", Quota: 20, Source: "gift", ValueCNY: &zero},
+			{Key: "grant-unknown", At: 2, Kind: "adjust", Quota: 10, Source: "unknown"},
+			{Key: "forfeit", At: 3, Kind: "adjust", Quota: -15},
+		}
+		for i, event := range facts {
+			_, err := service.AppendFinanceRevenue(db, userID, 5, service.FinanceRevenueWrite{ExpectedRevision: int64(i), Event: event, Evidence: "synthetic adjust"}, "synthetic")
+			require.NoError(t, err)
+		}
+		for _, invalid := range []service.FinanceRevenueEvent{
+			{Key: "bad-paid", At: 4, Kind: "adjust", Quota: 5, Source: "paid", ValueCNY: &one},
+			{Key: "bad-value", At: 4, Kind: "adjust", Quota: 5, Source: "gift", ValueCNY: &one},
+			{Key: "bad-zero", At: 4, Kind: "adjust", Quota: 0},
+			{Key: "bad-forfeit", At: 4, Kind: "adjust", Quota: -16},
+		} {
+			_, err := service.AppendFinanceRevenue(db, userID, 5, service.FinanceRevenueWrite{ExpectedRevision: 3, Event: invalid, Evidence: "synthetic"}, "synthetic")
+			assert.ErrorIs(t, err, model.ErrFinanceInvalid, invalid.Key)
+		}
+		_, err := service.AppendFinanceRevenue(db, userID, 5, service.FinanceRevenueWrite{ExpectedRevision: 3, Event: service.FinanceRevenueEvent{Key: "use", At: 4, Kind: "consume", Quota: 15}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		summary, err := service.SummarizeFinanceWallet(db, userID)
+		require.NoError(t, err)
+		assert.Nil(t, summary.ConsumptionCNY) // unknown-source quota was consumed
+		assert.Equal(t, "0", summary.Wallet.KnownRevenueCNY)
+		assert.Equal(t, int64(10), summary.Wallet.UnknownConsumedQuota)
+		assert.Equal(t, int64(1), summary.Wallet.UnknownCreditCount)
+		assert.Equal(t, "0", summary.Wallet.KnownBackingCNY)
+		assert.Equal(t, int64(0), summary.Wallet.RemainingQuota)
+		var user model.User
+		require.NoError(t, db.First(&user, userID).Error)
+		assert.Equal(t, 777, user.Quota)
+	})
+	t.Run("cash refund lifecycle separates pending from succeeded net", func(t *testing.T) {
+		assert.Equal(t, http.StatusServiceUnavailable, request("POST", "/api/owner/finance/cash-refunds", owner, nil).Code)
+		require.NoError(t, model.MigrateFinanceRefunds(db))
+		require.NoError(t, model.MigrateFinanceRefunds(db))
+		require.NoError(t, model.FinanceRefundsReady(db))
+		order, _, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-finance-refunds", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: time.Now().Unix() - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		confirmed, err := service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: order.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		base := service.FinanceCashRefundInput{ReceiptID: confirmed.ID, AmountCNY: "0.4", RefundedAt: order.PaidAt + 10, Evidence: "synthetic refund"}
+		base.State, base.EventKey = "pending", "synthetic-refund-pending"
+		pending, err := service.RegisterFinanceCashRefund(db, 5, base, "synthetic")
+		require.NoError(t, err)
+		assert.Equal(t, order.Id, pending.OrderID)
+		succeeded := base
+		succeeded.State, succeeded.EventKey, succeeded.AmountCNY = "succeeded", "synthetic-refund-succeeded", "0.5"
+		_, err = service.RegisterFinanceCashRefund(db, 5, succeeded, "synthetic")
+		require.NoError(t, err)
+		// Applied, queued and succeeded facts reserve against the receipt cap.
+		extra := base
+		extra.State, extra.EventKey, extra.AmountCNY = "queued", "synthetic-refund-extra", "0.2"
+		_, err = service.RegisterFinanceCashRefund(db, 5, extra, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		// A failed attempt stays as history without reserving.
+		failedAttempt := base
+		failedAttempt.State, failedAttempt.EventKey, failedAttempt.AmountCNY = "failed", "synthetic-refund-failed", "0.3"
+		_, err = service.RegisterFinanceCashRefund(db, 5, failedAttempt, "synthetic")
+		require.NoError(t, err)
+		_, err = service.RegisterFinanceCashRefund(db, 5, succeeded, "synthetic")
+		assert.ErrorIs(t, err, model.ErrFinanceConflict)
+		for _, bad := range []service.FinanceCashRefundInput{
+			{EventKey: "synthetic-refund-bad", ReceiptID: confirmed.ID, State: "refunded", AmountCNY: "0.1", RefundedAt: order.PaidAt, Evidence: "synthetic"},
+			{EventKey: "synthetic-refund-bad", ReceiptID: confirmed.ID, State: "succeeded", AmountCNY: "0", RefundedAt: order.PaidAt, Evidence: "synthetic"},
+			{EventKey: "synthetic-refund-bad", ReceiptID: confirmed.ID, State: "succeeded", AmountCNY: "-1", RefundedAt: order.PaidAt, Evidence: "synthetic"},
+			{EventKey: "synthetic-refund-bad", ReceiptID: confirmed.ID, State: "succeeded", AmountCNY: "0.1", RefundedAt: time.Now().Unix() + 3600, Evidence: "synthetic"},
+			{EventKey: "synthetic-refund-bad", ReceiptID: 999999, State: "succeeded", AmountCNY: "0.1", RefundedAt: order.PaidAt, Evidence: "synthetic"},
+			{EventKey: "offline-refund-1", ReceiptID: confirmed.ID, State: "succeeded", AmountCNY: "0.1", RefundedAt: order.PaidAt, Evidence: "synthetic"},
+			{EventKey: "request-refund-1", ReceiptID: confirmed.ID, State: "succeeded", AmountCNY: "0.1", RefundedAt: order.PaidAt, Evidence: "synthetic"},
+			{EventKey: "synthetic-refund-bad", ReceiptID: confirmed.ID, State: "succeeded", AmountCNY: "0.1", RefundedAt: order.PaidAt, Evidence: ""},
+		} {
+			_, err := service.RegisterFinanceCashRefund(db, 5, bad, "synthetic")
+			assert.ErrorIs(t, err, model.ErrFinanceInvalid, bad.EventKey)
+		}
+		require.NoError(t, db.Callback().Create().Before("gorm:create").Register("synthetic_refund_audit_fail", func(tx *gorm.DB) {
+			if tx.Statement.Table == "finance_audits" {
+				tx.AddError(fmt.Errorf("synthetic audit failure"))
+			}
+		}))
+		_, err = service.RegisterFinanceCashRefund(db, 5, service.FinanceCashRefundInput{EventKey: "synthetic-refund-rollback", ReceiptID: confirmed.ID, State: "pending", AmountCNY: "0.05", RefundedAt: order.PaidAt, Evidence: "synthetic"}, "synthetic")
+		require.Error(t, err)
+		require.NoError(t, db.Callback().Create().Remove("synthetic_refund_audit_fail"))
+		created := request("POST", "/api/owner/finance/cash-refunds", owner, service.FinanceCashRefundInput{EventKey: "synthetic-refund-api", ReceiptID: confirmed.ID, State: "succeeded", AmountCNY: "0.1", RefundedAt: order.PaidAt + 12, Evidence: "synthetic"})
+		require.Equal(t, http.StatusCreated, created.Code, created.Body.String())
+		assert.Contains(t, created.Header().Get("Cache-Control"), "no-store")
+		assert.Equal(t, http.StatusOK, request("GET", "/api/owner/finance/cash-refunds", owner, nil).Code)
+		cash, err := service.SummarizeFinanceCash(db, order.PaidAt, order.PaidAt+3600)
+		require.NoError(t, err)
+		assert.Equal(t, "1", cash.KnownReceiptsCNY)
+		assert.Equal(t, "0.6", cash.KnownRefundsCNY) // pending and failed never net
+		assert.Equal(t, "0.4", cash.NetKnownReceiptsCNY)
+		assert.Nil(t, cash.TotalReceiptsCNY)
+		assert.Equal(t, "partial", cash.Status)
+		// The receipt period is reported unchanged; refunds belong to their own period.
+		receiptPeriod, err := service.SummarizeFinanceCash(db, order.PaidAt-1, order.PaidAt+1)
+		require.NoError(t, err)
+		assert.Equal(t, "1", receiptPeriod.NetKnownReceiptsCNY)
+		refundPeriod, err := service.SummarizeFinanceCash(db, order.PaidAt+9, order.PaidAt+13)
+		require.NoError(t, err)
+		assert.Equal(t, "0", refundPeriod.KnownReceiptsCNY)
+		assert.Equal(t, "0.6", refundPeriod.KnownRefundsCNY)
+		assert.Equal(t, "-0.6", refundPeriod.NetKnownReceiptsCNY)
+	})
+	t.Run("reliable sync outbox recovers retries and parks the unresolvable", func(t *testing.T) {
+		assert.Equal(t, http.StatusServiceUnavailable, request("GET", "/api/owner/finance/sync-health", owner, nil).Code)
+		require.NoError(t, model.MigrateFinanceSync(db))
+		require.NoError(t, model.MigrateFinanceSync(db))
+		require.NoError(t, model.FinanceSyncReady(db))
+		now := time.Now().Unix()
+		syncEvents := func() int64 {
+			var count int64
+			require.NoError(t, db.Model(&model.FinanceSyncEvent{}).Count(&count).Error)
+			return count
+		}
+		// Emission is atomic with the offline redemption and skips plain codes.
+		user15, user16, user17, user20 := 15, 16, 17, 20
+		require.NoError(t, db.Create(&model.User{Id: user15, Username: "synthetic-sync-15", AffCode: "synthetic-aff-15", Quota: 500, Status: common.UserStatusEnabled}).Error)
+		require.NoError(t, db.Create(&model.User{Id: user16, Username: "synthetic-sync-16", AffCode: "synthetic-aff-16", Quota: 500, Status: common.UserStatusEnabled}).Error)
+		require.NoError(t, db.Create(&model.User{Id: user17, Username: "synthetic-sync-17", AffCode: "synthetic-aff-17", Quota: 500, Status: common.UserStatusEnabled}).Error)
+		require.NoError(t, db.Create(&model.User{Id: user20, Username: "synthetic-sync-20", AffCode: "synthetic-aff-20", Quota: 500, Status: common.UserStatusEnabled}).Error)
+		order, keys, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-sync-one", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		var businessBefore model.User
+		require.NoError(t, db.First(&businessBefore, user15).Error)
+		quota, err := model.RedeemOffline(keys[0], user15)
+		require.NoError(t, err)
+		assert.Equal(t, 60, quota)
+		var businessAfter model.User
+		require.NoError(t, db.First(&businessAfter, user15).Error)
+		assert.Equal(t, 60, businessAfter.Quota-businessBefore.Quota) // redeem credits the business wallet
+		var link model.OfflineOrderCode
+		require.NoError(t, db.Where("order_id = ?", order.Id).First(&link).Error)
+		var emitted model.FinanceSyncEvent
+		require.NoError(t, db.Where("event_key = ?", fmt.Sprintf("auto-offline-redemption-%d", link.RedemptionID)).First(&emitted).Error)
+		assert.Equal(t, "pending", emitted.Status)
+		assert.Equal(t, user15, emitted.UserID)
+		plain := &model.Redemption{UserId: 5, Name: "plain", Key: "synthetic-sync-plain-key", Status: common.RedemptionCodeStatusEnabled, Quota: 30, CreatedTime: now}
+		require.NoError(t, db.Create(plain).Error)
+		_, err = model.Redeem(plain.Key, user15)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), syncEvents()) // original codes stay outside finance
+		// Unconfirmed receipts block instead of inventing a value.
+		processed, err := service.RunFinanceSyncPass(db, 100)
+		require.NoError(t, err)
+		assert.Equal(t, 1, processed)
+		require.NoError(t, db.First(&emitted, emitted.ID).Error)
+		assert.Equal(t, "blocked", emitted.Status)
+		assert.Equal(t, "receipt_unconfirmed", emitted.ErrorClass)
+		var wallets int64
+		require.NoError(t, db.Model(&model.FinanceWallet{}).Where("user_id = ?", user15).Count(&wallets).Error)
+		assert.Zero(t, wallets)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: order.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		require.NoError(t, db.First(&emitted, emitted.ID).Error)
+		assert.Equal(t, "pending", emitted.Status) // unblocked by the confirmation
+		processed, err = service.RunFinanceSyncPass(db, 100)
+		require.NoError(t, err)
+		assert.Equal(t, 1, processed)
+		require.NoError(t, db.First(&emitted, emitted.ID).Error)
+		assert.Equal(t, "done", emitted.Status)
+		var wallet model.FinanceWallet
+		require.NoError(t, db.First(&wallet, "user_id = ?", user15).Error)
+		assert.Equal(t, "1", wallet.KnownBackingCNY)
+		assert.Equal(t, int64(60), wallet.RemainingQuota)
+		require.NoError(t, db.First(&businessAfter, user15).Error)
+		assert.Equal(t, businessBefore.Quota+90, businessAfter.Quota) // 60 offline + 30 plain; import never touches the business wallet
+		var autoAudits int64
+		require.NoError(t, db.Model(&model.FinanceAudit{}).Where("action = ?", "revenue.auto_sync").Count(&autoAudits).Error)
+		assert.Equal(t, int64(1), autoAudits)
+		processed, err = service.RunFinanceSyncPass(db, 100) // idempotent replay
+		require.NoError(t, err)
+		assert.Zero(t, processed)
+		require.NoError(t, db.First(&wallet, "user_id = ?", user15).Error)
+		assert.Equal(t, int64(1), wallet.Revision)
+		// A late source whose time precedes the ledger head parks for review.
+		order2, keys2, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-sync-late", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		_, err = model.RedeemOffline(keys2[0], user16)
+		require.NoError(t, err)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: order2.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		value := "3"
+		_, err = service.AppendFinanceRevenue(db, user16, 5, service.FinanceRevenueWrite{Event: service.FinanceRevenueEvent{Key: "late-head", At: now + 1000, Kind: "credit", Source: "paid", Quota: 30, ValueCNY: &value}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		processed, err = service.RunFinanceSyncPass(db, 100)
+		require.NoError(t, err)
+		assert.Equal(t, 1, processed)
+		var lateEvent model.FinanceSyncEvent
+		require.NoError(t, db.Where("topic = ? AND user_id = ?", "offline_redemption", user16).First(&lateEvent).Error)
+		assert.Equal(t, "needs_review", lateEvent.Status)
+		assert.Equal(t, "out_of_order", lateEvent.ErrorClass)
+		wallet = model.FinanceWallet{}
+		require.NoError(t, db.First(&wallet, "user_id = ?", user16).Error)
+		assert.Equal(t, int64(1), wallet.Revision) // no silent history rewrite
+		// Consumption facts apply through the same keyed machinery.
+		six := "6"
+		_, err = service.AppendFinanceRevenue(db, user17, 5, service.FinanceRevenueWrite{Event: service.FinanceRevenueEvent{Key: "consume-source", At: now - 2000, Kind: "credit", Source: "paid", Quota: 120, ValueCNY: &six}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader("{}"))
+		info := &relaycommon.RelayInfo{RequestId: "synthetic-sync-consume", UserId: user17, IsPlayground: true, OriginModelName: "public-finance-model", UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}, ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 21, UpstreamModelName: "supplier-real-model"}}
+		info.PriceData.UsePrice, info.PriceData.ModelPrice, info.PriceData.GroupRatioInfo.GroupRatio = true, 0.00006, 1
+		require.Nil(t, service.PreConsumeBilling(ctx, 30, info))
+		service.PostTextConsumeQuota(ctx, info, &dto.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15}, nil)
+		var observation model.FinanceRequestEvent
+		require.NoError(t, db.Where("request_id = ? AND phase = ?", info.RequestId, "text_settlement").First(&observation).Error)
+		// Direct-write settlements emit their fact automatically.
+		var autoEvent model.FinanceSyncEvent
+		require.NoError(t, db.Where("event_key = ?", "auto-text-settlement-"+info.RequestId).First(&autoEvent).Error)
+		assert.Equal(t, "pending", autoEvent.Status)
+		assert.Equal(t, observation.ID, autoEvent.RefID)
+		processed, err = service.RunFinanceSyncPass(db, 100)
+		require.NoError(t, err)
+		assert.Equal(t, 1, processed)
+		wallet = model.FinanceWallet{}
+		require.NoError(t, db.First(&wallet, "user_id = ?", user17).Error)
+		assert.Equal(t, "1.5", wallet.KnownRevenueCNY) // 6 CNY over 120 quota, 30 consumed
+		service.CaptureFinanceBilling(info, "funding_refund", nil, service.BillingSourceWallet, "refund_failed_unresolved")
+		require.NoError(t, db.Create(&model.FinanceSyncEvent{EventKey: "auto-consume-refund", Topic: "consumption", UserID: user17, RefID: observation.ID, At: observation.At, Payload: "{}", Status: model.FinanceSyncPending, NextAttemptAt: now, CreatedAt: now}).Error)
+		unresolvedInfo := &relaycommon.RelayInfo{RequestId: "synthetic-sync-unresolved", UserId: user17, ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 21, UpstreamModelName: "supplier-real-model"}}
+		failed := 7
+		service.CaptureFinanceBilling(unresolvedInfo, "text_settlement", &failed, service.BillingSourceWallet, "settlement_failed_charge_observed")
+		var unresolvedFact model.FinanceRequestEvent
+		require.NoError(t, db.Where("request_id = ? AND phase = ?", unresolvedInfo.RequestId, "text_settlement").First(&unresolvedFact).Error)
+		require.NoError(t, db.Create(&model.FinanceSyncEvent{EventKey: "auto-consume-unresolved", Topic: "consumption", UserID: user17, RefID: unresolvedFact.ID, At: unresolvedFact.At, Payload: "{}", Status: model.FinanceSyncPending, NextAttemptAt: now, CreatedAt: now}).Error)
+		zeroCharge := 0
+		zeroInfo := &relaycommon.RelayInfo{RequestId: "synthetic-sync-zero", UserId: user17, ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 21, UpstreamModelName: "supplier-real-model"}}
+		service.CaptureFinanceBilling(zeroInfo, "text_settlement", &zeroCharge, service.BillingSourceWallet, "settled")
+		var zeroFact model.FinanceRequestEvent
+		require.NoError(t, db.Where("request_id = ? AND phase = ?", zeroInfo.RequestId, "text_settlement").First(&zeroFact).Error)
+		require.NoError(t, db.Create(&model.FinanceSyncEvent{EventKey: "auto-consume-zero", Topic: "consumption", UserID: user17, RefID: zeroFact.ID, At: zeroFact.At, Payload: "{}", Status: model.FinanceSyncPending, NextAttemptAt: now, CreatedAt: now}).Error)
+		_, err = service.RunFinanceSyncPass(db, 100)
+		require.NoError(t, err)
+		var refundEvent, unresolvedEvent, zeroEvent model.FinanceSyncEvent
+		require.NoError(t, db.Where("event_key = ?", "auto-consume-refund").First(&refundEvent).Error)
+		assert.Equal(t, "needs_review", refundEvent.Status)
+		assert.Equal(t, "refund_requires_review", refundEvent.ErrorClass)
+		require.NoError(t, db.Where("event_key = ?", "auto-consume-unresolved").First(&unresolvedEvent).Error)
+		assert.Equal(t, "needs_review", unresolvedEvent.Status)
+		assert.Equal(t, "settlement_unresolved", unresolvedEvent.ErrorClass)
+		require.NoError(t, db.Where("event_key = ?", "auto-consume-zero").First(&zeroEvent).Error)
+		assert.Equal(t, "done", zeroEvent.Status)
+		assert.Equal(t, "no_charge", zeroEvent.ErrorClass)
+		// A crashed worker's lease is reclaimed and the fact still lands once.
+		order3, keys3, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-sync-crash", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		_, err = model.RedeemOffline(keys3[0], user15)
+		require.NoError(t, err)
+		var crashed model.FinanceSyncEvent
+		require.NoError(t, db.Where("topic = ? AND user_id = ?", "offline_redemption", user15).Order("id desc").First(&crashed).Error)
+		require.NoError(t, db.Model(&crashed).Updates(map[string]any{"status": model.FinanceSyncProcessing, "claimed_at": now - 120}).Error)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: order3.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		_, err = service.RunFinanceSyncPass(db, 100)
+		require.NoError(t, err)
+		require.NoError(t, db.First(&crashed, crashed.ID).Error)
+		assert.Equal(t, "done", crashed.Status)
+		// Bounded retries park a persistently failing fact for the owner.
+		order4, keys4, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-sync-stuck", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		_, err = model.RedeemOffline(keys4[0], user15)
+		require.NoError(t, err)
+		var stuck model.FinanceSyncEvent
+		require.NoError(t, db.Where("topic = ? AND user_id = ?", "offline_redemption", user15).Order("id desc").First(&stuck).Error)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: order4.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		require.NoError(t, db.Callback().Create().Before("gorm:create").Register("synthetic_sync_audit_fail", func(tx *gorm.DB) {
+			if tx.Statement.Table == "finance_audits" {
+				tx.AddError(fmt.Errorf("synthetic audit failure"))
+			}
+		}))
+		for range 5 { // financeSyncMaxAttempts
+
+			require.NoError(t, db.Model(&stuck).Update("next_attempt_at", 0).Error)
+			_, err = service.RunFinanceSyncPass(db, 100)
+			require.NoError(t, err)
+		}
+		require.NoError(t, db.Callback().Create().Remove("synthetic_sync_audit_fail"))
+		require.NoError(t, db.First(&stuck, stuck.ID).Error)
+		assert.Equal(t, "needs_review", stuck.Status)
+		assert.Equal(t, "attempts_exhausted", stuck.ErrorClass)
+		var recordsBefore int64
+		require.NoError(t, db.Model(&model.FinanceRevenueRecord{}).Where("user_id = ?", user15).Count(&recordsBefore).Error)
+		assert.Equal(t, int64(2), recordsBefore) // orders one and three only
+		wallet = model.FinanceWallet{}
+		require.NoError(t, db.First(&wallet, "user_id = ?", user15).Error)
+		var links4 []model.OfflineOrderCode
+		require.NoError(t, db.Where("order_id = ?", order4.Id).Find(&links4).Error)
+		_, err = service.ImportFinanceOfflineSources(db, user15, 5, service.FinanceOfflineImport{RedemptionIDs: []int{links4[0].RedemptionID}, ExpectedRevision: wallet.Revision, Evidence: "synthetic manual resolution"}, "synthetic")
+		require.NoError(t, err) // the owner resolves the parked fact manually
+		// Two workers competing for one event commit it exactly once.
+		order5, keys5, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-sync-race", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		_, err = model.RedeemOffline(keys5[0], user20)
+		require.NoError(t, err)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: order5.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		if dialect := os.Getenv("FINANCE_TEST_DIALECT"); dialect == "mysql" || dialect == "postgres" {
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			sqlDB.SetMaxOpenConns(2)
+			defer sqlDB.SetMaxOpenConns(1)
+			results := make(chan error, 2)
+			for range 2 {
+				go func() {
+					_, err := service.RunFinanceSyncPass(db, 100)
+					results <- err
+				}()
+			}
+			for range 2 {
+				require.NoError(t, <-results)
+			}
+		} else {
+			_, err := service.RunFinanceSyncPass(db, 100)
+			require.NoError(t, err)
+		}
+		wallet = model.FinanceWallet{}
+		require.NoError(t, db.First(&wallet, "user_id = ?", user20).Error)
+		assert.Equal(t, "1", wallet.KnownBackingCNY)
+		var raced int64
+		require.NoError(t, db.Model(&model.FinanceRevenueRecord{}).Where("user_id = ?", user20).Count(&raced).Error)
+		assert.Equal(t, int64(1), raced)
+		// Persistent health metrics and balance context.
+		health, err := service.FinanceSyncHealth(db)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, health.Counts["done"], int64(4))
+		assert.GreaterOrEqual(t, health.Counts["needs_review"], int64(4))
+		assert.Zero(t, health.Counts["blocked"])
+		assert.NotZero(t, health.WatermarkID)
+		assert.Contains(t, health.Warnings, "consumption_emission_not_connected_to_settlement_boundary")
+		healthView := request("GET", "/api/owner/finance/sync-health", owner, nil)
+		require.Equal(t, http.StatusOK, healthView.Code)
+		assert.Contains(t, healthView.Body.String(), "watermark_id")
+		assert.Contains(t, healthView.Header().Get("Cache-Control"), "no-store")
+		balance, err := service.CheckFinanceBalance(db, user15)
+		require.NoError(t, err)
+		assert.Equal(t, "mismatch", balance.Status)
+		require.NotNil(t, balance.NeedsReviewSyncEvents)
+		assert.Equal(t, int64(1), *balance.NeedsReviewSyncEvents)
+		require.NotNil(t, balance.PendingSyncEvents)
+		assert.Zero(t, *balance.PendingSyncEvents)
+		require.NoError(t, db.Create(&model.FinanceSyncEvent{EventKey: "auto-pending-context", Topic: "consumption", UserID: user17, RefID: 999999, At: now, Payload: "{}", Status: model.FinanceSyncPending, NextAttemptAt: now + 100000, CreatedAt: now}).Error)
+		balance, err = service.CheckFinanceBalance(db, user17)
+		require.NoError(t, err)
+		assert.Equal(t, "mismatch", balance.Status)
+		assert.Equal(t, int64(1), *balance.PendingSyncEvents)
+		assert.Equal(t, int64(2), *balance.NeedsReviewSyncEvents) // refund and unresolved
+	})
+	t.Run("settlement emission and controlled rebuild stay bounded and auditable", func(t *testing.T) {
+		previousBatch := common.BatchUpdateEnabled
+		common.BatchUpdateEnabled = false
+		defer func() { common.BatchUpdateEnabled = previousBatch }()
+		assert.Equal(t, http.StatusServiceUnavailable, request("POST", "/api/owner/finance/wallets/21/rebuild/preview", owner, nil).Code)
+		require.NoError(t, model.MigrateFinanceRebuilds(db))
+		require.NoError(t, model.MigrateFinanceRebuilds(db))
+		require.NoError(t, model.FinanceRebuildsReady(db))
+		now := time.Now().Unix()
+		user21, user22, user23 := 21, 22, 23
+		for _, user := range []int{user21, user22, user23} {
+			require.NoError(t, db.Create(&model.User{Id: user, Username: fmt.Sprintf("synthetic-rebuild-%d", user), AffCode: fmt.Sprintf("synthetic-aff-%d", user), Quota: 500, Status: common.UserStatusEnabled}).Error)
+		}
+		settle := func(userID int, requestID string, charge int) model.FinanceRequestEvent {
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader("{}"))
+			info := &relaycommon.RelayInfo{RequestId: requestID, UserId: userID, IsPlayground: true, OriginModelName: "public-finance-model", UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}, ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 21, UpstreamModelName: "supplier-real-model"}}
+			info.PriceData.UsePrice, info.PriceData.ModelPrice, info.PriceData.GroupRatioInfo.GroupRatio = true, float64(charge)/common.QuotaPerUnit, 1
+			require.Nil(t, service.PreConsumeBilling(ctx, charge, info))
+			service.PostTextConsumeQuota(ctx, info, &dto.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15}, nil)
+			var observation model.FinanceRequestEvent
+			require.NoError(t, db.Where("request_id = ? AND phase = ?", requestID, "text_settlement").First(&observation).Error)
+			return observation
+		}
+		// Direct-write settlements emit and import automatically.
+		six := "6"
+		_, err := service.AppendFinanceRevenue(db, user21, 5, service.FinanceRevenueWrite{Event: service.FinanceRevenueEvent{Key: "emission-source", At: now - 3000, Kind: "credit", Source: "paid", Quota: 120, ValueCNY: &six}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		var businessBefore model.User
+		require.NoError(t, db.First(&businessBefore, user21).Error)
+		observation := settle(user21, "synthetic-emission-direct", 30)
+		var emitted model.FinanceSyncEvent
+		require.NoError(t, db.Where("event_key = ?", "auto-text-settlement-synthetic-emission-direct").First(&emitted).Error)
+		assert.Equal(t, observation.ID, emitted.RefID)
+		_, err = service.RunFinanceSyncPass(db, 100)
+		require.NoError(t, err)
+		var wallet model.FinanceWallet
+		require.NoError(t, db.First(&wallet, "user_id = ?", user21).Error)
+		assert.Equal(t, "1.5", wallet.KnownRevenueCNY)
+		var businessAfter model.User
+		require.NoError(t, db.First(&businessAfter, user21).Error)
+		assert.Equal(t, businessBefore.Quota-30, businessAfter.Quota)
+		// Batch mode keeps the quota in memory: no reliable fact is claimed.
+		common.BatchUpdateEnabled = true
+		settle(user21, "synthetic-emission-batch", 20)
+		var batchEvent int64
+		require.NoError(t, db.Model(&model.FinanceSyncEvent{}).Where("event_key = ?", "auto-text-settlement-synthetic-emission-batch").Count(&batchEvent).Error)
+		assert.Zero(t, batchEvent)
+		common.BatchUpdateEnabled = false
+		// A failing emission never changes the existing charge behavior.
+		require.NoError(t, db.Callback().Create().Before("gorm:create").Register("synthetic_emission_fail", func(tx *gorm.DB) {
+			if tx.Statement.Table == "finance_sync_events" {
+				tx.AddError(fmt.Errorf("synthetic emission failure"))
+			}
+		}))
+		var quotaBefore model.User
+		require.NoError(t, db.First(&quotaBefore, user21).Error)
+		settle(user21, "synthetic-emission-fail", 10)
+		require.NoError(t, db.Callback().Create().Remove("synthetic_emission_fail"))
+		var quotaAfter model.User
+		require.NoError(t, db.First(&quotaAfter, user21).Error)
+		assert.Equal(t, 10, quotaBefore.Quota-quotaAfter.Quota)
+		var failEvent int64
+		require.NoError(t, db.Model(&model.FinanceSyncEvent{}).Where("event_key = ?", "auto-text-settlement-synthetic-emission-fail").Count(&failEvent).Error)
+		assert.Zero(t, failEvent)
+		// The batch-mode settle above is a visible, bounded reconciliation gap.
+		health, err := service.FinanceSyncHealth(db)
+		require.NoError(t, err)
+		assert.Equal(t, "active", health.SettlementEmission)
+		assert.GreaterOrEqual(t, health.UnimportedSettlementSample, 1)
+		assert.GreaterOrEqual(t, health.SettlementSampleSize, 1)
+		// Controlled rebuild: the late offline redemption returns to its
+		// historical FIFO position after preview, snapshot and hash checks.
+		orderA, keysA, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-rebuild-late", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		_, err = model.RedeemOffline(keysA[0], user22)
+		require.NoError(t, err)
+		// The test runs within one second; backdate the redemption so its fact
+		// is genuinely earlier than the later consumption (synthetic data only).
+		var linkA model.OfflineOrderCode
+		require.NoError(t, db.Where("order_id = ?", orderA.Id).First(&linkA).Error)
+		require.NoError(t, db.Model(&model.Redemption{}).Where("id = ?", linkA.RedemptionID).Update("redeemed_time", now-5000).Error)
+		orderB, keysB, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-rebuild-base", MoneyCents: 200, QuotaPerCode: 120, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		_, err = model.RedeemOffline(keysB[0], user22)
+		require.NoError(t, err)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: orderB.Id, ConfirmedAmountCNY: "2", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		_, err = service.RunFinanceSyncPass(db, 100) // imports order B's source
+		require.NoError(t, err)
+		settle(user22, "synthetic-rebuild-consume", 30)
+		_, err = service.RunFinanceSyncPass(db, 100) // consumes 0.5 CNY from B
+		require.NoError(t, err)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: orderA.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		_, err = service.RunFinanceSyncPass(db, 100) // A is late: parks for review
+		require.NoError(t, err)
+		var lateEvent model.FinanceSyncEvent
+		require.NoError(t, db.Where("topic = ? AND user_id = ?", "offline_redemption", user22).Order("id asc").First(&lateEvent).Error)
+		assert.Equal(t, "needs_review", lateEvent.Status)
+		assert.Equal(t, "out_of_order", lateEvent.ErrorClass)
+		preview, err := service.PreviewFinanceWalletRebuild(db, user22, []int64{lateEvent.ID})
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), preview.ExpectedRevision)
+		assert.Equal(t, []int64{lateEvent.ID}, preview.IncorporatedSyncEvents)
+		assert.Equal(t, 3, preview.FactCount)
+		assert.Equal(t, int64(90), preview.CurrentRemainingQuota)
+		assert.Equal(t, int64(150), preview.RebuiltRemainingQuota)
+		require.NotNil(t, preview.RebuiltBackingCNY)
+		assert.Equal(t, "3", *preview.RebuiltBackingCNY)
+		require.NotNil(t, preview.RebuiltRevenueCNY)
+		assert.Equal(t, "0.5", *preview.RebuiltRevenueCNY)
+		assert.Equal(t, http.StatusBadRequest, request("POST", "/api/owner/finance/wallets/22/rebuild/apply", owner, service.FinanceRebuildInput{SyncEventIDs: []int64{lateEvent.ID, lateEvent.ID}, ExpectedRevision: preview.ExpectedRevision, SnapshotHash: preview.SnapshotHash, Evidence: "synthetic rebuild"}).Code)
+		apply := request("POST", "/api/owner/finance/wallets/22/rebuild/apply", owner, service.FinanceRebuildInput{SyncEventIDs: []int64{lateEvent.ID}, ExpectedRevision: preview.ExpectedRevision, SnapshotHash: preview.SnapshotHash, Evidence: "synthetic rebuild"})
+		require.Equal(t, http.StatusOK, apply.Code, apply.Body.String())
+		wallet = model.FinanceWallet{}
+		require.NoError(t, db.First(&wallet, "user_id = ?", user22).Error)
+		assert.Equal(t, int64(150), wallet.RemainingQuota)
+		assert.Equal(t, "3", wallet.KnownBackingCNY)
+		assert.Equal(t, "0.5", wallet.KnownRevenueCNY)
+		assert.Equal(t, int64(5), wallet.Revision) // old revision + fact count stays monotonic
+		var snapshot model.FinanceRebuildSnapshot
+		require.NoError(t, db.Where("user_id = ?", user22).First(&snapshot).Error)
+		assert.Equal(t, preview.SnapshotHash, snapshot.Hash)
+		assert.Equal(t, 3, snapshot.FactCount)
+		var rebuildAudits int64
+		require.NoError(t, db.Model(&model.FinanceAudit{}).Where("action = ?", "revenue.rebuild").Count(&rebuildAudits).Error)
+		assert.GreaterOrEqual(t, rebuildAudits, int64(4)) // three replayed facts plus the summary
+		require.NoError(t, db.First(&lateEvent, lateEvent.ID).Error)
+		assert.Equal(t, "done", lateEvent.Status)
+		var consumeRecord model.FinanceRevenueRecord
+		require.NoError(t, db.Where("user_id = ? AND event_key LIKE ?", user22, "request-charge-%").First(&consumeRecord).Error)
+		var consumeParts []model.FinanceRevenueAllocation
+		require.NoError(t, db.Where("event_id = ?", consumeRecord.ID).Order("id asc").Find(&consumeParts).Error)
+		require.Len(t, consumeParts, 1)
+		var lateLot model.FinanceRevenueLot
+		require.NoError(t, db.First(&lateLot, consumeParts[0].LotID).Error) // consumption now draws from the late source
+		var business22 model.User
+		require.NoError(t, db.First(&business22, user22).Error)
+		assert.Equal(t, 650, business22.Quota) // 500 + 60 + 120 - 30; finance never moves it
+		// The incorporated event no longer parks: rebuilding again is rejected.
+		_, err = service.PreviewFinanceWalletRebuild(db, user22, []int64{lateEvent.ID})
+		assert.ErrorIs(t, err, model.ErrFinanceInvalid)
+		// Stale revisions and stale hashes are rejected before any write.
+		orderC, keysC, err := model.CreateOfflineOrder(model.CreateOfflineOrderInput{OrderNo: "synthetic-rebuild-conflict", MoneyCents: 100, QuotaPerCode: 60, CodeCount: 1, PaidAt: now - 100000, AdminUserID: 5})
+		require.NoError(t, err)
+		_, err = model.RedeemOffline(keysC[0], user23)
+		require.NoError(t, err)
+		var linkC model.OfflineOrderCode
+		require.NoError(t, db.Where("order_id = ?", orderC.Id).First(&linkC).Error)
+		require.NoError(t, db.Model(&model.Redemption{}).Where("id = ?", linkC.RedemptionID).Update("redeemed_time", now-5000).Error)
+		two := "2"
+		_, err = service.AppendFinanceRevenue(db, user23, 5, service.FinanceRevenueWrite{Event: service.FinanceRevenueEvent{Key: "conflict-source", At: now - 4000, Kind: "credit", Source: "paid", Quota: 50, ValueCNY: &two}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		_, err = service.ConfirmFinanceOfflineReceipt(db, 5, service.FinanceReceiptConfirmation{OrderID: orderC.Id, ConfirmedAmountCNY: "1", Evidence: "synthetic receipt"}, "synthetic")
+		require.NoError(t, err)
+		_, err = service.RunFinanceSyncPass(db, 100) // parks the late source for review
+		require.NoError(t, err)
+		var conflictEvent model.FinanceSyncEvent
+		require.NoError(t, db.Where("topic = ? AND user_id = ?", "offline_redemption", user23).First(&conflictEvent).Error)
+		require.Equal(t, "needs_review", conflictEvent.Status)
+		stale, err := service.PreviewFinanceWalletRebuild(db, user23, []int64{conflictEvent.ID})
+		require.NoError(t, err)
+		one := "1"
+		_, err = service.AppendFinanceRevenue(db, user23, 5, service.FinanceRevenueWrite{ExpectedRevision: 1, Event: service.FinanceRevenueEvent{Key: "conflict-head", At: now + 2000, Kind: "credit", Source: "paid", Quota: 10, ValueCNY: &one}, Evidence: "synthetic"}, "synthetic")
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusConflict, request("POST", "/api/owner/finance/wallets/23/rebuild/apply", owner, service.FinanceRebuildInput{SyncEventIDs: []int64{conflictEvent.ID}, ExpectedRevision: stale.ExpectedRevision, SnapshotHash: stale.SnapshotHash, Evidence: "synthetic"}).Code)
+		fresh, err := service.PreviewFinanceWalletRebuild(db, user23, []int64{conflictEvent.ID})
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusConflict, request("POST", "/api/owner/finance/wallets/23/rebuild/apply", owner, service.FinanceRebuildInput{SyncEventIDs: []int64{conflictEvent.ID}, ExpectedRevision: fresh.ExpectedRevision, SnapshotHash: stale.SnapshotHash, Evidence: "synthetic"}).Code)
+		// Scope bounds are enforced before any resolution.
+		manyIDs := make([]int64, 51)
+		for i := range manyIDs {
+			manyIDs[i] = int64(i + 1)
+		}
+		assert.Equal(t, http.StatusBadRequest, request("POST", "/api/owner/finance/wallets/23/rebuild/preview", owner, service.FinanceRebuildInput{SyncEventIDs: manyIDs}).Code)
+	})
+	t.Run("phase three covers transports failures multimodal tasks and pool costs", func(t *testing.T) {
+		require.NoError(t, model.MigrateFinanceRequests(db))
+		now := time.Now().Unix()
+		// Pool version and cost rule sharing the pool key for channel 31.
+		poolRaw := []byte(`{"name":"synthetic-pool","platform":"synthetic","channel_ids":[31]}`)
+		poolVersion := model.FinanceVersion{Kind: "pool", RecordKey: "synthetic-pool", EffectiveFrom: now - 1000, EffectiveTo: now + 100000, Active: true, Source: "synthetic pool", CreatedBy: 5}
+		require.NoError(t, service.ValidateFinanceVersion(&poolVersion, poolRaw))
+		require.NoError(t, model.AppendFinanceVersion(db, &poolVersion, 0, "synthetic"))
+		rule := service.FinanceCostRule{ChannelID: 31, UpstreamModel: "supplier-pool-model", PoolKey: "synthetic-pool", Currency: "USD", Prices: []service.FinanceUnitPrice{
+			{Meter: "input", Unit: "token", Per: "1000000", Price: "3"},
+			{Meter: "output", Unit: "token", Per: "1000000", Price: "12"},
+			{Meter: "cache_read", Unit: "token", Per: "1000000", Price: "0.5"},
+		}}
+		ruleRaw, err := common.Marshal(rule)
+		require.NoError(t, err)
+		ruleVersion := model.FinanceVersion{Kind: "cost", RecordKey: "pool-cost", EffectiveFrom: now - 1000, EffectiveTo: now + 100000, Active: true, Source: "synthetic procurement", CreatedBy: 5}
+		require.NoError(t, service.ValidateFinanceVersion(&ruleVersion, ruleRaw))
+		require.NoError(t, model.AppendFinanceVersion(db, &ruleVersion, 0, "synthetic"))
+		info := &relaycommon.RelayInfo{RequestId: "synthetic-retry-close", UserId: 8, OriginModelName: "public-finance-model", ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 31, UpstreamModelName: "supplier-pool-model", ChannelMultiKeyIndex: 3}}
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader("{}"))
+		// A still-open attempt is closed as failed by the next gateway attempt.
+		first := service.BeginFinanceAttempt(ctx, info)
+		require.NotEmpty(t, first)
+		second := service.BeginFinanceAttempt(ctx, info)
+		require.NotEmpty(t, second)
+		require.NotEqual(t, first, second)
+		var closed model.FinanceRequestEvent
+		require.NoError(t, db.Where("attempt_id = ? AND phase = ?", first, "attempt_finish").First(&closed).Error)
+		assert.Contains(t, closed.Payload, `"failed":true`)
+		var noUsage model.FinanceRequestEvent
+		require.NoError(t, db.Where("attempt_id = ? AND phase = ?", first, "usage").First(&noUsage).Error)
+		var noUsageSnapshot service.FinanceUsageSnapshot
+		require.NoError(t, common.UnmarshalJsonStr(noUsage.Payload, &noUsageSnapshot))
+		assert.Equal(t, "no_usage_failed_attempt", noUsageSnapshot.Source)
+		assert.Empty(t, noUsageSnapshot.Quantities)
+		assert.Equal(t, "unknown", noUsageSnapshot.Estimate.Status)
+		closed = model.FinanceRequestEvent{}
+		require.NoError(t, db.Where("attempt_id = ? AND phase = ?", first, "attempt_start").First(&closed).Error)
+		var firstSnapshot service.FinanceAttemptSnapshot
+		require.NoError(t, common.UnmarshalJsonStr(closed.Payload, &firstSnapshot))
+		assert.Equal(t, 3, firstSnapshot.ChannelAccountIndex)
+		assert.Equal(t, "synthetic-pool", firstSnapshot.PoolKey)
+		// A successful close without settlement keeps the explicit no-usage mark.
+		service.FinishFinanceAttempt(ctx, info, false)
+		var successNoUsage model.FinanceRequestEvent
+		require.NoError(t, db.Where("attempt_id = ? AND phase = ?", second, "usage").First(&successNoUsage).Error)
+		assert.Contains(t, successNoUsage.Payload, "no_usage_without_settlement")
+		// Multimodal sub-category tokens stay observable without poisoning the
+		// input/output estimate (image/audio tokens are inside upstream totals).
+		info.RequestId = "synthetic-multimodal"
+		multiAttempt := service.BeginFinanceAttempt(ctx, info)
+		require.NotEmpty(t, multiAttempt)
+		service.CaptureFinanceTextUsage(ctx, info, &dto.Usage{PromptTokens: 1000, CompletionTokens: 500, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 200, ImageTokens: 300}, CompletionTokenDetails: dto.OutputTokenDetails{AudioTokens: 100}})
+		var multiRecord model.FinanceRequestEvent
+		require.NoError(t, db.Where("attempt_id = ? AND phase = ?", multiAttempt, "usage").First(&multiRecord).Error)
+		var multiSnapshot service.FinanceUsageSnapshot
+		require.NoError(t, common.UnmarshalJsonStr(multiRecord.Payload, &multiSnapshot))
+		require.NotNil(t, multiSnapshot.Quantities["input"])
+		assert.Equal(t, "800", *multiSnapshot.Quantities["input"])
+		require.NotNil(t, multiSnapshot.Observed["image_input_tokens"])
+		assert.Equal(t, "300", *multiSnapshot.Observed["image_input_tokens"])
+		require.NotNil(t, multiSnapshot.Observed["audio_output_tokens"])
+		assert.Equal(t, "100", *multiSnapshot.Observed["audio_output_tokens"])
+		require.NotNil(t, multiSnapshot.Estimate.Amount)
+		assert.Equal(t, "0.0085", *multiSnapshot.Estimate.Amount)
+		service.FinishFinanceAttempt(ctx, info, false)
+		// WebSocket transports freeze attempts the same way; realtime usage
+		// follows OpenAI semantics with audio details in Observed.
+		info.RequestId = "synthetic-ws-usage"
+		wsAttempt := service.BeginFinanceAttempt(ctx, info)
+		require.NotEmpty(t, wsAttempt)
+		service.CaptureFinanceTransport(info, wsAttempt, 101, false)
+		service.CaptureFinanceRealtimeUsage(ctx, info, &dto.RealtimeUsage{InputTokens: 1000, OutputTokens: 500, InputTokenDetails: dto.InputTokenDetails{CachedTokens: 100, AudioTokens: 400}, OutputTokenDetails: dto.OutputTokenDetails{AudioTokens: 200}})
+		var wsRecord model.FinanceRequestEvent
+		require.NoError(t, db.Where("attempt_id = ? AND phase = ?", wsAttempt, "usage").First(&wsRecord).Error)
+		var wsSnapshot service.FinanceUsageSnapshot
+		require.NoError(t, common.UnmarshalJsonStr(wsRecord.Payload, &wsSnapshot))
+		require.NotNil(t, wsSnapshot.Quantities["input"])
+		assert.Equal(t, "900", *wsSnapshot.Quantities["input"])
+		require.NotNil(t, wsSnapshot.Observed["audio_input_tokens"])
+		assert.Equal(t, "400", *wsSnapshot.Observed["audio_input_tokens"])
+		service.FinishFinanceAttempt(ctx, info, false)
+		// Realtime settlement rides the same text_settlement fact and outbox.
+		// Token-ratio pricing keeps the expected charge deterministic; the
+		// per-request UsePrice branch of PostWssConsumeQuota has a preexisting
+		// zero-charge defect (QuotaInfo never receives ModelPrice) that stays
+		// untouched here because changing it would alter real user billing.
+		info.RequestId = "synthetic-ws-settlement"
+		info.IsPlayground = true
+		info.UserSetting = dto.UserSetting{BillingPreference: "wallet_only"}
+		info.PriceData.UsePrice, info.PriceData.ModelRatio, info.PriceData.GroupRatioInfo.GroupRatio = false, 1, 1
+		// In production WssHelper dials (and freezes the attempt) before the
+		// session settles; mirror that order here.
+		require.NotEmpty(t, service.BeginFinanceAttempt(ctx, info))
+		require.Nil(t, service.PreConsumeBilling(ctx, 20, info))
+		service.PostWssConsumeQuota(ctx, info, "public-finance-model", &dto.RealtimeUsage{InputTokens: 500, OutputTokens: 200, TotalTokens: 700, InputTokenDetails: dto.InputTokenDetails{CachedTokens: 50, AudioTokens: 400}, OutputTokenDetails: dto.OutputTokenDetails{AudioTokens: 200}}, "")
+		var wsSettlement model.FinanceRequestEvent
+		require.NoError(t, db.Where("request_id = ? AND phase = ?", info.RequestId, "text_settlement").First(&wsSettlement).Error)
+		assert.Contains(t, wsSettlement.Payload, `"charged_quota":600`)
+		assert.Contains(t, wsSettlement.Payload, `"status":"settled"`)
+		var wsOutbox model.FinanceSyncEvent
+		require.NoError(t, db.Where("event_key = ?", "auto-text-settlement-synthetic-ws-settlement").First(&wsOutbox).Error)
+		assert.Equal(t, wsSettlement.ID, wsOutbox.RefID)
+		// Task lifecycle facts: submission, idempotent delta, and refund.
+		task := &model.Task{TaskID: "task_syntheticfinance01", Platform: constant.TaskPlatformSuno, UserId: 8, ChannelId: 31, Action: "song", SubmitTime: now - 100, FinishTime: now - 50, Properties: model.Properties{UpstreamModelName: "supplier-pool-model"}}
+		task.PrivateData.FinanceAttemptID = wsAttempt
+		service.CaptureFinanceTaskSubmission(task, common.GetPointer(30), "wallet", "settled", task.PrivateData.FinanceAttemptID)
+		service.CaptureFinanceTaskSubmission(task, common.GetPointer(30), "wallet", "settled", task.PrivateData.FinanceAttemptID) // replay cannot double-count
+		var submissions int64
+		require.NoError(t, db.Model(&model.FinanceRequestEvent{}).Where("request_id = ? AND phase = ?", "task:"+task.TaskID, "task_submission").Count(&submissions).Error)
+		assert.Equal(t, int64(1), submissions)
+		var submission model.FinanceRequestEvent
+		require.NoError(t, db.Where("request_id = ? AND phase = ?", "task:"+task.TaskID, "task_submission").First(&submission).Error)
+		assert.Equal(t, task.SubmitTime, submission.At)
+		assert.Contains(t, submission.Payload, `"finance_attempt_id":"`+wsAttempt+`"`)
+		service.CaptureFinanceTaskAdjustment(task, 45, 30, "token重算", map[string]any{"total_tokens": 123.0})
+		service.CaptureFinanceTaskAdjustment(task, 45, 30, "token重算", map[string]any{"total_tokens": 123.0}) // same outcome replays idempotently
+		var adjustments int64
+		require.NoError(t, db.Model(&model.FinanceRequestEvent{}).Where("request_id = ? AND phase = ?", "task:"+task.TaskID, "task_adjustment").Count(&adjustments).Error)
+		assert.Equal(t, int64(1), adjustments)
+		var adjustment model.FinanceRequestEvent
+		require.NoError(t, db.Where("request_id = ? AND phase = ?", "task:"+task.TaskID, "task_adjustment").First(&adjustment).Error)
+		assert.Equal(t, task.FinishTime, adjustment.At)
+		assert.Contains(t, adjustment.Payload, `"total_tokens":123`)
+		service.CaptureFinanceTaskAdjustment(task, 50, 30, "token重算", nil) // a different outcome is a new fact
+		var distinct int64
+		require.NoError(t, db.Model(&model.FinanceRequestEvent{}).Where("request_id = ? AND phase = ?", "task:"+task.TaskID, "task_adjustment").Count(&distinct).Error)
+		assert.Equal(t, int64(2), distinct)
+		service.CaptureFinanceTaskRefund(task, 50, "任务失败", true)
+		var refund model.FinanceRequestEvent
+		require.NoError(t, db.Where("request_id = ? AND phase = ?", "task:"+task.TaskID, "task_refund").First(&refund).Error)
+		assert.Contains(t, refund.Payload, `"refunded":true`)
+		// Pool expense registered in USD with a frozen FX reference.
+		fxVersion := model.FinanceVersion{Kind: "fx", RecordKey: "pool-usd", EffectiveFrom: now - 1000, EffectiveTo: now + 100000, Active: true, Source: "synthetic fx", CreatedBy: 5}
+		require.NoError(t, service.ValidateFinanceVersion(&fxVersion, []byte(`{"currency":"USD","cny_per_unit":"7"}`)))
+		require.NoError(t, model.AppendFinanceVersion(db, &fxVersion, 0, "synthetic"))
+		expense := model.FinanceExpense{EventKey: "synthetic-pool-expense", Ledger: "direct", Category: "pool_subscription", PoolKey: "synthetic-pool", Amount: "10", Currency: "USD", FXVersionID: fxVersion.ID, PeriodFrom: now - 10, PeriodTo: now + 10, Recurrence: "once", Source: "synthetic supplier invoice", CreatedBy: 5}
+		require.NoError(t, service.ValidateFinanceExpense(db, &expense))
+		require.NoError(t, model.AppendFinanceExpense(db, &expense, "synthetic"))
+		summary, err := service.SummarizeFinancePoolCosts(db, now-10, now+10)
+		require.NoError(t, err)
+		var poolEntry *service.FinancePoolCostEntry
+		for i := range summary.Pools {
+			if summary.Pools[i].PoolKey == "synthetic-pool" {
+				poolEntry = &summary.Pools[i]
+			}
+		}
+		require.NotNil(t, poolEntry)
+		assert.Equal(t, "synthetic-pool", poolEntry.PoolKey)
+		require.NotNil(t, poolEntry.ExpenseCNY)
+		assert.Equal(t, "70", *poolEntry.ExpenseCNY)
+		assert.False(t, poolEntry.ExpenseMissing)
+		// Two no-usage attempts stay unknown; multimodal, ws usage, and the
+		// realtime settlement are known estimates.
+		assert.Equal(t, 3, poolEntry.RequestKnown)
+		assert.Equal(t, 2, poolEntry.RequestUnknown)
+		require.NotNil(t, poolEntry.RequestCostCNY)
+		// The pooled total posts once; unpooled keeps its reconciliation row.
+		assert.Contains(t, summary.Warnings, "pool_fees_post_only_in_expense_ledger")
+		assert.Contains(t, summary.Warnings, "request_estimates_are_reconciliation_only_not_profit")
+		summaryView := request("GET", "/api/owner/finance/pool-cost-summary?from="+strconv.FormatInt(now-10, 10)+"&to="+strconv.FormatInt(now+10, 10), owner, nil)
+		require.Equal(t, http.StatusOK, summaryView.Code)
+		assert.Contains(t, summaryView.Body.String(), "synthetic-pool")
+		for _, expected := range []struct {
+			token    string
+			expected int
+		}{
+			{"", http.StatusUnauthorized},
+			{"synthetic-admin-pat", http.StatusForbidden},
+		} {
+			assert.Equal(t, expected.expected, request("GET", "/api/owner/finance/pool-cost-summary?from=1&to=2", expected.token, nil).Code)
+		}
+	})
+	t.Run("phase four supplier bill lines reconcile without double posting", func(t *testing.T) {
+		assert.Equal(t, http.StatusServiceUnavailable, request("GET", "/api/owner/finance/supplier-bill-lines?bill_id=1", owner, nil).Code)
+		require.NoError(t, model.MigrateFinanceSupplierLines(db))
+		require.NoError(t, model.MigrateFinanceSupplierLines(db))
+		require.NoError(t, model.FinanceSupplierLinesReady(db))
+		now := time.Now().Unix()
+		usdFX := model.FinanceVersion{Kind: "fx", RecordKey: "lines-usd", EffectiveFrom: now - 1000, EffectiveTo: now + 100000, Active: true, Source: "synthetic fx", CreatedBy: 5}
+		require.NoError(t, service.ValidateFinanceVersion(&usdFX, []byte(`{"currency":"USD","cny_per_unit":"7"}`)))
+		require.NoError(t, model.AppendFinanceVersion(db, &usdFX, 0, "synthetic"))
+		// The bill keeps its posting total; lines never rewrite it.
+		bill, err := service.RegisterFinanceSupplierBill(db, service.FinanceSupplierInput{Scope: "all_channel_request_costs", EventKey: "synthetic-bill-lines-root", ChannelID: 41, PeriodFrom: now - 1000, PeriodTo: now + 10000, Currency: "USD", Amount: "10", FXVersionID: usdFX.ID, Evidence: "synthetic invoice"}, 5, "synthetic")
+		require.NoError(t, err)
+		require.NotNil(t, bill.AmountCNY)
+		// Facts to match against: one retried HTTP request and one task.
+		info := &relaycommon.RelayInfo{RequestId: "synthetic-line-req", UserId: 8, OriginModelName: "public-finance-model", ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 41, UpstreamModelName: "supplier-lines-model"}}
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader("{}"))
+		service.BeginFinanceAttempt(ctx, info)
+		service.CaptureFinanceTextUsage(ctx, info, &dto.Usage{PromptTokens: 1000, CompletionTokens: 500})
+		info.RetryIndex = 1
+		service.BeginFinanceAttempt(ctx, info)
+		service.CaptureFinanceTextUsage(ctx, info, &dto.Usage{PromptTokens: 100, CompletionTokens: 50})
+		service.FinishFinanceAttempt(ctx, info, false)
+		task := &model.Task{TaskID: "task_syntheticlines01", Platform: constant.TaskPlatformSuno, UserId: 8, ChannelId: 41, SubmitTime: now - 10, Properties: model.Properties{UpstreamModelName: "supplier-lines-model"}}
+		task.PrivateData.FinanceAttemptID = "unlinked"
+		service.CaptureFinanceTaskSubmission(task, common.GetPointer(12), "wallet", "settled", task.PrivateData.FinanceAttemptID)
+		linePost := func(body service.FinanceSupplierLineInput, token string) *httptest.ResponseRecorder {
+			return request("POST", "/api/owner/finance/supplier-bill-lines", token, body)
+		}
+		base := func(key string) service.FinanceSupplierLineInput {
+			return service.FinanceSupplierLineInput{Scope: "supplier_bill_detail", EventKey: key, BillID: bill.ID, ChannelID: 41, Category: "usage", UpstreamModel: "supplier-lines-model", UsageFrom: now - 500, UsageTo: now + 500, Currency: "USD", Evidence: "synthetic line evidence"}
+		}
+		lineByKey := func(key string) model.FinanceSupplierBillLine {
+			var line model.FinanceSupplierBillLine
+			require.NoError(t, db.Where("event_key = ?", key).First(&line).Error)
+			return line
+		}
+		// Usage line in USD with frozen FX; reference matches the retried request.
+		usage := base("synthetic-line-usage")
+		usage.Amount = "6"
+		usage.FXVersionID = usdFX.ID
+		usage.Reference = "synthetic-line-req"
+		response := linePost(usage, owner)
+		require.Equal(t, http.StatusCreated, response.Code, response.Body.String())
+		usageLine := lineByKey("synthetic-line-usage")
+		require.NotNil(t, usageLine.AmountCNY)
+		assert.Equal(t, "42", *usageLine.AmountCNY)
+		// Duplicate import of the same line key is rejected.
+		assert.Equal(t, http.StatusConflict, linePost(usage, owner).Code)
+		// Fixed line in CNY; a credit offsets part of the usage line.
+		fixed := base("synthetic-line-fixed")
+		fixed.Category, fixed.Currency, fixed.Amount = "fixed", "CNY", "20"
+		require.Equal(t, http.StatusCreated, linePost(fixed, owner).Code)
+		fixedLine := lineByKey("synthetic-line-fixed")
+		credit := base("synthetic-line-credit")
+		credit.Category, credit.Currency, credit.Amount = "credit", "USD", "1"
+		credit.FXVersionID, credit.ReferencesLineID = usdFX.ID, usageLine.ID
+		require.Equal(t, http.StatusCreated, linePost(credit, owner).Code)
+		creditLine := lineByKey("synthetic-line-credit")
+		// Accumulated credits may not exceed the original line amount.
+		excess := base("synthetic-line-credit2")
+		excess.Category, excess.Currency, excess.Amount = "credit", "USD", "6"
+		excess.FXVersionID, excess.ReferencesLineID = usdFX.ID, usageLine.ID
+		assert.Equal(t, http.StatusBadRequest, linePost(excess, owner).Code)
+		// Credits cannot reference credits; usage lines cannot reference lines.
+		creditOnCredit := base("synthetic-line-credit3")
+		creditOnCredit.Category, creditOnCredit.Currency, creditOnCredit.Amount = "credit", "USD", "0.5"
+		creditOnCredit.FXVersionID, creditOnCredit.ReferencesLineID = usdFX.ID, creditLine.ID
+		assert.Equal(t, http.StatusBadRequest, linePost(creditOnCredit, owner).Code)
+		usageWithRef := base("synthetic-line-usageref")
+		usageWithRef.Amount, usageWithRef.Currency, usageWithRef.ReferencesLineID = "1", "CNY", usageLine.ID
+		assert.Equal(t, http.StatusBadRequest, linePost(usageWithRef, owner).Code)
+		// Replacement keeps category, currency, FX and usage period; one line
+		// is superseded exactly once.
+		replacement := base("synthetic-line-fixed-r2")
+		replacement.Category, replacement.Currency, replacement.Amount = "fixed", "CNY", "25"
+		replacement.ReplacesLineID = fixedLine.ID
+		require.Equal(t, http.StatusCreated, linePost(replacement, owner).Code)
+		mismatched := base("synthetic-line-fixed-r3")
+		mismatched.Category, mismatched.Currency, mismatched.Amount = "fixed", "CNY", "25"
+		mismatched.ReplacesLineID = usageLine.ID
+		assert.Equal(t, http.StatusBadRequest, linePost(mismatched, owner).Code)
+		again := base("synthetic-line-fixed-r4")
+		again.Category, again.Currency, again.Amount = "fixed", "CNY", "26"
+		again.ReplacesLineID = fixedLine.ID
+		assert.Equal(t, http.StatusConflict, linePost(again, owner).Code)
+		// Unmatched reference and an out-of-period line stay review items.
+		late := base("synthetic-line-late")
+		late.Amount, late.FXVersionID = "1", usdFX.ID
+		late.Reference, late.UsageTo = "missing-request", now+20000
+		require.Equal(t, http.StatusCreated, linePost(late, owner).Code)
+		// EUR line without FX stays unknown, never zero.
+		euro := base("synthetic-line-euro")
+		euro.Currency, euro.Amount = "EUR", "2"
+		require.Equal(t, http.StatusCreated, linePost(euro, owner).Code)
+		// Task-referenced line in CNY.
+		taskLine := base("synthetic-line-task")
+		taskLine.Currency, taskLine.Amount = "CNY", "3"
+		taskLine.Reference = "task:task_syntheticlines01"
+		require.Equal(t, http.StatusCreated, linePost(taskLine, owner).Code)
+		// Audit failure rolls the line back completely.
+		require.NoError(t, db.Callback().Create().Before("gorm:create").Register("synthetic_line_audit_fail", func(tx *gorm.DB) {
+			if tx.Statement.Table == "finance_audits" {
+				tx.AddError(fmt.Errorf("synthetic audit failure"))
+			}
+		}))
+		auditFail := base("synthetic-line-audit-fail")
+		auditFail.Amount, auditFail.Currency = "1", "CNY"
+		assert.Equal(t, http.StatusServiceUnavailable, linePost(auditFail, owner).Code)
+		require.NoError(t, db.Callback().Create().Remove("synthetic_line_audit_fail"))
+		var auditFailCount int64
+		require.NoError(t, db.Model(&model.FinanceSupplierBillLine{}).Where("event_key = ?", "synthetic-line-audit-fail").Count(&auditFailCount).Error)
+		assert.Zero(t, auditFailCount)
+		// Summary: the bill total remains the only posting value; category
+		// nets include credits; unmatched and out-of-period stay partial.
+		summaryResponse := request("GET", "/api/owner/finance/supplier-bill-lines/summary?bill_id="+strconv.FormatInt(bill.ID, 10), owner, nil)
+		require.Equal(t, http.StatusOK, summaryResponse.Code, summaryResponse.Body.String())
+		var summary service.FinanceSupplierLinesSummary
+		require.NoError(t, common.UnmarshalJsonStr(summaryResponse.Body.String(), &struct {
+			Data *service.FinanceSupplierLinesSummary `json:"data"`
+		}{&summary}))
+		assert.Equal(t, 7, summary.TotalLines)
+		assert.Equal(t, 6, summary.EffectiveLines)
+		assert.Equal(t, 1, summary.CreditLines)
+		assert.Equal(t, 1, summary.UnknownFXLines)
+		assert.Equal(t, 1, summary.OutOfBillPeriodLines)
+		require.NotNil(t, summary.NetCNY)
+		assert.Equal(t, "70", *summary.NetCNY) // 42 usage + 25 fixed + 7 late + 3 task - 7 credit; EUR unknown excluded
+		// The EUR unknown-FX line keeps the variance uncomputable rather than
+		// pretending the bill is explained.
+		assert.Nil(t, summary.VarianceCNY)
+		require.NotNil(t, summary.UsageNetCNY)
+		assert.Equal(t, "45", *summary.UsageNetCNY)
+		require.NotNil(t, summary.NonUsageNetCNY)
+		assert.Equal(t, "25", *summary.NonUsageNetCNY)
+		assert.Equal(t, 1, summary.MatchStats["matched_request"])
+		assert.Equal(t, 1, summary.MatchStats["matched_task"])
+		assert.Equal(t, 1, summary.MatchStats["unmatched_ref"])
+		assert.Equal(t, 3, summary.MatchStats["no_reference"])
+		// A bill whose lines are fully known reconciles to a zero variance.
+		cnyBill, err := service.RegisterFinanceSupplierBill(db, service.FinanceSupplierInput{Scope: "all_channel_request_costs", EventKey: "synthetic-bill-lines-cny", ChannelID: 42, PeriodFrom: now - 1000, PeriodTo: now + 10000, Currency: "CNY", Amount: "50", Evidence: "synthetic invoice"}, 5, "synthetic")
+		require.NoError(t, err)
+		cnyLine := base("synthetic-line-cny-clean")
+		cnyLine.BillID, cnyLine.ChannelID, cnyLine.Currency, cnyLine.Amount = cnyBill.ID, 42, "CNY", "50"
+		require.Equal(t, http.StatusCreated, linePost(cnyLine, owner).Code)
+		cleanSummary := request("GET", "/api/owner/finance/supplier-bill-lines/summary?bill_id="+strconv.FormatInt(cnyBill.ID, 10), owner, nil)
+		require.Equal(t, http.StatusOK, cleanSummary.Code)
+		var clean service.FinanceSupplierLinesSummary
+		require.NoError(t, common.UnmarshalJsonStr(cleanSummary.Body.String(), &struct {
+			Data *service.FinanceSupplierLinesSummary `json:"data"`
+		}{&clean}))
+		require.NotNil(t, clean.NetCNY)
+		assert.Equal(t, "50", *clean.NetCNY)
+		require.NotNil(t, clean.VarianceCNY)
+		assert.Equal(t, "0", *clean.VarianceCNY)
+		listResponse := request("GET", "/api/owner/finance/supplier-bill-lines?bill_id="+strconv.FormatInt(bill.ID, 10), owner, nil)
+		require.Equal(t, http.StatusOK, listResponse.Code)
+		assert.Contains(t, listResponse.Body.String(), `"status":"matched_task"`)
+		assert.Contains(t, listResponse.Body.String(), `"superseded":true`)
+		// Non-owner access stays denied.
+		assert.Equal(t, http.StatusForbidden, linePost(usage, "synthetic-admin-pat").Code)
+		assert.Equal(t, http.StatusUnauthorized, request("GET", "/api/owner/finance/supplier-bill-lines?bill_id="+strconv.FormatInt(bill.ID, 10), "", nil).Code)
+		// The bill amount itself is unchanged by its lines.
+		var unchanged model.FinanceSupplierBill
+		require.NoError(t, db.First(&unchanged, bill.ID).Error)
+		assert.Equal(t, "10", unchanged.Amount)
+	})
 }
 
 func TestFinanceCalendarAccrual(t *testing.T) {
@@ -1247,6 +2167,45 @@ func TestFinanceRevenueFIFO(t *testing.T) {
 		assert.Nil(t, result.Lots[0].ValueCNY)
 		assert.Equal(t, int64(0), result.UnknownConsumedQuota)
 	})
+	t.Run("repeated partial reversals stay within the original consumption and conserve value", func(t *testing.T) {
+		input := service.FinanceRevenuePreview{Events: []service.FinanceRevenueEvent{
+			credit("paid", "paid", 30, value("3")), consume("use", 30),
+			reverse("first-part", "use", 10), reverse("second-part", "use", 10), reverse("last-part", "use", 10),
+		}}
+		result, err := service.PreviewFinanceRevenue(input)
+		require.NoError(t, err)
+		assert.Equal(t, "0", *result.ConsumptionCNY)
+		assert.Equal(t, "3", *result.BackingValueCNY)
+		assert.Equal(t, int64(30), result.RemainingQuota)
+		require.Len(t, result.Allocations[1].Parts, 1)
+		assert.Equal(t, "-1", *result.Allocations[1].Parts[0].ValueCNY)
+		assert.Equal(t, "-1", *result.Allocations[2].Parts[0].ValueCNY)
+		assert.Equal(t, "-1", *result.Allocations[3].Parts[0].ValueCNY)
+		// Reversed quota consumed again recognizes exactly the original values.
+		again := service.FinanceRevenuePreview{Events: append(input.Events, service.FinanceRevenueEvent{Key: "reconsume", At: 4, Kind: "consume", Quota: 30})}
+		reconsumed, err := service.PreviewFinanceRevenue(again)
+		require.NoError(t, err)
+		assert.Equal(t, "3", *reconsumed.ConsumptionCNY)
+		assert.Equal(t, int64(0), reconsumed.RemainingQuota)
+	})
+	t.Run("manual adjust facts grant without cash value and forfeit without revenue", func(t *testing.T) {
+		result, err := service.PreviewFinanceRevenue(service.FinanceRevenuePreview{Events: []service.FinanceRevenueEvent{
+			{Key: "grant-gift", At: 1, Kind: "adjust", Quota: 20, Source: "gift", ValueCNY: value("0")},
+			{Key: "grant-unknown", At: 2, Kind: "adjust", Quota: 10, Source: "unknown"},
+			{Key: "forfeit", At: 3, Kind: "adjust", Quota: -15},
+			{Key: "use", At: 4, Kind: "consume", Quota: 15},
+		}})
+		require.NoError(t, err)
+		assert.Equal(t, "partial", result.Status)
+		assert.Equal(t, "0", result.KnownBackingValueCNY)
+		assert.Nil(t, result.BackingValueCNY)
+		assert.Nil(t, result.ConsumptionCNY) // unknown-source quota was consumed
+		assert.Equal(t, int64(10), result.UnknownConsumedQuota)
+		assert.Equal(t, int64(0), result.RemainingQuota)
+		require.Len(t, result.Allocations[0].Parts, 1) // forfeit took from the gift lot only
+		assert.Equal(t, "grant-gift", result.Allocations[0].Parts[0].LotKey)
+		assert.Nil(t, result.Allocations[0].Parts[0].ValueCNY)
+	})
 	for _, test := range []struct {
 		name   string
 		events []service.FinanceRevenueEvent
@@ -1257,8 +2216,11 @@ func TestFinanceRevenueFIFO(t *testing.T) {
 		{"duplicate fact", []service.FinanceRevenueEvent{credit("p", "paid", 10, value("10")), consume("p", 1)}},
 		{"quota overflow", []service.FinanceRevenueEvent{credit("p", "paid", common.MaxWalletQuota, value("10")), credit("g", "gift", 1, value("0"))}},
 		{"overconsume", []service.FinanceRevenueEvent{credit("g", "gift", 10, value("0")), consume("c", 11)}},
-		{"partial refund", []service.FinanceRevenueEvent{credit("g", "gift", 10, value("0")), consume("c", 10), reverse("r", "c", 5)}},
-		{"double refund", []service.FinanceRevenueEvent{credit("g", "gift", 10, value("0")), consume("c", 10), reverse("r", "c", 10), reverse("r2", "c", 10)}},
+		{"over reversal", []service.FinanceRevenueEvent{credit("g", "gift", 10, value("0")), consume("c", 10), reverse("r", "c", 10), reverse("r2", "c", 10)}},
+		{"paid manual grant", []service.FinanceRevenueEvent{{Key: "a", At: 1, Kind: "adjust", Quota: 5, Source: "paid", ValueCNY: value("1")}}},
+		{"gift adjust with value", []service.FinanceRevenueEvent{{Key: "a", At: 1, Kind: "adjust", Quota: 5, Source: "gift", ValueCNY: value("1")}}},
+		{"zero adjust", []service.FinanceRevenueEvent{{Key: "a", At: 1, Kind: "adjust", Quota: 0}}},
+		{"forfeit beyond balance", []service.FinanceRevenueEvent{credit("g", "gift", 5, value("0")), {Key: "a", At: 2, Kind: "adjust", Quota: -6}}},
 		{"no original refund", []service.FinanceRevenueEvent{reverse("r", "absent", 10)}},
 		{"out of order", []service.FinanceRevenueEvent{{Key: "g", At: 3, Kind: "credit", Source: "gift", Quota: 10, ValueCNY: value("0")}, consume("c", 1)}},
 		{"unsupported cash refund", []service.FinanceRevenueEvent{{Key: "r", At: 1, Kind: "cash_refund", Quota: 1}}},
@@ -1307,5 +2269,17 @@ func TestFinanceFreshSchema(t *testing.T) {
 	require.NoError(t, model.MigrateFinanceSupplier(db))
 	require.NoError(t, model.FinanceSupplierReady(db))
 	assert.True(t, db.Migrator().HasTable(&model.FinanceSupplierBill{}))
+	require.NoError(t, model.MigrateFinanceRefunds(db))
+	require.NoError(t, model.MigrateFinanceRefunds(db))
+	require.NoError(t, model.FinanceRefundsReady(db))
+	assert.True(t, db.Migrator().HasTable(&model.FinanceCashRefund{}))
+	require.NoError(t, model.MigrateFinanceSync(db))
+	require.NoError(t, model.MigrateFinanceSync(db))
+	require.NoError(t, model.FinanceSyncReady(db))
+	assert.True(t, db.Migrator().HasTable(&model.FinanceSyncEvent{}))
+	require.NoError(t, model.MigrateFinanceRebuilds(db))
+	require.NoError(t, model.MigrateFinanceRebuilds(db))
+	require.NoError(t, model.FinanceRebuildsReady(db))
+	assert.True(t, db.Migrator().HasTable(&model.FinanceRebuildSnapshot{}))
 	assert.False(t, db.Migrator().HasTable(&model.User{}))
 }

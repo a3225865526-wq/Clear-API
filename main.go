@@ -132,6 +132,10 @@ func main() {
 	// Codex credential auto-refresh check every 10 minutes, refresh when expires within 1 day
 	service.StartCodexCredentialAutoRefreshTask()
 
+	// Finance ledger sync worker; no-op unless the owner finance feature is
+	// separately enabled in the startup environment.
+	service.StartFinanceSyncWorker()
+
 	// Subscription quota reset task (daily/weekly/monthly/custom)
 	service.StartSubscriptionQuotaResetTask()
 

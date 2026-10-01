@@ -245,6 +245,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 		if info != nil && billingPrepared {
 			apiErr = RefundFailedRequestBilling(c, info, apiErr)
 		}
+		service.FinishFinanceAttempt(c, info, apiErr != nil)
 	}()
 	if modelName == "" {
 		return newResponsesWSInvalidRequestError(errors.New("model is required"))
@@ -270,6 +271,9 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 			return apiErr
 		}
 		billingPrepared = true
+		// The upstream connection is reused, so there is no new handshake:
+		// the attempt freeze still happens per call, right before the send.
+		service.BeginFinanceAttempt(c, info)
 		var payload []byte
 		payload, apiErr = buildResponsesWSCreatePayload(c, info, create.Request, create.Generate, create.StreamID)
 		if apiErr != nil {
@@ -311,8 +315,15 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 			}
 			adaptor := GetAdaptor(info.ApiType)
 			adaptor.Init(info)
+			financeAttempt := service.BeginFinanceAttempt(c, info)
 			target, dialErr := relaychannel.DoWssRequest(adaptor, c, info, nil)
 			if dialErr != nil {
+				dialStatus := 0
+				var dialAPIErr *types.NewAPIError
+				if errors.As(dialErr, &dialAPIErr) {
+					dialStatus = dialAPIErr.StatusCode
+				}
+				service.CaptureFinanceTransport(info, financeAttempt, dialStatus, true)
 				apiErr = service.NormalizeViolationFeeError(types.NewError(dialErr, types.ErrorCodeDoRequestFailed))
 				service.ResetStatusCode(apiErr, c.GetString("status_code_mapping"))
 				info.LastError = apiErr
@@ -325,8 +336,10 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 				return apiErr
 			}
 			if !s.setTarget(target) {
+				service.CaptureFinanceTransport(info, financeAttempt, 101, false)
 				return types.NewError(context.Canceled, types.ErrorCodeBadResponse, types.ErrOptionWithSkipRetry())
 			}
+			service.CaptureFinanceTransport(info, financeAttempt, 101, false)
 			if err := s.writeTarget(websocket.TextMessage, payload); err != nil {
 				state.closeAfter = true
 				return types.NewError(err, types.ErrorCodeBadResponse, types.ErrOptionWithSkipRetry())

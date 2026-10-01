@@ -267,6 +267,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 	// 1. 退还资金来源（钱包或订阅）
 	if err := taskAdjustFunding(task, -quota); err != nil {
 		logger.LogWarn(ctx, fmt.Sprintf("退还资金来源失败 task %s: %s", task.TaskID, err.Error()))
+		CaptureFinanceTaskRefund(task, quota, reason+":refund_failed", false)
 		return false
 	}
 
@@ -299,6 +300,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 	if err := task.UpdateQuota(); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("退款成功但清除 task quota 失败 task %s: %s", task.TaskID, err.Error()))
 	}
+	CaptureFinanceTaskRefund(task, quota, reason, true)
 	return true
 }
 
@@ -307,6 +309,16 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 // reason 用于日志记录（例如 "token重算" 或 "adaptor调整"）。
 // clamps 可选：若计算 actualQuota 时发生额度饱和，将其记入日志 admin_info（仅管理员可见）。
 func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int, reason string, clamps ...*common.QuotaClamp) {
+	recalculateTaskQuotaWithFacts(ctx, task, actualQuota, reason, nil, clamps...)
+}
+
+// RecalculateTaskQuotaWithFacts behaves like RecalculateTaskQuota and also
+// forwards the final upstream usage facts into the finance observation.
+func RecalculateTaskQuotaWithFacts(ctx context.Context, task *model.Task, actualQuota int, reason string, usageFacts map[string]any, clamps ...*common.QuotaClamp) {
+	recalculateTaskQuotaWithFacts(ctx, task, actualQuota, reason, usageFacts, clamps...)
+}
+
+func recalculateTaskQuotaWithFacts(ctx context.Context, task *model.Task, actualQuota int, reason string, usageFacts map[string]any, clamps ...*common.QuotaClamp) {
 	if actualQuota < 0 {
 		return
 	}
@@ -316,6 +328,9 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	if quotaDelta == 0 {
 		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 预扣费准确（%s，%s）",
 			task.TaskID, logger.LogQuota(actualQuota), reason))
+		// A zero delta still carries the final upstream usage: procurement
+		// needs the settled facts even when no money moved.
+		CaptureFinanceTaskAdjustment(task, actualQuota, preConsumedQuota, reason, usageFacts)
 		return
 	}
 
@@ -330,6 +345,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 	// 调整资金来源
 	if err := taskAdjustFunding(task, quotaDelta); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("差额结算资金调整失败 task %s: %s", task.TaskID, err.Error()))
+		CaptureFinanceTaskAdjustment(task, actualQuota, preConsumedQuota, reason+":settlement_failed", usageFacts)
 		return
 	}
 
@@ -373,6 +389,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		Other:     other,
 		NodeName:  task.PrivateData.NodeName,
 	})
+	CaptureFinanceTaskAdjustment(task, actualQuota, preConsumedQuota, reason, usageFacts)
 }
 
 // RecalculateTaskQuotaByTokens 根据实际 token 消耗重新计费（异步差额结算）。
@@ -424,7 +441,7 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	actualQuota, clamp := common.QuotaFromFloatChecked(float64(totalTokens) * modelRatio * finalGroupRatio * otherMultiplier)
 
 	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
-	RecalculateTaskQuota(ctx, task, actualQuota, reason, clamp)
+	RecalculateTaskQuotaWithFacts(ctx, task, actualQuota, reason, map[string]any{"total_tokens": float64(totalTokens)}, clamp)
 	return true
 }
 

@@ -80,7 +80,7 @@ func TestFixedPriceBillingDatabaseMatrix(t *testing.T) {
 			model.DB, model.LOG_DB = db, logDB
 			common.SetDatabaseTypes(dialect.name, dialect.name)
 			t.Cleanup(func() { model.DB, model.LOG_DB = oldDB, oldLogDB; common.SetDatabaseTypes(oldMainType, oldLogType) })
-			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}))
+			require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}, &model.TopUp{}, &model.Checkin{}))
 			require.NoError(t, logDB.AutoMigrate(&model.Log{}))
 			versionQuery := "select version()"
 			if dialect.name == common.DatabaseTypeSQLite {
@@ -90,8 +90,128 @@ func TestFixedPriceBillingDatabaseMatrix(t *testing.T) {
 			require.NoError(t, db.Raw(versionQuery).Scan(&version).Error)
 			t.Logf("database: %s", version)
 			runFixedPriceAccountingCases(t, db, logDB)
+			runStrictPrepaidAccountingCases(t, db)
 		})
 	}
+}
+
+func runStrictPrepaidAccountingCases(t *testing.T, db *gorm.DB) {
+	t.Helper()
+	oldRedis, oldBatch := common.RedisEnabled, common.BatchUpdateEnabled
+	common.RedisEnabled, common.BatchUpdateEnabled = false, false
+	t.Cleanup(func() { common.RedisEnabled, common.BatchUpdateEnabled = oldRedis, oldBatch })
+	t.Run("concurrent wallet settlements never overdraw", func(t *testing.T) {
+		user := model.User{Username: "strict-wallet", Quota: 100, Status: common.UserStatusEnabled}
+		require.NoError(t, db.Create(&user).Error)
+		t.Cleanup(func() { require.NoError(t, db.Unscoped().Delete(&user).Error) })
+		start := make(chan struct{})
+		results := make(chan error, 2)
+		for range 2 {
+			go func() { <-start; results <- (&WalletFunding{userId: user.Id}).Settle(60) }()
+		}
+		close(start)
+		var succeeded, rejected int
+		for range 2 {
+			if err := <-results; err == nil {
+				succeeded++
+			} else {
+				require.ErrorIs(t, err, ErrInsufficientWalletQuota)
+				rejected++
+			}
+		}
+		assert.Equal(t, 1, succeeded)
+		assert.Equal(t, 1, rejected)
+		var updated model.User
+		require.NoError(t, db.First(&updated, user.Id).Error)
+		assert.Equal(t, 40, updated.Quota)
+	})
+	t.Run("reward credits cannot exceed wallet limit", func(t *testing.T) {
+		oldCheckin := *operation_setting.GetCheckinSetting()
+		operation_setting.GetCheckinSetting().Enabled = true
+		operation_setting.GetCheckinSetting().MinQuota = 100
+		operation_setting.GetCheckinSetting().MaxQuota = 100
+		t.Cleanup(func() { *operation_setting.GetCheckinSetting() = oldCheckin })
+		user := model.User{Username: "strict-reward-limit", Quota: common.MaxWalletQuota - 50, AffQuota: 500000, Status: common.UserStatusEnabled}
+		require.NoError(t, db.Create(&user).Error)
+		t.Cleanup(func() { require.NoError(t, db.Unscoped().Delete(&user).Error) })
+		_, err := model.UserCheckin(user.Id)
+		require.Error(t, err)
+		require.Error(t, user.TransferAffQuotaToQuota(500000))
+		var updated model.User
+		require.NoError(t, db.First(&updated, user.Id).Error)
+		assert.Equal(t, common.MaxWalletQuota-50, updated.Quota)
+		assert.Equal(t, 500000, updated.AffQuota)
+		var count int64
+		require.NoError(t, db.Model(&model.Checkin{}).Where("user_id = ?", user.Id).Count(&count).Error)
+		assert.Zero(t, count, "a failed reward must not leave a checkin record")
+	})
+	t.Run("existing trust setting cannot bypass strict prepaid", func(t *testing.T) {
+		oldTrust := operation_setting.GetQuotaSetting().TrustQuotaUSD
+		operation_setting.GetQuotaSetting().TrustQuotaUSD = 10
+		t.Cleanup(func() { operation_setting.GetQuotaSetting().TrustQuotaUSD = oldTrust })
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		info := &relaycommon.RelayInfo{TokenUnlimited: true, UserQuota: 100_000_000}
+		session := &BillingSession{relayInfo: info, funding: &WalletFunding{}}
+		assert.False(t, session.shouldTrust(ctx))
+	})
+	for index, tokenQuota := range []int{100, 1000} {
+		t.Run(fmt.Sprintf("insufficient settlement preserves paid quota token=%d", tokenQuota), func(t *testing.T) {
+			user := model.User{Username: fmt.Sprintf("strict-settle-%d", index), Quota: 100, Status: common.UserStatusEnabled}
+			require.NoError(t, db.Create(&user).Error)
+			token := model.Token{UserId: user.Id, Key: fmt.Sprintf("strict-settle-token-%d", index), RemainQuota: tokenQuota, Status: common.TokenStatusEnabled}
+			require.NoError(t, db.Create(&token).Error)
+			t.Cleanup(func() {
+				require.NoError(t, db.Unscoped().Delete(&token).Error)
+				require.NoError(t, db.Unscoped().Delete(&user).Error)
+			})
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			info := &relaycommon.RelayInfo{UserId: user.Id, TokenId: token.Id, TokenKey: token.Key, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
+			require.Nil(t, PreConsumeBilling(ctx, 80, info))
+			session := info.Billing.(*BillingSession)
+			require.Error(t, session.Settle(110))
+			require.Error(t, session.Settle(110), "failed settlement must not become a successful replay")
+			session.Refund(ctx)
+			assert.Equal(t, 80, session.ChargedQuota())
+			var updated model.User
+			var updatedToken model.Token
+			require.NoError(t, db.First(&updated, user.Id).Error)
+			require.NoError(t, db.First(&updatedToken, token.Id).Error)
+			assert.Equal(t, 20, updated.Quota)
+			assert.Equal(t, tokenQuota-80, updatedToken.RemainQuota)
+		})
+	}
+	t.Run("manual topup snapshot self-benefit and replay", func(t *testing.T) {
+		user := model.User{Username: "strict-manual-topup", Quota: 17, Status: common.UserStatusEnabled}
+		require.NoError(t, db.Create(&user).Error)
+		order := model.TopUp{UserId: user.Id, Amount: 1, Money: 1, TradeNo: "strict-manual-topup", Status: common.TopUpStatusPending}
+		require.NoError(t, db.Create(&order).Error)
+		t.Cleanup(func() {
+			require.NoError(t, db.Delete(&order).Error)
+			require.NoError(t, db.Unscoped().Delete(&user).Error)
+		})
+		_, err := model.ManualCompleteTopUp(order.TradeNo, "127.0.0.1", user.Id)
+		require.Error(t, err)
+		result, err := model.ManualCompleteTopUp(order.TradeNo, "127.0.0.1", user.Id+1)
+		require.NoError(t, err)
+		assert.Equal(t, 17, result.Before)
+		assert.Equal(t, 500017, result.After)
+		assert.Equal(t, 500000, result.CreditedQuota)
+		result, err = model.ManualCompleteTopUp(order.TradeNo, "127.0.0.1", user.Id+1)
+		require.NoError(t, err)
+		assert.True(t, result.AlreadyCompleted)
+		assert.Equal(t, result.Before, result.After)
+	})
+}
+
+func TestLegacyFixedPriceBillingWithZeroUsage(t *testing.T) {
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	info := &relaycommon.RelayInfo{StartTime: time.Now(), PriceData: hosttypes.PriceData{UsePrice: true, ModelPrice: 0.01, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}}}
+	summary := calculateTextQuotaSummary(ctx, info, &dto.Usage{})
+	assert.Equal(t, 5000, summary.Quota, "a successful fixed-price result must be charged once")
+	info.StreamStatus = relaycommon.NewStreamStatus()
+	info.StreamStatus.MarkFailed("incomplete_stream", "upstream_error", 502)
+	summary = calculateTextQuotaSummary(ctx, info, &dto.Usage{})
+	assert.Zero(t, summary.Quota, "a failed stream with no result must remain free")
 }
 
 func runFixedPriceAccountingCases(t *testing.T, db, logDB *gorm.DB) {

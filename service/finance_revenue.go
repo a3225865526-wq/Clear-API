@@ -71,6 +71,14 @@ func (lot financeRevenueLot) consumedValue(quota int64) decimal.Decimal {
 	return lot.value.Mul(decimal.NewFromInt(quota)).DivRound(decimal.NewFromInt(lot.event.Quota), 12)
 }
 
+// Tracks how much of one consumption has already been reversed so several
+// partial reversals stay within the original quota and sum to its value.
+type financeConsumptionState struct {
+	index       int
+	reversed    int64
+	reversedLot map[string]int64
+}
+
 func PreviewFinanceRevenue(input FinanceRevenuePreview) (*FinanceRevenueResult, error) {
 	if len(input.Events) == 0 || len(input.Events) > 512 {
 		return nil, model.ErrFinanceInvalid
@@ -83,22 +91,22 @@ func PreviewFinanceRevenue(input FinanceRevenuePreview) (*FinanceRevenueResult, 
 		}
 		nominal = &rate
 	}
-	result := &FinanceRevenueResult{Simulation: true, Status: "known", Lots: []FinanceRevenuePart{}, Allocations: []FinanceRevenueAllocation{}, Warnings: []string{"simulation_only", "cash_receipts_not_connected", "cash_refunds_and_subscription_revenue_not_supported"}}
+	result := &FinanceRevenueResult{Simulation: true, Status: "known", Lots: []FinanceRevenuePart{}, Allocations: []FinanceRevenueAllocation{}, Warnings: []string{"simulation_only", "cash_receipts_not_connected", "cash_refunds_separate_cash_account", "subscription_revenue_not_supported"}}
 	lots := []financeRevenueLot{}
 	lotByKey := map[string]int{}
-	consumptionByKey := map[string]int{}
-	seen, reversed := map[string]bool{}, map[string]bool{}
+	consumptionByKey := map[string]*financeConsumptionState{}
+	seen := map[string]bool{}
 	cash, revenue := decimal.Zero, decimal.Zero
 	unknownCash := false
 	var lastAt int64
 	for _, event := range input.Events {
-		if !financeKeyPattern.MatchString(event.Key) || seen[event.Key] || event.At <= 0 || event.At < lastAt || event.Quota <= 0 || event.Quota > common.MaxWalletQuota {
+		if !financeKeyPattern.MatchString(event.Key) || seen[event.Key] || event.At <= 0 || event.At < lastAt {
 			return nil, model.ErrFinanceInvalid
 		}
 		seen[event.Key], lastAt = true, event.At
 		switch event.Kind {
 		case "credit":
-			if !slices.Contains([]string{"paid", "gift", "unknown"}, event.Source) || event.Reverses != "" || event.Quota > common.MaxWalletQuota-result.RemainingQuota {
+			if event.Quota <= 0 || event.Quota > common.MaxWalletQuota || !slices.Contains([]string{"paid", "gift", "unknown"}, event.Source) || event.Reverses != "" || event.Quota > common.MaxWalletQuota-result.RemainingQuota {
 				return nil, model.ErrFinanceInvalid
 			}
 			lot := financeRevenueLot{event: event}
@@ -122,7 +130,7 @@ func PreviewFinanceRevenue(input FinanceRevenuePreview) (*FinanceRevenueResult, 
 			lots = append(lots, lot)
 			result.RemainingQuota += event.Quota
 		case "consume":
-			if event.Source != "" || event.ValueCNY != nil || event.Reverses != "" || event.Quota > result.RemainingQuota {
+			if event.Source != "" || event.ValueCNY != nil || event.Reverses != "" || event.Quota <= 0 || event.Quota > common.MaxWalletQuota || event.Quota > result.RemainingQuota {
 				return nil, model.ErrFinanceInvalid
 			}
 			allocation := FinanceRevenueAllocation{EventKey: event.Key, Kind: event.Kind, Parts: []FinanceRevenuePart{}}
@@ -151,42 +159,113 @@ func PreviewFinanceRevenue(input FinanceRevenuePreview) (*FinanceRevenueResult, 
 				}
 			}
 			result.RemainingQuota -= event.Quota
-			consumptionByKey[event.Key] = len(result.Allocations)
+			consumptionByKey[event.Key] = &financeConsumptionState{index: len(result.Allocations), reversedLot: map[string]int64{}}
 			result.Allocations = append(result.Allocations, allocation)
 		case "reverse":
-			index, exists := consumptionByKey[event.Reverses]
-			if !exists || reversed[event.Reverses] || event.Source != "" || event.ValueCNY != nil || event.Quota > common.MaxWalletQuota-result.RemainingQuota {
+			state, exists := consumptionByKey[event.Reverses]
+			if !exists || event.Source != "" || event.ValueCNY != nil || event.Quota <= 0 || event.Quota > common.MaxWalletQuota {
 				return nil, model.ErrFinanceInvalid
 			}
-			original := result.Allocations[index]
-			var total int64
-			for _, part := range original.Parts {
-				total += part.Quota
-			}
-			// Only whole consumption reversals are supported here. Partial cash
-			// refunds require separately approved attributable adjustment facts.
-			if event.Quota != total {
-				return nil, model.ErrFinanceInvalid
-			}
+			original := result.Allocations[state.index]
 			allocation := FinanceRevenueAllocation{EventKey: event.Key, Kind: event.Kind, Reverses: event.Reverses, Parts: []FinanceRevenuePart{}}
-			for _, part := range original.Parts {
-				lot := &lots[lotByKey[part.LotKey]]
-				lot.used -= part.Quota
-				part.Quota = -part.Quota
-				if part.ValueCNY == nil {
-					result.UnknownConsumedQuota += part.Quota
+			left := event.Quota
+			for _, originalPart := range original.Parts {
+				if left == 0 {
+					break
+				}
+				reversedQuota := state.reversedLot[originalPart.LotKey]
+				take := min(left, originalPart.Quota-reversedQuota)
+				if take <= 0 {
+					continue
+				}
+				lot := &lots[lotByKey[originalPart.LotKey]]
+				part := FinanceRevenuePart{LotKey: originalPart.LotKey, Source: originalPart.Source, Quota: -take}
+				if originalPart.ValueCNY == nil {
+					result.UnknownConsumedQuota -= take
 				} else {
-					amount, _ := financeDecimal(*part.ValueCNY, false)
+					originalValue, err := financeDecimal(*originalPart.ValueCNY, false)
+					if err != nil {
+						return nil, model.ErrFinanceInvalid
+					}
+					partQuota := decimal.NewFromInt(originalPart.Quota)
+					priorCumulative := originalValue.Mul(decimal.NewFromInt(reversedQuota)).DivRound(partQuota, 12)
+					amount := originalValue.Mul(decimal.NewFromInt(reversedQuota+take)).DivRound(partQuota, 12).Sub(priorCumulative)
 					revenue = revenue.Sub(amount)
 					lot.recognized = lot.recognized.Sub(amount)
 					value := amount.Neg().String()
 					part.ValueCNY = &value
 				}
+				lot.used -= take
+				state.reversed += take
+				state.reversedLot[originalPart.LotKey] = reversedQuota + take
 				allocation.Parts = append(allocation.Parts, part)
+				left -= take
 			}
-			result.RemainingQuota += total
-			reversed[event.Reverses] = true
+			if left != 0 {
+				return nil, model.ErrFinanceInvalid
+			}
+			result.RemainingQuota += event.Quota
 			result.Allocations = append(result.Allocations, allocation)
+		case "adjust":
+			if event.Reverses != "" {
+				return nil, model.ErrFinanceInvalid
+			}
+			if event.Quota > 0 {
+				// A manual grant never carries cash value; paid sources must
+				// enter through a cash-backed fact instead.
+				if !slices.Contains([]string{"gift", "unknown"}, event.Source) || event.Quota > common.MaxWalletQuota-result.RemainingQuota {
+					return nil, model.ErrFinanceInvalid
+				}
+				lot := financeRevenueLot{event: event}
+				if event.Source == "unknown" {
+					if event.ValueCNY != nil {
+						return nil, model.ErrFinanceInvalid
+					}
+					unknownCash = true
+				} else {
+					if event.ValueCNY == nil {
+						return nil, model.ErrFinanceInvalid
+					}
+					value, err := financeDecimal(*event.ValueCNY, false)
+					if err != nil || !value.IsZero() {
+						return nil, model.ErrFinanceInvalid
+					}
+					lot.value = value
+				}
+				lotByKey[event.Key] = len(lots)
+				lots = append(lots, lot)
+				result.RemainingQuota += event.Quota
+			} else if event.Quota < 0 {
+				if event.Source != "" || event.ValueCNY != nil {
+					return nil, model.ErrFinanceInvalid
+				}
+				forfeit := -event.Quota
+				if forfeit > result.RemainingQuota {
+					return nil, model.ErrFinanceInvalid
+				}
+				allocation := FinanceRevenueAllocation{EventKey: event.Key, Kind: event.Kind, Parts: []FinanceRevenuePart{}}
+				left := forfeit
+				for i := range lots {
+					lot := &lots[i]
+					take := min(left, lot.event.Quota-lot.used)
+					if take == 0 {
+						continue
+					}
+					// Forfeited quota leaves the wallet without becoming
+					// revenue or unknown consumption; its lot simply exhausts
+					// sooner and later consumption recognizes what remains.
+					allocation.Parts = append(allocation.Parts, FinanceRevenuePart{LotKey: lot.event.Key, Source: lot.event.Source, Quota: take})
+					lot.used += take
+					left -= take
+					if left == 0 {
+						break
+					}
+				}
+				result.RemainingQuota -= forfeit
+				result.Allocations = append(result.Allocations, allocation)
+			} else {
+				return nil, model.ErrFinanceInvalid
+			}
 		default:
 			return nil, model.ErrFinanceInvalid
 		}

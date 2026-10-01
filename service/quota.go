@@ -156,6 +156,8 @@ func PreWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usag
 func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, modelName string,
 	usage *dto.RealtimeUsage, extraContent string) {
 
+	CaptureFinanceRealtimeUsage(ctx, relayInfo, usage)
+
 	var tieredResult *billingexpr.TieredResult
 	tieredOk, tieredQuota, tieredRes := TryTieredSettle(relayInfo, billingexpr.TokenParams{
 		P:   float64(usage.InputTokens),
@@ -226,9 +228,21 @@ func PostWssConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, mod
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
+	financeCharged := &quota
+	financeStatus := "settled"
 	if err := SettleBilling(ctx, relayInfo, quota); err != nil {
+		if session, ok := relayInfo.Billing.(*BillingSession); ok {
+			quota = session.ChargedQuota()
+		} else {
+			financeCharged = nil
+			financeStatus = "settlement_unknown"
+		}
+		if financeCharged != nil {
+			financeStatus = "settlement_failed_charge_observed"
+		}
 		logger.LogError(ctx, "error settling billing: "+err.Error())
 	}
+	CaptureFinanceBilling(relayInfo, "text_settlement", financeCharged, relayInfo.BillingSource, financeStatus)
 
 	logModel := modelName
 	if extraContent != "" {
@@ -283,6 +297,9 @@ func CalcOpenRouterCacheCreateTokens(usage dto.Usage, priceData types.PriceData)
 }
 
 func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent string) {
+	// Capture the upstream-reported usage before the local estimate fallback
+	// replaces it, so finance facts never mistake an estimate for upstream data.
+	CaptureFinanceTextUsage(ctx, relayInfo, usage)
 	if usage == nil {
 		usage = &dto.Usage{PromptTokens: relayInfo.GetEstimatePromptTokens(), TotalTokens: relayInfo.GetEstimatePromptTokens()}
 	}
@@ -359,9 +376,21 @@ func PostAudioConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, u
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 	}
 
+	financeCharged := &quota
+	financeStatus := "settled"
 	if err := SettleBilling(ctx, relayInfo, quota); err != nil {
+		if session, ok := relayInfo.Billing.(*BillingSession); ok {
+			quota = session.ChargedQuota()
+		} else {
+			financeCharged = nil
+			financeStatus = "settlement_unknown"
+		}
+		if financeCharged != nil {
+			financeStatus = "settlement_failed_charge_observed"
+		}
 		logger.LogError(ctx, "error settling billing: "+err.Error())
 	}
+	CaptureFinanceBilling(relayInfo, "text_settlement", financeCharged, relayInfo.BillingSource, financeStatus)
 
 	logModel := billingModelName
 	if extraContent != "" {
@@ -423,6 +452,21 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 }
 
 func postConsumeQuotaWithResult(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int, sendEmail bool) (result postConsumeQuotaResult, err error) {
+	if quota > 0 && !relayInfo.IsPlayground {
+		if err = PreConsumeTokenQuota(relayInfo, quota); err != nil {
+			return result, err
+		}
+		result.TokenApplied = true
+		defer func() {
+			if !result.FundingApplied {
+				if rollbackErr := model.IncreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota); rollbackErr != nil {
+					err = errors.Join(err, rollbackErr)
+				} else {
+					result.TokenApplied = false
+				}
+			}
+		}()
+	}
 
 	// 1) Consume from wallet quota OR subscription item
 	if relayInfo != nil && relayInfo.BillingSource == BillingSourceSubscription {
@@ -439,7 +483,11 @@ func postConsumeQuotaWithResult(relayInfo *relaycommon.RelayInfo, quota int, pre
 	} else {
 		// Wallet
 		if quota > 0 {
-			err = model.DecreaseUserQuota(relayInfo.UserId, quota, false)
+			var reserved bool
+			reserved, err = model.TryReserveUserQuota(relayInfo.UserId, quota)
+			if err == nil && !reserved {
+				err = ErrInsufficientWalletQuota
+			}
 		} else {
 			err = model.IncreaseUserQuota(relayInfo.UserId, -quota, false)
 		}
@@ -449,12 +497,8 @@ func postConsumeQuotaWithResult(relayInfo *relaycommon.RelayInfo, quota int, pre
 	}
 	result.FundingApplied = true
 
-	if !relayInfo.IsPlayground {
-		if quota > 0 {
-			err = model.DecreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, quota)
-		} else {
-			err = model.IncreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, -quota)
-		}
+	if !relayInfo.IsPlayground && quota <= 0 {
+		err = model.IncreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, -quota)
 		if err != nil {
 			return result, err
 		}

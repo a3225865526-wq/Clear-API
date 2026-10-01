@@ -256,6 +256,10 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	summary.PromptTokens = usage.PromptTokens
 	summary.CompletionTokens = usage.CompletionTokens
 	summary.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	// A successful fixed-price result is billable even when usage is absent.
+	// Interrupted streams without any output must still refund their reservation.
+	summary.FixedPriceBilling = relayInfo.PriceData.UsePrice &&
+		(!relayInfo.StreamStatus.ResponseFailed() || summary.TotalTokens > 0)
 	summary.CacheTokens = usage.PromptTokensDetails.CachedTokens
 	summary.CacheCreationTokens = usage.PromptTokensDetails.CacheCreationTokensTotal()
 	summary.CacheCreationTokens5m = usage.ClaudeCacheCreation5mTokens
@@ -376,6 +380,10 @@ func calculateTextQuotaSummary(ctx *gin.Context, relayInfo *relaycommon.RelayInf
 	} else if !ratio.IsZero() && summary.Quota == 0 {
 		summary.Quota = 1
 	}
+	if relayInfo.PriceData.UsePrice && relayInfo.StreamStatus.ResponseFailed() &&
+		summary.CompletionTokens == 0 && summary.ToolCallSurchargeQuota.IsZero() {
+		summary.Quota = 0
+	}
 
 	return summary
 }
@@ -453,24 +461,30 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if !summary.hasBillableUsage() {
 		extraContent = append(extraContent, "上游没有返回计费信息，无法扣费（可能是上游超时）")
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, summary.ModelName, relayInfo.FinalPreConsumedQuota))
-	} else {
-		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
-		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
 	}
-
+	var settlementFailed bool
+	expectedQuota := summary.Quota
+	if err := SettleBilling(ctx, relayInfo, summary.Quota); err != nil {
+		settlementFailed = true
+		if session, ok := relayInfo.Billing.(*BillingSession); ok {
+			summary.Quota = session.ChargedQuota()
+		}
+		logger.LogError(ctx, "error settling billing: "+err.Error())
+	}
 	financeCharged := &summary.Quota
 	financeStatus := "settled"
-	if err := SettleBilling(ctx, relayInfo, summary.Quota); err != nil {
-		logger.LogError(ctx, "error settling billing: "+err.Error())
-		financeCharged = nil
-		financeStatus = "settlement_unknown"
-		if session, ok := relayInfo.Billing.(*BillingSession); ok {
-			charged := session.ChargedQuota()
-			financeCharged = &charged
-			financeStatus = "settlement_failed_charge_observed"
+	if settlementFailed {
+		financeStatus = "settlement_failed_charge_observed"
+		if _, ok := relayInfo.Billing.(*BillingSession); !ok {
+			financeCharged = nil
+			financeStatus = "settlement_unknown"
 		}
 	}
 	CaptureFinanceBilling(relayInfo, "text_settlement", financeCharged, relayInfo.BillingSource, financeStatus)
+	if summary.hasBillableUsage() {
+		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
+		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
+	}
 
 	logModel := summary.ModelName
 	if strings.HasPrefix(logModel, "gpt-4-gizmo") {
@@ -497,6 +511,14 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		other = GenerateTextOtherInfo(ctx, relayInfo, summary.ModelRatio, summary.GroupRatio, summary.CompletionRatio, summary.CacheTokens, summary.CacheRatio, summary.ModelPrice, relayInfo.PriceData.GroupRatioInfo.GroupSpecialRatio)
 	}
 	appendUsageBillingPathForLog(other, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens), originUsage)
+	if settlementFailed {
+		other.SetAdmin("settlement_failed", true)
+		other.SetAdmin("expected_quota", expectedQuota)
+		other.SetAdmin("charged_quota", summary.Quota)
+	}
+	if common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens) {
+		other.SetPublic("usage_estimated", true)
+	}
 	if adminRejectReason != "" {
 		other.SetAdmin("reject_reason", adminRejectReason)
 	}

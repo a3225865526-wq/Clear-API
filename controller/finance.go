@@ -48,7 +48,22 @@ func financeError(c *gin.Context, err error) {
 }
 
 func FinanceCapability(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"can_access": true, "currency": "CNY", "timezone": "Asia/Shanghai", "allocation": "fifo", "package_value": "total_quota", "stage": 5, "revenue_preview_available": true, "schema_ready": model.FinanceReady(model.DB) == nil, "source_ledger_ready": model.FinanceRevenueReady(model.DB) == nil, "source_ledger_coverage": "partial_confirmed_facts", "request_capture_ready": model.FinanceRequestsReady(model.DB) == nil, "cash_receipts_ready": model.FinanceReceiptsReady(model.DB) == nil, "supplier_bills_ready": model.FinanceSupplierReady(model.DB) == nil}})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"can_access": true, "currency": "CNY", "timezone": "Asia/Shanghai", "allocation": "fifo", "package_value": "total_quota", "stage": 10, "revenue_preview_available": true, "schema_ready": model.FinanceReady(model.DB) == nil, "source_ledger_ready": model.FinanceRevenueReady(model.DB) == nil, "source_ledger_coverage": "partial_confirmed_facts", "request_capture_ready": model.FinanceRequestsReady(model.DB) == nil, "cash_receipts_ready": model.FinanceReceiptsReady(model.DB) == nil, "cash_refunds_ready": model.FinanceRefundsReady(model.DB) == nil, "supplier_bills_ready": model.FinanceSupplierReady(model.DB) == nil, "supplier_bill_lines_ready": model.FinanceSupplierLinesReady(model.DB) == nil, "sync_events_ready": model.FinanceSyncReady(model.DB) == nil, "rebuilds_ready": model.FinanceRebuildsReady(model.DB) == nil, "pool_cost_summary_available": true}})
+}
+
+func GetFinancePoolCostSummary(c *gin.Context) {
+	from, errFrom := strconv.ParseInt(c.Query("from"), 10, 64)
+	to, errTo := strconv.ParseInt(c.Query("to"), 10, 64)
+	if errFrom != nil || errTo != nil {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	result, err := service.SummarizeFinancePoolCosts(model.DB, from, to)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
 }
 
 func CreateFinanceSupplierBill(c *gin.Context) {
@@ -64,6 +79,49 @@ func CreateFinanceSupplierBill(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"success": true, "data": entry})
+}
+
+func CreateFinanceSupplierBillLine(c *gin.Context) {
+	var input service.FinanceSupplierLineInput
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8192)
+	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	entry, err := service.RegisterFinanceSupplierBillLine(model.DB, input, c.GetInt("id"), c.GetString(common.RequestIdKey))
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": entry})
+}
+
+func ListFinanceSupplierBillLines(c *gin.Context) {
+	billID, err := strconv.ParseInt(c.Query("bill_id"), 10, 64)
+	if err != nil || billID <= 0 {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	lines, bill, err := service.ListFinanceSupplierBillLines(model.DB, billID)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"bill": bill, "items": lines}})
+}
+
+func GetFinanceSupplierLinesSummary(c *gin.Context) {
+	billID, err := strconv.ParseInt(c.Query("bill_id"), 10, 64)
+	if err != nil || billID <= 0 {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	result, err := service.SummarizeFinanceSupplierLines(model.DB, billID)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
 }
 
 func ListFinanceSupplierBills(c *gin.Context) {
@@ -196,6 +254,44 @@ func ListFinanceCashReceipts(c *gin.Context) {
 		return
 	}
 	var entries []model.FinanceCashReceipt
+	if err := model.DB.Order("id desc").Offset(page.GetStartIdx()).Limit(page.GetPageSize()).Find(&entries).Error; err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"items": entries, "total": total, "status": "partial", "verification": "owner_confirmed_manual"}})
+}
+
+func CreateFinanceCashRefund(c *gin.Context) {
+	var input service.FinanceCashRefundInput
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8192)
+	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	result, err := service.RegisterFinanceCashRefund(model.DB, c.GetInt("id"), input, c.GetString(common.RequestIdKey))
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": result, "verification": "owner_confirmed_manual"})
+}
+
+func ListFinanceCashRefunds(c *gin.Context) {
+	if err := model.FinanceRefundsReady(model.DB); err != nil {
+		financeError(c, err)
+		return
+	}
+	page, err := financePage(c)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	var total int64
+	if err := model.DB.Model(&model.FinanceCashRefund{}).Count(&total).Error; err != nil {
+		financeError(c, err)
+		return
+	}
+	var entries []model.FinanceCashRefund
 	if err := model.DB.Order("id desc").Offset(page.GetStartIdx()).Limit(page.GetPageSize()).Find(&entries).Error; err != nil {
 		financeError(c, err)
 		return
@@ -387,6 +483,55 @@ func ListFinanceRevenueAllocations(c *gin.Context) {
 
 func GetFinanceCaptureHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": service.FinanceCaptureHealth()})
+}
+
+func PreviewFinanceWalletRebuild(c *gin.Context) {
+	userID, err := financeWalletUser(c)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	var input service.FinanceRebuildInput
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8192)
+	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	result, err := service.PreviewFinanceWalletRebuild(model.DB, userID, input.SyncEventIDs)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+}
+
+func ApplyFinanceWalletRebuild(c *gin.Context) {
+	userID, err := financeWalletUser(c)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	var input service.FinanceRebuildInput
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8192)
+	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
+		financeError(c, model.ErrFinanceInvalid)
+		return
+	}
+	result, err := service.ApplyFinanceWalletRebuild(model.DB, userID, c.GetInt("id"), input, c.GetString(common.RequestIdKey))
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result, "rebuild": "owner_initiated_controlled"})
+}
+
+func GetFinanceSyncHealth(c *gin.Context) {
+	result, err := service.FinanceSyncHealth(model.DB)
+	if err != nil {
+		financeError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
 }
 
 func ListFinanceRequestEvents(c *gin.Context) {
