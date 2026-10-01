@@ -47,7 +47,7 @@ type CreateOfflineOrderInput struct {
 }
 
 func CreateOfflineOrder(input CreateOfflineOrderInput) (*OfflineOrder, []string, error) {
-	if !offlineOrderNoPattern.MatchString(input.OrderNo) || input.MoneyCents <= 0 ||
+	if !offlineOrderNoPattern.MatchString(input.OrderNo) || input.MoneyCents <= 0 || input.MoneyCents > common.MaxWalletQuota ||
 		input.CodeCount < 1 || input.CodeCount > 100 || input.AdminUserID <= 0 ||
 		input.PaidAt <= 0 || input.PaidAt > common.GetTimestamp() ||
 		input.QuotaPerCode <= 0 || (input.ExpiredTime != 0 && input.ExpiredTime < common.GetTimestamp()) {

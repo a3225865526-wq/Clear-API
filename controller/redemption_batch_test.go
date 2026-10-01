@@ -85,7 +85,7 @@ func TestDeleteRedemptionBatch(t *testing.T) {
 				common.SetDatabaseTypes(previousMain, previousLog)
 				common.RedisEnabled = previousRedis
 			})
-			for _, table := range []any{&model.User{}, &model.Redemption{}} {
+			for _, table := range []any{&model.User{}, &model.Redemption{}, &model.OfflineOrderCode{}} {
 				require.False(t, db.Migrator().HasTable(table), "use an empty test database")
 				require.NoError(t, db.AutoMigrate(table))
 				t.Cleanup(func() { require.NoError(t, db.Migrator().DropTable(table)) })

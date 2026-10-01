@@ -18,6 +18,17 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestAdminCompleteTopUpRequiresComplianceBeforeDatabaseAccess(t *testing.T) {
+	old := *operation_setting.GetPaymentSetting()
+	operation_setting.GetPaymentSetting().ComplianceConfirmed = false
+	t.Cleanup(func() { *operation_setting.GetPaymentSetting() = old })
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest("POST", "/api/user/topup/complete", strings.NewReader(`{"trade_no":"test"}`))
+	AdminCompleteTopUp(ctx)
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+}
+
 func TestTopUpQuotaValidation(t *testing.T) {
 	oldQuotaPerUnit := common.QuotaPerUnit
 	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType

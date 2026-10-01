@@ -18,6 +18,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestOaiResponsesHandlerEstimatesMissingUsageFromOutput(t *testing.T) {
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{UpstreamModelName: "test-model"}}
+	info.SetEstimatePromptTokens(100)
+	resp := &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"id":"test","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"hello world"}]}]}`))}
+	usage, apiErr := OaiResponsesHandler(ctx, info, resp)
+	require.Nil(t, apiErr)
+	require.NotNil(t, usage)
+	assert.Equal(t, 100, usage.PromptTokens)
+	assert.Positive(t, usage.CompletionTokens)
+}
+
 func TestOaiResponsesHandlerCountsOutputCallsNotDeclarations(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	operation_setting.SetToolPriceForTest("priced_fn", 5.0)

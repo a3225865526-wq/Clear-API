@@ -343,6 +343,25 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		claudeInfo.Usage.ClaudeCacheCreation5mTokens = claudeResponse.Usage.GetCacheCreation5mTokens()
 		claudeInfo.Usage.ClaudeCacheCreation1hTokens = claudeResponse.Usage.GetCacheCreation1hTokens()
 	}
+	if !service.ValidUsage(claudeInfo.Usage) && len(claudeResponse.Content) > 0 {
+		var output strings.Builder
+		for _, block := range claudeResponse.Content {
+			output.WriteString(block.GetText())
+			if block.Thinking != nil {
+				output.WriteString(*block.Thinking)
+			}
+			if block.Type == "tool_use" {
+				output.WriteString(block.Name)
+				if input, err := common.Marshal(block.Input); err == nil {
+					output.Write(input)
+				}
+			}
+		}
+		if output.Len() > 0 {
+			claudeInfo.Usage = service.ResponseText2Usage(c, output.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+			claudeInfo.Usage.UsageSemantic = "anthropic"
+		}
+	}
 	var responseData []byte
 	switch info.RelayFormat {
 	case types.RelayFormatOpenAI:

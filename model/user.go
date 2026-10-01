@@ -619,13 +619,11 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 	}
 
 	// 更新用户额度
-	user.AffQuota -= quota
-	user.Quota += quota
-
-	// 保存用户状态
-	if err := tx.Save(user).Error; err != nil {
+	if err := creditTopUpQuota(tx, user.Id, quota, map[string]any{"aff_quota": user.AffQuota - quota}); err != nil {
 		return err
 	}
+	user.AffQuota -= quota
+	user.Quota += quota
 
 	// 提交事务
 	return tx.Commit().Error

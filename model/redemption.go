@@ -191,7 +191,15 @@ func redeem(key string, userId int, offlineOnly bool) (quota int, err error) {
 		if result.RowsAffected == 0 {
 			return errors.New("该兑换码已被使用")
 		}
-		return creditTopUpQuota(tx, userId, redemption.Quota, nil)
+		if err := creditTopUpQuota(tx, userId, redemption.Quota, nil); err != nil {
+			return err
+		}
+		if offlineOnly {
+			// Atomic with the redemption: a failed finance emission fails the
+			// redeem so quota is never credited without its source fact.
+			return EmitFinanceRedemptionEvent(tx, redemption, userId, common.GetTimestamp())
+		}
+		return nil
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())

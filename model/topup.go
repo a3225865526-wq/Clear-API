@@ -445,10 +445,21 @@ func SearchAllTopUps(keyword string, pageInfo *common.PageInfo) (topups []*TopUp
 	return topups, total, nil
 }
 
-// ManualCompleteTopUp 管理员手动完成订单并给用户充值
-func ManualCompleteTopUp(tradeNo string, callerIp string) error {
+type ManualTopUpResult struct {
+	UserID           int
+	Before           int
+	After            int
+	CreditedQuota    int
+	AlreadyCompleted bool
+}
+
+// ManualCompleteTopUp returns the balance snapshot from the committed transaction.
+func ManualCompleteTopUp(tradeNo string, callerIp string, operatorID int) (*ManualTopUpResult, error) {
 	if tradeNo == "" {
-		return errors.New("未提供订单号")
+		return nil, errors.New("未提供订单号")
+	}
+	if operatorID <= 0 {
+		return nil, errors.New("无效的操作者")
 	}
 
 	refCol := "`trade_no`"
@@ -460,6 +471,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	var quotaToAdd int
 	var payMoney float64
 	var paymentMethod string
+	var result ManualTopUpResult
 
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		topUp := &TopUp{}
@@ -467,9 +479,18 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		if err := lockForUpdate(tx).Where(refCol+" = ?", tradeNo).First(topUp).Error; err != nil {
 			return errors.New("充值订单不存在")
 		}
+		if topUp.UserId == operatorID {
+			return errors.New("不能给自己补单")
+		}
+		var user User
+		if err := lockForUpdate(tx).First(&user, topUp.UserId).Error; err != nil {
+			return err
+		}
+		result = ManualTopUpResult{UserID: user.Id, Before: user.Quota, After: user.Quota}
 
 		// 幂等处理：已成功直接返回
 		if topUp.Status == common.TopUpStatusSuccess {
+			result.AlreadyCompleted = true
 			return nil
 		}
 
@@ -505,6 +526,8 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 		if err := creditTopUpQuota(tx, topUp.UserId, quotaToAdd, nil); err != nil {
 			return err
 		}
+		result.CreditedQuota = quotaToAdd
+		result.After = user.Quota + quotaToAdd
 
 		userId = topUp.UserId
 		payMoney = topUp.Money
@@ -513,13 +536,16 @@ func ManualCompleteTopUp(tradeNo string, callerIp string) error {
 	})
 
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if result.AlreadyCompleted {
+		return &result, nil
 	}
 
 	// 事务外记录日志，避免阻塞
 	syncCreditUserQuotaCache(userId, quotaToAdd, "manual topup")
 	RecordTopupLog(userId, fmt.Sprintf("管理员补单成功，充值金额: %v，支付金额：%f", logger.FormatQuota(quotaToAdd), payMoney), callerIp, paymentMethod, "admin")
-	return nil
+	return &result, nil
 }
 func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string) (err error) {
 	if referenceId == "" {

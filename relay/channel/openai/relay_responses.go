@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -45,6 +46,24 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	// compute usage
 	usage := &dto.Usage{}
 	service.ApplyResponsesUsage(usage, responsesResponse.Usage)
+	if !service.ValidUsage(usage) {
+		var output strings.Builder
+		for _, item := range responsesResponse.Output {
+			for _, content := range item.Content {
+				output.WriteString(content.Text)
+			}
+			for _, part := range item.Summary {
+				output.WriteString(part.Text)
+			}
+			if item.Type == dto.BuildInCallFunctionCall {
+				output.WriteString(item.Name)
+				output.WriteString(item.ArgumentsString())
+			}
+		}
+		if output.Len() > 0 {
+			usage = service.ResponseText2Usage(c, output.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+		}
+	}
 	// Count actual tool invocations from Output (not tool declarations).
 	for _, output := range responsesResponse.Output {
 		switch output.Type {

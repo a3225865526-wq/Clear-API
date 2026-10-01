@@ -120,6 +120,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	var secondLastStreamData string // 保留倒数第二个stream data；部分兼容网关把完整usage放在倒数第二个事件
 	seenStreamToolCalls := make(map[string]struct{})
 	var streamFunctionCallNames []string
+	var reportedUsage *dto.Usage
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		if lastStreamData != "" {
@@ -129,6 +130,12 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 		}
 		if len(data) > 0 {
+			var frame struct {
+				Usage *dto.Usage `json:"usage"`
+			}
+			if common.Unmarshal([]byte(data), &frame) == nil && service.ValidUsage(frame.Usage) {
+				reportedUsage = frame.Usage
+			}
 			if lastStreamData != "" {
 				secondLastStreamData = lastStreamData
 			}
@@ -159,14 +166,32 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 		}
 		writeIncompleteStreamError(c, info, incompleteMessage)
-		return &dto.Usage{}, nil
+		usage = reportedUsage
+		if usage != nil && usage.CompletionTokens == 0 && responseTextBuilder.Len() > 0 {
+			fallback := service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+			usage.CompletionTokens = fallback.CompletionTokens
+			usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+			usage.BillingUsage = dto.CloneBillingUsageWithEstimatedCompletion(usage.BillingUsage, usage.CompletionTokens)
+		}
+		if usage == nil {
+			usage = &dto.Usage{}
+			if responseTextBuilder.Len() > 0 || toolCount > 0 {
+				usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+				usage.CompletionTokens += toolCount * 7
+				usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+			}
+		}
+		for _, name := range streamFunctionCallNames {
+			info.CountBillableToolCall(dto.BuildInCallFunctionCall, name)
+		}
+		return usage, nil
 	}
 
 	// 处理最后的响应
 	shouldSendLastResp := true
 	if err := handleLastResponse(lastStreamData, &responseId, &createAt, &systemFingerprint, &model, &usage,
 		&containStreamUsage, info, &shouldSendLastResp); err != nil {
-		logger.LogError(c, fmt.Sprintf("error handling last response: %s, lastStreamData: [%s]", err.Error(), lastStreamData))
+		logger.LogError(c, "error parsing final stream frame")
 	}
 
 	// 部分兼容网关把完整的累计usage附在倒数第二个事件上，随后发送一个空的最后事件。
@@ -296,7 +321,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}
-	logger.LogDebug(c, "upstream response body: %s", responseBody)
+	logger.LogDebug(c, "upstream response received: %d bytes", len(responseBody))
 	// Unmarshal to simpleResponse
 	if info.ChannelType == constant.ChannelTypeOpenRouter && info.ChannelOtherSettings.IsOpenRouterEnterprise() {
 		// 尝试解析为 openrouter enterprise

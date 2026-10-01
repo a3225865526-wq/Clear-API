@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,4 +86,38 @@ func TestOaiStreamHandlerKeepsDoneForCompleteStream(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), "[DONE]")
 	assert.Equal(t, relaycommon.StreamEndReasonDone, info.StreamStatus.EndReason)
 	assert.Equal(t, string(relaycommon.ResponseOutcomeCompleted), info.StreamStatus.ResponseOutcome())
+}
+
+func TestOaiStreamHandlerBillsPartialOutputWithoutDone(t *testing.T) {
+	oldTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
+	for _, tc := range []struct {
+		name, tail         string
+		prompt, completion int
+	}{
+		{"estimated", "", 100, 0},
+		{"upstream usage", "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":123,\"completion_tokens\":7,\"total_tokens\":130}}\n\n", 123, 7},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := "data: {\"id\":\"partial\",\"model\":\"test-model\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello world\"}}]}\n\n" + tc.tail
+			c, recorder, resp, info := newImageTestContext(t, body, "text/event-stream", true)
+			info.ChannelMeta = &relaycommon.ChannelMeta{}
+			info.RelayFormat = types.RelayFormatOpenAI
+			info.RelayMode = relayconstant.RelayModeChatCompletions
+			info.UpstreamModelName = "test-model"
+			info.SetEstimatePromptTokens(100)
+			info.DisablePing = true
+			usage, apiErr := OaiStreamHandler(c, info, resp)
+			require.Nil(t, apiErr)
+			require.NotNil(t, usage)
+			assert.Equal(t, tc.prompt, usage.PromptTokens)
+			assert.Positive(t, usage.CompletionTokens)
+			if tc.completion > 0 {
+				assert.Equal(t, tc.completion, usage.CompletionTokens)
+			}
+			assert.NotContains(t, recorder.Body.String(), "[DONE]")
+			assert.Equal(t, string(relaycommon.ResponseOutcomeFailed), info.StreamStatus.ResponseOutcome())
+		})
+	}
 }

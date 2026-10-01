@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
@@ -568,6 +569,10 @@ type AdminCompleteTopupRequest struct {
 
 // AdminCompleteTopUp 管理员补单接口
 func AdminCompleteTopUp(c *gin.Context) {
+	if !operation_setting.IsPaymentComplianceConfirmed() {
+		common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
+		return
+	}
 	var req AdminCompleteTopupRequest
 	if err := c.ShouldBindJSON(&req); err != nil || req.TradeNo == "" {
 		common.ApiErrorMsg(c, "参数错误")
@@ -578,9 +583,14 @@ func AdminCompleteTopUp(c *gin.Context) {
 	LockOrder(req.TradeNo)
 	defer UnlockOrder(req.TradeNo)
 
-	if err := model.ManualCompleteTopUp(req.TradeNo, c.ClientIP()); err != nil {
+	result, err := model.ManualCompleteTopUp(req.TradeNo, c.ClientIP(), c.GetInt("id"))
+	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
+	recordManageAuditFor(c, result.UserID, "user.topup_complete", map[string]any{
+		"trade_no": req.TradeNo, "before": result.Before, "after": result.After,
+		"credited_quota": result.CreditedQuota, "already_completed": result.AlreadyCompleted,
+	})
 	common.ApiSuccess(c, nil)
 }
