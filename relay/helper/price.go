@@ -69,6 +69,14 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 }
 
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (hosttypes.PriceData, error) {
+	protectedOutput := 0
+	if billingProtectionEnabled() {
+		var err error
+		protectedOutput, err = protectedTextLimit(info)
+		if err != nil {
+			return hosttypes.PriceData{}, err
+		}
+	}
 	if info != nil {
 		if matched := resolveBillingModelName(info.GetOriginModelName()); matched != "" && matched != info.OriginModelName {
 			info.BillingModelName = matched
@@ -81,6 +89,9 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(billingModelName) == billing_setting.BillingModeTieredExpr {
+		if billingProtectionEnabled() {
+			return hosttypes.PriceData{}, fmt.Errorf("protected billing has no proven upper bound for expression-priced models")
+		}
 		return modelPriceHelperTiered(c, info, billingModelName, promptTokens, groupRatioInfo)
 	}
 
@@ -205,6 +216,11 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		priceData.QuotaToPreConsume = quota
 	}
 
+	if billingProtectionEnabled() {
+		if err := protectTextReservation(info, &priceData, promptTokens, protectedOutput); err != nil {
+			return hosttypes.PriceData{}, err
+		}
+	}
 	if common.DebugEnabled {
 		logger.LogDebug(c, "model_price_helper result: %s", priceData.ToSetting())
 	}

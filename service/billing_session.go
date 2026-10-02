@@ -39,6 +39,7 @@ type BillingSession struct {
 	refunded         bool // Refund 已调用
 	chargedQuota     int
 	settlementErr    error
+	durable          bool
 	mu               sync.Mutex
 }
 
@@ -53,6 +54,16 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	}
 	if s.refunded || actualQuota < 0 {
 		return errors.New("invalid billing settlement")
+	}
+	if s.durable {
+		if err := model.RequestBillingCompletion(s.relayInfo.RequestId, actualQuota, false); err != nil {
+			return err
+		}
+		charged, err := model.ApplyBillingCompletion(s.relayInfo.RequestId)
+		if err == nil {
+			s.chargedQuota, s.settled, s.fundingSettled = charged, true, true
+		}
+		return err
 	}
 	delta := actualQuota - s.preConsumedQuota
 	if delta == 0 {
@@ -116,6 +127,21 @@ func (s *BillingSession) Refund(c *gin.Context) {
 		s.mu.Unlock()
 		return
 	}
+	if s.durable {
+		defer s.mu.Unlock()
+		if err := model.RequestBillingCompletion(s.relayInfo.RequestId, 0, true); err != nil {
+			common.SysError("durable billing refund intent could not be saved; reservation requires review")
+			return
+		}
+		// The intent is now recoverable, even if application fails below.
+		s.refunded = true
+		if charged, err := model.ApplyBillingCompletion(s.relayInfo.RequestId); err == nil {
+			s.chargedQuota = charged
+		} else {
+			common.SysError("durable billing refund pending recovery")
+		}
+		return
+	}
 	s.refunded = true
 	s.mu.Unlock()
 
@@ -175,6 +201,9 @@ func (s *BillingSession) needsRefundLocked() bool {
 		// fundingSettled 时资金来源已提交结算，不能再退预扣费
 		return false
 	}
+	if s.durable {
+		return true
+	}
 	if s.tokenConsumed > 0 {
 		return true
 	}
@@ -193,6 +222,12 @@ func (s *BillingSession) GetPreConsumedQuota() int {
 func (s *BillingSession) Reserve(targetQuota int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.durable {
+		if targetQuota <= s.preConsumedQuota {
+			return nil
+		}
+		return errors.New("protected request cannot exceed its frozen reservation")
+	}
 
 	imageRequest := false
 	if s.relayInfo != nil {
@@ -428,6 +463,23 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
+		if BillingProtectionEnabled() {
+			if err := ValidateBillingProtection(); err != nil {
+				return nil, types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+			}
+			if !relayInfo.ProtectedTextBudget || relayInfo.IsPlayground || relayInfo.TokenGroup == "auto" || relayInfo.TieredBillingSnapshot != nil {
+				return nil, types.NewError(errors.New("billing protection requires a fixed-group wallet text request"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+			}
+			if err := model.ReserveBillingRequest(relayInfo.RequestId, relayInfo.UserId, relayInfo.TokenId, preConsumedQuota); err != nil {
+				if errors.Is(err, model.ErrBillingReservationQuota) {
+					return nil, types.NewErrorWithStatusCode(errors.New("protected billing reservation exceeds available quota"), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry())
+				}
+				return nil, types.NewError(errors.New("protected billing reservation could not be committed"), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+			}
+			session := &BillingSession{relayInfo: relayInfo, funding: &WalletFunding{userId: relayInfo.UserId}, durable: true, preConsumedQuota: preConsumedQuota, tokenConsumed: preConsumedQuota, chargedQuota: preConsumedQuota}
+			session.syncRelayInfo()
+			return session, nil
+		}
 		userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
 		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
@@ -457,6 +509,9 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	}
 
 	trySubscription := func() (*BillingSession, *types.NewAPIError) {
+		if BillingProtectionEnabled() {
+			return nil, types.NewError(errors.New("subscription billing is not admitted by billing protection"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+		}
 		subConsume := int64(preConsumedQuota)
 		if subConsume <= 0 {
 			subConsume = 1
