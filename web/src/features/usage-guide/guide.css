@@ -1,0 +1,107 @@
+.migrated-guide {
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.migrated-guide h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+}
+.migrated-guide h2 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin: 2rem 0 1rem;
+}
+.migrated-guide h3,
+.migrated-guide h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem;
+}
+.migrated-guide p,
+.migrated-guide ul,
+.migrated-guide ol {
+  margin: 0.8rem 0;
+}
+.migrated-guide ul {
+  padding-left: 1.5rem;
+  list-style: disc;
+}
+.migrated-guide ol {
+  padding-left: 1.5rem;
+  list-style: decimal;
+}
+.migrated-guide a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.migrated-guide .header-anchor {
+  margin-left: 0.4rem;
+  font-size: 0.8em;
+}
+.migrated-guide pre {
+  white-space: pre;
+  overflow-x: auto;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: var(--muted);
+  color: var(--foreground);
+}
+.migrated-guide pre span {
+  color: inherit !important;
+}
+.migrated-guide code {
+  font-family: monospace;
+  font-size: 0.875em;
+}
+.migrated-guide .lang {
+  display: block;
+  margin-top: 1rem;
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+.migrated-guide table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+.migrated-guide th,
+.migrated-guide td {
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+}
+.migrated-guide th {
+  background: var(--muted);
+}
+.migrated-guide .custom-block,
+.migrated-guide blockquote {
+  border-left: 3px solid var(--primary);
+  background: var(--muted);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+.migrated-guide .custom-block-title {
+  font-weight: 600;
+}
+.migrated-guide img,
+.migrated-guide video {
+  max-width: 100%;
+  height: auto;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+}
+.migrated-guide .shiki .line {
+  white-space: pre;
+}
+.migrated-guide .task-card {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin: 0.5rem 0;
+}

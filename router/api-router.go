@@ -20,6 +20,8 @@ func SetApiRouter(router *gin.Engine) {
 	apiRouter.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
 	apiRouter.Use(middleware.GlobalAPIRateLimit())
 	RegisterFinanceRoutes(apiRouter)
+	apiRouter.GET("/console/dashboard", middleware.UserAuth(), controller.GetConsoleDashboard)
+	apiRouter.GET("/console/channel-status", middleware.UserAuth(), controller.GetConsoleMonitoring)
 	anonymousRequestBodyLimit := middleware.AnonymousRequestBodyLimit()
 	{
 		apiRouter.GET("/setup", controller.GetSetup)

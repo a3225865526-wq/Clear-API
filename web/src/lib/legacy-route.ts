@@ -25,7 +25,7 @@ const legacyConsoleRoutes: Record<string, string> = {
   '/console/subscription': '/subscriptions',
   '/console/channel': '/channels',
   '/console/token': '/keys',
-  '/console/playground': '/playground',
+  '/console/playground': '/dashboard',
   '/console/redemption': '/redemption-codes',
   '/console/user': '/users',
   '/console/personal': '/profile',
@@ -90,8 +90,7 @@ export function resolveLegacyRoute(rawHref: string): string | null {
     return buildTargetHref('/dashboard', source)
   }
   if (pathname.startsWith('/console/chat/')) {
-    const chatID = pathname.slice('/console/chat/'.length)
-    return buildTargetHref(chatID ? `/chat/${chatID}` : '/dashboard', source)
+    return buildTargetHref('/dashboard', source)
   }
 
   const target = legacyConsoleRoutes[pathname]

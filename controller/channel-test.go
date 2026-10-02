@@ -960,6 +960,19 @@ func testChannelForHealthCheck(ctx context.Context, channel *model.Channel, test
 	}
 
 	channel.UpdateResponseTime(milliseconds)
+	probeModel := "gpt-4o-mini"
+	if channel.TestModel != nil && strings.TrimSpace(*channel.TestModel) != "" {
+		probeModel = strings.TrimSpace(*channel.TestModel)
+	} else if models := channel.GetModels(); len(models) > 0 && strings.TrimSpace(models[0]) != "" {
+		probeModel = strings.TrimSpace(models[0])
+	}
+	probeStatus := "normal"
+	if newAPIError != nil || result.localErr != nil {
+		probeStatus = "error"
+	}
+	if err := model.RecordConsoleProbe(ctx, channel.Id, probeModel, probeStatus, milliseconds); err != nil {
+		common.SysError("Failed to persist console monitoring result")
+	}
 	return summary
 }
 

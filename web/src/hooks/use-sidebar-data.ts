@@ -17,16 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import {
-  Activity,
   Box,
+  BookOpen,
+  RadioTower,
   ClipboardList,
   CreditCard,
   FileText,
-  FlaskConical,
   Key,
   LayoutDashboard,
   ListTodo,
-  MessageSquare,
   PlugZap,
   Radio,
   ServerCog,
@@ -56,34 +55,23 @@ export function useSidebarData(): SidebarData {
   return {
     navGroups: [
       {
-        id: 'chat',
-        title: t('Chat'),
-        items: [
-          {
-            title: t('Playground'),
-            url: '/playground',
-            icon: FlaskConical,
-          },
-          {
-            title: t('Chat'),
-            icon: MessageSquare,
-            type: 'chat-presets',
-          },
-        ],
-      },
-      {
         id: 'general',
         title: t('General'),
         items: [
           {
-            title: t('Overview'),
+            title: t('console.dashboard'),
             url: '/dashboard/overview',
-            icon: Activity,
+            icon: LayoutDashboard,
           },
           {
-            title: t('Dashboard'),
+            title: t('console.analytics'),
             url: '/dashboard/models',
             icon: LayoutDashboard,
+          },
+          {
+            title: t('console.channelStatus'),
+            url: '/channel-status',
+            icon: RadioTower,
           },
           {
             title: t('API Keys'),
@@ -128,6 +116,13 @@ export function useSidebarData(): SidebarData {
             url: '/security',
             icon: ShieldCheck,
           },
+        ],
+      },
+      {
+        id: 'help',
+        title: t('console.help'),
+        items: [
+          { title: t('console.guide'), url: '/usage-guide', icon: BookOpen },
         ],
       },
       {

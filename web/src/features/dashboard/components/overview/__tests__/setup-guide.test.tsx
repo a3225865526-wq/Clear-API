@@ -23,81 +23,59 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import i18next from 'i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import en from '@/i18n/locales/en.json'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
-import { useSystemConfigStore } from '@/stores/system-config-store'
 
+import type { ConsoleDashboardData } from '../console-api'
 import { OverviewDashboard } from '../overview-dashboard'
 
-const storageKey = 'dashboard_overview_setup_guide_expanded'
 let client: QueryClient
-let keyLookupError: Error | null
-let modelLookupError: Error | null
-let userModels: string[]
+const usage = {
+  requests: 0,
+  quota: 0,
+  input: 0,
+  output: 0,
+  average_seconds: null,
+}
+const fixture: ConsoleDashboardData = {
+  read_at: 1790812800,
+  timezone: 'Asia/Shanghai',
+  start: 1790294400,
+  end: 1790812800,
+  balance: 0,
+  account_quota: 0,
+  account_requests: 0,
+  keys: 0,
+  enabled_keys: 0,
+  today: usage,
+  retained: usage,
+  minute: usage,
+  models: [],
+  platforms: [],
+  trend: [],
+  recent: [],
+}
 
 beforeEach(() => {
-  window.localStorage.clear()
-  useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
-  useAuthStore.getState().auth.setUser({
-    id: 1,
-    username: 'dashboard-user',
-    role: 1,
-    quota: 1000000,
-    used_quota: 1000,
-    request_count: 1,
-  })
-  client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  })
-  keyLookupError = null
-  modelLookupError = null
-  userModels = ['gpt-4o-mini']
-  vi.spyOn(api, 'get').mockImplementation(async (url) => {
-    switch (url) {
-      case '/api/token/?p=1&size=10':
-        if (keyLookupError) throw keyLookupError
-        return {
-          data: {
-            success: true,
-            data: {
-              items: [{ id: 1, name: 'App key', key: 'masked', status: 1 }],
-            },
-          },
-        }
-      case '/api/status':
-        return {
-          data: {
-            data: {
-              api_info_enabled: false,
-              announcements_enabled: false,
-              faq_enabled: false,
-              uptime_kuma_enabled: false,
-            },
-          },
-        }
-      case '/api/user/models':
-        if (modelLookupError) throw modelLookupError
-        return { data: { success: true, data: userModels } }
-      case '/api/data/self':
-        return { data: { success: true, data: [] } }
-      default:
-        throw new Error(`Unexpected dashboard request: ${url}`)
-    }
+  i18next.addResourceBundle('en', 'translation', en.translation, true, true)
+  useAuthStore
+    .getState()
+    .auth.setUser({ id: 1, username: 'dashboard-user', role: 1 })
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: fixture },
   })
 })
-
 afterEach(() => {
-  cleanup()
   client.clear()
   useAuthStore.setState(useAuthStore.getInitialState(), true)
-  useSystemConfigStore.setState(useSystemConfigStore.getInitialState(), true)
-  window.localStorage.clear()
 })
-
 async function renderOverview() {
   const router = createRouter({
     routeTree: createRootRoute({ component: OverviewDashboard }),
@@ -111,166 +89,51 @@ async function renderOverview() {
   )
 }
 
-describe('overview setup guide', () => {
-  it('shows usage first and only a header entry when setup is complete', async () => {
+describe('dashboard guide and account usage', () => {
+  it('offers retained business links and separates zero usage from unknown response time', async () => {
     await renderOverview()
-
-    const toggle = await screen.findByRole('button', { name: 'Setup guide' })
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(
-      screen.getAllByRole('heading').map((heading) => heading.textContent)
-    ).toEqual(['Overview', 'Usage at a glance'])
-    expect(screen.queryByText('Setup guide complete')).not.toBeInTheDocument()
-    expect(screen.queryByText('Setup progress: 3/3')).not.toBeInTheDocument()
-    for (const name of ['API Keys', 'Channels', 'Usage Logs', 'Pricing']) {
-      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
-    }
-    const panel = document.getElementById(
-      toggle.getAttribute('aria-controls') ?? ''
+      await screen.findByText('Welcome back, dashboard-user')
+    ).toBeVisible()
+    expect(await screen.findByText('0 RPM')).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: 'View usage guide' })
+    ).toHaveAttribute('href', '/usage-guide?article=%2F')
+    expect(
+      screen.getByRole('button', { name: 'Manage API keys' })
+    ).toHaveAttribute('href', '/keys')
+    expect(
+      screen.getByRole('button', { name: 'Redeem a code in wallet' })
+    ).toHaveAttribute('href', '/wallet')
+    expect(screen.queryByText('Playground')).not.toBeInTheDocument()
+    expect(screen.getAllByText('No data').length).toBeGreaterThan(0)
+    expect(api.get).toHaveBeenCalledWith(
+      '/api/console/dashboard',
+      expect.objectContaining({ params: { days: 7 } })
     )
-    expect(panel).toBeInTheDocument()
-    expect(panel).not.toBeVisible()
   })
-
-  it('shows a real empty model state and a clearly named model placeholder', async () => {
-    const user = userEvent.setup()
-    userModels = []
+  it('updates the selected range through the account-only endpoint', async () => {
     await renderOverview()
-
-    await user.click(await screen.findByRole('button', { name: 'Setup guide' }))
-
-    expect(await screen.findByText('No models available')).toBeVisible()
-    expect(screen.queryByText('gpt-4o-mini')).not.toBeInTheDocument()
-    expect(screen.getByText(/MODEL_NAME_FROM_CATALOG/)).toBeVisible()
-    expect(
-      screen.queryByRole('button', { name: 'Copy ready-to-run curl' })
-    ).not.toBeInTheDocument()
-    expect(
-      screen.getAllByRole('button', { name: /Pricing/ }).length
-    ).toBeGreaterThan(0)
-  })
-
-  it('reports a model lookup failure without substituting a made-up model', async () => {
-    const user = userEvent.setup()
-    modelLookupError = new Error('Model lookup unavailable')
-    await renderOverview()
-
-    await user.click(await screen.findByRole('button', { name: 'Setup guide' }))
-
-    expect(await screen.findByText('Failed to load')).toBeVisible()
-    expect(screen.queryByText('gpt-4o-mini')).not.toBeInTheDocument()
-    expect(screen.getByText(/MODEL_NAME_FROM_CATALOG/)).toBeVisible()
-  })
-
-  it('toggles the completed guide with the keyboard and restores focus after hiding it', async () => {
-    const user = userEvent.setup()
-    await renderOverview()
-    const toggle = await screen.findByRole('button', { name: 'Setup guide' })
-
-    await user.tab()
-    expect(toggle).toHaveFocus()
-    await user.keyboard('{Enter}')
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(
-      document.getElementById(toggle.getAttribute('aria-controls') ?? '')
-    ).toBeVisible()
-    expect(
-      screen.getByRole('heading', {
-        name: 'Build on your API gateway in minutes',
-      })
-    ).toBeVisible()
+    await screen.findByText('0 RPM')
+    await userEvent.click(screen.getByRole('combobox'))
+    await userEvent.click(
+      await screen.findByRole('option', { name: 'Last 15 days' })
+    )
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /^API Keys/ })).toBeVisible()
+      expect(api.get).toHaveBeenCalledWith(
+        '/api/console/dashboard',
+        expect.objectContaining({ params: { days: 15 } })
+      )
     )
-
-    await user.keyboard(' ')
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle).toHaveFocus()
-    await user.click(toggle)
-    await user.click(screen.getByRole('button', { name: 'Hide setup guide' }))
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(toggle).toHaveFocus()
+    expect(screen.getByText('0 RPM')).toBeVisible()
   })
-
-  it('restores the completed guide preference after remounting', async () => {
-    const user = userEvent.setup()
-    const first = await renderOverview()
-    await user.click(await screen.findByRole('button', { name: 'Setup guide' }))
-    first.unmount()
-
-    const second = await renderOverview()
-    expect(
-      await screen.findByRole('button', { name: 'Setup guide' })
-    ).toHaveAttribute('aria-expanded', 'true')
-    await user.click(screen.getByRole('button', { name: 'Hide setup guide' }))
-    second.unmount()
-
+  it('preserves valid data and offers retry after a refresh fails', async () => {
     await renderOverview()
-    expect(
-      await screen.findByRole('button', { name: 'Setup guide' })
-    ).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Setup guide complete')).not.toBeInTheDocument()
-  })
-
-  it('keeps the existing progress banner when an incomplete guide is manually collapsed', async () => {
-    const user = userEvent.setup()
-    useAuthStore
-      .getState()
-      .auth.setUser({ id: 1, username: 'new-user', role: 1 })
-    await renderOverview()
-
-    await user.click(
-      await screen.findByRole('button', { name: 'Hide setup guide' })
-    )
-    expect(screen.getByText('Setup progress: 1/3')).toBeVisible()
-    expect(
-      screen.getByText('Setup guide is collapsed. Expand it anytime.')
-    ).toBeVisible()
-    expect(screen.getByRole('button', { name: 'API Keys' })).toBeVisible()
-    expect(
-      screen.queryByRole('button', { name: 'Setup guide' })
-    ).not.toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show setup guide' }))
-    expect(
-      screen.getByRole('button', { name: 'Hide setup guide' })
-    ).toBeVisible()
-  })
-
-  it('removes the collapsed progress banner when the remaining setup step completes', async () => {
-    useAuthStore.getState().auth.setUser({
-      id: 1,
-      username: 'dashboard-user',
-      role: 1,
-      quota: 1000000,
-    })
-    window.localStorage.setItem(storageKey, 'collapsed')
-    await renderOverview()
-    expect(await screen.findByText('Setup progress: 2/3')).toBeVisible()
-
-    act(() => {
-      useAuthStore.getState().auth.setUser({
-        id: 1,
-        username: 'dashboard-user',
-        role: 1,
-        quota: 1000000,
-        request_count: 1,
-      })
-    })
-    expect(
-      await screen.findByRole('button', { name: 'Setup guide' })
-    ).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText(/Setup progress:/)).not.toBeInTheDocument()
-  })
-
-  it('does not show a completed setup entry when the key lookup fails', async () => {
-    keyLookupError = new Error('Key lookup unavailable')
-    await renderOverview()
-
-    expect(
-      await screen.findByRole('button', { name: 'Hide setup guide' })
-    ).toBeVisible()
-    expect(
-      screen.queryByRole('button', { name: 'Setup guide' })
-    ).not.toBeInTheDocument()
+    await screen.findByText('0 RPM')
+    vi.mocked(api.get).mockRejectedValueOnce(new Error('offline'))
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(await screen.findByText('Unable to load data')).toBeVisible()
+    expect(screen.getByText('0 RPM')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
   })
 })
