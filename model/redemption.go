@@ -168,6 +168,14 @@ func redeem(key string, userId int, offlineOnly bool) (quota int, err error) {
 				First(&link).Error; err != nil {
 				return errors.New("无效的离线兑换码")
 			}
+		} else if tx.Migrator().HasTable(&OfflineOrderCode{}) {
+			var count int64
+			if err := tx.Model(&OfflineOrderCode{}).Where("redemption_id = ?", redemption.Id).Count(&count).Error; err != nil {
+				return err
+			}
+			if count > 0 {
+				return errors.New("离线订单码须使用专用兑换接口")
+			}
 		}
 		if redemption.Status != common.RedemptionCodeStatusEnabled {
 			return errors.New("该兑换码已被使用")

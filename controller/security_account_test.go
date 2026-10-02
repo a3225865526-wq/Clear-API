@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"net/textproto"
 	"regexp"
 	"strings"
@@ -31,6 +32,59 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func TestRegistrationVerificationHasUniformResponse(t *testing.T) {
+	user, _ := setupSecurityEnrollmentTest(t)
+	user.Email = "taken@example.com"
+	require.NoError(t, model.DB.Model(user).Update("email", user.Email).Error)
+	oldDomain, oldAlias := common.EmailDomainRestrictionEnabled, common.EmailAliasRestrictionEnabled
+	oldServer, oldAccount, oldFrom := common.SMTPServer, common.SMTPAccount, common.SMTPFrom
+	common.EmailDomainRestrictionEnabled, common.EmailAliasRestrictionEnabled = false, false
+	common.SMTPServer, common.SMTPAccount, common.SMTPFrom = "", "", ""
+	t.Cleanup(func() {
+		common.EmailDomainRestrictionEnabled, common.EmailAliasRestrictionEnabled = oldDomain, oldAlias
+		common.SMTPServer, common.SMTPAccount, common.SMTPFrom = oldServer, oldAccount, oldFrom
+	})
+	var expected string
+	for _, email := range []string{"taken@example.com", "available@example.com"} {
+		engine := gin.New()
+		engine.GET("/verification", SendEmailVerification)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, httptest.NewRequest("GET", "/verification?email="+email, nil))
+		require.Equal(t, 200, w.Code)
+		if expected == "" {
+			expected = w.Body.String()
+		}
+		assert.Equal(t, expected, w.Body.String())
+		assert.JSONEq(t, `{"success":true,"message":""}`, w.Body.String())
+	}
+}
+
+func TestClosedLaunchRegistrationRejectsAnonymous(t *testing.T) {
+	setupSecurityEnrollmentTest(t)
+	t.Setenv("CLEARAPI_CLOSED_LAUNCH", "true")
+	previous := common.RegisterEnabled
+	previousPassword, previousQuota, previousRetry := common.PasswordRegisterEnabled, common.QuotaForNewUser, common.RetryTimes
+	previousOptions := common.OptionMap
+	t.Cleanup(func() {
+		common.RegisterEnabled = previous
+		common.PasswordRegisterEnabled, common.QuotaForNewUser, common.RetryTimes = previousPassword, previousQuota, previousRetry
+		common.OptionMap = previousOptions
+	})
+	model.InitOptionMap()
+	engine := gin.New()
+	engine.POST("/register", Register)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest("POST", "/register", strings.NewReader(`{}`)))
+	var result struct {
+		Success bool
+		Message string
+	}
+	require.NoError(t, common.Unmarshal(w.Body.Bytes(), &result))
+	assert.False(t, result.Success)
+	assert.NotEmpty(t, result.Message)
+	assert.False(t, common.RegisterEnabled)
+}
 
 func TestSecurityAccountDeletionRequiresScopedProof(t *testing.T) {
 	for _, scenario := range []string{"missing", "wrong scope", "expired", "consumed", "other session", "other account", "password disabled", "factor added"} {

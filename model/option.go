@@ -2,6 +2,7 @@ package model
 
 import (
 	"maps"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -192,6 +193,11 @@ func InitOptionMap() {
 
 	common.OptionMapRWMutex.Unlock()
 	loadOptionsFromDatabase()
+	if os.Getenv("CLEARAPI_CLOSED_LAUNCH") == "true" {
+		for _, key := range []string{"RegisterEnabled", "PasswordRegisterEnabled", "QuotaForNewUser", "RetryTimes"} {
+			_ = updateOptionMap(key, "0")
+		}
+	}
 }
 
 func loadOptionsFromDatabase() {
@@ -340,6 +346,16 @@ func UpdateOptionsBulk(values map[string]string) error {
 }
 
 func updateOptionMap(key string, value string) (err error) {
+	// Production launch guard overrides persisted options in memory only.
+	// Removing the guard requires an explicit operational configuration change.
+	if os.Getenv("CLEARAPI_CLOSED_LAUNCH") == "true" {
+		switch key {
+		case "RegisterEnabled", "PasswordRegisterEnabled":
+			value = "false"
+		case "QuotaForNewUser", "RetryTimes":
+			value = "0"
+		}
+	}
 	if key == retiredThemeOptionKey {
 		common.OptionMapRWMutex.Lock()
 		delete(common.OptionMap, key)

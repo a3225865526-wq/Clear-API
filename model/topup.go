@@ -671,7 +671,7 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 	return nil
 }
 
-func RechargeWaffo(tradeNo string, callerIp string) (err error) {
+func RechargeWaffo(tradeNo string, callerIp string, receipt ...PaymentReceipt) (err error) {
 	if tradeNo == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -692,6 +692,9 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 
 		if topUp.PaymentProvider != PaymentProviderWaffo {
 			return ErrPaymentMethodMismatch
+		}
+		if err := topUp.PaymentReceipt.Validate(receipt); err != nil {
+			return err
 		}
 
 		if topUp.Status == common.TopUpStatusSuccess {
@@ -720,6 +723,9 @@ func RechargeWaffo(tradeNo string, callerIp string) (err error) {
 
 	if err != nil {
 		common.SysError("waffo topup failed: " + err.Error())
+		if errors.Is(err, ErrPaymentReceiptMismatch) {
+			return ErrPaymentReceiptMismatch
+		}
 		return errors.New("充值失败，请稍后重试")
 	}
 	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, "waffo topup")

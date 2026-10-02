@@ -79,13 +79,16 @@ func TestPaymentReceiptDatabase(t *testing.T) {
 	assert.Equal(t, common.TopUpStatusPending, legacy.Status)
 	assert.True(t, db.Migrator().HasIndex(&TopUp{}, "TradeNo"))
 
-	for i, provider := range []string{PaymentProviderEpay, PaymentProviderStripe, PaymentProviderCreem} {
+	for i, provider := range []string{PaymentProviderEpay, PaymentProviderStripe, PaymentProviderCreem, PaymentProviderWaffo} {
 		t.Run(provider, func(t *testing.T) {
 			user := User{Id: i + 901, Username: fmt.Sprintf("synthetic-%d", i), AffCode: fmt.Sprintf("receipt-%d", i), Status: common.UserStatusEnabled, Quota: 7}
 			require.NoError(t, db.Create(&user).Error)
 			expected := PaymentReceipt{Amount: "1000", Currency: "USD", Reference: "checkout-fixture"}
 			if provider == PaymentProviderEpay {
 				expected = PaymentReceipt{Amount: "10.00", Currency: "CNY"}
+			}
+			if provider == PaymentProviderWaffo {
+				expected = PaymentReceipt{Amount: "10.00", Currency: "USD"}
 			}
 			order := TopUp{UserId: user.Id, TradeNo: "receipt-" + provider, Money: 10, Amount: 2, PaymentProvider: provider, PaymentMethod: provider, Status: common.TopUpStatusPending, PaymentReceipt: expected}
 			require.NoError(t, order.Insert())
@@ -96,6 +99,8 @@ func TestPaymentReceiptDatabase(t *testing.T) {
 					return err
 				case PaymentProviderStripe:
 					return Recharge(order.TradeNo, "synthetic-customer", "127.0.0.1", receipt)
+				case PaymentProviderWaffo:
+					return RechargeWaffo(order.TradeNo, "127.0.0.1", receipt)
 				default:
 					return RechargeCreem(order.TradeNo, "", "", "127.0.0.1", receipt)
 				}

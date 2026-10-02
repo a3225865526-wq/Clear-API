@@ -9,8 +9,9 @@ import (
 )
 
 type verificationValue struct {
-	code string
-	time time.Time
+	code     string
+	time     time.Time
+	attempts int
 }
 
 const (
@@ -50,9 +51,20 @@ func VerifyCodeWithKey(key string, code string, purpose string) bool {
 	value, okay := verificationMap[purpose+key]
 	now := time.Now()
 	if !okay || int(now.Sub(value.time).Seconds()) >= VerificationValidMinutes*60 {
+		delete(verificationMap, purpose+key)
 		return false
 	}
-	return code == value.code
+	if code == value.code {
+		delete(verificationMap, purpose+key)
+		return true
+	}
+	value.attempts++
+	if value.attempts >= 5 {
+		delete(verificationMap, purpose+key)
+	} else {
+		verificationMap[purpose+key] = value
+	}
+	return false
 }
 
 func DeleteKey(key string, purpose string) {

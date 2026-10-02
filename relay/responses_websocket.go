@@ -128,12 +128,39 @@ func ResponsesWebSocketHelper(c *gin.Context, client *websocket.Conn, runner Res
 		maxMB = 128
 	}
 	client.SetReadLimit(int64(maxMB) << 20)
+	idleTimeout := time.Duration(max(1, common.GetEnvOrDefault("RESPONSES_WS_IDLE_TIMEOUT", 120))) * time.Second
+	client.SetPongHandler(func(string) error {
+		// Keep a live generation connected, but heartbeats alone must not
+		// keep an unused connection occupying an admission slot forever.
+		if s.getCurrent() != nil {
+			return client.SetReadDeadline(time.Now().Add(idleTimeout))
+		}
+		return nil
+	})
+	s.workers.Go(func() {
+		ticker := time.NewTicker(min(30*time.Second, idleTimeout/3))
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.ctx.Done():
+				return
+			case <-ticker.C:
+				if err := client.WriteControl(websocket.PingMessage, nil, time.Now().Add(responsesWSWriteTimeout)); err != nil {
+					client.Close()
+					return
+				}
+			}
+		}
+	})
 	defer func() {
 		s.shutdown()
 		s.workers.Wait()
 	}()
 
 	for {
+		if err := client.SetReadDeadline(time.Now().Add(idleTimeout)); err != nil {
+			return nil
+		}
 		_, message, err := client.ReadMessage()
 		if err != nil {
 			return nil

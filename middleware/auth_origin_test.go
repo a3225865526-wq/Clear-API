@@ -10,6 +10,33 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestCORSAllowsOnlyTrustedOrigins(t *testing.T) {
+	previous := common.SessionCookieTrustedURLs
+	common.SessionCookieTrustedURLs = []string{"https://trusted.example.com"}
+	t.Cleanup(func() { common.SessionCookieTrustedURLs = previous })
+	router := gin.New()
+	router.Use(CORS())
+	router.GET("/test", func(c *gin.Context) { c.Status(204) })
+	for _, tc := range []struct {
+		origin string
+		status int
+	}{
+		{"https://trusted.example.com", 204}, {"https://evil.example.com", 403}, {"http://localhost:3000", 403},
+	} {
+		r := httptest.NewRequest("GET", "/test", nil)
+		r.Header.Set("Origin", tc.origin)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, r)
+		assert.Equal(t, tc.status, w.Code)
+		if tc.status == 204 {
+			assert.Equal(t, tc.origin, w.Header().Get("Access-Control-Allow-Origin"))
+			assert.Equal(t, "true", w.Header().Get("Access-Control-Allow-Credentials"))
+		} else {
+			assert.Empty(t, w.Header().Get("Access-Control-Allow-Origin"))
+		}
+	}
+}
+
 func runOriginGuardRequest(t *testing.T, origin, referer string) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)

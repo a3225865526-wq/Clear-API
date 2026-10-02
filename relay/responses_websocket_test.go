@@ -15,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	appdto "github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
@@ -27,6 +28,107 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestResponsesWSActiveHeartbeatPreservesLongRequest(t *testing.T) {
+	t.Setenv("RESPONSES_WS_IDLE_TIMEOUT", "1")
+	client, server, cleanup := newTestWebSocketPair(t)
+	defer cleanup()
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/v1/responses", nil)
+	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
+	defer close(release)
+	go func() {
+		defer close(done)
+		ResponsesWebSocketHelper(c, server, func(r *http.Request, _ string, _ func(*gin.Context) *types.NewAPIError) *types.NewAPIError {
+			close(entered)
+			select {
+			case <-release:
+			case <-r.Context().Done():
+			}
+			return nil
+		})
+	}()
+	pings := make(chan struct{}, 8)
+	client.SetPingHandler(func(data string) error {
+		if err := client.WriteControl(websocket.PongMessage, []byte(data), time.Now().Add(time.Second)); err != nil {
+			return err
+		}
+		pings <- struct{}{}
+		return nil
+	})
+	readDone := make(chan struct{})
+	go func() { defer close(readDone); _, _, _ = client.ReadMessage() }()
+	require.NoError(t, client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"synthetic","input":"hi"}`)))
+	select {
+	case <-entered:
+	case <-time.After(5 * time.Second):
+		t.Fatal("request not admitted")
+	}
+	for range 4 { // crosses the idle deadline while only control frames arrive
+		select {
+		case <-pings:
+		case <-readDone:
+			t.Fatal("live request disconnected")
+		case <-time.After(5 * time.Second):
+			t.Fatal("heartbeat missing")
+		}
+	}
+	select {
+	case <-done:
+		t.Fatal("active session exited")
+	default:
+	}
+	client.Close()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("session did not shut down")
+	}
+}
+
+func TestResponsesWSIdleClosesAndReleasesAdmission(t *testing.T) {
+	t.Setenv("RESPONSES_WS_IDLE_TIMEOUT", "1")
+	t.Setenv("RELAY_CONCURRENCY_USER", "1")
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set("id", 7); c.Set("token_id", 9) })
+	router.Use(middleware.RelayConcurrencyLimit())
+	upgrader := websocket.Upgrader{}
+	done := make(chan struct{})
+	router.GET("/ws", func(c *gin.Context) {
+		conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			return
+		}
+		ResponsesWebSocketHelper(c, conn, nil)
+	})
+	// This outer middleware runs after the admission defer releases its slot.
+	outer := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		router.ServeHTTP(w, r)
+		if r.URL.Path == "/ws" {
+			close(done)
+		}
+	})
+	router.GET("/ok", func(c *gin.Context) { c.Status(204) })
+	server := httptest.NewServer(outer)
+	defer server.Close()
+	client, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws", nil)
+	require.NoError(t, err)
+	defer client.Close()
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/ok", nil))
+	require.Equal(t, 429, w.Code)
+	require.NoError(t, client.SetReadDeadline(time.Now().Add(5*time.Second)))
+	_, _, err = client.ReadMessage() // answers pings, still idle
+	require.Error(t, err)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("idle websocket did not exit")
+	}
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest("GET", "/ok", nil))
+	assert.Equal(t, 204, w.Code)
+}
 
 // normalizeResponsesWSTestMessage runs the read-loop envelope parse followed by
 // request normalization, exactly as the session does for one response.create.

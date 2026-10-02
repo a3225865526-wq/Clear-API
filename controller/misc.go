@@ -223,7 +223,7 @@ func SendEmailVerification(c *gin.Context) {
 	}
 
 	if model.IsEmailAlreadyTaken(email) {
-		common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 		return
 	}
 	code := common.GenerateVerificationCode(6)
@@ -234,8 +234,8 @@ func SendEmailVerification(c *gin.Context) {
 		"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, common.VerificationValidMinutes)
 	err = common.SendEmail(subject, email, content)
 	if err != nil {
-		common.ApiError(c, err)
-		return
+		common.DeleteKey(email, common.EmailVerificationPurpose)
+		logger.LogError(c.Request.Context(), "registration verification email delivery failed")
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

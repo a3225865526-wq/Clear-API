@@ -47,6 +47,16 @@ var buildFS embed.FS
 //go:embed web/dist/index.html
 var indexPage []byte
 
+func newHTTPServer(address string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr: address, Handler: handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       120 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
+	}
+}
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "plugin" {
 		os.Exit(jsplugin.RunCLI(os.Args[2:], os.Stdout, os.Stderr))
@@ -209,6 +219,11 @@ func main() {
 	//server.Use(gzip.Gzip(gzip.DefaultCompression))
 	server.Use(middleware.RequestId())
 	server.Use(middleware.Version())
+	server.Use(func(c *gin.Context) {
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Next()
+	})
 	server.Use(middleware.I18n())
 	middleware.SetUpLogger(server)
 	InjectUmamiAnalytics()
@@ -224,13 +239,7 @@ func main() {
 		port = strconv.Itoa(*common.Port)
 	}
 
-	srv := &http.Server{
-		Addr:              ":" + port,
-		Handler:           server,
-		ReadHeaderTimeout: 10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20,
-	}
+	srv := newHTTPServer(":"+port, server)
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

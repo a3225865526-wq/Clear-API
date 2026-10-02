@@ -69,6 +69,11 @@ func TestOfflineOrderDatabaseCompatibility(t *testing.T) {
 			require.Error(t, protectedCode.Update())
 			_, _, err = CreateOfflineOrder(input)
 			require.Error(t, err)
+			_, err = Redeem(keys[0], user.Id)
+			require.Error(t, err)
+			var before User
+			require.NoError(t, db.First(&before, user.Id).Error)
+			require.Zero(t, before.Quota)
 			credited, err := RedeemOffline(keys[0], user.Id)
 			require.NoError(t, err)
 			require.Equal(t, 500, credited)
@@ -104,6 +109,14 @@ func TestOfflineOrderRedeemsOnceAndCannotVoidAfterUse(t *testing.T) {
 	require.Error(t, protectedCode.Delete())
 	_, err = BatchDeleteRedemptions([]int{protectedCode.Id})
 	require.Error(t, err)
+
+	_, err = Redeem(keys[0], user.Id)
+	require.Error(t, err)
+	var unchanged User
+	require.NoError(t, db.First(&unchanged, user.Id).Error)
+	require.Zero(t, unchanged.Quota)
+	require.NoError(t, db.First(&protectedCode, protectedCode.Id).Error)
+	require.Equal(t, common.RedemptionCodeStatusEnabled, protectedCode.Status)
 
 	credited, err := RedeemOffline(keys[0], user.Id)
 	require.NoError(t, err)

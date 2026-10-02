@@ -17,8 +17,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestVerificationAttemptLimitExpiryAndReplay(t *testing.T) {
+	key := "synthetic-verification@example.invalid"
+	t.Cleanup(func() { DeleteKey(key, EmailVerificationPurpose) })
+	RegisterVerificationCodeWithKey(key, "123456", EmailVerificationPurpose)
+	for range 5 {
+		assert.False(t, VerifyCodeWithKey(key, "wrong", EmailVerificationPurpose))
+	}
+	assert.False(t, VerifyCodeWithKey(key, "123456", EmailVerificationPurpose))
+	RegisterVerificationCodeWithKey(key, "654321", EmailVerificationPurpose)
+	assert.True(t, VerifyCodeWithKey(key, "654321", EmailVerificationPurpose))
+	assert.False(t, VerifyCodeWithKey(key, "654321", EmailVerificationPurpose))
+	verificationMutex.Lock()
+	verificationMap[EmailVerificationPurpose+key] = verificationValue{code: "expired", time: time.Now().Add(-time.Hour)}
+	verificationMutex.Unlock()
+	assert.False(t, VerifyCodeWithKey(key, "expired", EmailVerificationPurpose))
+}
 
 type fakeSMTPServer struct {
 	listener          net.Listener

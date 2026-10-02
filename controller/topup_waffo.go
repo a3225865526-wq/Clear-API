@@ -221,6 +221,7 @@ func RequestWaffoPay(c *gin.Context) {
 	}
 
 	// 创建本地订单
+	currency := getWaffoCurrency()
 	topUp := &model.TopUp{
 		UserId:          id,
 		Amount:          amount,
@@ -228,6 +229,7 @@ func RequestWaffoPay(c *gin.Context) {
 		TradeNo:         merchantOrderId,
 		PaymentMethod:   model.PaymentMethodWaffo,
 		PaymentProvider: model.PaymentProviderWaffo,
+		PaymentReceipt:  model.PaymentReceipt{Amount: formatWaffoAmount(payMoney, currency), Currency: currency},
 		CreateTime:      time.Now().Unix(),
 		Status:          common.TopUpStatusPending,
 	}
@@ -256,7 +258,6 @@ func RequestWaffoPay(c *gin.Context) {
 		returnUrl = setting.WaffoReturnUrl
 	}
 
-	currency := getWaffoCurrency()
 	goodsInfo := buildWaffoTopUpGoodsInfo(req.Amount)
 	createParams := &order.CreateOrderParams{
 		PaymentRequestID: paymentRequestId,
@@ -411,7 +412,7 @@ func handleWaffoPayment(c *gin.Context, wh *core.WebhookHandler, result *core.Pa
 	LockOrder(merchantOrderId)
 	defer UnlockOrder(merchantOrderId)
 
-	if err := model.RechargeWaffo(merchantOrderId, c.ClientIP()); err != nil {
+	if err := model.RechargeWaffo(merchantOrderId, c.ClientIP(), model.PaymentReceipt{Amount: result.OrderAmount, Currency: result.OrderCurrency}); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Waffo 充值处理失败 trade_no=%s client_ip=%s error=%q", merchantOrderId, c.ClientIP(), err.Error()))
 		sendWaffoWebhookResponse(c, wh, false, err.Error())
 		return
