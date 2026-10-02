@@ -16,8 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getRouteApi, Link } from '@tanstack/react-router'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { EmptyState } from '@/components/empty-state'
@@ -27,43 +28,37 @@ import { LoadingState } from '@/components/loading-state'
 import { RichContent } from '@/components/rich-content'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/stores/auth-store'
+
+import { getGuide, getGuideAccess } from './api'
+import { GuideEditor } from './editor'
 
 import './guide.css'
 
-interface GuideArticle {
-  title: string
-  source: string
-  html: string
-  previous?: string
-  next?: string
-  sections: { title: string; items: { path: string; title: string }[] }[]
-}
-interface GuideDocument {
-  pages: Record<string, GuideArticle>
-  inaccessible: Record<string, string>
-}
 const route = getRouteApi('/_authenticated/usage-guide')
 
 export function UsageGuidePage() {
   const { t } = useTranslation()
   const { article } = route.useSearch()
+  const user = useAuthStore((state) => state.auth.user)
+  const client = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const key = ['published-usage-guide', user?.id]
   const query = useQuery({
-    queryKey: ['public-usage-guide'],
-    queryFn: async ({ signal }): Promise<GuideDocument> => {
-      const response = await fetch('/guide/pages.json', {
-        signal,
-        credentials: 'omit',
-      })
-      if (!response.ok) throw new Error('Guide unavailable')
-      return response.json()
-    },
-    staleTime: Infinity,
+    queryKey: key,
+    queryFn: ({ signal }) => getGuide(signal),
+    staleTime: 0,
+    refetchInterval: editing ? false : 60000,
+    refetchOnWindowFocus: !editing,
+  })
+  const access = useQuery({
+    queryKey: ['guide-edit-access', user?.id],
+    queryFn: ({ signal }) => getGuideAccess(signal),
+    enabled: Boolean(user),
+    retry: false,
   })
   const page = query.data?.pages[article]
-  const catalog =
-    query.data &&
-    Object.values(query.data.pages).find((item) => item.sections.length > 0)
-      ?.sections
+  const catalog = query.data?.catalog
   return (
     <SectionPageLayout>
       <SectionPageLayout.Title>{t('console.guide')}</SectionPageLayout.Title>
@@ -107,6 +102,13 @@ export function UsageGuidePage() {
               ))}
             </nav>
             <div className='min-w-0 space-y-4'>
+              {access.data?.can_edit && page && (
+                <div className='flex justify-end'>
+                  <Button onClick={() => setEditing(true)}>
+                    {t('guideEdit.edit')}
+                  </Button>
+                </div>
+              )}
               <Alert>
                 <AlertTitle>{t('guide.sourceTitle')}</AlertTitle>
                 <AlertDescription>
@@ -176,6 +178,19 @@ export function UsageGuidePage() {
               )}
             </div>
           </div>
+        )}
+        {editing && query.data && page && access.data?.can_edit && (
+          <GuideEditor
+            key={article}
+            open={editing}
+            article={article}
+            document={query.data}
+            onClose={() => setEditing(false)}
+            onSaved={(document) => {
+              client.setQueryData(key, document)
+              void client.invalidateQueries({ queryKey: ['guide-versions'] })
+            }}
+          />
         )}
       </SectionPageLayout.Content>
     </SectionPageLayout>

@@ -22,6 +22,12 @@ func SetApiRouter(router *gin.Engine) {
 	RegisterFinanceRoutes(apiRouter)
 	apiRouter.GET("/console/dashboard", middleware.UserAuth(), controller.GetConsoleDashboard)
 	apiRouter.GET("/console/channel-status", middleware.UserAuth(), controller.GetConsoleMonitoring)
+	apiRouter.GET("/guide", middleware.UserAuth(), controller.GetUsageGuide)
+	apiRouter.GET("/guide/access", middleware.UserAuth(), controller.GetUsageGuideAccess)
+	apiRouter.GET("/guide/versions", middleware.UserAuth(), controller.GetUsageGuideVersions)
+	apiRouter.PUT("/guide/article", middleware.UserAuth(), controller.SaveUsageGuide)
+	apiRouter.POST("/guide/images", middleware.UserAuth(), controller.UploadUsageGuideImage)
+	apiRouter.GET("/guide/images/:name", controller.GetUsageGuideImage)
 	anonymousRequestBodyLimit := middleware.AnonymousRequestBodyLimit()
 	{
 		apiRouter.GET("/setup", controller.GetSetup)

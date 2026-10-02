@@ -7,12 +7,17 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 
 	"github.com/gin-gonic/gin"
 )
 
 func SetRouter(router *gin.Engine, assets WebAssets) {
+	guideBase, err := assets.BuildFS.ReadFile("web/dist/guide/pages.json")
+	if err != nil || controller.InitUsageGuide(guideBase) != nil {
+		common.SysError("usage guide content unavailable")
+	}
 	SetApiRouter(router)
 	SetDashboardRouter(router)
 	SetRelayRouter(router)
