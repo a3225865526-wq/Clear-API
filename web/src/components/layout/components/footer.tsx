@@ -126,7 +126,7 @@ export function Footer(props: FooterProps) {
     demoSiteEnabled,
   } = useSystemConfig()
 
-  const displayLogo = systemLogo || props.logo || '/clearapi.svg'
+  const displayLogo = systemLogo || props.logo || '/clearapi.svg?v=2'
   const displayName = props.name || getClearApiSystemName(systemName)
   const isDemoSiteMode = Boolean(demoSiteEnabled)
   const currentYear = new Date().getFullYear()

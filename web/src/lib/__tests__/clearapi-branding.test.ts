@@ -42,9 +42,10 @@ describe('ClearAPI system branding', () => {
 
 describe('ClearAPI assets and documentation', () => {
   it('maps legacy logo paths while retaining a configured logo', () => {
-    expect(getClearApiLogo()).toBe('/clearapi.svg')
-    expect(getClearApiLogo('/logo.png')).toBe('/clearapi.svg')
-    expect(getClearApiLogo('/favicon.ico')).toBe('/clearapi.svg')
+    expect(getClearApiLogo()).toBe('/clearapi.svg?v=2')
+    expect(getClearApiLogo('/logo.png')).toBe('/clearapi.svg?v=2')
+    expect(getClearApiLogo('/favicon.ico')).toBe('/clearapi.svg?v=2')
+    expect(getClearApiLogo('/clearapi.svg')).toBe('/clearapi.svg?v=2')
     expect(getClearApiLogo('/custom.svg')).toBe('/custom.svg')
   })
 

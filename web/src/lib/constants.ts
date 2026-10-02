@@ -22,7 +22,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 // System Configuration Defaults
 export const DEFAULT_SYSTEM_NAME = '澄光 API / ClearAPI'
-export const DEFAULT_LOGO = '/clearapi.svg'
+export const DEFAULT_LOGO = '/clearapi.svg?v=2'
 
 // LocalStorage Keys
 export const STORAGE_KEYS = {

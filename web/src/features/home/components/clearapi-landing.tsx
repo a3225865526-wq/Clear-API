@@ -25,6 +25,7 @@ import { Footer } from '@/components/layout/components/footer'
 import type { TopNavLink } from '@/components/layout/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { CLEARAPI_LOGO } from '@/lib/clearapi-branding'
 
 import {
   CapabilitiesSection,
@@ -37,12 +38,12 @@ type ClearApiLandingProps = {
 
 function ClearApiMark() {
   return (
-    <span
+    <img
       aria-hidden='true'
-      className='relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-gradient-to-br from-teal-500 to-cyan-700 shadow-sm shadow-teal-900/20'
-    >
-      <span className='text-xs font-semibold text-white'>CA</span>
-    </span>
+      src={CLEARAPI_LOGO}
+      alt=''
+      className='size-7 shrink-0 object-contain'
+    />
   )
 }
 

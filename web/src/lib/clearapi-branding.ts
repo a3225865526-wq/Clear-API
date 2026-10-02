@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 export const CLEARAPI_BRAND_NAME = '澄光 API / ClearAPI'
-export const CLEARAPI_LOGO = '/clearapi.svg'
+export const CLEARAPI_LOGO = '/clearapi.svg?v=2'
 
 export function isDefaultNewApiName(name?: string | null): boolean {
   return !name?.trim() || name.trim().toLowerCase() === 'new api'
@@ -33,7 +33,7 @@ export function getClearApiSystemName(name?: string | null): string {
 
 export function getClearApiLogo(logo?: string | null): string {
   const value = logo?.trim()
-  if (!value || /^\/?(?:logo\.png|favicon\.ico)$/.test(value)) {
+  if (!value || /^\/?(?:logo\.png|favicon\.ico|clearapi\.svg)$/.test(value)) {
     return CLEARAPI_LOGO
   }
   return value

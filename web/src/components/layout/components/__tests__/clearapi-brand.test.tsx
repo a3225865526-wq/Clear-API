@@ -27,7 +27,7 @@ const fixture = vi.hoisted(() => ({ footerHtml: '', demoSiteEnabled: false }))
 vi.mock('@/hooks/use-system-config', () => ({
   useSystemConfig: () => ({
     systemName: '澄光 API / ClearAPI',
-    logo: '/clearapi.svg',
+    logo: '/clearapi.svg?v=2',
     ...fixture,
   }),
 }))
@@ -49,7 +49,7 @@ describe('ClearAPI shared brand presentation', () => {
     render(<SystemBrand />)
     expect(screen.getByText('澄光 API / ClearAPI')).toBeVisible()
     expect(screen.queryByText(/v1.0.0|Based on New API/)).not.toBeInTheDocument()
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/clearapi.svg')
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/clearapi.svg?v=2')
   })
 
   it('shows only the product brand without upstream attribution or promotions', () => {
@@ -59,7 +59,7 @@ describe('ClearAPI shared brand presentation', () => {
     expect(screen.queryByText(/New API contributors/)).not.toBeInTheDocument()
     expect(document.querySelector('a[href*="QuantumNous/new-api"]')).toBeNull()
     expect(document.querySelector('a[href*="docs.newapi.pro"]')).toBeNull()
-    expect(screen.getByRole('img')).toHaveAttribute('src', '/clearapi.svg')
+    expect(screen.getByRole('img')).toHaveAttribute('src', '/clearapi.svg?v=2')
     fixture.demoSiteEnabled = false
   })
 

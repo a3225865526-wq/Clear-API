@@ -80,6 +80,7 @@ if (!rootElement) {
       ) as HTMLMetaElement | null
       if (metaTitle) metaTitle.setAttribute('content', title)
     }
+    applyFaviconToDom(getClearApiLogo())
     // Cache-first
     const cached = readCachedStatus()
     if (cached?.system_name) apply(cached.system_name as string)
