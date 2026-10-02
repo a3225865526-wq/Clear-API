@@ -2,15 +2,76 @@ package channel
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type cancellationAdaptor struct {
+	Adaptor
+	url string
+}
+
+func (a cancellationAdaptor) GetRequestURL(*relaycommon.RelayInfo) (string, error) { return a.url, nil }
+func (a cancellationAdaptor) SetupRequestHeader(*gin.Context, *http.Header, *relaycommon.RelayInfo) error {
+	return nil
+}
+
+func TestRelayRequestsStopUpstreamWhenClientCancels(t *testing.T) {
+	for _, send := range []struct {
+		name string
+		call func(Adaptor, *gin.Context, *relaycommon.RelayInfo, io.Reader) (*http.Response, error)
+	}{{"json", DoApiRequest}, {"form", DoFormRequest}} {
+		t.Run(send.name, func(t *testing.T) {
+			started, stopped, cleanup := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			upstream := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+				_, _ = io.Copy(io.Discard, r.Body)
+				close(started)
+				select {
+				case <-r.Context().Done():
+					close(stopped)
+				case <-cleanup:
+				}
+			}))
+			defer upstream.Close()
+			defer close(cleanup)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil).WithContext(ctx)
+			result := make(chan error, 1)
+			go func() {
+				_, err := send.call(cancellationAdaptor{url: upstream.URL}, c, &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}, strings.NewReader("synthetic"))
+				result <- err
+			}()
+			select {
+			case <-started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("mock upstream did not receive request")
+			}
+			cancel()
+			select {
+			case err := <-result:
+				require.Error(t, err)
+			case <-time.After(5 * time.Second):
+				t.Fatal("relay did not cancel")
+			}
+			select {
+			case <-stopped:
+			case <-time.After(5 * time.Second):
+				t.Fatal("upstream connection remained active")
+			}
+		})
+	}
+}
 
 func TestNewTaskAPIRequestInheritsClientCancellation(t *testing.T) {
 	recorder := httptest.NewRecorder()

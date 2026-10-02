@@ -74,7 +74,17 @@ func RefundFailedRequestBilling(c *gin.Context, info *relaycommon.RelayInfo, api
 	}
 	apiErr = service.NormalizeViolationFeeError(apiErr)
 	if info.Billing != nil {
-		info.Billing.Refund(c)
+		if c.GetBool("upstream_usage_uncertain") || (c.Request.Context().Err() != nil && c.GetBool("upstream_attempted")) {
+			// A disconnect does not establish that the provider did no work.
+			// Keep the reserved charge for reconciliation instead of offering a
+			// free invocation by aborting the stream before usage is received.
+			if err := info.Billing.Settle(info.Billing.GetPreConsumedQuota()); err != nil {
+				logger.LogError(c, "cancelled upstream request requires billing reconciliation")
+			}
+			logger.LogWarn(c, "upstream usage unknown after dispatch; reserved quota retained pending usage reconciliation")
+		} else {
+			info.Billing.Refund(c)
+		}
 	}
 	service.ChargeViolationFeeIfNeeded(c, info, apiErr)
 	return apiErr

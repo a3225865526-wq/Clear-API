@@ -97,8 +97,49 @@ func ReserveBillingRequest(requestID string, userID, tokenID, quota int) error {
 	})
 }
 
-// RequestBillingCompletion first persists an immutable intent. If applying it
-// fails or the process exits, the worker can safely finish the pending intent.
+// RaiseBillingReservation atomically grows an active wallet/token reservation.
+func RaiseBillingReservation(requestID string, quota int) error {
+	if quota < 0 || quota > math.MaxInt32 {
+		return ErrBillingReservationConflict
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var r BillingReservation
+		if err := lockForUpdate(tx).Where("request_id = ?", requestID).First(&r).Error; err != nil {
+			return err
+		}
+		if r.State != "active" || r.Applied != r.Reserved {
+			return ErrBillingReservationConflict
+		}
+		if quota <= r.Reserved {
+			return nil
+		}
+		delta := quota - r.Reserved
+		user := tx.Model(&User{}).Where("id = ? AND status = ? AND quota >= ? AND quota <= ?", r.UserID, common.UserStatusEnabled, delta, common.MaxWalletQuota).Update("quota", gorm.Expr("quota - ?", delta))
+		if user.Error != nil {
+			return user.Error
+		}
+		if user.RowsAffected != 1 {
+			return ErrBillingReservationQuota
+		}
+		token := tx.Model(&Token{}).Where("id = ? AND user_id = ? AND status = ? AND (expired_time = -1 OR expired_time > ?) AND (unlimited_quota = ? OR remain_quota >= ?) AND used_quota >= 0 AND used_quota <= ? AND remain_quota >= ?", r.TokenID, r.UserID, common.TokenStatusEnabled, time.Now().Unix(), true, delta, common.MaxWalletQuota-int64(delta), -common.MaxWalletQuota+int64(delta)).Updates(map[string]any{"remain_quota": gorm.Expr("remain_quota - ?", delta), "used_quota": gorm.Expr("used_quota + ?", delta)})
+		if token.Error != nil {
+			return token.Error
+		}
+		if token.RowsAffected != 1 {
+			return ErrBillingReservationQuota
+		}
+		claim := tx.Model(&BillingReservation{}).Where("id = ? AND state = ? AND reserved = ?", r.ID, "active", r.Reserved).Updates(map[string]any{"reserved": quota, "applied": quota, "updated_at": time.Now().Unix()})
+		if claim.Error != nil {
+			return claim.Error
+		}
+		if claim.RowsAffected != 1 {
+			return ErrBillingReservationConflict
+		}
+		return nil
+	})
+}
+
+// RequestBillingCompletion persists an immutable intent for crash recovery.
 func RequestBillingCompletion(requestID string, target int, refund bool) error {
 	if target < 0 || target > math.MaxInt32 || refund && target != 0 {
 		return ErrBillingReservationConflict

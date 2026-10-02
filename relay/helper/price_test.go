@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
@@ -17,10 +19,37 @@ import (
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	hosttypes "github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPaidTextReservationIncludesEveryOutput(t *testing.T) {
+	oldRatios, oldPrices := ratio_setting.ModelRatio2JSONString(), ratio_setting.ModelPrice2JSONString()
+	oldCount, oldQuota := constant.CountToken, *operation_setting.GetQuotaSetting()
+	constant.CountToken = true
+	operation_setting.GetQuotaSetting().PreConsumeMultiplier = 1
+	t.Cleanup(func() {
+		constant.CountToken = oldCount
+		*operation_setting.GetQuotaSetting() = oldQuota
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatios))
+		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(oldPrices))
+	})
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"security-budget":1}`))
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{}`))
+	for _, count := range []int{1, 3} {
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+		limit := uint(100)
+		info := &relaycommon.RelayInfo{OriginModelName: "security-budget", UserGroup: "default", UsingGroup: "default", RelayMode: relayconstant.RelayModeChatCompletions, Request: &dto.GeneralOpenAIRequest{MaxTokens: &limit, N: &count}}
+		price, err := ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{MaxTokens: 100})
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, price.QuotaToPreConsume, 1000+100*count)
+		_, err = ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{})
+		require.ErrorContains(t, err, "bounded output limit")
+	}
+}
 
 func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -137,11 +166,11 @@ func TestModelPriceHelperTieredInputPreConsumeMultiplier(t *testing.T) {
 		multiplier float64
 		expected   int
 	}{
-		{"default uses only input", "default", 1000, 0, 1, 1500},
-		{"explicit output limit does not increase reservation", "default", 1000, 100, 1, 1500},
-		{"fraction below one", "default", 1000, 0, 0.5, 750},
-		{"fraction above one preserves context tier", "default", 1000, 0, 2.5, 3750},
-		{"small input has no token floor", "default", 100, 0, 1, 150},
+		{"reserves the most expensive possible branch", "default", 1000, 0, 1, 15000},
+		{"bound includes every pricing branch", "default", 1000, 100, 1, 15000},
+		{"fraction cannot underreserve", "default", 1000, 0, 0.5, 15000},
+		{"fraction above one increases input bound", "default", 1000, 0, 2.5, 37500},
+		{"small input has no token floor", "default", 100, 0, 1, 1500},
 		{"zero input", "default", 0, 100, 1, 0},
 		{"free group", "free", 1000, 0, 2.5, 0},
 	}
@@ -258,7 +287,7 @@ func TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice(t *testing.T)
 		{
 			name:         "ratio price ignores request billing ratios",
 			model:        "ratio-image-price",
-			wantQuota:    15000,
+			wantQuota:    30000,
 			wantUsePrice: false,
 		},
 	}
@@ -647,6 +676,9 @@ func TestModelPriceHelperPreservesGpt51CodexMaxIdentity(t *testing.T) {
 
 func TestModelPriceHelperNativeGeminiNoThinkingDoesNotAliasBillingModel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	oldCount := constant.CountToken
+	constant.CountToken = true
+	t.Cleanup(func() { constant.CountToken = oldCount })
 
 	savedRatios := ratio_setting.ModelRatio2JSONString()
 	t.Cleanup(func() {
@@ -683,7 +715,7 @@ func TestModelPriceHelperNativeGeminiNoThinkingDoesNotAliasBillingModel(t *testi
 		},
 	}
 
-	priceData, err := ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{})
+	priceData, err := ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{MaxTokens: 100})
 	require.NoError(t, err)
 	assert.Empty(t, info.BillingModelName)
 	assert.Equal(t, "gemini-3-pro", info.GetBillingModelName())
@@ -711,7 +743,7 @@ func TestInputPreConsumeMultiplierLegacyAndRequestPrices(t *testing.T) {
 		multiplier   float64
 		prompt, want int
 	}{
-		{"legacy-input-policy", 0.5, 100, 75},
+		{"legacy-input-policy", 0.5, 100, 300},
 		{"legacy-input-policy", 2.5, 100, 375},
 		{"legacy-input-policy", 1, 0, 0},
 		{"request-input-policy", 2.5, 100, 5000},
@@ -745,3 +777,42 @@ func (s *priceTestReservation) Refund(*gin.Context)      {}
 func (s *priceTestReservation) NeedsRefund() bool        { return false }
 func (s *priceTestReservation) GetPreConsumedQuota() int { return s.held }
 func (s *priceTestReservation) Reserve(quota int) error  { s.held = max(s.held, quota); return nil }
+
+func TestOutboundTextBudgetCoversParameterOverrides(t *testing.T) {
+	old := constant.CountToken
+	constant.CountToken = true
+	t.Cleanup(func() { constant.CountToken = old })
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	reservation := &priceTestReservation{held: 10}
+	info := &relaycommon.RelayInfo{Request: &dto.GeneralOpenAIRequest{}, RelayMode: relayconstant.RelayModeChatCompletions, RelayFormat: types.RelayFormatOpenAI, Billing: reservation, PriceData: hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}, QuotaToPreConsume: 10}}
+	require.NoError(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"synthetic prompt"}],"max_tokens":200,"n":2}`)))
+	assert.GreaterOrEqual(t, reservation.held, 400)
+	require.ErrorContains(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"fixture"}]}`)), "bounded output limit")
+}
+
+func TestPaidGeminiBatchBudgetIncludesEveryRequest(t *testing.T) {
+	old := constant.CountToken
+	constant.CountToken = true
+	t.Cleanup(func() { constant.CountToken = old })
+	limit := uint(100)
+	n := 2
+	batch := &dto.GeminiChatRequest{Requests: []dto.GeminiChatRequest{
+		{GenerationConfig: dto.GeminiChatGenerationConfig{MaxOutputTokens: &limit}},
+		{GenerationConfig: dto.GeminiChatGenerationConfig{MaxOutputTokens: &limit, CandidateCount: &n}},
+	}}
+	info := &relaycommon.RelayInfo{Request: batch, RelayFormat: types.RelayFormatGemini}
+	budget, err := requestOutputBudget(info, batch.GetTokenCountMeta())
+	require.NoError(t, err)
+	assert.Equal(t, 300.0, budget)
+	batch.Requests[0].GenerationConfig.MaxOutputTokens = nil
+	_, err = requestOutputBudget(info, batch.GetTokenCountMeta())
+	require.ErrorContains(t, err, "bounded output limit")
+	embedding := &relaycommon.RelayInfo{Request: &dto.GeminiChatRequest{}, RequestURLPath: "/v1beta/models/synthetic:embedContent", RelayFormat: types.RelayFormatGemini}
+	budget, err = requestOutputBudget(embedding, &types.TokenCountMeta{})
+	require.NoError(t, err)
+	assert.Zero(t, budget)
+	assert.False(t, RequiresOutboundTextBudget(embedding))
+	_, err = requestToolBudget(&relaycommon.RelayInfo{Request: &dto.OpenAIResponsesRequest{Tools: []byte(`[{"type":"code_interpreter"}]`)}})
+	require.ErrorContains(t, err, "cannot bound provider-hosted tool")
+}

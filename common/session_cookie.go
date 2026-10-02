@@ -44,6 +44,9 @@ func NormalizeOrigin(raw string) (string, error) {
 func InitSessionCookieSettings() error {
 	secureRaw := strings.TrimSpace(os.Getenv("SESSION_COOKIE_SECURE"))
 	trustedURLsRaw := strings.TrimSpace(os.Getenv("SESSION_COOKIE_TRUSTED_URL"))
+	if os.Getenv("GIN_MODE") == "release" && !strings.EqualFold(secureRaw, "true") {
+		return fmt.Errorf("production mode requires SESSION_COOKIE_SECURE=true and a trusted HTTPS origin")
+	}
 
 	SessionCookieSecure = false
 	SessionCookieTrustedURLs = nil

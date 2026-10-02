@@ -1,17 +1,22 @@
 package helper
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/relayconvert/reasoning"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
@@ -92,7 +97,7 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		if billingProtectionEnabled() {
 			return hosttypes.PriceData{}, fmt.Errorf("protected billing has no proven upper bound for expression-priced models")
 		}
-		return modelPriceHelperTiered(c, info, billingModelName, promptTokens, groupRatioInfo)
+		return modelPriceHelperTiered(c, info, billingModelName, promptTokens, meta, groupRatioInfo)
 	}
 
 	var preConsumedQuota int
@@ -134,7 +139,14 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		audioRatio = ratio_setting.GetAudioRatio(billingModelName)
 		audioCompletionRatio = ratio_setting.GetAudioCompletionRatio(billingModelName)
 		ratio := modelRatio * groupRatioInfo.GroupRatio
-		quota, err := common.QuotaFromFloatStrict(preConsumedTokens * ratio)
+		output, err := requestOutputBudget(info, meta)
+		if err != nil && ratio != 0 {
+			return hosttypes.PriceData{}, err
+		}
+		inputCategoryRatio := max(1.0, cacheRatio, cacheCreationRatio5m, cacheCreationRatio1h, imageRatio, audioRatio)
+		inputBudget := max(preConsumedTokens, float64(promptTokens)*inputCategoryRatio)
+		outputRatio := max(completionRatio, audioRatio*audioCompletionRatio)
+		quota, err := common.QuotaFromFloatStrict(math.Ceil((inputBudget + output*outputRatio) * ratio))
 		if err != nil {
 			return hosttypes.PriceData{}, err
 		}
@@ -220,6 +232,18 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		if err := protectTextReservation(info, &priceData, promptTokens, protectedOutput); err != nil {
 			return hosttypes.PriceData{}, err
 		}
+	}
+	toolQuota, err := requestToolBudget(info)
+	if err != nil {
+		return hosttypes.PriceData{}, err
+	}
+	if toolQuota > 0 {
+		quota, err := common.QuotaFromFloatStrict(math.Ceil(float64(priceData.QuotaToPreConsume) + toolQuota*priceData.GroupRatioInfo.GroupRatio))
+		if err != nil {
+			return hosttypes.PriceData{}, err
+		}
+		priceData.QuotaToPreConsume = quota
+		priceData.FreeModel = false
 	}
 	if common.DebugEnabled {
 		logger.LogDebug(c, "model_price_helper result: %s", priceData.ToSetting())
@@ -355,7 +379,7 @@ func resolveBillingModelName(origin string) string {
 	return matched
 }
 
-func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billingModelName string, promptTokens int, groupRatioInfo hosttypes.GroupRatioInfo) (hosttypes.PriceData, error) {
+func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billingModelName string, promptTokens int, meta *types.TokenCountMeta, groupRatioInfo hosttypes.GroupRatioInfo) (hosttypes.PriceData, error) {
 	exprStr, ok := billing_setting.GetBillingExpr(billingModelName)
 	if !ok {
 		return hosttypes.PriceData{}, fmt.Errorf("model %s is configured as tiered_expr but has no billing expression", billingModelName)
@@ -397,6 +421,25 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billing
 	if trace.BillingUnit != billingexpr.BillingUnitRequest {
 		quotaBeforeGroup *= preConsumeMultiplier
 	}
+	output, budgetErr := requestOutputBudget(info, meta)
+	usedVars := billingexpr.UsedVarsByHash(exprStr, exprHash)
+	if budgetErr != nil && groupRatioInfo.GroupRatio != 0 && (usedVars["c"] || usedVars["ao"] || usedVars["img_o"]) {
+		return hosttypes.PriceData{}, budgetErr
+	}
+	imageCount := 1
+	if requestInput.ImageCount != nil {
+		imageCount = *requestInput.ImageCount
+	}
+	upper, err := billingexpr.ReservationUpperBound(exprStr, float64(promptTokens)*max(1.0, preConsumeMultiplier), output, imageCount)
+	if err != nil && groupRatioInfo.GroupRatio != 0 {
+		return hosttypes.PriceData{}, err
+	}
+	quotaBeforeGroup = max(quotaBeforeGroup, upper/1_000_000*common.QuotaPerUnit)
+	toolQuota, err := requestToolBudget(info)
+	if err != nil {
+		return hosttypes.PriceData{}, err
+	}
+	quotaBeforeGroup += toolQuota
 	preConsumedQuota, err := billingexpr.QuotaRoundStrict(quotaBeforeGroup * groupRatioInfo.GroupRatio)
 	if err != nil {
 		return hosttypes.PriceData{}, err
@@ -441,4 +484,241 @@ func modelPriceHelperTiered(c *gin.Context, info *relaycommon.RelayInfo, billing
 
 	info.PriceData = priceData
 	return priceData, nil
+}
+
+// requestOutputBudget retains multi-output requests, reserving all candidates.
+// An omitted cap on a paid generation request has no enforceable cost bound.
+func requestOutputBudget(info *relaycommon.RelayInfo, meta *types.TokenCountMeta) (float64, error) {
+	if info == nil || meta == nil {
+		return 0, fmt.Errorf("request billing metadata is missing")
+	}
+	count := 1
+	generation := false
+	switch request := info.Request.(type) {
+	case *dto.GeneralOpenAIRequest:
+		generation = info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions
+		if request.N != nil {
+			count = *request.N
+		}
+	case *dto.ClaudeRequest, *dto.OpenAIResponsesRequest:
+		generation = true
+	case *dto.GeminiChatRequest:
+		generation = !strings.Contains(info.RequestURLPath, ":embedContent") && !strings.Contains(info.RequestURLPath, ":batchEmbedContents")
+		if !generation {
+			return 0, nil
+		}
+		if len(request.Requests) > 0 {
+			if !constant.CountToken || len(request.Requests) > dto.MaxImageN || len(request.Contents) > 0 {
+				return 0, fmt.Errorf("invalid Gemini batch billing budget")
+			}
+			total := 0.0
+			for i := range request.Requests {
+				child := request.Requests[i]
+				if len(child.Requests) > 0 {
+					return 0, fmt.Errorf("nested Gemini batches are not supported")
+				}
+				copyInfo := *info
+				copyInfo.Request = &child
+				budget, err := requestOutputBudget(&copyInfo, child.GetTokenCountMeta())
+				if err != nil {
+					return 0, err
+				}
+				total += budget
+			}
+			return total, nil
+		}
+		if request.GenerationConfig.CandidateCount != nil {
+			count = *request.GenerationConfig.CandidateCount
+		}
+	}
+	if count < 1 || count > dto.MaxImageN {
+		return 0, fmt.Errorf("output candidate count is out of range")
+	}
+	if !generation {
+		return 0, nil
+	}
+	if generation && (!constant.CountToken || meta.MaxTokens <= 0 || meta.MaxTokens > maxTokensLimit) {
+		return 0, fmt.Errorf("paid generation requires token counting and an explicit bounded output limit")
+	}
+	return float64(max(0, meta.MaxTokens)) * float64(count), nil
+}
+
+func requestToolBudget(info *relaycommon.RelayInfo) (float64, error) {
+	if info.Request == nil {
+		return 0, nil
+	}
+	var raw json.RawMessage
+	var err error
+	var maxCalls uint
+	webSearch := false
+	switch request := info.Request.(type) {
+	case *dto.GeneralOpenAIRequest:
+		raw, err = common.Marshal(request.Tools)
+		webSearch = request.WebSearchOptions != nil
+	case *dto.ClaudeRequest:
+		raw, err = common.Marshal(request.Tools)
+	case *dto.OpenAIResponsesRequest:
+		raw = request.Tools
+		if request.MaxToolCalls != nil {
+			maxCalls = *request.MaxToolCalls
+		}
+	case *dto.GeminiChatRequest:
+		if len(request.Requests) > 0 {
+			if len(request.Requests) > dto.MaxImageN {
+				return 0, fmt.Errorf("Gemini batch is too large")
+			}
+			total := 0.0
+			for i := range request.Requests {
+				child := request.Requests[i]
+				if len(child.Requests) > 0 {
+					return 0, fmt.Errorf("nested Gemini batch is invalid")
+				}
+				copyInfo := *info
+				copyInfo.Request = &child
+				quota, err := requestToolBudget(&copyInfo)
+				if err != nil {
+					return 0, err
+				}
+				total += quota
+			}
+			return total, nil
+		}
+		raw = request.Tools
+	default:
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	var tools []struct {
+		Type                  string          `json:"type"`
+		MaxUses               int             `json:"max_uses"`
+		GoogleSearch          json.RawMessage `json:"googleSearch"`
+		GoogleSearchSnake     json.RawMessage `json:"google_search"`
+		GoogleSearchRetrieval json.RawMessage `json:"googleSearchRetrieval"`
+		CodeExecution         json.RawMessage `json:"codeExecution"`
+		CodeExecutionSnake    json.RawMessage `json:"code_execution"`
+		URLContext            json.RawMessage `json:"url_context"`
+	}
+	if len(raw) > 0 {
+		if err = common.Unmarshal(raw, &tools); err != nil {
+			return 0, err
+		}
+	}
+	counts := map[string]int{}
+	if strings.HasSuffix(info.GetBillingModelName(), "search-preview") || webSearch {
+		counts[dto.BuildInToolWebSearchPreview] = 1
+	}
+	for _, tool := range tools {
+		if len(tool.CodeExecution) > 0 || len(tool.CodeExecutionSnake) > 0 || len(tool.URLContext) > 0 {
+			return 0, fmt.Errorf("cannot bound this provider-hosted tool before dispatch")
+		}
+		if tool.Type != "" && tool.Type != "function" && tool.Type != "custom" && !strings.HasPrefix(tool.Type, "web_search") {
+			return 0, fmt.Errorf("cannot bound provider-hosted tool %s before dispatch", tool.Type)
+		}
+		name, count := "", 1
+		switch {
+		case strings.HasPrefix(tool.Type, "web_search"):
+			name = dto.BuildInToolWebSearch
+			if strings.HasPrefix(tool.Type, "web_search_preview") {
+				name = dto.BuildInToolWebSearchPreview
+			}
+			count = tool.MaxUses
+			if _, ok := info.Request.(*dto.OpenAIResponsesRequest); ok {
+				if maxCalls > maxTokensLimit {
+					return 0, fmt.Errorf("tool call limit is out of range")
+				}
+				count = int(maxCalls)
+			}
+		case len(tool.GoogleSearch) > 0 || len(tool.GoogleSearchSnake) > 0 || len(tool.GoogleSearchRetrieval) > 0:
+			name = dto.BuildInToolGoogleSearch
+		}
+		if name == "" || operation_setting.GetToolPriceForModel(name, info.GetBillingModelName()) <= 0 {
+			continue
+		}
+		if count <= 0 || count > maxTokensLimit {
+			return 0, fmt.Errorf("paid built-in tools require an explicit bounded call limit")
+		}
+		counts[name] += count
+	}
+	quota := 0.0
+	for name, count := range counts {
+		quota += float64(count) * operation_setting.GetToolPriceForModel(name, info.GetBillingModelName()) / 1000 * common.QuotaPerUnit
+	}
+	if math.IsInf(quota, 0) || math.IsNaN(quota) || quota < 0 {
+		return 0, fmt.Errorf("invalid tool billing budget")
+	}
+	return quota, nil
+}
+
+// PrepareOutboundTextBudget repeats reservation after conversion, injected
+// prompts and administrator overrides, using the frozen pricing snapshot.
+func RequiresOutboundTextBudget(info *relaycommon.RelayInfo) bool {
+	if info != nil && (strings.Contains(info.RequestURLPath, ":embedContent") || strings.Contains(info.RequestURLPath, ":batchEmbedContents")) {
+		return false
+	}
+	return info != nil && info.Request != nil && !info.IsChannelTest && !info.PriceData.FreeModel && (info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions || info.RelayMode == relayconstant.RelayModeResponses || info.RelayFormat == types.RelayFormatClaude || info.RelayFormat == types.RelayFormatGemini)
+}
+
+func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body []byte) error {
+	if !RequiresOutboundTextBudget(info) {
+		return nil
+	}
+	copyInfo := *info
+	switch info.GetFinalRequestRelayFormat() {
+	case types.RelayFormatOpenAI:
+		copyInfo.Request = &dto.GeneralOpenAIRequest{}
+	case types.RelayFormatClaude:
+		copyInfo.Request = &dto.ClaudeRequest{}
+	case types.RelayFormatGemini:
+		copyInfo.Request = &dto.GeminiChatRequest{}
+	case types.RelayFormatOpenAIResponses:
+		copyInfo.Request = &dto.OpenAIResponsesRequest{}
+	default:
+		return fmt.Errorf("cannot verify outbound generation budget for this provider")
+	}
+	if err := common.Unmarshal(body, copyInfo.Request); err != nil {
+		return fmt.Errorf("cannot verify outbound request budget")
+	}
+	meta := copyInfo.Request.GetTokenCountMeta()
+	output, err := requestOutputBudget(&copyInfo, meta)
+	if err != nil {
+		return err
+	}
+	prompt, err := service.EstimateRequestToken(c, meta, &copyInfo)
+	if err != nil {
+		return err
+	}
+	price := info.PriceData
+	quota := 0.0
+	if snap := info.TieredBillingSnapshot; snap != nil {
+		images := 1
+		if snap.EstimatedImageCount != nil {
+			images = *snap.EstimatedImageCount
+		}
+		upper, err := billingexpr.ReservationUpperBound(snap.ExprString, float64(prompt)*max(1.0, snap.PreConsumeMultiplier), output, images)
+		if err != nil {
+			return err
+		}
+		quota = upper / 1_000_000 * common.QuotaPerUnit * snap.GroupRatio
+	} else if !price.UsePrice {
+		inputRatio := max(1.0, price.CacheRatio, price.CacheCreation5mRatio, price.CacheCreation1hRatio, price.ImageRatio, price.AudioRatio)
+		outputRatio := max(price.CompletionRatio, price.AudioRatio*price.AudioCompletionRatio)
+		quota = (float64(prompt)*inputRatio + output*outputRatio) * price.ModelRatio * price.GroupRatioInfo.GroupRatio
+	} else {
+		quota = price.ApplyOtherRatiosToFloat(price.ModelPrice * common.QuotaPerUnit * price.GroupRatioInfo.GroupRatio)
+	}
+	toolQuota, err := requestToolBudget(&copyInfo)
+	if err != nil {
+		return err
+	}
+	quota = max(float64(price.QuotaToPreConsume), quota+toolQuota*price.GroupRatioInfo.GroupRatio)
+	target, err := common.QuotaFromFloatStrict(math.Ceil(quota))
+	if err != nil {
+		return err
+	}
+	if info.Billing == nil {
+		return fmt.Errorf("paid outbound request has no billing reservation")
+	}
+	return info.Billing.Reserve(target)
 }

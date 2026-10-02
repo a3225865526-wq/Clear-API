@@ -28,12 +28,9 @@ func SetUpLogger(server *gin.Engine) {
 		if tag == "" {
 			tag = "web"
 		}
-		path := param.Path
-		// OAuth callbacks carry one-time codes and state in the query string.
-		// Redact the log value only; the handler still needs the original query.
-		if strings.HasPrefix(path, "/api/oauth/") || strings.HasPrefix(path, "/oauth/") {
-			path, _, _ = strings.Cut(path, "?")
-		}
+		// Query strings can contain API keys, OAuth codes and signed URLs.
+		// Strip them only from the log; handlers retain the original request.
+		path, _, _ := strings.Cut(param.Path, "?")
 		return fmt.Sprintf("[GIN] %s | %s | %s | %3d | %13v | %15s | %7s %s\n",
 			param.TimeStamp.Format("2006/01/02 - 15:04:05"),
 			tag,

@@ -42,7 +42,7 @@ func getAwsErrorStatusCode(err error) int {
 
 func newAwsInvokeContext(parent context.Context) (context.Context, context.CancelFunc) {
 	if common.RelayTimeout <= 0 {
-		return context.WithCancel(parent)
+		return context.WithTimeout(parent, 15*time.Minute)
 	}
 	return context.WithTimeout(parent, time.Duration(common.RelayTimeout)*time.Second)
 }
@@ -73,6 +73,7 @@ func newAwsClient(c *gin.Context, info *relaycommon.RelayInfo) (*bedrockruntime.
 		apiKey := awsSecret[0]
 		region := awsSecret[1]
 		client = bedrockruntime.New(bedrockruntime.Options{
+			Retryer:                 aws.NopRetryer{},
 			Region:                  region,
 			BearerAuthTokenProvider: bearer.StaticTokenProvider{Token: bearer.Token{Value: apiKey}},
 			HTTPClient:              httpClient,
@@ -82,6 +83,7 @@ func newAwsClient(c *gin.Context, info *relaycommon.RelayInfo) (*bedrockruntime.
 		sk := awsSecret[1]
 		region := awsSecret[2]
 		client = bedrockruntime.New(bedrockruntime.Options{
+			Retryer:     aws.NopRetryer{},
 			Region:      region,
 			Credentials: aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(ak, sk, "")),
 			HTTPClient:  httpClient,
@@ -226,7 +228,43 @@ func getAwsModelID(requestModel string) string {
 	return requestModel
 }
 
+func prepareAwsBudget(c *gin.Context, info *relaycommon.RelayInfo, body []byte, nova bool) *types.NewAPIError {
+	if helper.RequiresOutboundTextBudget(info) {
+		copyInfo := *info
+		copyInfo.FinalRequestRelayFormat = types.RelayFormatClaude
+		if nova {
+			var request NovaRequest
+			if err := common.Unmarshal(body, &request); err != nil || request.InferenceConfig == nil || request.InferenceConfig.MaxTokens <= 0 {
+				return types.NewError(errors.New("cannot verify Nova output budget"), types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
+			}
+			messages := make([]map[string]any, 0, len(request.Messages))
+			for _, message := range request.Messages {
+				var text strings.Builder
+				for _, content := range message.Content {
+					text.WriteString(content.Text)
+				}
+				messages = append(messages, map[string]any{"role": message.Role, "content": text.String()})
+			}
+			var err error
+			body, err = common.Marshal(map[string]any{"messages": messages, "max_tokens": request.InferenceConfig.MaxTokens})
+			if err != nil {
+				return types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+			}
+		}
+		if err := helper.PrepareOutboundTextBudget(c, &copyInfo, body); err != nil {
+			return types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
+		}
+	}
+	if c.Request.Context().Err() == nil {
+		c.Set("upstream_attempted", true)
+	}
+	return nil
+}
+
 func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types.NewAPIError, *dto.Usage) {
+	if err := prepareAwsBudget(c, info, a.AwsReq.(*bedrockruntime.InvokeModelInput).Body, false); err != nil {
+		return err, nil
+	}
 
 	requestContext := c.Request.Context()
 	ctx, cancel := newAwsInvokeContext(requestContext)
@@ -234,7 +272,10 @@ func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types
 
 	awsResp, err := a.AwsClient.InvokeModel(ctx, a.AwsReq.(*bedrockruntime.InvokeModelInput))
 	if err != nil {
-		return newAwsInvokeError(requestContext, err, "InvokeModel"), nil
+		if ctx.Err() == context.DeadlineExceeded {
+			c.Set("upstream_usage_uncertain", true)
+		}
+		return newAwsInvokeError(ctx, err, "InvokeModel"), nil
 	}
 
 	claudeInfo := &claude.ClaudeResponseInfo{
@@ -258,13 +299,19 @@ func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types
 }
 
 func awsStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types.NewAPIError, *dto.Usage) {
+	if err := prepareAwsBudget(c, info, a.AwsReq.(*bedrockruntime.InvokeModelWithResponseStreamInput).Body, false); err != nil {
+		return err, nil
+	}
 	requestContext := c.Request.Context()
 	ctx, cancel := newAwsInvokeContext(requestContext)
 	defer cancel()
 
 	awsResp, err := a.AwsClient.InvokeModelWithResponseStream(ctx, a.AwsReq.(*bedrockruntime.InvokeModelWithResponseStreamInput))
 	if err != nil {
-		return newAwsInvokeError(requestContext, err, "InvokeModelWithResponseStream"), nil
+		if ctx.Err() == context.DeadlineExceeded {
+			c.Set("upstream_usage_uncertain", true)
+		}
+		return newAwsInvokeError(ctx, err, "InvokeModelWithResponseStream"), nil
 	}
 	stream := awsResp.GetStream()
 	defer stream.Close()
@@ -315,6 +362,9 @@ streamLoop:
 
 // Nova模型处理函数
 func handleNovaRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types.NewAPIError, *dto.Usage) {
+	if err := prepareAwsBudget(c, info, a.AwsReq.(*bedrockruntime.InvokeModelInput).Body, true); err != nil {
+		return err, nil
+	}
 
 	requestContext := c.Request.Context()
 	ctx, cancel := newAwsInvokeContext(requestContext)
@@ -322,7 +372,10 @@ func handleNovaRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) 
 
 	awsResp, err := a.AwsClient.InvokeModel(ctx, a.AwsReq.(*bedrockruntime.InvokeModelInput))
 	if err != nil {
-		return newAwsInvokeError(requestContext, err, "InvokeModel"), nil
+		if ctx.Err() == context.DeadlineExceeded {
+			c.Set("upstream_usage_uncertain", true)
+		}
+		return newAwsInvokeError(ctx, err, "InvokeModel"), nil
 	}
 
 	// 解析Nova响应

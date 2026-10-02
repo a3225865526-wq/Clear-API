@@ -100,6 +100,33 @@ func runStrictPrepaidAccountingCases(t *testing.T, db *gorm.DB) {
 	oldRedis, oldBatch := common.RedisEnabled, common.BatchUpdateEnabled
 	common.RedisEnabled, common.BatchUpdateEnabled = false, false
 	t.Cleanup(func() { common.RedisEnabled, common.BatchUpdateEnabled = oldRedis, oldBatch })
+	t.Run("durable wallet supports general requests and recoverable refunds", func(t *testing.T) {
+		t.Setenv("CLEARAPI_DURABLE_WALLET", "true")
+		t.Setenv("CLEARAPI_BILLING_PROTECTION", "false")
+		require.NoError(t, model.MigrateBillingReservations(db))
+		user := model.User{Username: "durable-general-wallet", Status: common.UserStatusEnabled, Quota: 100}
+		require.NoError(t, db.Create(&user).Error)
+		token := model.Token{UserId: user.Id, Key: "synthetic-durable-key", Status: common.TokenStatusEnabled, RemainQuota: 100, ExpiredTime: -1}
+		require.NoError(t, db.Create(&token).Error)
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		info := &relaycommon.RelayInfo{UserId: user.Id, TokenId: token.Id, TokenKey: token.Key, RequestId: "durable-general-fixture", TokenGroup: "auto", TieredBillingSnapshot: &billingexpr.BillingSnapshot{}, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
+		session, apiErr := NewBillingSession(ctx, info, 20)
+		require.Nil(t, apiErr)
+		require.True(t, session.durable)
+		require.NoError(t, session.Reserve(40))
+		require.NoError(t, session.Reserve(40))
+		session.Refund(ctx)
+		session.Refund(ctx)
+		require.NoError(t, model.RecoverBillingCompletions(10))
+		var updated model.User
+		require.NoError(t, db.First(&updated, user.Id).Error)
+		assert.Equal(t, 100, updated.Quota)
+		t.Cleanup(func() {
+			require.NoError(t, db.Where("request_id = ?", info.RequestId).Delete(&model.BillingReservation{}).Error)
+			require.NoError(t, db.Unscoped().Delete(&token).Error)
+			require.NoError(t, db.Unscoped().Delete(&user).Error)
+		})
+	})
 	t.Run("concurrent wallet settlements never overdraw", func(t *testing.T) {
 		user := model.User{Username: "strict-wallet", Quota: 100, Status: common.UserStatusEnabled}
 		require.NoError(t, db.Create(&user).Error)

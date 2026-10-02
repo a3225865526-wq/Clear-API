@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
@@ -28,8 +31,8 @@ import (
 func RelayMidjourneyImage(c *gin.Context) {
 	taskId := c.Param("id")
 	midjourneyTask := model.GetByOnlyMJId(taskId)
-	if midjourneyTask == nil {
-		c.JSON(400, gin.H{
+	if midjourneyTask == nil || (!middleware.IsTaskArtifactAccess(c) && midjourneyTask.UserId != c.GetInt("id")) {
+		c.JSON(http.StatusNotFound, gin.H{
 			"error": "midjourney_task_not_found",
 		})
 		return
@@ -65,7 +68,16 @@ func RelayMidjourneyImage(c *gin.Context) {
 		})
 		return
 	}
-	resp, err := httpClient.Get(midjourneyTask.ImageUrl)
+	// Proxy clients are shared. Keep redirects disabled on a local copy.
+	fetchClient := *httpClient
+	fetchClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }
+	fetchClient.Timeout = 60 * time.Second
+	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, midjourneyTask.ImageUrl, nil)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadGateway)
+		return
+	}
+	resp, err := fetchClient.Do(req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "http_get_image_failed",
@@ -74,9 +86,8 @@ func RelayMidjourneyImage(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		responseBody, _ := io.ReadAll(resp.Body)
-		c.JSON(resp.StatusCode, gin.H{
-			"error": string(responseBody),
+		c.JSON(http.StatusBadGateway, gin.H{
+			"error": "upstream_image_fetch_failed",
 		})
 		return
 	}
@@ -86,10 +97,23 @@ func RelayMidjourneyImage(c *gin.Context) {
 		// 如果无法确定内容类型，则默认为jpeg
 		contentType = "image/jpeg"
 	}
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		c.AbortWithStatus(http.StatusBadGateway)
+		return
+	}
+	switch mediaType {
+	case "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif":
+	default:
+		c.AbortWithStatus(http.StatusBadGateway)
+		return
+	}
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Header("Referrer-Policy", "no-referrer")
 	// 设置响应的内容类型
 	c.Writer.Header().Set("Content-Type", contentType)
 	// 将图片流式传输到响应体
-	_, err = io.Copy(c.Writer, resp.Body)
+	_, err = io.Copy(c.Writer, io.LimitReader(resp.Body, 64<<20))
 	if err != nil {
 		log.Println("Failed to stream image:", err)
 	}
@@ -149,9 +173,13 @@ func coverMidjourneyTaskDto(c *gin.Context, originTask *model.Midjourney) (midjo
 	midjourneyTask.FinishTime = originTask.FinishTime
 	midjourneyTask.ImageUrl = ""
 	if originTask.ImageUrl != "" && setting.MjForwardUrlEnabled {
-		midjourneyTask.ImageUrl = system_setting.ServerAddress + "/mj/image/" + originTask.MjId
+		access, err := service.IssueTaskArtifactAccess("mj:"+originTask.MjId, "image")
+		if err != nil {
+			return midjourneyTask
+		}
+		midjourneyTask.ImageUrl = system_setting.ServerAddress + "/mj/image/" + url.PathEscape(originTask.MjId) + "?access=" + url.QueryEscape(access)
 		if originTask.Status != "SUCCESS" {
-			midjourneyTask.ImageUrl += "?rand=" + strconv.FormatInt(time.Now().UnixNano(), 10)
+			midjourneyTask.ImageUrl += "&rand=" + strconv.FormatInt(time.Now().UnixNano(), 10)
 		}
 	} else {
 		midjourneyTask.ImageUrl = originTask.ImageUrl

@@ -192,6 +192,12 @@ func TokenOrTaskArtifactAccessAuth(taskParam, artifactParam string) gin.HandlerF
 
 		taskID := c.Param(taskParam)
 		artifactKey := c.Param(artifactParam)
+		if artifactParam == "" {
+			// The MJ image capability has its own namespace and cannot authorize
+			// a task artifact with the same public ID.
+			taskID = "mj:" + taskID
+			artifactKey = "image"
+		}
 		ip := c.ClientIP()
 		if ip == "" {
 			ip = "unknown"

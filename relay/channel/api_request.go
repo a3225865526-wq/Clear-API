@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptrace"
 	"regexp"
 	"strings"
 	"sync"
@@ -316,7 +318,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
 	logger.LogDebug(c, "fullRequestURL: %s", common.SanitizeURLForLog(fullRequestURL))
-	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+	req, err := http.NewRequestWithContext(c.Request.Context(), c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
@@ -346,7 +348,7 @@ func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBod
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
 	logger.LogDebug(c, "fullRequestURL: %s", common.SanitizeURLForLog(fullRequestURL))
-	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
+	req, err := http.NewRequestWithContext(c.Request.Context(), c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
 	}
@@ -518,6 +520,24 @@ func keepUpstreamRedirectResponse(_ *http.Request, _ []*http.Request) error {
 }
 
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
+	req = req.WithContext(c.Request.Context())
+	if helper.RequiresOutboundTextBudget(info) {
+		if req.GetBody == nil || req.Body == nil {
+			return nil, types.NewError(errors.New("outbound request budget cannot be verified"), types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
+		}
+		body, err := req.GetBody()
+		if err != nil {
+			return nil, err
+		}
+		data, err := io.ReadAll(io.LimitReader(body, int64(max(1, common2.GetEnvOrDefault("MAX_REQUEST_BODY_MB", 128)))<<20))
+		_ = body.Close()
+		if err != nil {
+			return nil, err
+		}
+		if err = helper.PrepareOutboundTextBudget(c, info, data); err != nil {
+			return nil, types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
+		}
+	}
 	client, err := service.GetHttpClientWithProxySettings(info.ChannelSetting.Proxy, info.ChannelSetting)
 	if err != nil {
 		return nil, fmt.Errorf("new proxy http client failed: %w", err)
@@ -527,6 +547,9 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	// still reuses its transport and connection pools, including HTTP/2's
 	// transparent stream retries.
 	relayClient := *client
+	if relayClient.Timeout <= 0 {
+		relayClient.Timeout = 15 * time.Minute
+	}
 	relayClient.CheckRedirect = keepUpstreamRedirectResponse
 	if common2.DebugEnabled && req != nil && req.URL != nil {
 		policy := service.NormalizeHTTPTransportPolicy(info.ChannelSetting)
@@ -560,6 +583,13 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	}
 
 	financeAttempt := service.BeginFinanceAttempt(c, info)
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
+		WroteRequest: func(wrote httptrace.WroteRequestInfo) {
+			if wrote.Err == nil {
+				c.Set("upstream_attempted", true)
+			}
+		},
+	}))
 	resp, err := relayClient.Do(req)
 	financeStatus := 0
 	if resp != nil {
@@ -567,8 +597,15 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	}
 	service.CaptureFinanceTransport(info, financeAttempt, financeStatus, err != nil)
 	if err != nil {
-		logger.LogError(c, "do request failed: "+err.Error())
-		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
+		// net/http errors contain the full URL, including provider credentials.
+		logger.LogError(c, "upstream transport failed")
+		var timeout net.Error
+		uncertain := c.GetBool("upstream_attempted") && (errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &timeout) && timeout.Timeout()))
+		if uncertain {
+			c.Set("upstream_usage_uncertain", true)
+			return nil, types.NewError(errors.New("upstream timed out after dispatch"), types.ErrorCodeDoRequestFailed, types.ErrOptionWithSkipRetry())
+		}
+		return nil, types.NewError(errors.New("upstream transport failed"), types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
 	if resp == nil {
 		return nil, errors.New("resp is nil")

@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -87,6 +88,7 @@ func SubscriptionRequestCreemPay(c *gin.Context) {
 
 	// create pending order first
 	order := &model.SubscriptionOrder{
+		PaymentReceipt:  model.PaymentReceipt{Amount: decimal.NewFromFloat(plan.PriceAmount).Mul(decimal.NewFromInt(100)).String(), Currency: plan.Currency, Reference: plan.CreemProductId},
 		UserId:          userId,
 		PlanId:          plan.Id,
 		Money:           plan.PriceAmount,

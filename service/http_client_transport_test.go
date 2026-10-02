@@ -18,6 +18,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUpstreamCredentialAndControlHeadersAreNotForwarded(t *testing.T) {
+	for _, name := range []string{"Set-Cookie", "Authorization", "X-API-Key", "X-Goog-API-Key", "Connection", "Transfer-Encoding", "Content-Length"} {
+		assert.False(t, ShouldCopyUpstreamHeader(nil, name, []string{"synthetic-value"}), name)
+	}
+	assert.True(t, ShouldCopyUpstreamHeader(nil, "X-RateLimit-Remaining", []string{"10"}))
+	assert.True(t, ShouldCopyUpstreamHeader(nil, "Content-Type", []string{"application/json"}))
+}
+
 func withRelayHTTPTransportSettings(t *testing.T) {
 	t.Helper()
 	prevMaxIdle := common.RelayMaxIdleConns

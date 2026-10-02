@@ -17,7 +17,6 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
-	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
 )
 
@@ -120,7 +119,8 @@ func (s *BillingSession) ChargedQuota() int {
 	return s.chargedQuota
 }
 
-// Refund 退还所有预扣费，幂等安全，异步执行。
+// Refund completes refunds before returning rather than leaving detached work
+// that can be lost when the process exits. Durable sessions also persist intent.
 func (s *BillingSession) Refund(c *gin.Context) {
 	s.mu.Lock()
 	if s.settled || s.refunded || !s.needsRefundLocked() {
@@ -160,7 +160,7 @@ func (s *BillingSession) Refund(c *gin.Context) {
 	subscriptionId := s.relayInfo.SubscriptionId
 	funding := s.funding
 
-	gopool.Go(func() {
+	func() {
 		// 1) 退还资金来源
 		if err := funding.Refund(); err != nil {
 			common.SysLog("error refunding billing source: " + err.Error())
@@ -186,7 +186,7 @@ func (s *BillingSession) Refund(c *gin.Context) {
 				common.SysLog("error refunding token quota: " + err.Error())
 			}
 		}
-	})
+	}()
 }
 
 // NeedsRefund 返回是否存在需要退还的预扣状态。
@@ -226,7 +226,17 @@ func (s *BillingSession) Reserve(targetQuota int) error {
 		if targetQuota <= s.preConsumedQuota {
 			return nil
 		}
-		return errors.New("protected request cannot exceed its frozen reservation")
+		if BillingProtectionEnabled() {
+			return errors.New("protected request cannot exceed its frozen reservation")
+		}
+		if err := model.RaiseBillingReservation(s.relayInfo.RequestId, targetQuota); err != nil {
+			return err
+		}
+		s.preConsumedQuota = targetQuota
+		s.chargedQuota = targetQuota
+		s.tokenConsumed = targetQuota
+		s.syncRelayInfo()
+		return nil
 	}
 
 	imageRequest := false
@@ -463,11 +473,11 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
-		if BillingProtectionEnabled() {
+		if BillingProtectionEnabled() || DurableWalletBillingEnabled() && !relayInfo.IsPlayground {
 			if err := ValidateBillingProtection(); err != nil {
 				return nil, types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 			}
-			if !relayInfo.ProtectedTextBudget || relayInfo.IsPlayground || relayInfo.TokenGroup == "auto" || relayInfo.TieredBillingSnapshot != nil {
+			if BillingProtectionEnabled() && (!relayInfo.ProtectedTextBudget || relayInfo.IsPlayground || relayInfo.TokenGroup == "auto" || relayInfo.TieredBillingSnapshot != nil) {
 				return nil, types.NewError(errors.New("billing protection requires a fixed-group wallet text request"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 			}
 			if err := model.ReserveBillingRequest(relayInfo.RequestId, relayInfo.UserId, relayInfo.TokenId, preConsumedQuota); err != nil {

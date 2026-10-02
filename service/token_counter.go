@@ -188,6 +188,29 @@ func CountRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relayco
 	if meta == nil {
 		return 0, errors.New("token count meta is nil")
 	}
+	if request, ok := info.Request.(*dto.GeminiChatRequest); ok && len(request.Requests) > 0 {
+		if len(request.Requests) > dto.MaxImageN || len(request.Contents) > 0 {
+			return 0, errors.New("invalid Gemini batch")
+		}
+		total := 0
+		for i := range request.Requests {
+			child := request.Requests[i]
+			if len(child.Requests) > 0 {
+				return 0, errors.New("nested Gemini batch is invalid")
+			}
+			copyInfo := *info
+			copyInfo.Request = &child
+			count, err := CountRequestToken(c, child.GetTokenCountMeta(), &copyInfo)
+			if err != nil {
+				return 0, err
+			}
+			if count < 0 || count > math.MaxInt32-total {
+				return 0, errors.New("Gemini batch token budget overflow")
+			}
+			total += count
+		}
+		return total, nil
+	}
 
 	if info.RelayFormat == types.RelayFormatOpenAIRealtime {
 		return 0, nil

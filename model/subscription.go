@@ -212,10 +212,11 @@ func (p *SubscriptionPlan) NormalizeDefaults() {
 
 // Subscription order (payment -> webhook -> create UserSubscription)
 type SubscriptionOrder struct {
-	Id     int     `json:"id"`
-	UserId int     `json:"user_id" gorm:"index"`
-	PlanId int     `json:"plan_id" gorm:"index"`
-	Money  float64 `json:"money"`
+	PaymentReceipt PaymentReceipt `json:"-" gorm:"embedded;embeddedPrefix:payment_"`
+	Id             int            `json:"id"`
+	UserId         int            `json:"user_id" gorm:"index"`
+	PlanId         int            `json:"plan_id" gorm:"index"`
+	Money          float64        `json:"money"`
 
 	TradeNo         string `json:"trade_no" gorm:"unique;type:varchar(255);index"`
 	PaymentMethod   string `json:"payment_method" gorm:"type:varchar(50)"`
@@ -502,7 +503,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("已达到该套餐购买上限")
 		}
 	}
-	nowUnix := GetDBTimestamp()
+	nowUnix := GetDBTimestampTx(tx)
 	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
@@ -566,7 +567,7 @@ func refreshSubscriptionUserGroupCache(userId int, operation string) {
 // Complete a subscription order (idempotent). Creates a UserSubscription snapshot from the plan.
 // expectedPaymentProvider guards against cross-gateway callback attacks (empty skips the check).
 // actualPaymentMethod updates the order's PaymentMethod to reflect the real payment type used (empty skips update).
-func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string) error {
+func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedPaymentProvider string, actualPaymentMethod string, receipt ...PaymentReceipt) error {
 	if tradeNo == "" {
 		return errors.New("tradeNo is empty")
 	}
@@ -587,13 +588,22 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if expectedPaymentProvider != "" && order.PaymentProvider != expectedPaymentProvider {
 			return ErrPaymentMethodMismatch
 		}
+		if order.PaymentProvider == PaymentProviderEpay || order.PaymentProvider == PaymentProviderStripe || order.PaymentProvider == PaymentProviderCreem {
+			expected := order.PaymentReceipt
+			if expected.Amount == "" && order.PaymentProvider == PaymentProviderEpay {
+				expected = PaymentReceipt{Amount: fmt.Sprintf("%.2f", order.Money), Currency: "CNY"}
+			}
+			if err := expected.Validate(receipt); err != nil {
+				return err
+			}
+		}
 		if order.Status == common.TopUpStatusSuccess {
 			return nil
 		}
 		if order.Status != common.TopUpStatusPending {
 			return ErrSubscriptionOrderStatusInvalid
 		}
-		plan, err := GetSubscriptionPlanById(order.PlanId)
+		plan, err := getSubscriptionPlanByIdTx(tx, order.PlanId)
 		if err != nil {
 			return err
 		}

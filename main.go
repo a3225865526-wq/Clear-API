@@ -192,15 +192,19 @@ func main() {
 		common.FatalLog("failed to configure trusted proxies: " + err.Error())
 		return
 	}
-	server.Use(gin.CustomRecovery(func(c *gin.Context, err any) {
-		common.SysLog(fmt.Sprintf("panic detected: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": gin.H{
-				"message": fmt.Sprintf("Panic detected, error: %v. Please submit a issue here: https://github.com/Calcium-Ion/new-api", err),
-				"type":    "new_api_panic",
-			},
-		})
-	}))
+	// Gin's default recovery dumps request headers, including non-Bearer keys.
+	server.Use(func(c *gin.Context) {
+		defer func() {
+			if recover() != nil {
+				common.SysLog("request panic detected request_id=" + c.GetString(common.RequestIdKey))
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": gin.H{
+					"message": "Internal server error. Please provide the request ID to the administrator.",
+					"type":    "new_api_panic",
+				}})
+			}
+		}()
+		c.Next()
+	})
 	// This will cause SSE not to work!!!
 	//server.Use(gzip.Gzip(gzip.DefaultCompression))
 	server.Use(middleware.RequestId())
@@ -221,8 +225,11 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: server,
+		Addr:              ":" + port,
+		Handler:           server,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
 	go func() {

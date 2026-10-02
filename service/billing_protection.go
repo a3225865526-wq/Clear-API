@@ -12,8 +12,12 @@ import (
 // Protection is opt-in and never migrates a running database automatically.
 func BillingProtectionEnabled() bool { return os.Getenv("CLEARAPI_BILLING_PROTECTION") == "true" }
 
+// Durable wallet accounting does not impose the narrow text-only admission
+// rules of billing protection. It still requires an explicit schema migration.
+func DurableWalletBillingEnabled() bool { return os.Getenv("CLEARAPI_DURABLE_WALLET") == "true" }
+
 func ValidateBillingProtection() error {
-	if !BillingProtectionEnabled() {
+	if !BillingProtectionEnabled() && !DurableWalletBillingEnabled() {
 		return nil
 	}
 	if common.RedisEnabled || common.BatchUpdateEnabled || os.Getenv("BATCH_UPDATE_ENABLED") == "true" {
@@ -23,7 +27,7 @@ func ValidateBillingProtection() error {
 }
 
 func StartBillingProtectionWorker() error {
-	if !BillingProtectionEnabled() {
+	if !BillingProtectionEnabled() && !DurableWalletBillingEnabled() {
 		return nil
 	}
 	if err := ValidateBillingProtection(); err != nil {

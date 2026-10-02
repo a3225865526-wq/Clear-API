@@ -9,6 +9,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestProductionCookieConfigRejectsInsecureCookies(t *testing.T) {
+	resetSessionCookieSettingsAfterTest(t)
+	t.Setenv("GIN_MODE", "release")
+	t.Setenv("SESSION_COOKIE_SECURE", "")
+	t.Setenv("SESSION_COOKIE_TRUSTED_URL", "")
+	require.ErrorContains(t, InitSessionCookieSettings(), "production mode requires")
+	t.Setenv("SESSION_COOKIE_SECURE", "true")
+	t.Setenv("SESSION_COOKIE_TRUSTED_URL", "https://gateway.example")
+	require.NoError(t, InitSessionCookieSettings())
+	assert.True(t, SessionCookieSecure)
+}
+
 func TestValidateRedirectURL(t *testing.T) {
 	// Save original trusted domains and restore after test
 	originalDomains := constant.TrustedRedirectDomains

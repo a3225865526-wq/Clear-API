@@ -1,14 +1,18 @@
 package controller
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -17,6 +21,68 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+func TestStripeWebhookAcknowledgesOnlyCommittedCredits(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}, &model.TopUp{}, &model.SubscriptionOrder{}))
+	oldDB, oldLog := model.DB, model.LOG_DB
+	oldQuota := common.QuotaPerUnit
+	oldRedis, oldBatch := common.RedisEnabled, common.BatchUpdateEnabled
+	oldSecret, oldAPI, oldPrice := setting.StripeWebhookSecret, setting.StripeApiSecret, setting.StripePriceId
+	oldPayment := *operation_setting.GetPaymentSetting()
+	model.DB, model.LOG_DB = db, db
+	common.QuotaPerUnit = 5
+	common.RedisEnabled = false
+	common.BatchUpdateEnabled = false
+	setting.StripeWebhookSecret = "synthetic-webhook-secret"
+	setting.StripeApiSecret = "synthetic-api-setting"
+	setting.StripePriceId = "synthetic-price"
+	operation_setting.GetPaymentSetting().ComplianceConfirmed = true
+	operation_setting.GetPaymentSetting().ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB = oldDB, oldLog
+		common.QuotaPerUnit = oldQuota
+		common.RedisEnabled, common.BatchUpdateEnabled = oldRedis, oldBatch
+		setting.StripeWebhookSecret, setting.StripeApiSecret, setting.StripePriceId = oldSecret, oldAPI, oldPrice
+		*operation_setting.GetPaymentSetting() = oldPayment
+	})
+	require.NoError(t, db.Create(&model.User{Id: 81, Username: "synthetic-stripe-user", Status: common.UserStatusEnabled, Quota: 7}).Error)
+	order := model.TopUp{UserId: 81, TradeNo: "fixture-order", Money: 10, Amount: 10, PaymentProvider: model.PaymentProviderStripe, PaymentMethod: model.PaymentMethodStripe, Status: common.TopUpStatusPending, PaymentReceipt: model.PaymentReceipt{Amount: "1000", Currency: "usd", Reference: "cs-fixture"}}
+	require.NoError(t, order.Insert())
+	request := func(amount int, validSignature bool) int {
+		payload := fmt.Sprintf(`{"id":"evt-fixture","type":"checkout.session.completed","data":{"object":{"id":"cs-fixture","client_reference_id":"fixture-order","customer":"customer-fixture","status":"complete","payment_status":"paid","amount_subtotal":%d,"amount_total":%d,"currency":"usd"}}}`, amount, amount)
+		stamp := fmt.Sprint(time.Now().Unix())
+		mac := hmac.New(sha256.New, []byte("synthetic-webhook-secret"))
+		_, err := mac.Write([]byte(stamp + "." + payload))
+		require.NoError(t, err)
+		sig := fmt.Sprintf("t=%s,v1=%x", stamp, mac.Sum(nil))
+		if !validSignature {
+			sig = "t=" + stamp + ",v1=invalid"
+		}
+		r := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(r)
+		c.Request = httptest.NewRequest("POST", "/stripe/webhook", strings.NewReader(payload))
+		c.Request.Header.Set("Stripe-Signature", sig)
+		StripeWebhook(c)
+		c.Writer.WriteHeaderNow()
+		return r.Code
+	}
+	assert.Equal(t, 400, request(1000, false))
+	assert.Equal(t, 503, request(1, true))
+	for range 2 {
+		assert.Equal(t, 200, request(1000, true))
+	}
+	var user model.User
+	require.NoError(t, db.First(&user, 81).Error)
+	assert.Equal(t, 57, user.Quota)
+	require.NoError(t, db.Migrator().DropTable(&model.TopUp{}))
+	assert.Equal(t, 503, request(1000, true), "database failure must ask the provider to retry")
+}
 
 func TestAdminCompleteTopUpRequiresComplianceBeforeDatabaseAccess(t *testing.T) {
 	old := *operation_setting.GetPaymentSetting()

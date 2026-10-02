@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,7 +80,7 @@ func SubscriptionRequestStripePay(c *gin.Context) {
 	reference := fmt.Sprintf("sub-stripe-ref-%d-%d-%s", user.Id, time.Now().UnixMilli(), randstr.String(4))
 	referenceId := "sub_ref_" + common.Sha1([]byte(reference))
 
-	payLink, err := genStripeSubscriptionLink(referenceId, user.StripeCustomer, user.Email, plan.StripePriceId)
+	checkout, err := genStripeSubscriptionLink(referenceId, user.StripeCustomer, user.Email, plan.StripePriceId)
 	if err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Stripe 订阅支付链接创建失败 trade_no=%s plan_id=%d error=%q", referenceId, plan.Id, err.Error()))
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "拉起支付失败"})
@@ -87,6 +88,7 @@ func SubscriptionRequestStripePay(c *gin.Context) {
 	}
 
 	order := &model.SubscriptionOrder{
+		PaymentReceipt:  model.PaymentReceipt{Amount: strconv.FormatInt(checkout.AmountSubtotal, 10), Currency: string(checkout.Currency), Reference: checkout.ID},
 		UserId:          userId,
 		PlanId:          plan.Id,
 		Money:           plan.PriceAmount,
@@ -104,12 +106,12 @@ func SubscriptionRequestStripePay(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
-			"pay_link": payLink,
+			"pay_link": checkout.URL,
 		},
 	})
 }
 
-func genStripeSubscriptionLink(referenceId string, customerId string, email string, priceId string) (string, error) {
+func genStripeSubscriptionLink(referenceId string, customerId string, email string, priceId string) (*stripe.CheckoutSession, error) {
 	stripe.Key = setting.StripeApiSecret
 
 	params := &stripe.CheckoutSessionParams{
@@ -136,7 +138,10 @@ func genStripeSubscriptionLink(referenceId string, customerId string, email stri
 
 	result, err := session.New(params)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return result.URL, nil
+	if result == nil || result.ID == "" || result.Currency == "" || result.AmountSubtotal <= 0 {
+		return nil, fmt.Errorf("checkout response lacks a verifiable amount, currency or ID")
+	}
+	return result, nil
 }

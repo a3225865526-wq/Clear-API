@@ -29,7 +29,9 @@ func CloseResponseBodyGracefully(httpResponse *http.Response) {
 // ID). When the upstream header is X-Oneapi-Request-Id, the value is captured
 // into the Gin context for later logging.
 func ShouldCopyUpstreamHeader(c *gin.Context, k string, v []string) bool {
-	if strings.EqualFold(k, "Content-Length") {
+	// An upstream must not set local credentials, cookies or proxy controls.
+	switch strings.ToLower(k) {
+	case "content-length", "set-cookie", "set-cookie2", "authorization", "proxy-authorization", "proxy-authenticate", "www-authenticate", "x-api-key", "api-key", "x-goog-api-key", "connection", "keep-alive", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade":
 		return false
 	}
 	if strings.EqualFold(k, common.RequestIdKey) {

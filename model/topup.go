@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
@@ -13,16 +14,17 @@ import (
 )
 
 type TopUp struct {
-	Id              int     `json:"id"`
-	UserId          int     `json:"user_id" gorm:"index"`
-	Amount          int64   `json:"amount"`
-	Money           float64 `json:"money"`
-	TradeNo         string  `json:"trade_no" gorm:"unique;type:varchar(255);index"`
-	PaymentMethod   string  `json:"payment_method" gorm:"type:varchar(50)"`
-	PaymentProvider string  `json:"payment_provider" gorm:"type:varchar(50);default:''"`
-	CreateTime      int64   `json:"create_time"`
-	CompleteTime    int64   `json:"complete_time"`
-	Status          string  `json:"status"`
+	PaymentReceipt  PaymentReceipt `json:"-" gorm:"embedded;embeddedPrefix:payment_"`
+	Id              int            `json:"id"`
+	UserId          int            `json:"user_id" gorm:"index"`
+	Amount          int64          `json:"amount"`
+	Money           float64        `json:"money"`
+	TradeNo         string         `json:"trade_no" gorm:"unique;type:varchar(255);index"`
+	PaymentMethod   string         `json:"payment_method" gorm:"type:varchar(50)"`
+	PaymentProvider string         `json:"payment_provider" gorm:"type:varchar(50);default:''"`
+	CreateTime      int64          `json:"create_time"`
+	CompleteTime    int64          `json:"complete_time"`
+	Status          string         `json:"status"`
 }
 
 const (
@@ -32,6 +34,31 @@ const (
 	PaymentMethodWaffoPancake = "waffo_pancake"
 	PaymentMethodBalance      = "balance"
 )
+
+// PaymentReceipt snapshots the provider's amount and currency at checkout.
+// Amount uses the provider's unit: minor units for Stripe/Creem, yuan for Epay.
+type PaymentReceipt struct {
+	Amount    string `gorm:"type:varchar(64)"`
+	Currency  string `gorm:"type:varchar(8)"`
+	Reference string `gorm:"type:varchar(255)"`
+}
+
+var ErrPaymentReceiptMismatch = errors.New("payment receipt does not match checkout")
+
+func (expected PaymentReceipt) Validate(actual []PaymentReceipt) error {
+	if len(actual) != 1 || expected.Amount == "" || expected.Currency == "" {
+		return ErrPaymentReceiptMismatch
+	}
+	want, err := decimal.NewFromString(expected.Amount)
+	if err != nil || want.IsNegative() {
+		return ErrPaymentReceiptMismatch
+	}
+	paid, err := decimal.NewFromString(actual[0].Amount)
+	if err != nil || paid.IsNegative() || !want.Equal(paid) || !strings.EqualFold(expected.Currency, actual[0].Currency) || (expected.Reference != "" && expected.Reference != actual[0].Reference) {
+		return ErrPaymentReceiptMismatch
+	}
+	return nil
+}
 
 const (
 	PaymentProviderEpay         = "epay"
@@ -173,7 +200,7 @@ func UpdatePendingTopUpStatus(tradeNo string, expectedPaymentProvider string, ta
 // 在同一个事务内完成，因此同一订单的并发/重复回调（包括多实例部署下）最多充值一次。
 // alreadyDone=true 表示订单此前已完成，本次为幂等重复回调。
 // 进程内的 LockOrder 只是优化，正确性由本函数的数据库行锁保证。
-func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (alreadyDone bool, err error) {
+func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string, receipt ...PaymentReceipt) (alreadyDone bool, err error) {
 	if tradeNo == "" {
 		return false, errors.New("未提供支付单号")
 	}
@@ -191,6 +218,13 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 		}
 		if topUp.PaymentProvider != PaymentProviderEpay {
 			return ErrPaymentMethodMismatch
+		}
+		expected := topUp.PaymentReceipt
+		if expected.Amount == "" {
+			expected = PaymentReceipt{Amount: decimal.NewFromFloat(topUp.Money).StringFixed(2), Currency: "CNY"}
+		}
+		if err := expected.Validate(receipt); err != nil {
+			return err
 		}
 		if topUp.Status == common.TopUpStatusSuccess {
 			alreadyDone = true
@@ -232,7 +266,7 @@ func RechargeEpay(tradeNo string, actualPaymentMethod string, callerIp string) (
 	return false, nil
 }
 
-func Recharge(referenceId string, customerId string, callerIp string) (err error) {
+func Recharge(referenceId string, customerId string, callerIp string, receipt ...PaymentReceipt) (err error) {
 	if referenceId == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -253,6 +287,12 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 
 		if topUp.PaymentProvider != PaymentProviderStripe {
 			return ErrPaymentMethodMismatch
+		}
+		if err := topUp.PaymentReceipt.Validate(receipt); err != nil {
+			return err
+		}
+		if topUp.Status == common.TopUpStatusSuccess {
+			return nil
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
@@ -279,7 +319,10 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 
 	if err != nil {
 		common.SysError("topup failed: " + err.Error())
-		return errors.New("充值失败，请稍后重试")
+		return err
+	}
+	if quota == 0 {
+		return nil
 	}
 	syncCreditUserQuotaCache(topUp.UserId, quota, "stripe topup")
 
@@ -547,7 +590,7 @@ func ManualCompleteTopUp(tradeNo string, callerIp string, operatorID int) (*Manu
 	RecordTopupLog(userId, fmt.Sprintf("管理员补单成功，充值金额: %v，支付金额：%f", logger.FormatQuota(quotaToAdd), payMoney), callerIp, paymentMethod, "admin")
 	return &result, nil
 }
-func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string) (err error) {
+func RechargeCreem(referenceId string, customerEmail string, customerName string, callerIp string, receipt ...PaymentReceipt) (err error) {
 	if referenceId == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -568,6 +611,12 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 
 		if topUp.PaymentProvider != PaymentProviderCreem {
 			return ErrPaymentMethodMismatch
+		}
+		if err := topUp.PaymentReceipt.Validate(receipt); err != nil {
+			return err
+		}
+		if topUp.Status == common.TopUpStatusSuccess {
+			return nil
 		}
 
 		if topUp.Status != common.TopUpStatusPending {
@@ -610,7 +659,10 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 
 	if err != nil {
 		common.SysError("creem topup failed: " + err.Error())
-		return errors.New("充值失败，请稍后重试")
+		return err
+	}
+	if quota == 0 {
+		return nil
 	}
 	syncCreditUserQuotaCache(topUp.UserId, quota, "creem topup")
 
