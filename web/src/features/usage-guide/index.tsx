@@ -26,7 +26,6 @@ import { ErrorState } from '@/components/error-state'
 import { SectionPageLayout } from '@/components/layout/components/section-page-layout'
 import { LoadingState } from '@/components/loading-state'
 import { RichContent } from '@/components/rich-content'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -109,23 +108,6 @@ export function UsageGuidePage() {
                   </Button>
                 </div>
               )}
-              <Alert>
-                <AlertTitle>{t('guide.sourceTitle')}</AlertTitle>
-                <AlertDescription>
-                  {t('guide.sourceNotice')}{' '}
-                  {article === '/' && <>{t('guide.staticControls')} </>}
-                  {page && (
-                    <a
-                      href={page.source}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='underline'
-                    >
-                      {t('guide.original')}
-                    </a>
-                  )}
-                </AlertDescription>
-              </Alert>
               {page ? (
                 <>
                   <article className='bg-card min-w-0 rounded-2xl border p-5 md:p-8'>

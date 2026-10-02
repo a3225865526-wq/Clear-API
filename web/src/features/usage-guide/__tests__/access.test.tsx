@@ -67,6 +67,9 @@ it.each([false, true])(
       </QueryClientProvider>
     )
     await screen.findByRole('heading', { name: 'Guide' })
+    expect(screen.queryByText('guide.sourceTitle')).not.toBeInTheDocument()
+    expect(screen.queryByText('guide.sourceNotice')).not.toBeInTheDocument()
+    expect(screen.queryByText('guide.original')).not.toBeInTheDocument()
     await waitFor(() => expect(getGuideAccess).toHaveBeenCalled())
     if (canEdit) {
       expect(
