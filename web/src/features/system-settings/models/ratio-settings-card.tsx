@@ -36,6 +36,11 @@ import {
   type ModelPricingConfig,
 } from '@/features/model-pricing/api'
 import { pricingOptions } from '@/features/model-pricing/pricing'
+import {
+  applyGeneratedUpstreamPricing,
+  type GeneratedUpstreamPricing,
+} from '@/features/model-pricing/upstream-pricing'
+import { UpstreamPricingDialog } from '@/features/model-pricing/upstream-pricing-dialog'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import { SettingsPageTitleStatusPortal } from '../components/settings-page-context'
@@ -174,6 +179,8 @@ export function RatioSettingsCard({
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [upstreamPricingOpen, setUpstreamPricingOpen] = useState(false)
+  const [hasGeneratedDraft, setHasGeneratedDraft] = useState(false)
 
   const pricingQuery = useModelPricing()
   const savePricing = useSaveModelPricing()
@@ -385,6 +392,7 @@ export function RatioSettingsCard({
           normalized.ExposeRatioEnabled !==
           modelNormalizedDefaults.current.ExposeRatioEnabled
         if (!changes.length && !visibilityChanged) {
+          setHasGeneratedDraft(false)
           toast.info(t('No model price changes to save'))
           return
         }
@@ -399,6 +407,7 @@ export function RatioSettingsCard({
         setPricingBaseline(refreshed.data ?? null)
         modelNormalizedDefaults.current = normalized
         setSavedModelValues(normalized)
+        setHasGeneratedDraft(false)
         toast.success(t('Model pricing saved'))
       } catch (error) {
         handleServerError(error)
@@ -448,6 +457,43 @@ export function RatioSettingsCard({
     setConfirmOpen(true)
   }, [])
 
+  const applyUpstreamPrices = (
+    generated: GeneratedUpstreamPricing
+  ): boolean => {
+    try {
+      const updated = applyGeneratedUpstreamPricing(
+        pricingOptions(modelForm.getValues()),
+        generated
+      )
+      for (const [key, value] of Object.entries(updated)) {
+        const field =
+          (
+            {
+              'billing_setting.billing_mode': 'BillingMode',
+              'billing_setting.billing_expr': 'BillingExpr',
+              'billing_setting.plugin_billing_expr': 'PluginBillingExpr',
+            } as Record<string, string>
+          )[key] ?? key
+        modelForm.setValue(field as keyof ModelFormValues, value, {
+          shouldDirty: true,
+          shouldValidate: true,
+        })
+      }
+      toast.success(
+        t(
+          'Generated prices applied to draft. Save model prices to activate them.'
+        )
+      )
+      setHasGeneratedDraft(true)
+      return true
+    } catch {
+      toast.error(
+        t('Check the current pricing draft before importing generated prices.')
+      )
+      return false
+    }
+  }
+
   const { mutate: resetMutate } = resetMutation
   const handleConfirmReset = useCallback(() => {
     resetMutate()
@@ -483,6 +529,31 @@ export function RatioSettingsCard({
       if (!pricingBaseline) return <LoadingState />
       return (
         <>
+          <div className='flex flex-wrap justify-end gap-2'>
+            {hasGeneratedDraft && (
+              <Button
+                size='sm'
+                onClick={() => void modelForm.handleSubmit(saveModelRatios)()}
+                disabled={
+                  savePricing.isPending ||
+                  updateOption.isPending ||
+                  resetMutation.isPending
+                }
+              >
+                {savePricing.isPending
+                  ? t('Saving...')
+                  : t('Save generated prices')}
+              </Button>
+            )}
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => setUpstreamPricingOpen(true)}
+              disabled={savePricing.isPending || resetMutation.isPending}
+            >
+              {t('Generate prices from upstream')}
+            </Button>
+          </div>
           {savePricing.isError && (
             <Button
               variant='outline'
@@ -581,6 +652,11 @@ export function RatioSettingsCard({
         isLoading={resetMutation.isPending}
         handleConfirm={handleConfirmReset}
         confirmText={t('Reset')}
+      />
+      <UpstreamPricingDialog
+        open={upstreamPricingOpen}
+        onOpenChange={setUpstreamPricingOpen}
+        onApply={applyUpstreamPrices}
       />
     </>
   )

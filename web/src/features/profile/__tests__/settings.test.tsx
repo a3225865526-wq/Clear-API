@@ -22,6 +22,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/lib/api'
 
 import { updateUserSettings } from '../api'
+import { SidebarModulesCard } from '../components/sidebar-modules-card'
 import { NotificationTab } from '../components/tabs/notification-tab'
 import type { UserProfile } from '../types'
 
@@ -56,6 +57,40 @@ const settings = {
 }
 
 afterEach(() => vi.restoreAllMocks())
+
+it('removes chat settings and retains hidden configuration when saving or resetting visible settings', async () => {
+  const hidden = { enabled: false, playground: false, chat: false }
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: {
+      success: true,
+      data: {
+        sidebar_modules: JSON.stringify({
+          chat: hidden,
+          console: { enabled: false },
+        }),
+      },
+    },
+  })
+  const put = vi
+    .spyOn(api, 'put')
+    .mockResolvedValue({ data: { success: true } })
+  render(<SidebarModulesCard />)
+  await waitFor(() =>
+    expect(screen.getAllByRole('switch')[0]).not.toBeChecked()
+  )
+  expect(screen.queryByText('Chat Area')).not.toBeInTheDocument()
+  expect(screen.queryByText('Playground')).not.toBeInTheDocument()
+  expect(screen.getByText('Console Area')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Reset to Default' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+  await waitFor(() => expect(put).toHaveBeenCalledOnce())
+  const saved = put.mock.calls[0][1] as { sidebar_modules: string }
+  expect(JSON.parse(saved.sidebar_modules)).toMatchObject({
+    chat: hidden,
+    console: { enabled: true },
+    personal: { enabled: true },
+  })
+})
 
 describe('user settings saves across profile and security', () => {
   it('disabling IP recording sends the latest complete notification settings', async () => {
