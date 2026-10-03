@@ -187,3 +187,45 @@ func TestStoreAdminRoutesRequireAdmin(t *testing.T) {
 	router.ServeHTTP(response, request)
 	assert.Equal(t, http.StatusUnauthorized, response.Code)
 }
+
+// STEP 5: current_threshold_cents must reflect the matched level's threshold
+// so the wallet can render the segment progress bar. Display-only field: it
+// must not affect any bonus/total_recharge/quota calculation.
+func TestGetUserVipInfoCurrentThreshold(t *testing.T) {
+	_, user, _ := setupStoreControllerTest(t)
+
+	now := common.GetTimestamp()
+	require.NoError(t, model.DB.Create(&[]model.VIPLevel{
+		{Name: "Base", ThresholdCents: 0, BonusBasisPoints: 0, Enabled: true, Sort: 0, CreatedTime: now, UpdatedTime: now},
+		{Name: "TestVIP1", ThresholdCents: 1000, BonusBasisPoints: 200, Enabled: true, Sort: 1, CreatedTime: now, UpdatedTime: now},
+		{Name: "TestVIP2", ThresholdCents: 2000, BonusBasisPoints: 400, Enabled: true, Sort: 2, CreatedTime: now, UpdatedTime: now},
+	}).Error)
+
+	// Below TestVIP1: base level, current threshold 0, next is TestVIP1.
+	info := getUserVipInfo(user.Id)
+	require.NotNil(t, info)
+	assert.Equal(t, "Base", info["name"])
+	assert.EqualValues(t, 0, info["current_threshold_cents"])
+	next, ok := info["next_level"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "TestVIP1", next["name"])
+	assert.EqualValues(t, 1000, next["remaining_cents"])
+
+	// Cross into TestVIP1: current threshold follows the level.
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", user.Id).
+		Update("total_recharge_cents", 1100).Error)
+	info = getUserVipInfo(user.Id)
+	assert.Equal(t, "TestVIP1", info["name"])
+	assert.EqualValues(t, 1000, info["current_threshold_cents"])
+	next = info["next_level"].(map[string]any)
+	assert.Equal(t, "TestVIP2", next["name"])
+	assert.EqualValues(t, 900, next["remaining_cents"])
+
+	// Highest enabled level: next_level stays nil.
+	require.NoError(t, model.DB.Model(&model.User{}).Where("id = ?", user.Id).
+		Update("total_recharge_cents", 9900).Error)
+	info = getUserVipInfo(user.Id)
+	assert.Equal(t, "TestVIP2", info["name"])
+	assert.EqualValues(t, 2000, info["current_threshold_cents"])
+	assert.Nil(t, info["next_level"])
+}

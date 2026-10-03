@@ -17,9 +17,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
 import z from 'zod'
 
+import { SectionPageLayout } from '@/components/layout'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ClearAPIOfflineOrders } from '@/features/clearapi-offline-orders'
+import { RedemptionsBatchesTable } from '@/features/redemption-codes/components/redemptions-batches-table'
 import { REDEMPTION_FILTER_VALUES } from '@/features/redemption-codes/constants'
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
@@ -42,5 +46,28 @@ export const Route = createFileRoute('/_authenticated/redemption-codes/')({
     }
   },
   validateSearch: redemptionsSearchSchema,
-  component: ClearAPIOfflineOrders,
+  component: RedemptionManagement,
 })
+
+function RedemptionManagement() {
+  const { t } = useTranslation()
+  return (
+    <Tabs defaultValue='offline' className='min-h-0 flex-1'>
+      <TabsList className='mx-4 mt-4 sm:mx-6'>
+        <TabsTrigger value='offline'>{t('clearapi.offline.title')}</TabsTrigger>
+        <TabsTrigger value='batches'>{t('Batches')}</TabsTrigger>
+      </TabsList>
+      <TabsContent value='offline'>
+        <ClearAPIOfflineOrders />
+      </TabsContent>
+      <TabsContent value='batches'>
+        <SectionPageLayout>
+          <SectionPageLayout.Title>{t('Batches')}</SectionPageLayout.Title>
+          <SectionPageLayout.Content>
+            <RedemptionsBatchesTable />
+          </SectionPageLayout.Content>
+        </SectionPageLayout>
+      </TabsContent>
+    </Tabs>
+  )
+}

@@ -101,7 +101,7 @@ export function BalanceTransactionsDialog(props: BalanceTransactionsDialogProps)
     handlePageChange,
     handlePageSizeChange,
     handleTypeChange,
-  } = useBalanceTransactions()
+  } = useBalanceTransactions(props.open)
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
 

@@ -27,7 +27,7 @@ import type { BalanceTransactionDto } from '../types'
 // Balance Transactions Hook (own ledger only; user id comes from session)
 // ============================================================================
 
-export function useBalanceTransactions() {
+export function useBalanceTransactions(enabled = true) {
   const [records, setRecords] = useState<BalanceTransactionDto[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -60,8 +60,10 @@ export function useBalanceTransactions() {
   )
 
   useEffect(() => {
-    void fetchRecords(page, pageSize, type)
-  }, [fetchRecords, page, pageSize, type])
+    if (enabled) {
+      void fetchRecords(page, pageSize, type)
+    }
+  }, [enabled, fetchRecords, page, pageSize, type])
 
   const handlePageChange = useCallback((nextPage: number) => {
     setPage(nextPage)

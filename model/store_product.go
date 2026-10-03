@@ -17,11 +17,11 @@ type StoreProduct struct {
 	FaceValueCents int64  `json:"face_value_cents" gorm:"type:bigint"`
 	StoreUrl       string `json:"store_url" gorm:"type:varchar(512)"`
 	// Enabled 不设 gorm default：避免插入 false 被 GORM 忽略而落到默认 true。
-	Enabled        bool   `json:"enabled"`
-	Sort           int    `json:"sort" gorm:"default:0"`
-	Description    string `json:"description" gorm:"type:varchar(255);default:''"`
-	CreatedTime    int64  `json:"created_time" gorm:"bigint"`
-	UpdatedTime    int64  `json:"updated_time" gorm:"bigint"`
+	Enabled     bool   `json:"enabled" gorm:"index:idx_store_products_enabled_sort,priority:1"`
+	Sort        int    `json:"sort" gorm:"default:0;index:idx_store_products_enabled_sort,priority:2"`
+	Description string `json:"description" gorm:"type:varchar(255);default:''"`
+	CreatedTime int64  `json:"created_time" gorm:"bigint"`
+	UpdatedTime int64  `json:"updated_time" gorm:"bigint"`
 }
 
 // maxStoreProductFaceValueCents 单档面额上限 ¥10,000,000.00（1e9 分），防误配。

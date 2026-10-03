@@ -3,9 +3,54 @@ package model
 import (
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
+
+func TestStoreProductIndexDatabase(t *testing.T) {
+	dialect := common.GetEnvOrDefaultString("TEST_STORE_INDEX_DIALECT", "sqlite")
+	dsn := common.GetEnvOrDefaultString("TEST_STORE_INDEX_DSN", "")
+	var driver gorm.Dialector
+	switch dialect {
+	case "sqlite":
+		driver = sqlite.Open(":memory:")
+	case "mysql":
+		require.NotEmpty(t, dsn)
+		driver = mysql.Open(dsn)
+	case "postgres":
+		require.NotEmpty(t, dsn)
+		driver = postgres.Open(dsn)
+	default:
+		t.Fatalf("unsupported test dialect %q", dialect)
+	}
+	db, err := gorm.Open(driver, newGormConfig(false))
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	require.NoError(t, db.AutoMigrate(&StoreProduct{}))
+	product := StoreProduct{Name: "index regression", FaceValueCents: 1000, StoreUrl: "https://example.com", Enabled: false, Sort: 3}
+	require.NoError(t, db.Create(&product).Error)
+	require.NoError(t, db.AutoMigrate(&StoreProduct{}))
+	var restored StoreProduct
+	require.NoError(t, db.First(&restored, product.Id).Error)
+	assert.Equal(t, product, restored)
+	indexes, err := db.Migrator().GetIndexes(&StoreProduct{})
+	require.NoError(t, err)
+	found := false
+	for _, index := range indexes {
+		if index.Name() == "idx_store_products_enabled_sort" {
+			assert.Equal(t, []string{"enabled", "sort"}, index.Columns())
+			found = true
+		}
+	}
+	require.True(t, found, "enabled/sort composite index must survive repeated migration")
+}
 
 func TestValidateStoreProductURL(t *testing.T) {
 	valid := []string{
