@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { IconBadge } from '@/components/ui/icon-badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TitledCard } from '@/components/ui/titled-card'
 import {
@@ -65,6 +66,8 @@ interface RechargeFormCardProps {
   onPaymentMethodSelect: (method: PaymentMethod) => void
   paymentLoading: string | null
   redemptionCode: string
+  redemptionKind?: 'offline' | 'legacy'
+  onRedemptionKindChange?: (kind: 'offline' | 'legacy') => void
   onRedemptionCodeChange: (code: string) => void
   onRedeem: () => void
   redeeming: boolean
@@ -95,6 +98,8 @@ export function RechargeFormCard({
   onPaymentMethodSelect,
   paymentLoading,
   redemptionCode,
+  redemptionKind = 'offline',
+  onRedemptionKindChange,
   onRedemptionCodeChange,
   onRedeem,
   redeeming,
@@ -506,6 +511,25 @@ export function RechargeFormCard({
       {/* Redemption Code Section */}
       {redemptionEnabled ? (
         <div className='space-y-2.5 border-t pt-4 sm:space-y-3 sm:pt-6'>
+          {onRedemptionKindChange && (
+            <NativeSelect
+              aria-label={t('Redemption code type')}
+              value={redemptionKind}
+              disabled={redeeming}
+              onChange={(event) =>
+                onRedemptionKindChange(
+                  event.target.value === 'legacy' ? 'legacy' : 'offline'
+                )
+              }
+            >
+              <NativeSelectOption value='offline'>
+                {t('clearapi.offline.title')}
+              </NativeSelectOption>
+              <NativeSelectOption value='legacy'>
+                {t('Legacy redemption code')}
+              </NativeSelectOption>
+            </NativeSelect>
+          )}
           <div className='flex items-center gap-2'>
             <IconBadge tone='warning' size='xs'>
               <Gift />

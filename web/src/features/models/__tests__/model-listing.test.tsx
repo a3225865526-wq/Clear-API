@@ -624,9 +624,12 @@ it.each([
         }}
       />
     )
-    expect(button.textContent).toBe(
-      screen.getByRole('group', { name: 'Catalog price' }).textContent
-    )
+    // The catalog also includes separate official-price comparison metadata.
+    expect(
+      screen
+        .getByRole('group', { name: 'Catalog price' })
+        .textContent?.startsWith(`Platform price${button.textContent}`)
+    ).toBe(true)
   }
 )
 

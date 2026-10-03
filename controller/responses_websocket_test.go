@@ -357,7 +357,7 @@ func newResponsesWSBillingTest(t *testing.T, expression string, handle func(*web
 	constant.StreamingTimeout = 30
 	t.Cleanup(func() { constant.StreamingTimeout = previousTimeout })
 	previousBatch, previousLogs, previousCount, previousQuota := common.BatchUpdateEnabled, common.LogConsumeEnabled, constant.CountToken, common.QuotaPerUnit
-	common.BatchUpdateEnabled, common.LogConsumeEnabled, constant.CountToken, common.QuotaPerUnit = false, true, false, 500000
+	common.BatchUpdateEnabled, common.LogConsumeEnabled, constant.CountToken, common.QuotaPerUnit = false, true, true, 500000
 	saved := map[string]string{}
 	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
 		switch key {
@@ -472,7 +472,7 @@ func TestResponsesInterruptedStreamHealth(t *testing.T) {
 				<-r.Context().Done()
 			}
 			if scenario == "websocket timeout" {
-				require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hello"}`)))
+				require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hello","max_output_tokens":16}`)))
 				assert.Equal(t, "response.created", readResponsesWSTestEvent(t, fixture.client)["type"])
 				assert.Equal(t, "response.output_text.delta", readResponsesWSTestEvent(t, fixture.client)["type"])
 				_, _, err := fixture.client.ReadMessage()
@@ -480,7 +480,7 @@ func TestResponsesInterruptedStreamHealth(t *testing.T) {
 			} else {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				request, err := http.NewRequestWithContext(ctx, http.MethodPost, fixture.gatewayURL+"/v1/responses", strings.NewReader(`{"model":"ws-billing","input":"hello","stream":true}`))
+				request, err := http.NewRequestWithContext(ctx, http.MethodPost, fixture.gatewayURL+"/v1/responses", strings.NewReader(`{"model":"ws-billing","input":"hello","stream":true,"max_output_tokens":16}`))
 				require.NoError(t, err)
 				request.Header.Set("Authorization", "Bearer sk-"+fixture.token.Key)
 				request.Header.Set("Content-Type", "application/json")
@@ -716,11 +716,16 @@ func TestResponsesWebSocketDialsNativeResponsesChannelTypes(t *testing.T) {
 			fixture.channel.SetOtherSettings(tc.otherSettings)
 			require.NoError(t, model.DB.Model(fixture.channel).Updates(map[string]any{"type": tc.channelType, "settings": fixture.channel.OtherSettings}).Error)
 
-			require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
-			assert.Equal(t, "response.completed", readResponsesWSTestEvent(t, fixture.client)["type"])
-			assert.Equal(t, tc.want("upstream-first"), <-targets)
+			require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
+			require.Equal(t, "response.completed", readResponsesWSTestEvent(t, fixture.client)["type"])
+			select {
+			case target := <-targets:
+				assert.Equal(t, tc.want("upstream-first"), target)
+			case <-time.After(3 * time.Second):
+				t.Fatal("WebSocket upstream target was not observed")
+			}
 
-			request, err := http.NewRequest(http.MethodPost, fixture.gatewayURL+"/v1/responses", strings.NewReader(`{"model":"ws-billing","input":"hi","stream":true}`))
+			request, err := http.NewRequest(http.MethodPost, fixture.gatewayURL+"/v1/responses", strings.NewReader(`{"model":"ws-billing","input":"hi","stream":true,"max_output_tokens":16}`))
 			require.NoError(t, err)
 			request.Header.Set("Authorization", "Bearer sk-"+fixture.token.Key)
 			request.Header.Set("Content-Type", "application/json")
@@ -737,7 +742,12 @@ func TestResponsesWebSocketDialsNativeResponsesChannelTypes(t *testing.T) {
 				t.Fatal("HTTP request did not finish")
 			}
 			// The polling multi-key channel rotates to its second key for the HTTP request.
-			assert.Equal(t, tc.want("upstream-second"), <-targets)
+			select {
+			case target := <-targets:
+				assert.Equal(t, tc.want("upstream-second"), target)
+			case <-time.After(3 * time.Second):
+				t.Fatal("HTTP upstream target was not observed")
+			}
 			fixture.closeAndWait(t)
 			assertResponsesWSAccounting(t, fixture, []int{1000, 1000})
 		})
@@ -800,7 +810,7 @@ func TestResponsesWebSocketCancelErrorDoesNotFinishActiveRequest(t *testing.T) {
 		}
 		_, _, _ = ws.ReadMessage()
 	})
-	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
+	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
 	select {
 	case <-receivedCreate:
 	case <-time.After(3 * time.Second):
@@ -1046,7 +1056,7 @@ func TestResponsesHTTPHealthCountsFinalResult(t *testing.T) {
 			}))
 			t.Cleanup(upstream.Close)
 			require.NoError(t, model.DB.Model(&model.Channel{}).Where("name = ?", "responses-ws-upstream").Update("base_url", upstream.URL).Error)
-			request, err := http.NewRequest(http.MethodPost, fixture.gatewayURL+"/v1/responses", strings.NewReader(`{"model":"ws-billing","input":"hello"}`))
+			request, err := http.NewRequest(http.MethodPost, fixture.gatewayURL+"/v1/responses", strings.NewReader(`{"model":"ws-billing","input":"hello","max_output_tokens":16}`))
 			require.NoError(t, err)
 			request.Header.Set("Authorization", "Bearer sk-"+fixture.token.Key)
 			request.Header.Set("Content-Type", "application/json")
@@ -1095,7 +1105,7 @@ func TestResponsesWebSocketLocalErrorsKeepStreamIdentity(t *testing.T) {
 	assert.Equal(t, "invalid", invalid["event_id"])
 	fixture.token.Status = common.TokenStatusDisabled
 	require.NoError(t, fixture.token.SelectUpdate())
-	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","event_id":"revoked","stream_id":"planner","model":"ws-billing","input":"hi"}`)))
+	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","event_id":"revoked","stream_id":"planner","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
 	revoked := readResponsesWSTestEvent(t, fixture.client)
 	assert.Equal(t, float64(http.StatusUnauthorized), revoked["status"])
 	assert.Equal(t, "planner", revoked["stream_id"])
@@ -1123,7 +1133,7 @@ func TestResponsesWebSocketAmbiguousControlErrorClosesAndSettlesOnce(t *testing.
 		}
 		_, _, _ = ws.ReadMessage()
 	})
-	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
+	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
 	assert.Equal(t, "response.created", readResponsesWSTestEvent(t, fixture.client)["type"])
 	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.cancel","response_id":"active"}`)))
 	body, err := common.Marshal(readResponsesWSTestEvent(t, fixture.client))
@@ -1161,7 +1171,7 @@ func TestResponsesWebSocketRejectsSecondControlWhileOnePending(t *testing.T) {
 		}
 		_, _, _ = ws.ReadMessage()
 	})
-	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
+	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
 	assert.Equal(t, "response.created", readResponsesWSTestEvent(t, fixture.client)["type"])
 	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.cancel","event_id":"first-cancel","response_id":"active"}`)))
 	select {
@@ -1208,7 +1218,7 @@ func TestResponsesWebSocketAcceptsCancelAfterControlError(t *testing.T) {
 		}
 		_, _, _ = ws.ReadMessage()
 	})
-	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
+	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
 	assert.Equal(t, "response.created", readResponsesWSTestEvent(t, fixture.client)["type"])
 	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.cancel","response_id":"wrong"}`)))
 	cancelError := readResponsesWSTestEvent(t, fixture.client)
@@ -1283,7 +1293,7 @@ func TestResponsesWebSocketForwardsErrorForOtherResponseWithoutEndingRequest(t *
 		}
 		_, _, _ = ws.ReadMessage()
 	})
-	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
+	require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
 	assert.Equal(t, "response.created", readResponsesWSTestEvent(t, fixture.client)["type"])
 	stray, err := common.Marshal(readResponsesWSTestEvent(t, fixture.client))
 	require.NoError(t, err)
@@ -1327,7 +1337,7 @@ func TestResponsesWebSocketPreRoutingRejectionsFollowHealthClassification(t *tes
 				t.Error("rejected request reached upstream")
 			})
 			tc.reject(t, fixture)
-			require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi"}`)))
+			require.NoError(t, fixture.client.WriteMessage(websocket.TextMessage, []byte(`{"type":"response.create","model":"ws-billing","input":"hi","max_output_tokens":16}`)))
 			rejected := readResponsesWSTestEvent(t, fixture.client)
 			assert.Equal(t, "error", rejected["type"])
 			assert.Equal(t, float64(tc.status), rejected["status"])

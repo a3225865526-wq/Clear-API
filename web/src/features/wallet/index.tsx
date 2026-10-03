@@ -81,6 +81,9 @@ export function Wallet(props: WalletProps) {
   const [billingDialogOpen, setBillingDialogOpen] = useState(false)
   const [balanceDialogOpen, setBalanceDialogOpen] = useState(false)
   const [redemptionCode, setRedemptionCode] = useState('')
+  const [redemptionKind, setRedemptionKind] = useState<'offline' | 'legacy'>(
+    'offline'
+  )
   const [creemDialogOpen, setCreemDialogOpen] = useState(false)
   const [selectedCreemProduct, setSelectedCreemProduct] =
     useState<CreemProduct | null>(null)
@@ -230,7 +233,7 @@ export function Wallet(props: WalletProps) {
   const handleRedeem = async () => {
     if (!redemptionCode) return
 
-    const success = await redeemCode(redemptionCode)
+    const success = await redeemCode(redemptionCode, redemptionKind)
     if (success) {
       setRedemptionCode('')
       await fetchUser()
@@ -348,6 +351,11 @@ export function Wallet(props: WalletProps) {
                   onPaymentMethodSelect={handlePaymentMethodSelect}
                   paymentLoading={paymentLoading}
                   redemptionCode={redemptionCode}
+                  redemptionKind={redemptionKind}
+                  onRedemptionKindChange={(kind) => {
+                    setRedemptionCode('')
+                    setRedemptionKind(kind)
+                  }}
                   onRedemptionCodeChange={setRedemptionCode}
                   onRedeem={handleRedeem}
                   redeeming={redeeming}

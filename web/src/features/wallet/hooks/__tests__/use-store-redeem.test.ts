@@ -1,3 +1,4 @@
+import { act, renderHook } from '@testing-library/react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,7 +18,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, renderHook } from '@testing-library/react'
 
 const mockPost = vi.fn()
 vi.mock('@/lib/api', () => ({
@@ -34,26 +34,36 @@ describe('store redeem endpoints', () => {
     mockPost.mockReset()
   })
 
+  test('Legacy uses its original endpoint without falling back', async () => {
+    mockPost.mockResolvedValue({
+      data: { success: false, message: 'Compliance required' },
+    })
+    const { redeemLegacyCode } = await import('../../api')
+    const result = await redeemLegacyCode({ key: 'synthetic-legacy' })
+    expect(result.success).toBe(false)
+    expect(mockPost).toHaveBeenCalledExactlyOnceWith('/api/user/topup', {
+      key: 'synthetic-legacy',
+    })
+  })
+
   test('store codes go to the dedicated store endpoint', async () => {
     mockPost.mockResolvedValue({
       data: { success: true, data: { base_quota: 1 } },
     })
     const { redeemStoreCode } = await import('../../api')
     await redeemStoreCode({ key: 'store-1' })
-    expect(mockPost).toHaveBeenCalledWith(
-      '/api/clearapi/store/redeem',
-      { key: 'store-1' }
-    )
+    expect(mockPost).toHaveBeenCalledWith('/api/clearapi/store/redeem', {
+      key: 'store-1',
+    })
   })
 
   test('legacy offline redeem keeps its original endpoint', async () => {
     mockPost.mockResolvedValue({ data: { success: true, data: 1 } })
     const { redeemTopupCode } = await import('../../api')
     await redeemTopupCode({ key: 'offline-1' })
-    expect(mockPost).toHaveBeenCalledWith(
-      '/api/clearapi/redeem',
-      { key: 'offline-1' }
-    )
+    expect(mockPost).toHaveBeenCalledWith('/api/clearapi/redeem', {
+      key: 'offline-1',
+    })
   })
 })
 

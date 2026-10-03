@@ -72,6 +72,13 @@ export async function redeemTopupCode(
   return res.data
 }
 
+export async function redeemLegacyCode(
+  request: RedemptionRequest
+): Promise<RedemptionResponse> {
+  const res = await api.post('/api/user/topup', request)
+  return res.data
+}
+
 /**
  * Redeem a store card code via the dedicated store endpoint. Never falls
  * back to the offline-order endpoint: the two businesses are separate.
@@ -98,7 +105,9 @@ export async function getBalanceTransactions(
   if (type) {
     params.append('type', type)
   }
-  const res = await api.get(`/api/user/balance_transactions/self?${params.toString()}`)
+  const res = await api.get(
+    `/api/user/balance_transactions/self?${params.toString()}`
+  )
   return res.data
 }
 

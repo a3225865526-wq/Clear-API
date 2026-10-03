@@ -137,6 +137,17 @@ func seedChargedAccounting(t *testing.T, userID, channelID, tokenID, quota, requ
 	}
 }
 
+// prepareChargedTask records the precharge that a persisted legacy task must
+// carry before a settlement or refund may atomically reverse its counters.
+func prepareChargedTask(t *testing.T, task *model.Task) {
+	t.Helper()
+	if task.ChannelId == 0 {
+		task.ChannelId = task.UserId
+		seedChannel(t, task.ChannelId)
+	}
+	seedChargedAccounting(t, task.UserId, task.ChannelId, task.PrivateData.TokenId, task.Quota, 1)
+}
+
 func makeTask(userId, channelId, quota, tokenId int, billingSource string, subscriptionId int) *model.Task {
 	return &model.Task{
 		TaskID:    "task_" + time.Now().Format("150405.000"),
@@ -1127,8 +1138,10 @@ func TestRecalculate_ActualQuotaZero(t *testing.T) {
 	const initQuota = 10000
 
 	seedUser(t, userID, initQuota)
+	seedChannel(t, userID)
+	seedChargedAccounting(t, userID, userID, 0, preConsumed, 1)
 
-	task := makeTask(userID, 0, preConsumed, 0, BillingSourceWallet, 0)
+	task := makeTask(userID, userID, preConsumed, 0, BillingSourceWallet, 0)
 	require.NoError(t, model.DB.Create(task).Error)
 
 	RecalculateTaskQuota(ctx, task, 0, "zero actual")
@@ -1490,6 +1503,9 @@ func TestSettle_NonPerCallBilling_AppliesAdaptorAdjustment(t *testing.T) {
 	adaptor := &mockAdaptor{adjustReturn: adaptorQuota}
 	taskResult := &relaycommon.TaskInfo{Status: model.TaskStatusSuccess}
 
+	prepareChargedTask(t, task)
+	require.NoError(t, model.DB.Create(task).Error)
+
 	settled := settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
 
 	// Non-per-call: adaptor adjustment applies (refund 2000)
@@ -1588,6 +1604,9 @@ func TestSettle_TieredSuccessStillRecomputes(t *testing.T) {
 		EstimatedTier:    "base",
 	}
 
+	prepareChargedTask(t, task)
+	require.NoError(t, model.DB.Create(task).Error)
+
 	settled := settleTaskBillingOnComplete(
 		ctx,
 		&mockAdaptor{adjustReturn: 1},
@@ -1661,6 +1680,9 @@ func TestSettle_TieredUsageFactsMergeCompletionOverSubmission(t *testing.T) {
 				EstimatedTier:    "base",
 			}
 
+			prepareChargedTask(t, task)
+			require.NoError(t, model.DB.Create(task).Error)
+
 			settled := settleTaskBillingOnComplete(
 				context.Background(),
 				&mockAdaptor{},
@@ -1709,6 +1731,9 @@ func TestSettle_TieredSnapshotWriteBackUsesSettledFactsAndMatchedTier(t *testing
 		UsageFacts:       map[string]any{"resolution": "720P", "seconds": float64(5)},
 		EstimatedTier:    "720P",
 	}
+
+	prepareChargedTask(t, task)
+	require.NoError(t, model.DB.Create(task).Error)
 
 	settled := settleTaskBillingOnComplete(
 		context.Background(),
@@ -1786,6 +1811,9 @@ func TestSettle_TokenRecalcFallsBackToCompletionTokens(t *testing.T) {
 			seedChannel(t, channelID)
 
 			task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
+			prepareChargedTask(t, task)
+			require.NoError(t, model.DB.Create(task).Error)
+
 			settled := settleTaskBillingOnComplete(
 				context.Background(),
 				&mockAdaptor{},

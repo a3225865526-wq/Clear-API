@@ -334,6 +334,7 @@ func TestUpdateBatchTasksSettlesTieredUsageForTerminalStates(t *testing.T) {
 				ExprVersion:      1,
 				TaskUsageBilling: true,
 			}
+			prepareChargedTask(t, task)
 			require.NoError(t, model.DB.Create(task).Error)
 
 			upstreamID := task.GetUpstreamTaskID()
@@ -401,6 +402,7 @@ func TestUpdateBatchTasksRefundsFailedTieredTask(t *testing.T) {
 		UsageFacts:       map[string]any{"units": float64(5)},
 		EstimatedTier:    "actual",
 	}
+	prepareChargedTask(t, task)
 	require.NoError(t, model.DB.Create(task).Error)
 
 	upstreamID := task.GetUpstreamTaskID()
@@ -449,6 +451,7 @@ func TestUpdateBatchTasksRefundsFailedTaskWithoutUsageSettlement(t *testing.T) {
 	task.Properties.OriginModelName = "missing-batch-token-price"
 	task.PrivateData.UpstreamTaskID = "upstream_batch_refund"
 	task.PrivateData.BillingContext.OriginModelName = "missing-batch-token-price"
+	prepareChargedTask(t, task)
 	require.NoError(t, model.DB.Create(task).Error)
 
 	upstreamID := task.GetUpstreamTaskID()
@@ -667,6 +670,7 @@ func TestUpdateSunoTasksStalePollsRefundExactlyOnce(t *testing.T) {
 	task.Progress = "50%"
 	task.SubmitTime = time.Now().Unix()
 	task.PrivateData.UpstreamTaskID = upstreamTaskID
+	prepareChargedTask(t, task)
 	require.NoError(t, model.DB.Create(task).Error)
 
 	var firstPollTask model.Task
@@ -750,6 +754,7 @@ func TestSweepTimedOutTasksHonorsRefundRolloutBoundary(t *testing.T) {
 	modernTask.TaskID = "modern_timeout_with_refund"
 	modernTask.Progress = "50%"
 	modernTask.SubmitTime = 1771718400 // 2026-02-22 00:00:00 UTC
+	prepareChargedTask(t, modernTask)
 	require.NoError(t, model.DB.Create(modernTask).Error)
 
 	previousTimeout := constant.TaskTimeoutMinutes
@@ -919,6 +924,7 @@ func TestUpdateVideoSingleTaskPollClassification(t *testing.T) {
 			seedUser(t, userID, initialQuota)
 			seedToken(t, tokenID, userID, "sk-poll-class", tokenRemain)
 			ch := &model.Channel{Id: channelID, Type: constant.ChannelTypeKling, Name: "poll", Key: "sk-test", Status: common.ChannelStatusEnabled}
+			require.NoError(t, model.DB.Create(ch).Error)
 
 			if testCase.maxFailures > 0 {
 				previous := constant.TaskPollMaxFailures
@@ -933,6 +939,7 @@ func TestUpdateVideoSingleTaskPollClassification(t *testing.T) {
 			if testCase.priorState != "" {
 				task.PrivateData.PluginState = []byte(testCase.priorState)
 			}
+			prepareChargedTask(t, task)
 			require.NoError(t, model.DB.Create(task).Error)
 
 			adaptor := &scriptedPollingAdaptor{statusCode: testCase.statusCode, fetchErr: testCase.fetchErr, parse: testCase.parse, parseErr: testCase.parseErr}
@@ -1011,6 +1018,7 @@ func TestUpdateBatchTasksPollClassification(t *testing.T) {
 			task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceWallet, 0)
 			task.TaskID = "task_batch_class"
 			task.PrivateData.UpstreamTaskID = "upstream_batch_class"
+			prepareChargedTask(t, task)
 			require.NoError(t, model.DB.Create(task).Error)
 			upstreamID := task.GetUpstreamTaskID()
 
