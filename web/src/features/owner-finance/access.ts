@@ -183,13 +183,15 @@ export function useFinanceAccess() {
 export function useFinanceSummary(
   range: Range,
   epoch: number,
-  enabled: boolean
+  enabled: boolean,
+  refetchOnMount = true
 ) {
   return useQuery({
     queryKey: [...financeKey, epoch, 'summary', range],
     queryFn: ({ signal }) =>
       financeRequest<Summary>('/profit-summary', { params: range, signal }),
     enabled,
+    refetchOnMount,
     retry: false,
     staleTime: 0,
     gcTime: 0,

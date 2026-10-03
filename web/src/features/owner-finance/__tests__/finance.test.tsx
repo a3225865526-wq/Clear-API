@@ -26,6 +26,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import {
   AxiosError,
   type AxiosAdapter,
@@ -42,6 +43,7 @@ import { checkFinanceAccess, financeKey, financeRequest } from '../access'
 import { beijingInput, financeMoney, validRange } from '../format'
 import { metricLabels } from '../labels'
 import { buildOperation, operationSchema, type Values } from '../operation-form'
+import { OwnerOverview } from '../overview'
 import type { Summary } from '../types'
 
 export function syntheticSummary(): Summary {
@@ -171,6 +173,30 @@ beforeEach(() => {
       : syntheticSummary()
   api.defaults.adapter = (async (config) => {
     calls.push(config)
+    if (config.url?.endsWith('/overview')) {
+      return reply(config, {
+        from: 1790860800,
+        to: 1790947200,
+        read_at: 1790899200,
+        timezone: 'Asia/Shanghai',
+        total_users: 20,
+        new_users: 2,
+        unknown_registration: 0,
+        paid_credit_users: null,
+        pending_review: null,
+        requests: 3,
+        errors: 0,
+        active_users: 2,
+        quota: 100,
+        refund_quota: 0,
+        input: 10,
+        output: 5,
+        average_seconds: 1,
+        trend: [],
+        models: [],
+        channels: [],
+      })
+    }
     return reply(config, await endpoint(config))
   }) as AxiosAdapter
 })
@@ -265,6 +291,67 @@ describe('finance semantics', () => {
         evidence: 'test',
       }).success
     ).toBe(false)
+  })
+})
+describe('site operations overview', () => {
+  it('shows user and usage statistics without a finance schema and keeps unknown finance separate', async () => {
+    login()
+    mount(<OwnerOverview epoch={0} financeReady={false} />)
+    expect(await screen.findByText('ops.totalUsers')).toBeVisible()
+    expect(screen.getByText('ops.totalUsers').parentElement).toHaveTextContent(
+      '20'
+    )
+    expect(
+      screen.getAllByText('ops.tokens')[0].closest('div.rounded-lg')
+    ).toHaveTextContent('15')
+    expect(
+      screen.getByText('ops.paidCreditUsers').parentElement
+    ).toHaveTextContent('Unknown')
+    expect(screen.getByText('ops.financeUnavailable')).toBeVisible()
+    expect(calls.some((call) => call.url?.endsWith('/profit-summary'))).toBe(
+      false
+    )
+    expect(
+      calls.find((call) => call.url?.endsWith('/overview'))?.params
+    ).toEqual({ period: 'today' })
+  })
+  it('validates custom dates locally and sends the applied Beijing range', async () => {
+    login()
+    mount(<OwnerOverview epoch={0} financeReady={false} />)
+    await screen.findByText('ops.totalUsers')
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('combobox', { name: 'ops.period' }))
+    await user.click(
+      await screen.findByRole('option', { name: 'Custom period' })
+    )
+    fireEvent.change(screen.getByLabelText('Start, Beijing time (inclusive)'), {
+      target: { value: '2026-10-02T00:00' },
+    })
+    fireEvent.change(screen.getByLabelText('End, Beijing time (exclusive)'), {
+      target: { value: '2026-10-01T00:00' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'ops.apply' }))
+    expect(
+      await screen.findByText('Enter a valid Beijing period of up to 366 days.')
+    ).toBeVisible()
+    expect(
+      calls.filter((call) => call.url?.endsWith('/overview'))
+    ).toHaveLength(1)
+    fireEvent.change(screen.getByLabelText('End, Beijing time (exclusive)'), {
+      target: { value: '2026-10-03T00:00' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'ops.apply' }))
+    await waitFor(() =>
+      expect(
+        calls.filter((call) => call.url?.endsWith('/overview'))
+      ).toHaveLength(2)
+    )
+    expect(
+      calls.filter((call) => call.url?.endsWith('/overview'))[1].params
+    ).toEqual({
+      from: beijingInput('2026-10-02T00:00'),
+      to: beijingInput('2026-10-03T00:00'),
+    })
   })
 })
 describe('owner finance isolation and daily workflow', () => {
@@ -714,6 +801,10 @@ describe('owner finance isolation and daily workflow', () => {
     })
     mount()
     expect(await screen.findByText('Finance schema is not ready')).toBeVisible()
-    expect(calls.every((call) => call.url?.endsWith('/capability'))).toBe(true)
+    expect(calls.some((call) => call.url?.endsWith('/overview'))).toBe(true)
+    expect(calls.some((call) => call.url?.endsWith('/profit-summary'))).toBe(
+      false
+    )
+    expect(await screen.findByText('ops.financeUnavailable')).toBeVisible()
   })
 })

@@ -39,6 +39,7 @@ import { Code, FinanceTable, Money, Panel } from './components'
 import { beijingInput, financeTime, validRange } from './format'
 import { metricLabels } from './labels'
 import { FinanceOperations } from './operations'
+import { OwnerOverview } from './overview'
 import { FinanceRecords } from './records'
 import type { Fact, Metric, Range, Summary } from './types'
 import { WalletReconciliation } from './wallet'
@@ -83,7 +84,21 @@ export function OwnerFinance() {
   return (
     <SectionPageLayout>
       <SectionPageLayout.Title>{t('Owner finance')}</SectionPageLayout.Title>
-      <SectionPageLayout.Content>{content}</SectionPageLayout.Content>
+      <SectionPageLayout.Content>
+        <div className='space-y-6'>
+          {access.allowed && (
+            <OwnerOverview
+              key={`overview-${access.epoch}`}
+              epoch={access.epoch}
+              financeReady={
+                access.data?.supplier_bill_lines_ready === true &&
+                access.data?.profit_summary_available === true
+              }
+            />
+          )}
+          {content}
+        </div>
+      </SectionPageLayout.Content>
     </SectionPageLayout>
   )
 }

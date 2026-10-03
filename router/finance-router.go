@@ -12,6 +12,7 @@ func RegisterFinanceRoutes(api *gin.RouterGroup) {
 	finance := api.Group("/owner/finance")
 	finance.Use(middleware.DisableCache(), middleware.FinanceOwnerAuth())
 	finance.GET("/capability", controller.FinanceCapability)
+	finance.GET("/overview", controller.GetOwnerOverview)
 	finance.GET("/profit-summary", controller.GetFinanceProfitSummary)
 	finance.POST("/revenue/preview", controller.PreviewFinanceRevenue)
 	finance.POST("/wallets/:user_id/events", controller.CreateFinanceRevenue)
