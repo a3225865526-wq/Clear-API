@@ -89,7 +89,7 @@ func sweepTimedOutTasks(ctx context.Context) {
 		task.Status = model.TaskStatusFailure
 		task.Progress = "100%"
 		task.FinishTime = now
-		if isLegacy {
+		if isLegacy && !model.TaskSettlementRequested() {
 			task.FailReason = legacyReason
 			// 旧系统任务明确不退款，随终态 CAS 一并清掉 quota，
 			// 避免留下可再次退款的计费状态。
@@ -133,11 +133,23 @@ type TaskPollSummary struct {
 // adaptor factory has not been wired yet, to avoid a nil call during startup.
 func RunTaskPollingOnce(ctx context.Context, report func(processed, total int)) TaskPollSummary {
 	summary := TaskPollSummary{}
-	if GetTaskAdaptorFunc == nil {
-		return summary
-	}
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	if model.TaskSettlementRequested() {
+		db, logDB := model.DB, model.LOG_DB
+		if db != nil {
+			db = db.WithContext(ctx)
+		}
+		if logDB != nil {
+			logDB = logDB.WithContext(ctx)
+		}
+		if err := model.RecoverTaskSettlements(db, logDB); err != nil {
+			logger.LogWarn(context.Background(), "task settlement recovery is unavailable")
+		}
+	}
+	if GetTaskAdaptorFunc == nil {
+		return summary
 	}
 
 	common.SysLog("任务进度轮询开始")
@@ -679,6 +691,9 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 		result, usageFacts, err := EvaluateTaskCompletionUsage(bc.TieredSnapshot, taskResult.UsageFacts)
 		if err != nil {
 			logger.LogWarn(ctx, fmt.Sprintf("任务 %s 表达式结算失败，保留预扣额度: %v", task.TaskID, err))
+			if model.TaskSettlementRequested() {
+				_ = model.MarkTaskSettlementReview(model.DB, task.ID, "billing_facts_invalid")
+			}
 			return true
 		}
 		if result.Clamp != nil {
@@ -692,12 +707,18 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 	// 按次计费的成功任务保持预扣；失败任务由调用方全额退款。
 	if bc := task.PrivateData.BillingContext; bc != nil && bc.PerCallBilling {
 		logger.LogInfo(ctx, fmt.Sprintf("任务 %s 按次计费，跳过差额结算", task.TaskID))
+		if model.TaskSettlementRequested() && task.Status == model.TaskStatusSuccess {
+			settleDurableTask(ctx, task, task.Quota, "per_call_charge", nil)
+			return true
+		}
 		return false
 	}
 	// 优先让 adaptor 决定最终额度。
-	if actualQuota := adaptor.AdjustBillingOnComplete(task, taskResult); actualQuota > 0 {
-		RecalculateTaskQuotaWithFacts(ctx, task, actualQuota, "adaptor计费调整", taskResult.UsageFacts)
-		return true
+	if adaptor != nil {
+		if actualQuota := adaptor.AdjustBillingOnComplete(task, taskResult); actualQuota > 0 {
+			RecalculateTaskQuotaWithFacts(ctx, task, actualQuota, "adaptor计费调整", taskResult.UsageFacts)
+			return true
+		}
 	}
 	// 回退到 token 重算。
 	tokens := taskResult.TotalTokens
@@ -706,6 +727,10 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 	}
 	if tokens > 0 {
 		return RecalculateTaskQuotaByTokens(ctx, task, tokens)
+	}
+	if model.TaskSettlementRequested() && task.Status == model.TaskStatusSuccess {
+		settleDurableTask(ctx, task, task.Quota, "reserved_charge_no_adjustment", nil)
+		return true
 	}
 	return false
 }

@@ -152,6 +152,8 @@ func TestFinanceStageOne(t *testing.T) {
 	})
 	t.Run("all routes deny nonowners before schema access", func(t *testing.T) {
 		for _, endpoint := range []struct{ method, path string }{
+			{"GET", "/billing-reservations"}, {"POST", "/billing-reservations/1/decision"},
+			{"GET", "/task-settlements"}, {"POST", "/task-settlements/1/retry"},
 			{"GET", "/capability"}, {"GET", "/versions/cost"}, {"POST", "/versions/cost"},
 			{"GET", "/versions/fx"}, {"POST", "/versions/fx"}, {"GET", "/versions/pool"}, {"POST", "/versions/pool"},
 			{"GET", "/expenses"}, {"POST", "/expenses"}, {"GET", "/expenses/summary?from=1&to=2"}, {"GET", "/audit"},

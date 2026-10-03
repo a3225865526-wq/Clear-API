@@ -42,6 +42,23 @@ type BillingSession struct {
 	mu               sync.Mutex
 }
 
+// SettleUncertain retains the approved charge while durably flagging missing
+// usage. If the marker cannot commit, the active reservation remains visible.
+func (s *BillingSession) SettleUncertain() error {
+	s.mu.Lock()
+	alreadySettled, settlementErr := s.settled || s.refunded, s.settlementErr
+	s.mu.Unlock()
+	if alreadySettled {
+		return settlementErr
+	}
+	if s.durable {
+		if err := model.MarkBillingUsageUncertain(s.relayInfo.RequestId); err != nil {
+			return err
+		}
+	}
+	return s.Settle(s.GetPreConsumedQuota())
+}
+
 // Settle 根据实际消耗额度进行结算。
 // 资金来源和令牌额度分两步提交：若资金来源已提交但令牌调整失败，
 // 会标记 fundingSettled 防止 Refund 对已提交的资金来源执行退款。
@@ -176,7 +193,7 @@ func (s *BillingSession) Refund(c *gin.Context) {
 			}
 		}
 		if extraReserved > 0 && funding.Source() == BillingSourceSubscription && subscriptionId > 0 {
-			if err := model.PostConsumeUserSubscriptionDelta(subscriptionId, -int64(extraReserved)); err != nil {
+			if err := model.PostConsumeUserSubscriptionDelta(subscriptionId, -int64(extraReserved), s.relayInfo.RequestId); err != nil {
 				common.SysLog("error refunding subscription extra reserved quota: " + err.Error())
 			}
 		}
@@ -359,7 +376,7 @@ func (s *BillingSession) reserveFunding(delta int, requireAvailableQuota bool) e
 		funding.consumed += delta
 		return nil
 	case *SubscriptionFunding:
-		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, int64(delta)); err != nil {
+		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, int64(delta), s.relayInfo.RequestId); err != nil {
 			return types.NewErrorWithStatusCode(
 				fmt.Errorf("订阅额度不足或未配置订阅: %s", err.Error()),
 				types.ErrorCodeInsufficientUserQuota,
@@ -383,7 +400,7 @@ func (s *BillingSession) rollbackFundingReserve(delta int) {
 			funding.consumed -= delta
 		}
 	case *SubscriptionFunding:
-		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, -int64(delta)); err != nil {
+		if err := model.PostConsumeUserSubscriptionDelta(funding.subscriptionId, -int64(delta), s.relayInfo.RequestId); err != nil {
 			common.SysLog("error rolling back subscription funding reserve: " + err.Error())
 		}
 	}
@@ -487,6 +504,7 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 				return nil, types.NewError(errors.New("protected billing reservation could not be committed"), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 			}
 			session := &BillingSession{relayInfo: relayInfo, funding: &WalletFunding{userId: relayInfo.UserId}, durable: true, preConsumedQuota: preConsumedQuota, tokenConsumed: preConsumedQuota, chargedQuota: preConsumedQuota}
+			c.Set(model.BillingExecutionContextKey, append(c.GetStringSlice(model.BillingExecutionContextKey), relayInfo.RequestId))
 			session.syncRelayInfo()
 			return session, nil
 		}

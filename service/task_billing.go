@@ -259,6 +259,9 @@ func taskModelName(task *model.Task) string {
 // 当异步任务失败时，退还资金与令牌额度，并回减用户和渠道用量。
 // 返回资金来源是否已成功退还；失败时保留 quota，供显式重试或人工对账。
 func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool {
+	if model.TaskSettlementRequested() {
+		return settleDurableTask(ctx, task, 0, "task_failure_refund", nil)
+	}
 	quota := task.Quota
 	if quota == 0 {
 		return true
@@ -319,6 +322,10 @@ func RecalculateTaskQuotaWithFacts(ctx context.Context, task *model.Task, actual
 }
 
 func recalculateTaskQuotaWithFacts(ctx context.Context, task *model.Task, actualQuota int, reason string, usageFacts map[string]any, clamps ...*common.QuotaClamp) {
+	if model.TaskSettlementRequested() {
+		settleDurableTask(ctx, task, actualQuota, reason, usageFacts, clamps...)
+		return
+	}
 	if actualQuota < 0 {
 		return
 	}

@@ -588,6 +588,11 @@ func CompleteSubscriptionOrder(tradeNo string, providerPayload string, expectedP
 		if expectedPaymentProvider != "" && order.PaymentProvider != expectedPaymentProvider {
 			return ErrPaymentMethodMismatch
 		}
+		if order.PaymentProvider == PaymentProviderWaffoPancake {
+			if err := order.PaymentReceipt.ValidatePancake(receipt); err != nil {
+				return err
+			}
+		}
 		if order.PaymentProvider == PaymentProviderEpay || order.PaymentProvider == PaymentProviderStripe || order.PaymentProvider == PaymentProviderCreem {
 			expected := order.PaymentReceipt
 			if expected.Amount == "" && order.PaymentProvider == PaymentProviderEpay {
@@ -1306,6 +1311,11 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 
 // PreConsumeUserSubscription pre-consumes from any active subscription total quota.
 func PreConsumeUserSubscription(requestId string, userId int, modelName string, quotaType int, amount int64) (*SubscriptionPreConsumeResult, error) {
+	if TaskSettlementRequested() {
+		if err := TaskSettlementReady(DB); err != nil {
+			return nil, err
+		}
+	}
 	if userId <= 0 {
 		return nil, errors.New("invalid userId")
 	}
@@ -1332,6 +1342,11 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 			var sub UserSubscription
 			if err := tx.Where("id = ?", existing.UserSubscriptionId).First(&sub).Error; err != nil {
 				return err
+			}
+			if TaskSettlementRequested() {
+				if err := validateTaskSubscriptionEpoch(tx, requestId, &sub); err != nil {
+					return err
+				}
 			}
 			returnValue.UserSubscriptionId = sub.Id
 			returnValue.PreConsumed = existing.PreConsumed
@@ -1393,6 +1408,11 @@ func PreConsumeUserSubscription(requestId string, userId int, modelName string, 
 			if err := tx.Save(&sub).Error; err != nil {
 				return err
 			}
+			if TaskSettlementRequested() {
+				if err := tx.Create(&TaskSubscriptionEpoch{RequestID: requestId, SubscriptionID: sub.Id, UserID: userId, ResetTime: sub.LastResetTime}).Error; err != nil {
+					return err
+				}
+			}
 			returnValue.UserSubscriptionId = sub.Id
 			returnValue.PreConsumed = amount
 			returnValue.AmountTotal = sub.AmountTotal
@@ -1426,7 +1446,21 @@ func RefundSubscriptionPreConsume(requestId string) error {
 			record.Status = "refunded"
 			return tx.Save(&record).Error
 		}
-		if err := PostConsumeUserSubscriptionDelta(record.UserSubscriptionId, -record.PreConsumed); err != nil {
+		if TaskSettlementRequested() {
+			var sub UserSubscription
+			if err := lockForUpdate(tx).First(&sub, record.UserSubscriptionId).Error; err != nil {
+				return err
+			}
+			if err := validateTaskSubscriptionEpoch(tx, requestId, &sub); err != nil {
+				return err
+			}
+			if sub.AmountUsed < record.PreConsumed {
+				return ErrFinanceConflict
+			}
+			if err := tx.Model(&sub).Update("amount_used", sub.AmountUsed-record.PreConsumed).Error; err != nil {
+				return err
+			}
+		} else if err := PostConsumeUserSubscriptionDelta(record.UserSubscriptionId, -record.PreConsumed); err != nil {
 			return err
 		}
 		record.Status = "refunded"
@@ -1517,7 +1551,7 @@ func GetSubscriptionPlanInfoByUserSubscriptionId(userSubscriptionId int) (*Subsc
 }
 
 // Update subscription used amount by delta (positive consume more, negative refund).
-func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error {
+func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64, requestIDs ...string) error {
 	if userSubscriptionId <= 0 {
 		return errors.New("invalid userSubscriptionId")
 	}
@@ -1531,6 +1565,14 @@ func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error
 			First(&sub).Error; err != nil {
 			return err
 		}
+		if TaskSettlementRequested() && len(requestIDs) > 0 {
+			if err := validateTaskSubscriptionEpoch(tx, requestIDs[0], &sub); err != nil {
+				return err
+			}
+			if delta > common.MaxWalletQuota || delta < -common.MaxWalletQuota || sub.AmountUsed < max(-delta, 0) || sub.AmountUsed > common.MaxWalletQuota-max(delta, 0) {
+				return ErrFinanceConflict
+			}
+		}
 		newUsed := max(sub.AmountUsed+delta, 0)
 		if sub.AmountTotal > 0 && newUsed > sub.AmountTotal {
 			return fmt.Errorf("subscription used exceeds total, used=%d total=%d", newUsed, sub.AmountTotal)
@@ -1538,4 +1580,15 @@ func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error
 		sub.AmountUsed = newUsed
 		return tx.Save(&sub).Error
 	})
+}
+
+func validateTaskSubscriptionEpoch(tx *gorm.DB, requestID string, sub *UserSubscription) error {
+	var epoch TaskSubscriptionEpoch
+	if err := tx.Where("request_id = ? AND subscription_id = ? AND user_id = ?", requestID, sub.Id, sub.UserId).First(&epoch).Error; err != nil {
+		return err
+	}
+	if epoch.ResetTime != sub.LastResetTime {
+		return ErrFinanceConflict
+	}
+	return nil
 }

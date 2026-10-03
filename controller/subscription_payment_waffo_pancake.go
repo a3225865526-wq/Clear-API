@@ -12,7 +12,6 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
-	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
 
@@ -78,8 +77,14 @@ func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
 	// WAFFO_PANCAKE_SUB- prefix (vs. wallet's WAFFO_PANCAKE-) drives webhook
 	// dispatch in WaffoPancakeWebhook.
 	tradeNo := fmt.Sprintf("WAFFO_PANCAKE_SUB-%d-%d-%s", userId, time.Now().UnixMilli(), randstr.String(6))
+	receipt, err := service.WaffoPancakeCheckoutReceipt(plan.PriceAmount, tradeNo)
+	if err != nil {
+		common.ApiErrorMsg(c, "套餐金额无效")
+		return
+	}
 
 	order := &model.SubscriptionOrder{
+		PaymentReceipt:  receipt,
 		UserId:          userId,
 		PlanId:          plan.Id,
 		Money:           plan.PriceAmount,
@@ -100,7 +105,7 @@ func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
 		ProductID:     plan.WaffoPancakeProductId,
 		BuyerIdentity: service.WaffoPancakeBuyerIdentityFromUserID(user.Id),
 		PriceSnapshot: &service.WaffoPancakePriceSnapshot{
-			Amount:      decimal.NewFromFloat(plan.PriceAmount).StringFixed(2),
+			Amount:      receipt.Amount,
 			TaxCategory: "saas",
 		},
 		BuyerEmail:              getWaffoPancakeBuyerEmail(user),

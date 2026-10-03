@@ -95,6 +95,8 @@ export type Summary = Period & {
   warnings: string[]
 }
 export type Capability = {
+  billing_reconciliation_ready?: boolean
+  task_settlement_ready?: boolean
   can_access: boolean
   schema_ready: boolean
   supplier_bill_lines_ready: boolean

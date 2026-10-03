@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -12,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	commonRelay "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"gorm.io/gorm"
 )
 
 type TaskStatus string
@@ -404,7 +406,7 @@ func HasUnfinishedSyncTasks() bool {
 		Where("status != ?", TaskStatusSuccess).
 		Limit(1).
 		Pluck("id", &id).Error
-	return err == nil && id != 0
+	return (err == nil && id != 0) || HasTaskSettlementWork(DB)
 }
 
 func GetByOnlyTaskId(taskId string) (*Task, bool, error) {
@@ -494,6 +496,17 @@ func (Task *Task) Insert() error {
 // (for example "data" when the submit route discards the upstream snapshot)
 // while the in-memory task keeps its values for presentation.
 func (Task *Task) InsertWithContext(ctx context.Context, omitColumns ...string) error {
+	if TaskSettlementRequested() {
+		if err := TaskSettlementReady(DB); err != nil {
+			return err
+		}
+		return DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			if err := tx.Omit(omitColumns...).Create(Task).Error; err != nil {
+				return err
+			}
+			return createTaskSettlement(tx, Task, false)
+		})
+	}
 	tx := DB.WithContext(ctx)
 	if len(omitColumns) > 0 {
 		tx = tx.Omit(omitColumns...)
@@ -559,6 +572,35 @@ func (t *Task) UpdateQuota() error {
 // falls back to INSERT ON CONFLICT when the WHERE-guarded UPDATE matches
 // zero rows, which silently bypasses the CAS guard.
 func (t *Task) UpdateWithStatus(fromStatus TaskStatus) (bool, error) {
+	if TaskSettlementRequested() {
+		if err := TaskSettlementReady(DB); err != nil {
+			return false, err
+		}
+		if fromStatus == TaskStatusSuccess || fromStatus == TaskStatusFailure {
+			return false, nil
+		}
+		won := false
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			var r TaskSettlement
+			err := lockForUpdate(tx).Where("task_id = ?", t.ID).First(&r).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			result := tx.Model(t).Where("status = ?", fromStatus).Select("*").Updates(t)
+			if result.Error != nil {
+				return result.Error
+			}
+			won = result.RowsAffected > 0
+			if !won || (t.Status != TaskStatusSuccess && t.Status != TaskStatusFailure) || t.Status == fromStatus {
+				return nil
+			}
+			if r.ID == 0 {
+				return createTaskSettlement(tx, t, true)
+			}
+			return tx.Model(&r).Where("state = ?", "running").Updates(map[string]any{"state": "awaiting_facts", "updated_at": time.Now().Unix()}).Error
+		})
+		return won, err
+	}
 	result := DB.Model(t).Where("status = ?", fromStatus).Select("*").Updates(t)
 	if result.Error != nil {
 		return false, result.Error

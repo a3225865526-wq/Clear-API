@@ -11,28 +11,49 @@ import (
 
 func AnonymousRequestBodyLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		maxBytes := common.GetAnonymousRequestBodyLimitBytes()
-		if maxBytes <= 0 || c.Request.Body == nil {
-			c.Next()
-			return
-		}
-
-		originalBody := c.Request.Body
-		limitedBody, err := readAnonymousRequestBody(originalBody, maxBytes)
-		_ = originalBody.Close()
-		if err != nil {
-			if common.IsRequestBodyTooLargeError(err) {
-				c.AbortWithStatus(http.StatusRequestEntityTooLarge)
-				return
-			}
-			c.AbortWithStatus(http.StatusBadRequest)
-			return
-		}
-
-		c.Request.Body = io.NopCloser(bytes.NewReader(limitedBody))
-		c.Request.ContentLength = int64(len(limitedBody))
-		c.Next()
+		limitRequestBody(c, common.GetAnonymousRequestBodyLimitBytes())
 	}
+}
+
+// APIRequestBodyLimit bounds management requests before any handler reads them.
+// Only the registered guide image upload route needs a larger multipart budget.
+func APIRequestBodyLimit() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		maxBytes := int64(2 << 20)
+		if c.Request.Method == http.MethodPost && c.FullPath() == "/api/guide/images" {
+			maxBytes = 6 << 20
+		}
+		limitRequestBody(c, maxBytes)
+	}
+}
+
+func limitRequestBody(c *gin.Context, maxBytes int64) {
+	if maxBytes <= 0 || c.Request.Body == nil {
+		c.Next()
+		return
+	}
+
+	originalBody := c.Request.Body
+	if c.Request.ContentLength > maxBytes {
+		_ = originalBody.Close()
+		c.AbortWithStatus(http.StatusRequestEntityTooLarge)
+		return
+	}
+	limitedBody, err := readAnonymousRequestBody(originalBody, maxBytes)
+	_ = originalBody.Close()
+	if err != nil {
+		if common.IsRequestBodyTooLargeError(err) {
+			c.AbortWithStatus(http.StatusRequestEntityTooLarge)
+			return
+		}
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
+	// Preserve the exact bytes for payment signatures and multipart boundaries.
+	c.Request.Body = io.NopCloser(bytes.NewReader(limitedBody))
+	c.Request.ContentLength = int64(len(limitedBody))
+	c.Next()
 }
 
 func readAnonymousRequestBody(body io.Reader, maxBytes int64) ([]byte, error) {

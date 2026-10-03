@@ -186,6 +186,31 @@ func TestResponsesWSRequestRunnerRefreshesBillingContextAndCleansBody(t *testing
 	}))
 }
 
+func TestResponsesWSRequestRunnerReleasesDurableReservation(t *testing.T) {
+	user, token := setupResponsesWSRequestTest(t)
+	require.NoError(t, model.MigrateFinanceRequests(model.DB))
+	require.NoError(t, model.MigrateBillingReconciliation(model.DB))
+	runner, _ := newResponsesWSTestRunner(t, token)
+	requestID := "ws-durable-execution-cleanup"
+	t.Cleanup(func() { model.EndBillingRequestExecution(requestID) })
+	request := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"input":"synthetic"}`))
+	require.Nil(t, runner(request, requestID, func(c *gin.Context) *types.NewAPIError {
+		require.NoError(t, model.ReserveBillingRequest(requestID, user.Id, token.Id, 10))
+		c.Set(model.BillingExecutionContextKey, []string{requestID})
+		rows, _, err := model.ListBillingReconciliation(model.DB, "pending", 0, 100)
+		require.NoError(t, err)
+		require.Len(t, rows, 1)
+		require.True(t, rows[0].Executing)
+		// The turn ends with an unresolved reservation. Its independent Gin
+		// context must release execution even while the socket remains open.
+		return nil
+	}))
+	rows, _, err := model.ListBillingReconciliation(model.DB, "pending", 0, 100)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.False(t, rows[0].Executing)
+}
+
 func TestResponsesWSRequestRunnerRejectsRevokedCredentials(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

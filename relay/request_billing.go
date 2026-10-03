@@ -78,7 +78,13 @@ func RefundFailedRequestBilling(c *gin.Context, info *relaycommon.RelayInfo, api
 			// A disconnect does not establish that the provider did no work.
 			// Keep the reserved charge for reconciliation instead of offering a
 			// free invocation by aborting the stream before usage is received.
-			if err := info.Billing.Settle(info.Billing.GetPreConsumedQuota()); err != nil {
+			var err error
+			if session, ok := info.Billing.(*service.BillingSession); ok {
+				err = session.SettleUncertain()
+			} else {
+				err = info.Billing.Settle(info.Billing.GetPreConsumedQuota())
+			}
+			if err != nil {
 				logger.LogError(c, "cancelled upstream request requires billing reconciliation")
 			}
 			logger.LogWarn(c, "upstream usage unknown after dispatch; reserved quota retained pending usage reconciliation")

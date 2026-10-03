@@ -35,12 +35,14 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 import { useFinanceAccess, useFinanceSummary } from './access'
+import { BillingReconciliation } from './billing-review'
 import { Code, FinanceTable, Money, Panel } from './components'
 import { beijingInput, financeTime, validRange } from './format'
 import { metricLabels } from './labels'
 import { FinanceOperations } from './operations'
 import { OwnerOverview } from './overview'
 import { FinanceRecords } from './records'
+import { TaskSettlementReview } from './task-settlement-review'
 import type { Fact, Metric, Range, Summary } from './types'
 import { WalletReconciliation } from './wallet'
 
@@ -80,7 +82,16 @@ export function OwnerFinance() {
         )}
       />
     )
-  } else content = <FinanceWorkspace key={access.epoch} epoch={access.epoch} />
+  } else {
+    content = (
+      <FinanceWorkspace
+        key={access.epoch}
+        epoch={access.epoch}
+        billingReady={access.data?.billing_reconciliation_ready === true}
+        taskReady={access.data?.task_settlement_ready === true}
+      />
+    )
+  }
   return (
     <SectionPageLayout>
       <SectionPageLayout.Title>{t('Owner finance')}</SectionPageLayout.Title>
@@ -102,7 +113,15 @@ export function OwnerFinance() {
     </SectionPageLayout>
   )
 }
-function FinanceWorkspace({ epoch }: { epoch: number }) {
+function FinanceWorkspace({
+  epoch,
+  billingReady,
+  taskReady,
+}: {
+  epoch: number
+  billingReady: boolean
+  taskReady: boolean
+}) {
   const { t } = useTranslation()
   const [range, setRange] = useState<Range>({ period: 'today', trend: 'day' })
   const [selection, setSelection] = useState('today')
@@ -226,6 +245,8 @@ function FinanceWorkspace({ epoch }: { epoch: number }) {
           <SummaryView
             key={JSON.stringify(range)}
             summary={query.data}
+            billingReady={billingReady}
+            taskReady={taskReady}
             onChanged={() => void query.refetch()}
           />
         )
@@ -236,9 +257,13 @@ function FinanceWorkspace({ epoch }: { epoch: number }) {
 function SummaryView({
   summary: s,
   onChanged,
+  billingReady,
+  taskReady,
 }: {
   summary: Summary
   onChanged: () => void
+  billingReady: boolean
+  taskReady: boolean
 }) {
   const { t, i18n } = useTranslation()
   const [detail, setDetail] = useState<string | null>(null)
@@ -653,6 +678,8 @@ function SummaryView({
             />
           </Panel>
           <WalletReconciliation />
+          <BillingReconciliation ready={billingReady} />
+          <TaskSettlementReview ready={taskReady} />
           <FinanceRecords />
         </TabsContent>
         <TabsContent value='exceptions' className='space-y-4'>

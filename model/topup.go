@@ -60,6 +60,43 @@ func (expected PaymentReceipt) Validate(actual []PaymentReceipt) error {
 	return nil
 }
 
+// ParsePancakePaymentAmount accepts bounded display amounts that can be
+// represented exactly in USD cents, without rounding or exponent notation.
+func ParsePancakePaymentAmount(value string) (decimal.Decimal, error) {
+	if value == "" || len(value) > 64 {
+		return decimal.Zero, ErrPaymentReceiptMismatch
+	}
+	dot := false
+	for i, char := range value {
+		if char == '.' && !dot && i > 0 && i < len(value)-1 {
+			dot = true
+			continue
+		}
+		if char < '0' || char > '9' {
+			return decimal.Zero, ErrPaymentReceiptMismatch
+		}
+	}
+	amount, err := decimal.NewFromString(value)
+	if err != nil || !amount.Equal(amount.Round(2)) {
+		return decimal.Zero, ErrPaymentReceiptMismatch
+	}
+	return amount, nil
+}
+
+// ValidatePancake also rejects legacy orders without a checkout snapshot.
+func (expected PaymentReceipt) ValidatePancake(actual []PaymentReceipt) error {
+	if len(actual) != 1 || expected.Reference == "" || !strings.EqualFold(expected.Currency, "USD") || !strings.EqualFold(actual[0].Currency, "USD") {
+		return ErrPaymentReceiptMismatch
+	}
+	for _, receipt := range []PaymentReceipt{expected, actual[0]} {
+		amount, err := ParsePancakePaymentAmount(receipt.Amount)
+		if err != nil || !amount.IsPositive() {
+			return ErrPaymentReceiptMismatch
+		}
+	}
+	return expected.Validate(actual)
+}
+
 const (
 	PaymentProviderEpay         = "epay"
 	PaymentProviderStripe       = "stripe"
@@ -737,7 +774,7 @@ func RechargeWaffo(tradeNo string, callerIp string, receipt ...PaymentReceipt) (
 	return nil
 }
 
-func RechargeWaffoPancake(tradeNo string) (err error) {
+func RechargeWaffoPancake(tradeNo string, receipt ...PaymentReceipt) (err error) {
 	if tradeNo == "" {
 		return errors.New("未提供支付单号")
 	}
@@ -758,6 +795,9 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 
 		if topUp.PaymentProvider != PaymentProviderWaffoPancake {
 			return ErrPaymentMethodMismatch
+		}
+		if err := topUp.PaymentReceipt.ValidatePancake(receipt); err != nil {
+			return err
 		}
 
 		if topUp.Status == common.TopUpStatusSuccess {
@@ -786,6 +826,9 @@ func RechargeWaffoPancake(tradeNo string) (err error) {
 
 	if err != nil {
 		common.SysError("waffo pancake topup failed: " + err.Error())
+		if errors.Is(err, ErrPaymentReceiptMismatch) {
+			return ErrPaymentReceiptMismatch
+		}
 		return errors.New("充值失败，请稍后重试")
 	}
 	syncCreditUserQuotaCache(topUp.UserId, quotaToAdd, "waffo pancake topup")

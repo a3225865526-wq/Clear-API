@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -378,7 +379,13 @@ func RequestWaffoPancakePay(c *gin.Context) {
 	}
 
 	tradeNo := fmt.Sprintf("WAFFO_PANCAKE-%d-%d-%s", id, time.Now().UnixMilli(), randstr.String(6))
+	receipt, err := service.WaffoPancakeCheckoutReceipt(payMoney, tradeNo)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "充值金额无效"})
+		return
+	}
 	topUp := &model.TopUp{
+		PaymentReceipt:  receipt,
 		UserId:          id,
 		Amount:          normalizeWaffoPancakeTopUpAmount(req.Amount),
 		Money:           payMoney,
@@ -399,7 +406,7 @@ func RequestWaffoPancakePay(c *gin.Context) {
 		ProductID:     setting.WaffoPancakeProductID,
 		BuyerIdentity: getWaffoPancakeBuyerIdentity(user),
 		PriceSnapshot: &service.WaffoPancakePriceSnapshot{
-			Amount:      formatWaffoPancakeAmount(payMoney),
+			Amount:      receipt.Amount,
 			TaxCategory: "saas",
 		},
 		BuyerEmail:              getWaffoPancakeBuyerEmail(user),
@@ -479,6 +486,12 @@ func WaffoPancakeWebhook(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
 		return
 	}
+	receipt, err := service.WaffoPancakeWebhookReceipt(event)
+	if err != nil {
+		logger.LogError(c.Request.Context(), fmt.Sprintf("Waffo Pancake payment rejected class=invalid_payment_facts event_id=%s order_id=%s", event.ID, event.Data.OrderID))
+		c.String(http.StatusOK, "OK")
+		return
+	}
 
 	// Dispatch by trade_no prefix. OrderMerchantExternalID = our trade_no;
 	// OrderID is Pancake's internal ORD_* (logs only).
@@ -488,17 +501,26 @@ func WaffoPancakeWebhook(c *gin.Context) {
 	if isSubscription {
 		tradeNo, err := service.ResolveWaffoPancakeSubscriptionTradeNo(event)
 		if err != nil {
+			if errors.Is(err, service.ErrWaffoPancakeLookupUnavailable) {
+				logger.LogError(c.Request.Context(), "Waffo Pancake payment deferred class=order_lookup_unavailable")
+				c.String(http.StatusInternalServerError, "retry")
+				return
+			}
 			logger.LogError(c.Request.Context(), fmt.Sprintf(
-				"Waffo Pancake webhook 订阅订单解析失败 event_id=%s order_id=%s buyer_identity=%q client_ip=%s error=%q",
-				event.ID, event.Data.OrderID, event.Data.MerchantProvidedBuyerIdentity, c.ClientIP(), err.Error(),
+				"Waffo Pancake webhook 订阅订单解析失败 event_id=%s order_id=%s client_ip=%s",
+				event.ID, event.Data.OrderID, c.ClientIP(),
 			))
 			c.String(http.StatusOK, "OK")
 			return
 		}
 		LockOrder(tradeNo)
 		defer UnlockOrder(tradeNo)
-		if err := model.CompleteSubscriptionOrder(tradeNo, string(bodyBytes), model.PaymentProviderWaffoPancake, ""); err != nil {
+		if err := model.CompleteSubscriptionOrder(tradeNo, string(bodyBytes), model.PaymentProviderWaffoPancake, "", receipt); err != nil {
 			logger.LogError(c.Request.Context(), fmt.Sprintf("Waffo Pancake 订阅完成失败 trade_no=%s event_id=%s order_id=%s client_ip=%s error=%q", tradeNo, event.ID, event.Data.OrderID, c.ClientIP(), err.Error()))
+			if errors.Is(err, model.ErrPaymentReceiptMismatch) {
+				c.String(http.StatusOK, "OK")
+				return
+			}
 			c.String(http.StatusInternalServerError, "retry")
 			return
 		}
@@ -509,12 +531,17 @@ func WaffoPancakeWebhook(c *gin.Context) {
 
 	tradeNo, err := service.ResolveWaffoPancakeTradeNo(event)
 	if err != nil {
+		if errors.Is(err, service.ErrWaffoPancakeLookupUnavailable) {
+			logger.LogError(c.Request.Context(), "Waffo Pancake payment deferred class=order_lookup_unavailable")
+			c.String(http.StatusInternalServerError, "retry")
+			return
+		}
 		// LogError (not LogWarn): covers order-not-found and buyer-identity
 		// mismatch — both warrant human attention. 200 OK so Waffo doesn't
 		// retry a permanently-unresolvable webhook.
 		logger.LogError(c.Request.Context(), fmt.Sprintf(
-			"Waffo Pancake webhook 订单解析失败 event_id=%s order_id=%s buyer_identity=%q client_ip=%s error=%q",
-			event.ID, event.Data.OrderID, event.Data.MerchantProvidedBuyerIdentity, c.ClientIP(), err.Error(),
+			"Waffo Pancake webhook 订单解析失败 event_id=%s order_id=%s client_ip=%s",
+			event.ID, event.Data.OrderID, c.ClientIP(),
 		))
 		c.String(http.StatusOK, "OK")
 		return
@@ -523,8 +550,12 @@ func WaffoPancakeWebhook(c *gin.Context) {
 	LockOrder(tradeNo)
 	defer UnlockOrder(tradeNo)
 
-	if err := model.RechargeWaffoPancake(tradeNo); err != nil {
+	if err := model.RechargeWaffoPancake(tradeNo, receipt); err != nil {
 		logger.LogError(c.Request.Context(), fmt.Sprintf("Waffo Pancake 充值处理失败 trade_no=%s event_id=%s order_id=%s client_ip=%s error=%q", tradeNo, event.ID, event.Data.OrderID, c.ClientIP(), err.Error()))
+		if errors.Is(err, model.ErrPaymentReceiptMismatch) {
+			c.String(http.StatusOK, "OK")
+			return
+		}
 		c.String(http.StatusInternalServerError, "retry")
 		return
 	}

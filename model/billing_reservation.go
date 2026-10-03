@@ -48,7 +48,17 @@ func ReserveBillingRequest(requestID string, userID, tokenID, quota int) error {
 	if requestID == "" || len(requestID) > 128 || userID <= 0 || tokenID <= 0 || quota < 0 || quota > math.MaxInt32 {
 		return errors.New("invalid billing reservation")
 	}
-	return DB.Transaction(func(tx *gorm.DB) error {
+	billingExecutionMu.Lock()
+	if billingExecutions[requestID] {
+		billingExecutionMu.Unlock()
+		return ErrBillingReservationConflict
+	}
+	// Register before committing the reservation so there is no window in
+	// which an operator can decide a live request. Independent reservations
+	// still run their database transactions concurrently.
+	billingExecutions[requestID] = true
+	billingExecutionMu.Unlock()
+	err := DB.Transaction(func(tx *gorm.DB) error {
 		r := BillingReservation{RequestID: requestID, UserID: userID, TokenID: tokenID, Reserved: quota, Applied: quota, State: "active", UpdatedAt: time.Now().Unix()}
 		if err := tx.Create(&r).Error; err != nil {
 			return err // The unique request ID prevents duplicate submission/reservation.
@@ -95,6 +105,10 @@ func ReserveBillingRequest(requestID string, userID, tokenID, quota int) error {
 		}
 		return nil
 	})
+	if err != nil {
+		EndBillingRequestExecution(requestID)
+	}
+	return err
 }
 
 // RaiseBillingReservation atomically grows an active wallet/token reservation.

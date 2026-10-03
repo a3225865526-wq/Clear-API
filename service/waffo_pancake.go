@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/shopspring/decimal"
 	pancake "github.com/waffo-com/waffo-pancake-sdk-go"
+	"gorm.io/gorm"
 )
 
 // WaffoPancakePriceSnapshot is the per-session price override sent with checkout.
@@ -60,6 +64,9 @@ type WaffoPancakeWebhookData struct {
 	Currency                      string
 	Amount                        string
 	TaxAmount                     string
+	Subtotal                      *string
+	Total                         *string
+	PaymentStatus                 *string
 	ProductName                   string
 	MerchantProvidedBuyerIdentity string
 }
@@ -188,11 +195,70 @@ func VerifyConfiguredWaffoPancakeWebhook(payload string, signatureHeader string)
 			Currency:                      evt.Data.Currency,
 			Amount:                        evt.Data.Amount,
 			TaxAmount:                     evt.Data.TaxAmount,
+			Subtotal:                      evt.Data.Subtotal,
+			Total:                         evt.Data.Total,
+			PaymentStatus:                 evt.Data.PaymentStatus,
 			ProductName:                   evt.Data.ProductName,
 			MerchantProvidedBuyerIdentity: identity,
 		},
 	}, nil
 }
+
+// WaffoPancakeCheckoutReceipt freezes the exact display price sent to checkout.
+func WaffoPancakeCheckoutReceipt(money float64, tradeNo string) (model.PaymentReceipt, error) {
+	if math.IsNaN(money) || math.IsInf(money, 0) || money < 0.01 || tradeNo == "" {
+		return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+	}
+	amount := decimal.NewFromFloat(money).StringFixed(2)
+	parsed, err := model.ParsePancakePaymentAmount(amount)
+	if err != nil || !parsed.IsPositive() {
+		return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+	}
+	return model.PaymentReceipt{Amount: amount, Currency: "USD", Reference: tradeNo}, nil
+}
+
+// WaffoPancakeWebhookReceipt derives only a provable pretax amount. The SDK
+// defines subtotal/total explicitly but does not define whether amount includes tax.
+func WaffoPancakeWebhookReceipt(event *WaffoPancakeWebhookEvent) (model.PaymentReceipt, error) {
+	if event == nil || event.NormalizedEventType() != "order.completed" || !strings.EqualFold(event.Data.Currency, "USD") || (event.Data.PaymentStatus != nil && *event.Data.PaymentStatus != "succeeded") {
+		return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+	}
+	data := event.Data
+	amount, err := model.ParsePancakePaymentAmount(data.Amount)
+	if err != nil || !amount.IsPositive() {
+		return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+	}
+	tax, err := model.ParsePancakePaymentAmount(data.TaxAmount)
+	if err != nil {
+		return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+	}
+	subtotal, total := amount, amount.Add(tax)
+	if data.Subtotal != nil {
+		subtotal, err = model.ParsePancakePaymentAmount(*data.Subtotal)
+		if err != nil || !subtotal.IsPositive() {
+			return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+		}
+		total = subtotal.Add(tax)
+	}
+	if data.Total != nil {
+		paidTotal, err := model.ParsePancakePaymentAmount(*data.Total)
+		if err != nil || !paidTotal.IsPositive() || (data.Subtotal != nil && !paidTotal.Equal(total)) {
+			return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+		}
+		total = paidTotal
+		subtotal = total.Sub(tax)
+	}
+	if (!tax.IsZero() && data.Subtotal == nil && data.Total == nil) || !subtotal.IsPositive() || (!amount.Equal(subtotal) && !amount.Equal(total)) {
+		return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+	}
+	tradeNo := strings.TrimSpace(data.OrderMerchantExternalID)
+	if tradeNo == "" {
+		return model.PaymentReceipt{}, model.ErrPaymentReceiptMismatch
+	}
+	return model.PaymentReceipt{Amount: subtotal.StringFixed(2), Currency: "USD", Reference: tradeNo}, nil
+}
+
+var ErrWaffoPancakeLookupUnavailable = errors.New("waffo pancake order lookup unavailable")
 
 // ResolveWaffoPancakeTradeNo maps a verified webhook event to a local TopUp
 // trade_no via OrderMerchantExternalID, and rejects buyer-identity mismatches.
@@ -204,8 +270,12 @@ func ResolveWaffoPancakeTradeNo(event *WaffoPancakeWebhookEvent) (string, error)
 	if tradeNo == "" {
 		return "", fmt.Errorf("missing webhook orderMerchantExternalId")
 	}
-	topUp := model.GetTopUpByTradeNo(tradeNo)
-	if topUp == nil || topUp.PaymentProvider != model.PaymentProviderWaffoPancake {
+	var topUp model.TopUp
+	err := model.DB.Where("trade_no = ?", tradeNo).First(&topUp).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", ErrWaffoPancakeLookupUnavailable
+	}
+	if err != nil || topUp.PaymentProvider != model.PaymentProviderWaffoPancake {
 		return "", fmt.Errorf("waffo pancake order not found for tradeNo=%s", tradeNo)
 	}
 	expectedIdentity := WaffoPancakeBuyerIdentityFromUserID(topUp.UserId)
@@ -231,8 +301,12 @@ func ResolveWaffoPancakeSubscriptionTradeNo(event *WaffoPancakeWebhookEvent) (st
 	if tradeNo == "" {
 		return "", fmt.Errorf("missing webhook orderMerchantExternalId")
 	}
-	order := model.GetSubscriptionOrderByTradeNo(tradeNo)
-	if order == nil || order.PaymentProvider != model.PaymentProviderWaffoPancake {
+	var order model.SubscriptionOrder
+	err := model.DB.Where("trade_no = ?", tradeNo).First(&order).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return "", ErrWaffoPancakeLookupUnavailable
+	}
+	if err != nil || order.PaymentProvider != model.PaymentProviderWaffoPancake {
 		return "", fmt.Errorf("waffo pancake subscription order not found for tradeNo=%s", tradeNo)
 	}
 	expectedIdentity := WaffoPancakeBuyerIdentityFromUserID(order.UserId)

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/service/guide"
 	"github.com/gin-gonic/gin"
 )
@@ -26,11 +27,13 @@ func guideTestRouter(t *testing.T, id int) *gin.Engine {
 		t.Fatal(err)
 	}
 	r := gin.New()
+	r.Use(middleware.APIRequestBodyLimit())
 	r.Use(func(c *gin.Context) { c.Set("id", id) })
 	r.GET("/access", GetUsageGuideAccess)
 	r.GET("/versions", GetUsageGuideVersions)
 	r.PUT("/save", SaveUsageGuide)
 	r.POST("/images", UploadUsageGuideImage)
+	r.POST("/api/guide/images", UploadUsageGuideImage)
 	return r
 }
 func TestGuideOnlyConfiguredOwnerCanEdit(t *testing.T) {
@@ -92,13 +95,16 @@ func TestGuideImageUploadValidatesBytes(t *testing.T) {
 	for _, test := range []struct {
 		data []byte
 		want int
-	}{{[]byte("<svg onload='x'/>"), 400}, {pngBytes.Bytes(), 200}} {
+	}{{[]byte("<svg onload='x'/>"), 400}, {pngBytes.Bytes(), 200},
+		{append(append([]byte(nil), pngBytes.Bytes()...), make([]byte, 3<<20)...), 200},
+		{append(append([]byte(nil), pngBytes.Bytes()...), make([]byte, 5<<20)...), 400},
+		{make([]byte, 6<<20), 413}} {
 		var body bytes.Buffer
 		writer := multipart.NewWriter(&body)
 		part, _ := writer.CreateFormFile("image", "../../pretend.png")
 		_, _ = part.Write(test.data)
 		_ = writer.Close()
-		req := httptest.NewRequest("POST", "/images", &body)
+		req := httptest.NewRequest("POST", "/api/guide/images", &body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("X-Guide-Editor", "1")
 		w := httptest.NewRecorder()

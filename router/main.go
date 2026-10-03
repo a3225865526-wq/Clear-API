@@ -14,6 +14,7 @@ import (
 )
 
 func SetRouter(router *gin.Engine, assets WebAssets) {
+	router.Use(middleware.BillingRequestExecution())
 	guideBase, err := assets.BuildFS.ReadFile("web/dist/guide/pages.json")
 	if err != nil || controller.InitUsageGuide(guideBase) != nil {
 		common.SysError("usage guide content unavailable")

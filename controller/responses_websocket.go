@@ -32,6 +32,7 @@ type responsesWSRequestState struct {
 // without routing another HTTP request or retaining a pooled Gin context.
 var responsesWSRequestEngine = sync.OnceValue(func() *gin.Engine {
 	engine := gin.New()
+	engine.Use(middleware.BillingRequestExecution())
 	engine.ForwardedByClientIP = false
 	_ = engine.SetTrustedProxies(nil)
 	engine.POST("/v1/responses", func(c *gin.Context) {
