@@ -33,6 +33,7 @@ import type { PricingModel } from '../types'
 import { CachedPriceCell } from './cached-price-cell'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPriceCell, type ModelPriceCellOptions } from './model-price-cell'
+import { OfficialPriceReference } from './official-price-reference'
 
 // ----------------------------------------------------------------------------
 // Pricing Table Columns
@@ -89,9 +90,20 @@ export function usePricingColumns(
         <DataTableColumnHeader column={column} title={t('Price')} />
       ),
       cell: ({ row }) => (
-        <ModelPriceCell model={row.original} options={options} />
+        <div className='min-w-0 space-y-2'>
+          <p className='text-muted-foreground text-xs font-medium'>
+            {t('Platform price')}
+          </p>
+          <ModelPriceCell model={row.original} options={options} />
+          {(!options.selectedGroup || options.selectedGroup === 'all') && (
+            <p className='text-muted-foreground text-xs'>
+              {t('Lowest price across available groups')}
+            </p>
+          )}
+          <OfficialPriceReference model={row.original} options={options} />
+        </div>
       ),
-      size: 180,
+      size: 300,
       enableSorting: false,
     },
 

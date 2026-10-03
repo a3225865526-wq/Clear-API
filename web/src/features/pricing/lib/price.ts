@@ -138,6 +138,27 @@ function applyRechargeRate(
   return (price * priceRate) / usdExchangeRate
 }
 
+/** Unrounded USD price per displayed token unit, shared by display and comparison. */
+export function calculateDisplayTokenPrice(
+  model: PricingModel,
+  type: PriceType,
+  tokenUnit: TokenUnit,
+  showWithRecharge = false,
+  priceRate = 1,
+  usdExchangeRate = 1,
+  selectedGroup?: string
+): number {
+  const price = calculateTokenPrice(
+    model,
+    type,
+    getDisplayGroupRatio(model, selectedGroup)
+  )
+  return (
+    applyRechargeRate(price, showWithRecharge, priceRate, usdExchangeRate) /
+    TOKEN_UNIT_DIVISORS[tokenUnit]
+  )
+}
+
 /**
  * Format token-based price for display
  */
@@ -155,17 +176,15 @@ export function formatPrice(
     return '-'
   }
 
-  const displayGroupRatio = getDisplayGroupRatio(model, selectedGroup)
-
-  let priceInUSD = calculateTokenPrice(model, type, displayGroupRatio)
-  priceInUSD = applyRechargeRate(
-    priceInUSD,
+  const price = calculateDisplayTokenPrice(
+    model,
+    type,
+    tokenUnit,
     showWithRecharge,
     priceRate,
-    usdExchangeRate
+    usdExchangeRate,
+    selectedGroup
   )
-
-  const price = priceInUSD / TOKEN_UNIT_DIVISORS[tokenUnit]
   return formatBillingCurrencyFromUSD(price, {
     showSymbol: showCurrencySymbol,
     digitsLarge: 4,

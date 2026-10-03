@@ -43,6 +43,7 @@ import { taskPriceLabel, taskUsageUnitLabel } from '../lib/task-price-display'
 import type { PricingModel, PriceType, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { OfficialPriceReference } from './official-price-reference'
 
 export interface ModelCardProps {
   model: PricingModel
@@ -318,6 +319,9 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           className='mt-auto flex min-w-0 flex-col gap-1.5'
         >
           <ModelBillingModeBadge model={props.model} appearance='caption' />
+          <p className='text-muted-foreground text-xs font-medium'>
+            {t('Platform price')}
+          </p>
           {dynamicSummary?.providerCount && (
             <span className='text-muted-foreground text-xs break-words'>
               {t('{{count}} providers', {
@@ -330,6 +334,21 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           <div className='grid grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-x-3 gap-y-2'>
             {priceSummary}
           </div>
+          {(!props.selectedGroup || props.selectedGroup === 'all') && (
+            <p className='text-muted-foreground text-xs'>
+              {t('Lowest price across available groups')}
+            </p>
+          )}
+          <OfficialPriceReference
+            model={props.model}
+            options={{
+              tokenUnit,
+              priceRate,
+              usdExchangeRate,
+              showRechargePrice,
+              selectedGroup: props.selectedGroup,
+            }}
+          />
         </div>
         {(groups.length > 0 || endpoints.length > 0) && (
           <dl
