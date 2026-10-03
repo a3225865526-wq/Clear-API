@@ -122,6 +122,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.GET("/aff", controller.GetAffCode)
 				selfRoute.GET("/topup/info", controller.GetTopUpInfo)
 				selfRoute.GET("/topup/self", controller.GetUserTopUps)
+				selfRoute.GET("/balance_transactions/self", controller.GetUserBalanceTransactions)
 				selfRoute.POST("/topup", middleware.CriticalRateLimit(), controller.TopUp)
 				selfRoute.POST("/pay", middleware.CriticalRateLimit(), controller.RequestEpay)
 				selfRoute.POST("/amount", controller.RequestAmount)
@@ -157,6 +158,7 @@ func SetApiRouter(router *gin.Engine) {
 			{
 				adminRoute.GET("/", controller.GetAllUsers)
 				adminRoute.GET("/topup", controller.GetAllTopUps)
+				adminRoute.GET("/balance_transactions", controller.GetAllBalanceTransactions)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
 				adminRoute.GET("/search", controller.SearchUsers)
 				adminRoute.GET("/:id/oauth/bindings", controller.GetUserOAuthBindingsByAdmin)
@@ -312,6 +314,10 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			redemptionRoute.GET("/", controller.GetAllRedemptions)
 			redemptionRoute.GET("/search", controller.SearchRedemptions)
+			redemptionRoute.GET("/batches", controller.GetAllRedemptionBatches)
+			redemptionRoute.POST("/batches", controller.AddRedemptionBatch)
+			redemptionRoute.GET("/batches/:id/codes", controller.GetRedemptionBatchCodes)
+			redemptionRoute.POST("/batches/:id/disable", controller.DisableRedemptionBatch)
 			redemptionRoute.GET("/:id", controller.GetRedemption)
 			redemptionRoute.POST("/", controller.AddRedemption)
 			redemptionRoute.POST("/batch", controller.DeleteRedemptionBatch)
@@ -321,12 +327,29 @@ func SetApiRouter(router *gin.Engine) {
 		}
 		clearAPIOfflineRoute := apiRouter.Group("/clearapi")
 		clearAPIOfflineRoute.POST("/redeem", middleware.UserAuth(), middleware.CriticalRateLimit(), controller.RedeemClearAPIOfflineCode)
+		clearAPIOfflineRoute.POST("/store/redeem", middleware.UserAuth(), middleware.CriticalRateLimit(), controller.RedeemStoreCode)
 		clearAPIOfflineAdminRoute := clearAPIOfflineRoute.Group("/offline-orders")
 		clearAPIOfflineAdminRoute.Use(middleware.AdminAuth())
 		{
 			clearAPIOfflineAdminRoute.GET("/", controller.ListClearAPIOfflineOrders)
 			clearAPIOfflineAdminRoute.POST("/", controller.CreateClearAPIOfflineOrder)
 			clearAPIOfflineAdminRoute.POST("/:id/void", controller.VoidClearAPIOfflineOrder)
+		}
+		storeAdminRoute := apiRouter.Group("/store")
+		storeAdminRoute.Use(middleware.AdminAuth())
+		{
+			storeAdminRoute.GET("/products", controller.GetAllStoreProducts)
+			storeAdminRoute.POST("/products", controller.AddStoreProduct)
+			storeAdminRoute.PUT("/products", controller.UpdateStoreProduct)
+			storeAdminRoute.DELETE("/products/:id", controller.DeleteStoreProduct)
+		}
+		vipLevelAdminRoute := apiRouter.Group("/vip_levels")
+		vipLevelAdminRoute.Use(middleware.AdminAuth())
+		{
+			vipLevelAdminRoute.GET("/", controller.GetAllVIPLevels)
+			vipLevelAdminRoute.POST("/", controller.AddVIPLevel)
+			vipLevelAdminRoute.PUT("/", controller.UpdateVIPLevel)
+			vipLevelAdminRoute.DELETE("/:id", controller.DeleteVIPLevel)
 		}
 		apiRouter.GET("/audit", middleware.DisableCache(), middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), controller.GetAuditLogs)
 		apiRouter.GET("/audit/self", middleware.DisableCache(), middleware.UserAuth(), controller.GetAuditLogs)

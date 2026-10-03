@@ -11,19 +11,35 @@ import (
 	"gorm.io/gorm"
 )
 
+// RedemptionType / RedemptionSource 显式声明兑换码类别与来源；
+// 禁止用 batch_id 等间接字段推断来源。
+const (
+	RedemptionTypeBalance      = "BALANCE"
+	RedemptionTypeSubscription = "SUBSCRIPTION"
+
+	RedemptionSourceLegacy       = "LEGACY"
+	RedemptionSourceOfflineOrder = "OFFLINE_ORDER"
+	RedemptionSourceStore        = "STORE"
+	RedemptionSourceAdmin        = "ADMIN"
+)
+
 type Redemption struct {
-	Id           int            `json:"id"`
-	UserId       int            `json:"user_id"`
-	Key          string         `json:"key" gorm:"type:char(32);uniqueIndex"`
-	Status       int            `json:"status" gorm:"default:1"`
-	Name         string         `json:"name" gorm:"index"`
-	Quota        int            `json:"quota" gorm:"default:100"`
-	CreatedTime  int64          `json:"created_time" gorm:"bigint"`
-	RedeemedTime int64          `json:"redeemed_time" gorm:"bigint"`
-	Count        int            `json:"count" gorm:"-:all"` // only for api request
-	UsedUserId   int            `json:"used_user_id"`
-	DeletedAt    gorm.DeletedAt `gorm:"index"`
-	ExpiredTime  int64          `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+	Id             int            `json:"id"`
+	UserId         int            `json:"user_id"`
+	Key            string         `json:"key" gorm:"type:char(32);uniqueIndex"`
+	Status         int            `json:"status" gorm:"default:1"`
+	Name           string         `json:"name" gorm:"index"`
+	Quota          int            `json:"quota" gorm:"default:100"`
+	CreatedTime    int64          `json:"created_time" gorm:"bigint"`
+	RedeemedTime   int64          `json:"redeemed_time" gorm:"bigint"`
+	Count          int            `json:"count" gorm:"-:all"` // only for api request
+	UsedUserId     int            `json:"used_user_id"`
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
+	ExpiredTime    int64          `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+	BatchId        int            `json:"batch_id" gorm:"default:0;index"`
+	FaceValueCents int64          `json:"face_value_cents" gorm:"type:bigint;default:0"` // 人民币面额（分），旧码为 0
+	Type           string         `json:"type" gorm:"type:varchar(16);default:'BALANCE';index"`
+	Source         string         `json:"source" gorm:"type:varchar(16);default:'LEGACY';index"`
 }
 
 func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total int64, err error) {
@@ -177,6 +193,13 @@ func redeem(key string, userId int, offlineOnly bool) (quota int, err error) {
 				return errors.New("离线订单码须使用专用兑换接口")
 			}
 		}
+		// 商城码与未来订阅码必须走各自专用入口，禁止从普通余额兑换绕过。
+		if redemption.Source == RedemptionSourceStore {
+			return errors.New("商城兑换码须使用商城兑换入口")
+		}
+		if redemption.Type != RedemptionTypeBalance {
+			return errors.New("该兑换码类型不支持余额兑换")
+		}
 		if redemption.Status != common.RedemptionCodeStatusEnabled {
 			return errors.New("该兑换码已被使用")
 		}
@@ -308,4 +331,17 @@ func rejectOfflineOrderCodeChanges(ids []int) error {
 		return errors.New("offline order codes must be managed through offline orders")
 	}
 	return nil
+}
+
+// backfillOfflineOrderRedemptionSources 把与离线订单关联、仍标记为 LEGACY 的
+// 历史兑换码回填为 OFFLINE_ORDER，幂等（只更新 LEGACY 行，绝不覆盖后续
+// 管理员设置）。best-effort：失败由调用方记录日志，不阻断启动。
+func backfillOfflineOrderRedemptionSources() error {
+	if !DB.Migrator().HasTable(&OfflineOrderCode{}) {
+		return nil
+	}
+	result := DB.Model(&Redemption{}).
+		Where("source = ? AND id IN (SELECT redemption_id FROM offline_order_codes)", RedemptionSourceLegacy).
+		Update("source", RedemptionSourceOfflineOrder)
+	return result.Error
 }

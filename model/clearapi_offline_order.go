@@ -73,6 +73,7 @@ func CreateOfflineOrder(input CreateOfflineOrderInput) (*OfflineOrder, []string,
 				UserId: input.AdminUserID, Name: "ClearAPI offline",
 				Key: key, Status: common.RedemptionCodeStatusEnabled,
 				Quota: input.QuotaPerCode, CreatedTime: common.GetTimestamp(), ExpiredTime: input.ExpiredTime,
+				Source: RedemptionSourceOfflineOrder, Type: RedemptionTypeBalance,
 			}
 			if err := tx.Create(code).Error; err != nil {
 				return err

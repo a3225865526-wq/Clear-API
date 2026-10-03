@@ -345,6 +345,10 @@ func migrateDB() error {
 		&Option{},
 		&LoginEncryptionKey{},
 		&Redemption{},
+		&RedemptionBatch{},
+		&VIPLevel{},
+		&BalanceTransaction{},
+		&StoreProduct{},
 		&OfflineOrder{},
 		&OfflineOrderCode{},
 		&Ability{},
@@ -375,6 +379,14 @@ func migrateDB() error {
 	)
 	if err != nil {
 		return err
+	}
+	// 商城充值相关迁移均为幂等 best-effort：失败记录日志不阻断启动，
+	// 缺失数据时兑换侧按 0% 加赠/空商品列表兜底。
+	if err := seedDefaultVIPLevels(); err != nil {
+		common.SysError("failed to seed default vip levels: " + err.Error())
+	}
+	if err := backfillOfflineOrderRedemptionSources(); err != nil {
+		common.SysError("failed to backfill offline order redemption sources: " + err.Error())
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
 		return err

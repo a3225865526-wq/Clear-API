@@ -108,6 +108,8 @@ func AddRedemption(c *gin.Context) {
 			CreatedTime: common.GetTimestamp(),
 			Quota:       redemption.Quota,
 			ExpiredTime: redemption.ExpiredTime,
+			Source:      model.RedemptionSourceAdmin,
+			Type:        model.RedemptionTypeBalance,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
