@@ -330,6 +330,7 @@ export type BillingSettings = {
   CreemWebhookSecret: string
   CreemTestMode: boolean
   CreemProducts: string
+  StoreRechargeEnabled?: boolean | string
   WaffoEnabled: boolean
   WaffoApiKey: string
   WaffoPrivateKey: string

@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Activity, BarChart3, WalletCards } from 'lucide-react'
+import { Activity, BarChart3, ReceiptText, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '@/components/ui/button'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatQuota } from '@/lib/format'
@@ -28,6 +29,7 @@ import type { UserWalletData } from '../types'
 interface WalletStatsCardProps {
   user: UserWalletData | null
   loading?: boolean
+  onOpenBalanceDetails?: () => void
 }
 
 export function WalletStatsCard(props: WalletStatsCardProps) {
@@ -95,6 +97,18 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
           <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>
             {item.description}
           </div>
+          {item.label === t('Current Balance') &&
+            props.onOpenBalanceDetails && (
+              <Button
+                variant='ghost'
+                size='sm'
+                className='text-muted-foreground mt-1 h-6 px-2 text-xs'
+                onClick={props.onOpenBalanceDetails}
+              >
+                <ReceiptText className='h-3 w-3' />
+                {t('Balance Details')}
+              </Button>
+            )}
         </div>
       ))}
     </div>

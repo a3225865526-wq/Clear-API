@@ -84,3 +84,54 @@ export interface RedemptionFormData {
 // ============================================================================
 
 export type RedemptionsDialogType = 'create' | 'update' | 'delete' | 'view'
+
+// ============================================================================
+// Store Redemption Batches
+// ============================================================================
+
+export interface RedemptionBatch {
+  id: number
+  name: string
+  source: string
+  type: string
+  face_value_cents: number
+  quota: number
+  count: number
+  expired_time: number
+  status: number
+  note: string
+  created_by: number
+  created_time: number
+  updated_time: number
+  used_count: number
+  unused_count: number
+  disabled_count: number
+}
+
+export interface GetRedemptionBatchesResponse {
+  success: boolean
+  message?: string
+  data?: {
+    items: RedemptionBatch[]
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
+export interface CreateRedemptionBatchRequest {
+  name: string
+  face_value_cents: number
+  count: number
+  expired_time: number
+  note?: string
+}
+
+export interface CreateRedemptionBatchResponse {
+  success: boolean
+  message?: string
+  data?: {
+    batch: RedemptionBatch
+    keys: string[]
+  }
+}

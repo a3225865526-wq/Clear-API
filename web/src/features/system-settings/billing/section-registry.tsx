@@ -22,9 +22,14 @@ import { CheckinSettingsSection } from '../general/checkin-settings-section'
 import { PricingSection } from '../general/pricing-section'
 import { QuotaSettingsSection } from '../general/quota-settings-section'
 import { PaymentSettingsSection } from '../integrations/payment-settings-section'
+import { StoreSettingsSection } from '../integrations/store-settings-section'
+import { VipLevelsSettingsSection } from '../integrations/vip-levels-settings-section'
 import { RatioSettingsCard } from '../models/ratio-settings-card'
 import type { BillingSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
+
+const parseStoreFlag = (value: boolean | string | undefined): boolean =>
+  value === true || value === 'true'
 
 const getModelDefaults = (settings: BillingSettings) => ({
   ModelPrice: settings.ModelPrice,
@@ -187,6 +192,22 @@ const BILLING_SECTIONS = [
         }}
       />
     ),
+  },
+  {
+    id: 'store',
+    titleKey: 'Store Recharge',
+    build: (settings: BillingSettings) => (
+      <StoreSettingsSection
+        defaultValues={{
+          storeRechargeEnabled: parseStoreFlag(settings.StoreRechargeEnabled),
+        }}
+      />
+    ),
+  },
+  {
+    id: 'vip-levels',
+    titleKey: 'VIP Levels',
+    build: () => <VipLevelsSettingsSection />,
   },
   {
     id: 'checkin',

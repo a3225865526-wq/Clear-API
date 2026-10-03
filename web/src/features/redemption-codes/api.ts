@@ -25,6 +25,9 @@ import type {
   GetRedemptionsResponse,
   SearchRedemptionsParams,
   RedemptionFormData,
+  GetRedemptionBatchesResponse,
+  CreateRedemptionBatchRequest,
+  CreateRedemptionBatchResponse,
 } from './types'
 
 // ============================================================================
@@ -103,5 +106,38 @@ export async function batchDeleteRedemptions(
   ids: number[]
 ): Promise<ApiResponse<number>> {
   const res = await api.post('/api/redemption/batch', { ids })
+  return res.data
+}
+
+// ============================================================================
+// Store Redemption Batches
+// ============================================================================
+
+export async function getRedemptionBatches(
+  p: number,
+  page_size: number
+): Promise<GetRedemptionBatchesResponse> {
+  const res = await api.get(`/api/redemption/batches?p=${p}&page_size=${page_size}`)
+  return res.data
+}
+
+export async function createRedemptionBatch(
+  data: CreateRedemptionBatchRequest
+): Promise<CreateRedemptionBatchResponse> {
+  const res = await api.post('/api/redemption/batches', data)
+  return res.data
+}
+
+export async function getRedemptionBatchCodes(
+  id: number
+): Promise<ApiResponse<string[]>> {
+  const res = await api.get(`/api/redemption/batches/${id}/codes`)
+  return res.data
+}
+
+export async function disableRedemptionBatch(
+  id: number
+): Promise<ApiResponse<number>> {
+  const res = await api.post(`/api/redemption/batches/${id}/disable`)
   return res.data
 }

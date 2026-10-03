@@ -92,6 +92,8 @@ func getUserVipInfo(userId int) map[string]any {
 	if level, ok, err := model.GetVIPLevelForRecharge(nil, total); err == nil && ok {
 		info["name"] = level.Name
 		info["bonus_basis_points"] = level.BonusBasisPoints
+		// 进度条需要当前档门槛（区间 total→next），STEP 3 漏发该字段，此处补上。
+		info["current_threshold_cents"] = level.ThresholdCents
 	}
 	if next, err := model.GetNextVIPLevel(total); err == nil && next != nil {
 		info["next_level"] = map[string]any{

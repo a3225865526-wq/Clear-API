@@ -25,12 +25,16 @@ import { useSystemConfig } from '@/hooks/use-system-config'
 import { getSelf } from '@/lib/api'
 
 import { AffiliateRewardsCard } from './components/affiliate-rewards-card'
+import { BalanceTransactionsDialog } from './components/dialogs/balance-transactions-dialog'
 import { BillingHistoryDialog } from './components/dialogs/billing-history-dialog'
 import { CreemConfirmDialog } from './components/dialogs/creem-confirm-dialog'
 import { PaymentConfirmDialog } from './components/dialogs/payment-confirm-dialog'
 import { TransferDialog } from './components/dialogs/transfer-dialog'
 import { RechargeFormCard } from './components/recharge-form-card'
+import { StoreProductsCard } from './components/store-products-card'
+import { StoreRedeemCard } from './components/store-redeem-card'
 import { SubscriptionPlansCard } from './components/subscription-plans-card'
+import { VipProgressCard } from './components/vip-progress-card'
 import { WalletStatsCard } from './components/wallet-stats-card'
 import { DEFAULT_DISCOUNT_RATE, PAYMENT_TYPES } from './constants'
 import {
@@ -75,6 +79,7 @@ export function Wallet(props: WalletProps) {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [transferDialogOpen, setTransferDialogOpen] = useState(false)
   const [billingDialogOpen, setBillingDialogOpen] = useState(false)
+  const [balanceDialogOpen, setBalanceDialogOpen] = useState(false)
   const [redemptionCode, setRedemptionCode] = useState('')
   const [creemDialogOpen, setCreemDialogOpen] = useState(false)
   const [selectedCreemProduct, setSelectedCreemProduct] =
@@ -83,7 +88,12 @@ export function Wallet(props: WalletProps) {
 
   const { status } = useStatus()
   const { currency } = useSystemConfig()
-  const { topupInfo, presetAmounts, loading: topupLoading } = useTopupInfo()
+  const {
+    topupInfo,
+    presetAmounts,
+    loading: topupLoading,
+    refetch: refetchTopupInfo,
+  } = useTopupInfo()
   const checkoutDisabledTopupInfo = useMemo(
     () => disableOnlinePayments(topupInfo),
     [topupInfo]
@@ -287,13 +297,36 @@ export function Wallet(props: WalletProps) {
     []
   )
 
+  // Refresh user balance + topup info (VIP status, store products) after a
+  // store code redemption succeeds. No page reload.
+  const handleStoreRedeemSuccess = useCallback(async () => {
+    await Promise.all([fetchUser(), refetchTopupInfo()])
+  }, [fetchUser, refetchTopupInfo])
+
   return (
     <>
       <SectionPageLayout>
         <SectionPageLayout.Title>{t('Wallet')}</SectionPageLayout.Title>
         <SectionPageLayout.Content>
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
-            <WalletStatsCard user={user} loading={userLoading} />
+            <WalletStatsCard
+              user={user}
+              loading={userLoading}
+              onOpenBalanceDetails={() => setBalanceDialogOpen(true)}
+            />
+
+            {topupInfo?.store_recharge_enabled ? (
+              <StoreProductsCard
+                enabled={topupInfo.store_recharge_enabled}
+                products={topupInfo.store_products}
+              />
+            ) : null}
+
+            <VipProgressCard vip={topupInfo?.vip} loading={topupLoading} />
+
+            {topupInfo?.store_recharge_enabled ? (
+              <StoreRedeemCard onSuccess={handleStoreRedeemSuccess} />
+            ) : null}
 
             <div
               className={
@@ -385,6 +418,11 @@ export function Wallet(props: WalletProps) {
       <BillingHistoryDialog
         open={billingDialogOpen}
         onOpenChange={setBillingDialogOpen}
+      />
+
+      <BalanceTransactionsDialog
+        open={balanceDialogOpen}
+        onOpenChange={setBalanceDialogOpen}
       />
 
       <CreemConfirmDialog

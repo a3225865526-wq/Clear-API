@@ -39,6 +39,8 @@ import type {
   WaffoPaymentResponse,
   WaffoPancakePaymentRequest,
   WaffoPancakePaymentResponse,
+  StoreRedeemResult,
+  BalanceTransactionsPage,
 } from './types'
 
 // ============================================================================
@@ -67,6 +69,36 @@ export async function redeemTopupCode(
   request: RedemptionRequest
 ): Promise<RedemptionResponse> {
   const res = await api.post('/api/clearapi/redeem', request)
+  return res.data
+}
+
+/**
+ * Redeem a store card code via the dedicated store endpoint. Never falls
+ * back to the offline-order endpoint: the two businesses are separate.
+ */
+export async function redeemStoreCode(
+  request: RedemptionRequest
+): Promise<ApiResponse<StoreRedeemResult>> {
+  const res = await api.post('/api/clearapi/store/redeem', request)
+  return res.data
+}
+
+/**
+ * Get balance adjustment ledger for current user (paged).
+ */
+export async function getBalanceTransactions(
+  page: number,
+  pageSize: number,
+  type?: string
+): Promise<ApiResponse<BalanceTransactionsPage>> {
+  const params = new URLSearchParams({
+    p: page.toString(),
+    page_size: pageSize.toString(),
+  })
+  if (type) {
+    params.append('type', type)
+  }
+  const res = await api.get(`/api/user/balance_transactions/self?${params.toString()}`)
   return res.data
 }
 

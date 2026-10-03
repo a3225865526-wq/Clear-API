@@ -156,6 +156,12 @@ export interface TopupInfo {
   payment_compliance_confirmed?: boolean
   /** Current compliance terms version */
   payment_compliance_terms_version?: string
+  /** Whether third-party store card redemption is enabled */
+  store_recharge_enabled?: boolean
+  /** Enabled store products, sorted by backend (sort ASC, id ASC) */
+  store_products?: StoreProductDto[]
+  /** VIP status of the current user (null when unavailable) */
+  vip?: VipInfo | null
 }
 
 /**
@@ -286,4 +292,78 @@ export interface BillingHistoryResponse {
  */
 export interface CompleteOrderRequest {
   trade_no: string
+}
+
+/**
+ * Store product configuration delivered via topup info. Only a jump-link
+ * carrier: the real credited value always comes from the redeemed code.
+ */
+export interface StoreProductDto {
+  id: number
+  name: string
+  face_value_cents: number
+  store_url: string
+  description: string
+  sort: number
+}
+
+/**
+ * Next VIP level as computed by the backend (null/undefined when the user
+ * already reached the highest enabled level).
+ */
+export interface VipNextLevel {
+  name: string
+  threshold_cents: number
+  remaining_cents: number
+}
+
+/**
+ * VIP status of the current user, fully computed by the backend. The
+ * frontend never re-derives level rules.
+ */
+export interface VipInfo {
+  name: string
+  bonus_basis_points: number
+  total_recharge_cents: number
+  /** Threshold of the current level, when a level matched. */
+  current_threshold_cents?: number
+  next_level?: VipNextLevel | null
+}
+
+/**
+ * Successful store code redemption result (backend-decided values only).
+ */
+export interface StoreRedeemResult {
+  base_quota: number
+  bonus_quota: number
+  total_quota: number
+  balance: number
+  face_value_cents: number
+  vip_name: string
+  vip_bonus_basis_points: number
+  new_vip_name: string
+}
+
+/**
+ * Balance adjustment ledger entry (RECHARGE/BONUS/...). reference_id and
+ * metadata internals must never be rendered; only code_tail is user-visible.
+ */
+export interface BalanceTransactionDto {
+  id: number
+  user_id: number
+  created_at: number
+  type: string
+  amount_quota: number
+  balance_before: number
+  balance_after: number
+  recharge_cents: number
+  reference_type: string
+  reference_id: number
+  description: string
+  code_tail?: string
+}
+
+export interface BalanceTransactionsPage {
+  items: BalanceTransactionDto[]
+  total: number
 }

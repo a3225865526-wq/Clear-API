@@ -19,7 +19,9 @@ For commercial licensing, please contact support@quantumnous.com
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
+import { RedemptionsBatchesTable } from './components/redemptions-batches-table'
 import { RedemptionsDialogs } from './components/redemptions-dialogs'
 import { RedemptionsPrimaryButtons } from './components/redemptions-primary-buttons'
 import { RedemptionsProvider } from './components/redemptions-provider'
@@ -33,11 +35,22 @@ export function Redemptions() {
         <SectionPageLayout.Title>
           {t('Redemption Codes')}
         </SectionPageLayout.Title>
-        <SectionPageLayout.Actions>
-          <RedemptionsPrimaryButtons />
-        </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
-          <RedemptionsTable />
+          <Tabs defaultValue='codes'>
+            <TabsList>
+              <TabsTrigger value='codes'>{t('Codes')}</TabsTrigger>
+              <TabsTrigger value='batches'>{t('Batches')}</TabsTrigger>
+            </TabsList>
+            <TabsContent value='codes' className='space-y-3'>
+              <div className='flex justify-end'>
+                <RedemptionsPrimaryButtons />
+              </div>
+              <RedemptionsTable />
+            </TabsContent>
+            <TabsContent value='batches'>
+              <RedemptionsBatchesTable />
+            </TabsContent>
+          </Tabs>
         </SectionPageLayout.Content>
       </SectionPageLayout>
 
