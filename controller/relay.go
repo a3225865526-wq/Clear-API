@@ -439,6 +439,17 @@ type taskSubmissionOutcome struct {
 }
 
 func RelayTask(c *gin.Context) {
+	release, admissionErr := service.AdmitTaskSubmission(c.GetInt("id"))
+	if admissionErr != nil {
+		status := http.StatusServiceUnavailable
+		if errors.Is(admissionErr, service.ErrTaskAdmission) {
+			status = http.StatusTooManyRequests
+		}
+		c.Header("Retry-After", "5")
+		respondTaskSubmissionError(c, &taskdto.TaskError{Code: "task_admission_unavailable", Message: admissionErr.Error(), StatusCode: status})
+		return
+	}
+	defer release()
 	relayInfo, err := relaycommon.GenRelayInfo(c, types.RelayFormatTask, nil, nil)
 	if err != nil {
 		respondTaskSubmissionError(c, &taskdto.TaskError{

@@ -20,10 +20,14 @@ func main() {
 	reconciliation := flag.Bool("apply-approved-billing-reconciliation-v1", false, "separate approval for review/decision tables; requires existing finance v3 or newer")
 	tasks := flag.Bool("apply-approved-task-settlement-v1", false, "separate approval for the task settlement intent/outbox table")
 	taskLogs := flag.Bool("apply-approved-task-settlement-logs-v1", false, "separate approval for log-database delivery receipts")
+	tokenKeys := flag.Bool("apply-approved-token-encryption-v1", false, "offline credential migration; requires separate verified key-file backup")
+	outbox := flag.Bool("apply-approved-billing-outbox-v1", false, "canonical billing outbox in the primary database")
+	receipts := flag.Bool("apply-approved-billing-receipts-v1", false, "billing delivery receipts in the log database")
+	rotation := flag.Bool("rotate-approved-token-encryption-v1", false, "offline key rotation; requires separately protected old/new key files and backup")
 	flag.Parse()
 	dsn := os.Getenv("CLEARAPI_BILLING_MIGRATION_DSN")
 	approvals := 0
-	for _, selected := range []bool{*approved, *reconciliation, *tasks, *taskLogs} {
+	for _, selected := range []bool{*approved, *reconciliation, *tasks, *taskLogs, *tokenKeys, *outbox, *receipts, *rotation} {
 		if selected {
 			approvals++
 		}
@@ -59,6 +63,33 @@ func main() {
 	}
 	if *taskLogs {
 		migrate, verify = model.MigrateTaskSettlementLogs, model.TaskSettlementLogsReady
+	}
+	if *tokenKeys {
+		// The service remains stopped until the complete encrypted dataset verifies.
+		os.Setenv("CLEARAPI_TOKEN_ENCRYPTION", "true")
+		migrate, verify = model.MigrateTokenEncryption, model.TokenEncryptionReady
+	}
+	if *outbox {
+		migrate = model.MigrateBillingCompletionOutbox
+		verify = func(db *gorm.DB) error {
+			if !db.Migrator().HasIndex(&model.BillingCompletionOutbox{}, "idx_billing_completion_outbox") {
+				return model.ErrFinanceUnavailable
+			}
+			return nil
+		}
+	}
+	if *receipts {
+		migrate = model.MigrateBillingCompletionReceipts
+		verify = func(db *gorm.DB) error {
+			if !db.Migrator().HasIndex(&model.BillingCompletionReceipt{}, "idx_billing_completion_receipt") {
+				return model.ErrFinanceUnavailable
+			}
+			return nil
+		}
+	}
+	if *rotation {
+		os.Setenv("CLEARAPI_TOKEN_ENCRYPTION", "true")
+		migrate, verify = model.RotateTokenEncryption, model.TokenEncryptionReady
 	}
 	if err := migrate(db); err != nil {
 		fmt.Fprintln(os.Stderr, "Billing migration failed; inspect the approved target and restore plan.")

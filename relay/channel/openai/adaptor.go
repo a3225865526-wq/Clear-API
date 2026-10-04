@@ -764,6 +764,13 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		err, usage = OpenaiRealtimeHandler(c, info)
 	case relayconstant.RelayModeAudioSpeech:
 		usage = OpenaiTTSHandler(c, resp, info)
+		if c.GetBool("upstream_body_read_failed") {
+			c.Writer.Header().Del("Content-Length")
+			c.Writer.Header().Del("Content-Encoding")
+			c.Writer.Header().Set("Content-Type", "application/json")
+			usage = nil
+			err = types.NewOpenAIError(errors.New("upstream response body read failed"), types.ErrorCodeReadResponseBodyFailed, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
+		}
 	case relayconstant.RelayModeAudioTranslation:
 		fallthrough
 	case relayconstant.RelayModeAudioTranscription:

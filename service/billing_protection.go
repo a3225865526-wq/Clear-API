@@ -23,6 +23,11 @@ func ValidateBillingProtection() error {
 	if common.RedisEnabled || common.BatchUpdateEnabled || os.Getenv("BATCH_UPDATE_ENABLED") == "true" {
 		return errors.New("billing protection requires direct database accounting without Redis or batch updates")
 	}
+	if model.BillingOutboxEnabled() {
+		if err := model.BillingCompletionOutboxReady(model.DB, model.LOG_DB); err != nil {
+			return err
+		}
+	}
 	return model.BillingReservationsReady(model.DB)
 }
 
@@ -38,6 +43,9 @@ func StartBillingProtectionWorker() error {
 			if err := model.RecoverBillingCompletions(100); err != nil {
 				// Do not leak driver errors, credentials, or request identifiers.
 				common.SysError("billing completion recovery requires attention")
+			}
+			if err := model.RecoverBillingCompletionLogs(100); err != nil {
+				common.SysError("billing log delivery requires attention")
 			}
 			time.Sleep(10 * time.Second)
 		}

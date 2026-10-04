@@ -73,6 +73,10 @@ func main() {
 		return
 	}
 
+	if err := service.ValidateProductionReadiness(); err != nil {
+		common.FatalLog("production readiness check failed: " + err.Error())
+		return
+	}
 	common.SysLog("New API " + common.Version + " started")
 	if os.Getenv("GIN_MODE") != "debug" {
 		gin.SetMode(gin.ReleaseMode)

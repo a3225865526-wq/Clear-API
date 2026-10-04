@@ -100,6 +100,11 @@ func ensureLogRequestId(log *Log) {
 
 func createLog(log *Log) error {
 	ensureLogRequestId(log)
+	if log.Type == LogTypeConsume {
+		if handled, err := EnrichBillingCompletionLog(log); handled {
+			return err
+		}
+	}
 	return LOG_DB.Create(log).Error
 }
 

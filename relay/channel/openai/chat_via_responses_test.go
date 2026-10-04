@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
@@ -38,6 +39,26 @@ func newResponsesChatTestContext(t *testing.T, body string, isStream bool) (*gin
 		DisablePing:        true,
 	}
 	return c, recorder, resp, info
+}
+
+func TestOpenaiOversizedResponseStopsRetryAndPreservesUnknownUsage(t *testing.T) {
+	t.Setenv("MAX_UPSTREAM_RESPONSE_MB", "1")
+	c, recorder, resp, info := newResponsesChatTestContext(t, strings.Repeat("x", (1<<20)+1), false)
+	usage, apiErr := OpenaiHandler(c, info, resp)
+	require.Nil(t, usage)
+	require.NotNil(t, apiErr)
+	require.True(t, types.IsSkipRetryError(apiErr))
+	require.True(t, c.GetBool("upstream_usage_uncertain"))
+	require.Empty(t, recorder.Body.String())
+	c, recorder, resp, info = newResponsesChatTestContext(t, strings.Repeat("x", (1<<20)+1), false)
+	info.RelayMode = relayconstant.RelayModeAudioSpeech
+	adaptor := &Adaptor{}
+	_, apiErr = adaptor.DoResponse(c, resp, info)
+	require.NotNil(t, apiErr)
+	require.True(t, types.IsSkipRetryError(apiErr))
+	require.True(t, c.GetBool("upstream_usage_uncertain"))
+	require.False(t, c.Writer.Written())
+	require.Empty(t, recorder.Body.String())
 }
 
 func TestOaiResponsesToChatStreamHandlerConvertsSSEOrderAndUsage(t *testing.T) {

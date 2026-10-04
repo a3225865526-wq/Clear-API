@@ -63,6 +63,38 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestTaskSubmissionAdmissionBounds(t *testing.T) {
+	truncate(t)
+	t.Setenv("TASK_OUTSTANDING_GLOBAL", "2")
+	t.Setenv("TASK_OUTSTANDING_USER", "1")
+	release, err := AdmitTaskSubmission(55)
+	require.NoError(t, err)
+	_, err = AdmitTaskSubmission(55)
+	require.ErrorIs(t, err, ErrTaskAdmission)
+	otherRelease, err := AdmitTaskSubmission(56)
+	require.NoError(t, err)
+	_, err = AdmitTaskSubmission(57)
+	require.ErrorIs(t, err, ErrTaskAdmission)
+	release()
+	release()
+	otherRelease()
+	task := makeTask(55, 0, 0, 0, BillingSourceWallet, 0)
+	require.NoError(t, model.DB.Create(task).Error)
+	_, err = AdmitTaskSubmission(55)
+	require.ErrorIs(t, err, ErrTaskAdmission)
+	require.NoError(t, model.DB.Model(task).Update("status", model.TaskStatusSuccess).Error)
+	release, err = AdmitTaskSubmission(55)
+	require.NoError(t, err)
+	release()
+}
+
+func TestProductionGateFailsClosed(t *testing.T) {
+	t.Setenv("CLEARAPI_PRODUCTION", "true")
+	require.Error(t, ValidateProductionReadiness())
+	t.Setenv("CLEARAPI_PRODUCTION", "false")
+	require.NoError(t, ValidateProductionReadiness())
+}
+
 // ---------------------------------------------------------------------------
 // Seed helpers
 // ---------------------------------------------------------------------------
@@ -858,19 +890,13 @@ func TestRefundMidjourneyQuotaUsesLegacyChannelFallbackWithoutTokenAdjustment(t 
 	}
 	require.NoError(t, task.Insert())
 
-	assert.True(t, RefundMidjourneyQuota(ctx, task, "legacy failure"))
-
-	assert.Equal(t, walletAfterCharge+chargedQuota, getUserQuota(t, userID))
-	assert.Equal(t, tokenQuota, getTokenRemainQuota(t, tokenID))
-	assert.Zero(t, getTokenUsedQuota(t, tokenID))
-	usedQuota, requestCount := getUserUsageAccounting(t, userID)
-	assert.Zero(t, usedQuota)
-	assert.Equal(t, 1, requestCount)
-	assert.Zero(t, getChannelUsedQuota(t, channelID))
-	log := getLastLog(t)
-	require.NotNil(t, log)
-	assert.Equal(t, channelID, log.ChannelId)
-	assert.Zero(t, log.TokenId)
+	// token_id=0 cannot distinguish a charged historical row from an
+	// uncharged preparation. Never mint an automatic refund from that marker.
+	require.False(t, RefundMidjourneyQuota(ctx, task, "legacy failure"))
+	require.Equal(t, walletAfterCharge, getUserQuota(t, userID))
+	require.Equal(t, tokenQuota, getTokenRemainQuota(t, tokenID))
+	require.Equal(t, chargedQuota, getMidjourneyTask(t, task.Id).Quota)
+	require.Zero(t, countLogs(t))
 }
 
 // ===========================================================================
@@ -934,23 +960,13 @@ func TestRefundTaskQuota_Subscription(t *testing.T) {
 	task := makeTask(userID, channelID, preConsumed, tokenID, BillingSourceSubscription, subID)
 	require.NoError(t, model.DB.Create(task).Error)
 
-	assert.True(t, RefundTaskQuota(ctx, task, "subscription task failed"))
-
-	// Subscription used should decrease by preConsumed
-	assert.Equal(t, subUsed-int64(preConsumed), getSubscriptionUsed(t, subID))
-
-	// Token should also be refunded
-	assert.Equal(t, tokenRemain+preConsumed, getTokenRemainQuota(t, tokenID))
-	assert.Zero(t, getTokenUsedQuota(t, tokenID))
-	usedQuota, requestCount := getUserUsageAccounting(t, userID)
-	assert.Zero(t, usedQuota)
-	assert.Equal(t, 1, requestCount)
-	assert.Zero(t, getChannelUsedQuota(t, channelID))
-
-	log := getLastLog(t)
-	require.NotNil(t, log)
-	assert.Equal(t, model.LogTypeRefund, log.Type)
-	assert.Zero(t, getTaskQuota(t, task.ID))
+	// Historical rows lack the original subscription reset epoch. Preserve
+	// the charge for review rather than credit a different accounting period.
+	require.False(t, RefundTaskQuota(ctx, task, "subscription task failed"))
+	require.Equal(t, subUsed, getSubscriptionUsed(t, subID))
+	require.Equal(t, tokenRemain, getTokenRemainQuota(t, tokenID))
+	require.Equal(t, preConsumed, getTaskQuota(t, task.ID))
+	require.Zero(t, countLogs(t))
 }
 
 func TestRefundTaskQuota_ZeroQuota(t *testing.T) {
@@ -1191,22 +1207,11 @@ func TestRecalculate_Subscription_NegativeDelta(t *testing.T) {
 	require.NoError(t, model.DB.Create(task).Error)
 	RecalculateTaskQuota(ctx, task, actualQuota, "subscription over-charge")
 
-	// Subscription used should decrease by delta (refund 3000)
-	assert.Equal(t, subUsed-int64(preConsumed-actualQuota), getSubscriptionUsed(t, subID))
-
-	// Token refunded
-	assert.Equal(t, tokenRemain+(preConsumed-actualQuota), getTokenRemainQuota(t, tokenID))
-	assert.Equal(t, actualQuota, getTokenUsedQuota(t, tokenID))
-	usedQuota, requestCount := getUserUsageAccounting(t, userID)
-	assert.Equal(t, actualQuota, usedQuota)
-	assert.Equal(t, 1, requestCount)
-	assert.Equal(t, int64(actualQuota), getChannelUsedQuota(t, channelID))
-
-	assert.Equal(t, actualQuota, task.Quota)
-
-	log := getLastLog(t)
-	require.NotNil(t, log)
-	assert.Equal(t, model.LogTypeRefund, log.Type)
+	// No original epoch: fail closed and retain all accounting for review.
+	require.Equal(t, subUsed, getSubscriptionUsed(t, subID))
+	require.Equal(t, tokenRemain, getTokenRemainQuota(t, tokenID))
+	require.Equal(t, preConsumed, getTaskQuota(t, task.ID))
+	require.Zero(t, countLogs(t))
 }
 
 // ===========================================================================

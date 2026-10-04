@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	bodylimit "github.com/QuantumNous/new-api/common"
 	"io"
 	"net/http"
 	"time"
@@ -75,7 +76,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *common.RelayInfo, requestBody 
 	}
 	// 解析 resp
 	var cozeResponse CozeChatResponse
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := bodylimit.ReadUpstreamBodyForRequest(c, resp.Body)
 	if err != nil {
 		return nil, err
 	}

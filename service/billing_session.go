@@ -72,7 +72,12 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		return errors.New("invalid billing settlement")
 	}
 	if s.durable {
-		if err := model.RequestBillingCompletion(s.relayInfo.RequestId, actualQuota, false); err != nil {
+		info := s.relayInfo
+		detail := &model.Log{ModelName: info.OriginModelName, Group: info.UsingGroup, IsStream: info.IsStream}
+		if info.ChannelMeta != nil {
+			detail.ChannelId = info.ChannelId
+		}
+		if err := model.RequestBillingCompletion(info.RequestId, actualQuota, false, detail); err != nil {
 			return err
 		}
 		charged, err := model.ApplyBillingCompletion(s.relayInfo.RequestId)

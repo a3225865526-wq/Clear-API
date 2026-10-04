@@ -14,7 +14,8 @@ import (
 type Token struct {
 	Id                 int            `json:"id"`
 	UserId             int            `json:"user_id" gorm:"index"`
-	Key                string         `json:"key" gorm:"type:varchar(128);uniqueIndex"`
+	Key                string         `json:"key" gorm:"type:varchar(128);uniqueIndex;serializer:clearapi_token"`
+	KeyDigest          *string        `json:"-" gorm:"type:varchar(64);uniqueIndex:idx_token_digest"`
 	Status             int            `json:"status" gorm:"default:1"`
 	Name               string         `json:"name" gorm:"index" `
 	CreatedTime        int64          `json:"created_time" gorm:"bigint"`
@@ -194,11 +195,18 @@ func SearchUserTokens(userId int, keyword string, token string, offset int, limi
 		baseQuery = baseQuery.Where("name LIKE ? ESCAPE '!'", keywordPattern)
 	}
 	if token != "" {
-		tokenPattern, err := sanitizeLikePattern(token)
-		if err != nil {
-			return nil, 0, err
+		if TokenEncryptionEnabled() {
+			if strings.Contains(token, "%") {
+				return nil, 0, errors.New("encrypted credentials require exact key search")
+			}
+			baseQuery = baseQuery.Where("key_digest = ?", tokenDigest(token))
+		} else {
+			tokenPattern, err := sanitizeLikePattern(token)
+			if err != nil {
+				return nil, 0, err
+			}
+			baseQuery = baseQuery.Where(commonKeyCol+" LIKE ? ESCAPE '!'", tokenPattern)
 		}
-		baseQuery = baseQuery.Where(commonKeyCol+" LIKE ? ESCAPE '!'", tokenPattern)
 	}
 
 	// 先查匹配总数（用于分页，受 maxTokens 上限保护，避免全表 COUNT）
@@ -287,8 +295,15 @@ func GetTokenByKey(key string, fromDB bool) (token *Token, err error) {
 		// Don't return error - fall through to DB
 	}
 	token = &Token{}
-	if err = DB.Where(commonKeyCol+" = ?", key).First(token).Error; err != nil {
+	query := DB.Where(commonKeyCol+" = ?", key)
+	if TokenEncryptionEnabled() {
+		query = DB.Where("key_digest = ?", tokenDigest(key))
+	}
+	if err = query.First(token).Error; err != nil {
 		return nil, err
+	}
+	if TokenEncryptionEnabled() && (token.KeyDigest == nil || *token.KeyDigest != tokenDigest(token.Key) || token.Key != key) {
+		return nil, ErrTokenStorage
 	}
 	if common.RedisEnabled {
 		// 冷缓存时用数据库快照初始化；已存在的哈希只刷新 TTL，

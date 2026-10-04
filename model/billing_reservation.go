@@ -45,7 +45,7 @@ func BillingReservationsReady(db *gorm.DB) error {
 }
 
 func ReserveBillingRequest(requestID string, userID, tokenID, quota int) error {
-	if requestID == "" || len(requestID) > 128 || userID <= 0 || tokenID <= 0 || quota < 0 || quota > math.MaxInt32 {
+	if requestID == "" || len(requestID) > 64 || userID <= 0 || tokenID <= 0 || quota < 0 || quota > math.MaxInt32 {
 		return errors.New("invalid billing reservation")
 	}
 	billingExecutionMu.Lock()
@@ -154,7 +154,7 @@ func RaiseBillingReservation(requestID string, quota int) error {
 }
 
 // RequestBillingCompletion persists an immutable intent for crash recovery.
-func RequestBillingCompletion(requestID string, target int, refund bool) error {
+func RequestBillingCompletion(requestID string, target int, refund bool, details ...*Log) error {
 	if target < 0 || target > math.MaxInt32 || refund && target != 0 {
 		return ErrBillingReservationConflict
 	}
@@ -187,6 +187,20 @@ func RequestBillingCompletion(requestID string, target int, refund bool) error {
 		}
 		if result.RowsAffected != 1 {
 			return ErrBillingReservationConflict
+		}
+		if BillingOutboxEnabled() && pending != "needs_review" {
+			log := Log{UserId: r.UserID, TokenId: r.TokenID, RequestId: requestID, CreatedAt: time.Now().Unix(), Type: LogTypeConsume, Quota: target, Content: "Durable wallet settlement", Other: "{}"}
+			if len(details) > 0 && details[0] != nil {
+				log.ChannelId, log.ModelName, log.Group, log.IsStream = details[0].ChannelId, details[0].ModelName, details[0].Group, details[0].IsStream
+			}
+			if refund {
+				log.Type, log.Quota, log.Content = LogTypeRefund, r.Reserved, "Durable reservation refund"
+			}
+			payload, err := common.Marshal(&log)
+			if err != nil {
+				return err
+			}
+			return tx.Create(&BillingCompletionOutbox{RequestID: requestID, Payload: string(payload), State: "prepared"}).Error
 		}
 		return nil
 	})
@@ -237,6 +251,43 @@ func ApplyBillingCompletion(requestID string) (int, error) {
 			}
 			if token.RowsAffected != 1 {
 				return ErrBillingReservationConflict
+			}
+		}
+		if BillingOutboxEnabled() {
+			result := tx.Model(&BillingCompletionOutbox{}).Where("request_id = ? AND state = ?", requestID, "prepared").Update("state", "pending")
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != 1 {
+				return ErrBillingReservationConflict
+			}
+			if common.FinanceEnabled() {
+				var outbox BillingCompletionOutbox
+				if err := tx.Where("request_id = ?", requestID).First(&outbox).Error; err != nil {
+					return err
+				}
+				var log Log
+				if err := common.Unmarshal([]byte(outbox.Payload), &log); err != nil {
+					return err
+				}
+				payload, err := common.Marshal(map[string]any{"scope": "wallet", "charged_quota": r.Target, "funding_source": "wallet", "status": "settled", "allocation_status": "unallocated"})
+				if err != nil {
+					return err
+				}
+				phase := "text_settlement"
+				if state == "refunded" {
+					phase = "funding_refund"
+				}
+				event := FinanceRequestEvent{EventKey: "billing-committed-" + requestID, RequestID: requestID, UserID: r.UserID, ChannelID: log.ChannelId, Phase: phase, At: time.Now().Unix(), Payload: string(payload)}
+				if err := tx.Create(&event).Error; err != nil {
+					return err
+				}
+				if r.Target > 0 && state == "settled" {
+					entry := FinanceSyncEvent{EventKey: "auto-text-settlement-" + requestID, Topic: "consumption", UserID: r.UserID, RefID: event.ID, At: event.At, Payload: "{}", Status: FinanceSyncPending, NextAttemptAt: event.At, CreatedAt: event.At}
+					if err := tx.Create(&entry).Error; err != nil {
+						return err
+					}
+				}
 			}
 		}
 		applied = r.Target
