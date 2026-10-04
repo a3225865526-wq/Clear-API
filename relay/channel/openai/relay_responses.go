@@ -30,6 +30,7 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
 	}
 	service.ObserveTokenUsage(c, "responses", responseBody)
+	service.ObserveCodexMetering(c, info, responseBody, true)
 	err = common.Unmarshal(responseBody, &responsesResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
@@ -47,7 +48,10 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 	// compute usage
 	usage := &dto.Usage{}
 	service.ApplyResponsesUsage(usage, responsesResponse.Usage)
-	if !service.ValidUsage(usage) {
+	if exact := service.CodexUsageForSettlement(c, info); exact != nil {
+		usage = exact
+	}
+	if usage.CodexMetering == nil && !service.ValidUsage(usage) {
 		service.MarkTokenEstimate(c)
 		var output strings.Builder
 		for _, item := range responsesResponse.Output {
@@ -98,7 +102,7 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 
 	defer service.CloseResponseBodyGracefully(resp)
 
-	accumulator := service.NewResponsesUsageAccumulator(info)
+	accumulator := service.NewResponsesUsageAccumulator(info, c)
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		service.ObserveTokenUsage(c, "responses", []byte(data))
@@ -110,6 +114,7 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			sr.Error(err)
 			return
 		}
+		service.ObserveCodexMetering(c, info, []byte(data), service.IsResponsesUsageTerminal(streamResponse.Type))
 		if streamResponse.Response != nil {
 			data = string(rewriteSGLangResponsesCreatedAt(info, []byte(data), "response.created_at", streamResponse.Response.CreatedAt))
 		}

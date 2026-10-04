@@ -41,6 +41,7 @@ func OaiResponsesToChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		return nil, types.WithOpenAIError(*oaiError, resp.StatusCode)
 	}
 
+	service.ObserveCodexMetering(c, info, body, true)
 	info.ObserveResponseModel(responsesResp.Model)
 	responseValue, usage, err := convertResponsesResponseForClient(c, info, &responsesResp)
 	if err != nil {
@@ -93,6 +94,7 @@ func OaiResponsesToChatBufferedStreamHandler(c *gin.Context, info *relaycommon.R
 			info.ObserveResponseModel(streamResp.Response.Model)
 		}
 		service.ObserveResponsesOutcome(info, &streamResp)
+		service.ObserveCodexMetering(c, info, []byte(data), service.IsResponsesUsageTerminal(streamResp.Type))
 		accumulator.ProcessEvent(&streamResp)
 		switch streamResp.Type {
 		case "response.completed", "response.done", "response.incomplete":
@@ -153,7 +155,10 @@ func convertResponsesResponseForClient(c *gin.Context, info *relaycommon.RelayIn
 	}
 
 	usage := relayconvert.UsageFromResponsesUsage(response.Usage)
-	if usage == nil || usage.TotalTokens == 0 {
+	if exact := service.CodexUsageForSettlement(c, info); exact != nil {
+		usage = exact
+	}
+	if (usage == nil || usage.TotalTokens == 0) && (usage == nil || usage.CodexMetering == nil) {
 		text := service.ExtractOutputTextFromResponses(response)
 		usage = service.ResponseText2Usage(c, text, info.UpstreamModelName, info.GetEstimatePromptTokens())
 		response.Usage = relayconvert.UsageFromChatUsage(usage)
@@ -163,7 +168,7 @@ func convertResponsesResponseForClient(c *gin.Context, info *relaycommon.RelayIn
 	if err != nil {
 		return nil, nil, err
 	}
-	if result.Usage != nil && result.Usage.TotalTokens != 0 {
+	if usage.CodexMetering == nil && result.Usage != nil && result.Usage.TotalTokens != 0 {
 		usage = result.Usage
 	}
 	return result.Value, usage, nil
@@ -280,6 +285,7 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 			return
 		}
 
+		service.ObserveCodexMetering(c, info, []byte(data), service.IsResponsesUsageTerminal(streamResp.Type))
 		results, err := service.ConvertStreamResponseChunk(c, info, state, &streamResp)
 		if err != nil {
 			streamErr = types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
@@ -299,7 +305,10 @@ func OaiResponsesToChatStreamHandler(c *gin.Context, info *relaycommon.RelayInfo
 	}
 
 	usage := state.Usage()
-	if usage == nil || usage.TotalTokens == 0 {
+	if exact := service.CodexUsageForSettlement(c, info); exact != nil {
+		usage = exact
+	}
+	if (usage == nil || usage.TotalTokens == 0) && (usage == nil || usage.CodexMetering == nil) {
 		usage = service.ResponseText2Usage(c, state.UsageText(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		state.SetUsage(usage)
 	}

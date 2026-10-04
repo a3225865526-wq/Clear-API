@@ -192,6 +192,7 @@ func RequestBillingCompletion(requestID string, target int, refund bool, details
 			log := Log{UserId: r.UserID, TokenId: r.TokenID, RequestId: requestID, CreatedAt: time.Now().Unix(), Type: LogTypeConsume, Quota: target, Content: "Durable wallet settlement", Other: "{}"}
 			if len(details) > 0 && details[0] != nil {
 				log.ChannelId, log.ModelName, log.Group, log.IsStream = details[0].ChannelId, details[0].ModelName, details[0].Group, details[0].IsStream
+				log.PromptTokens, log.CompletionTokens, log.Other = details[0].PromptTokens, details[0].CompletionTokens, details[0].Other
 			}
 			if refund {
 				log.Type, log.Quota, log.Content = LogTypeRefund, r.Reserved, "Durable reservation refund"

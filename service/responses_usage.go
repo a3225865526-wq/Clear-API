@@ -8,6 +8,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/relayconvert"
+	"github.com/gin-gonic/gin"
 )
 
 // ResponsesUsageAccumulator owns the accounting facts for one Responses stream.
@@ -15,6 +16,7 @@ import (
 // Finish's usage through the normal text billing path, including interrupted
 // streams. Observe and Finish must be called by the same stream owner.
 type ResponsesUsageAccumulator struct {
+	ctx            *gin.Context
 	info           *relaycommon.RelayInfo
 	usage          *dto.Usage
 	outputText     strings.Builder
@@ -24,8 +26,12 @@ type ResponsesUsageAccumulator struct {
 	finished       bool
 }
 
-func NewResponsesUsageAccumulator(info *relaycommon.RelayInfo) *ResponsesUsageAccumulator {
-	return &ResponsesUsageAccumulator{info: info, usage: &dto.Usage{}}
+func NewResponsesUsageAccumulator(info *relaycommon.RelayInfo, contexts ...*gin.Context) *ResponsesUsageAccumulator {
+	a := &ResponsesUsageAccumulator{info: info, usage: &dto.Usage{}}
+	if len(contexts) > 0 {
+		a.ctx = contexts[0]
+	}
+	return a
 }
 
 func (a *ResponsesUsageAccumulator) Observe(event *dto.ResponsesStreamResponse) {
@@ -91,6 +97,19 @@ func (a *ResponsesUsageAccumulator) Finish() *dto.Usage {
 		a.imageCounter.Commit(a.info)
 		a.imageCommitted = true
 	}
+	if exact := CodexUsageForSettlement(a.ctx, a.info); exact != nil {
+		a.usage = exact
+		return a.usage
+	}
+	if a.usage.CodexMetering != nil {
+		return a.usage
+	}
+	if a.ctx != nil && !a.started && a.ctx.GetBool("upstream_attempted") {
+		// No event means the gateway's provider cannot yet be identified.
+		// Preserve uncertainty rather than turn a dispatched request into zero.
+		a.usage = &dto.Usage{CodexMetering: &dto.CodexMetering{Status: "unavailable", Source: "unidentified_responses_upstream", Reason: "final_usage_not_received"}}
+		return a.usage
+	}
 	if a.usage.CompletionTokens == 0 {
 		if output := a.outputText.String(); output != "" {
 			a.usage.CompletionTokens = CountTextToken(output, a.info.GetUpstreamModelName())
@@ -148,6 +167,10 @@ func ObserveResponsesOutcome(info *relaycommon.RelayInfo, event *dto.ResponsesSt
 
 func ApplyResponsesUsage(dst *dto.Usage, src *dto.Usage) {
 	if dst == nil || src == nil {
+		return
+	}
+	if src.CodexMetering != nil {
+		*dst = *src
 		return
 	}
 	incoming := relayconvert.NormalizeResponsesUsage(src)

@@ -19,6 +19,16 @@ func TestUsageRetryStopsAfterClientOutput(t *testing.T) {
 	}
 }
 
+func TestUsageRetryDispatchFence(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	err := types.NewError(errors.New("synthetic channel error"), types.ErrorCodeChannelNoAvailableKey)
+	require.Equal(t, "retry", DecideRelayRetry(c, err, 2).Action)
+	c.Set("upstream_attempted", true)
+	decision := DecideRelayRetry(c, err, 2)
+	require.Equal(t, "stop", decision.Action)
+	require.Equal(t, "upstream_dispatch_not_replayable", decision.Reason)
+}
+
 func TestUsageToolChainRetrySafetyPreservesRequests(t *testing.T) {
 	for _, payload := range []string{
 		`{"messages":[{"role":"tool","content":"fixed sample"}]}`,

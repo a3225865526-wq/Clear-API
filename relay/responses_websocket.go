@@ -306,6 +306,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 		if apiErr != nil {
 			return apiErr
 		}
+		c.Set("upstream_attempted", true)
 		if err := s.writeTarget(websocket.TextMessage, payload); err != nil {
 			state.closeAfter = true
 			return types.NewError(err, types.ErrorCodeBadResponse, types.ErrOptionWithSkipRetry())
@@ -367,6 +368,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 				return types.NewError(context.Canceled, types.ErrorCodeBadResponse, types.ErrOptionWithSkipRetry())
 			}
 			service.CaptureFinanceTransport(info, financeAttempt, 101, false)
+			c.Set("upstream_attempted", true)
 			if err := s.writeTarget(websocket.TextMessage, payload); err != nil {
 				state.closeAfter = true
 				return types.NewError(err, types.ErrorCodeBadResponse, types.ErrOptionWithSkipRetry())
@@ -396,7 +398,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 		}
 	}
 
-	accumulator := service.NewResponsesUsageAccumulator(info)
+	accumulator := service.NewResponsesUsageAccumulator(info, c)
 	info.StreamStatus = relaycommon.NewStreamStatus()
 	info.StreamStatus.RequireTerminal()
 	common.SetContextKey(c, appconstant.ContextKeyResponseStreamStatus, info.StreamStatus)
@@ -464,6 +466,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 							}
 							info.StreamStatus.MarkFailed(code, rejection.Error.Type, rejection.Status)
 						}
+						service.ObserveCodexMetering(c, info, incoming.body, service.IsResponsesUsageTerminal(event.Type))
 						accumulator.Observe(&event.ResponsesStreamResponse)
 						info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonDone, nil)
 						s.lastResponseID = responseID
@@ -492,6 +495,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 						responseID = event.Response.ID
 					}
 				}
+				service.ObserveCodexMetering(c, info, incoming.body, service.IsResponsesUsageTerminal(event.Type))
 				accumulator.Observe(&event.ResponsesStreamResponse)
 			}
 			switch event.Type {

@@ -197,6 +197,7 @@ func usageFromResponsesUsage(src *dto.Usage, createBillingSnapshot bool) *dto.Us
 	if src == nil {
 		return usage
 	}
+	usage.CodexMetering = src.CodexMetering
 	usage.UsageSemantic = src.UsageSemantic
 	usage.UsageSource = src.UsageSource
 	usage.BillingUsage = dto.CloneBillingUsage(src.BillingUsage)

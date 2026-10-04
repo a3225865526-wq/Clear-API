@@ -399,9 +399,31 @@ func usageSemanticFromUsage(relayInfo *relaycommon.RelayInfo, usage *dto.Usage) 
 }
 
 func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, usage *dto.Usage, extraContent []string) {
+	if usage != nil && usage.CodexMetering != nil {
+		if usage.CodexMetering.Status == "exact" {
+			usage.CodexMetering.Validate()
+		}
+		if session, ok := relayInfo.Billing.(*BillingSession); ok {
+			if !session.ClaimCodexFinalization(usage.CodexMetering) {
+				return
+			}
+		} else {
+			if ctx.GetBool("codex_finalized") {
+				return
+			}
+			ctx.Set("codex_finalized", true)
+		}
+		if usage.CodexMetering.Status != "exact" {
+			PostCodexUnavailableQuota(ctx, relayInfo, usage)
+			return
+		}
+	}
 	CaptureFinanceTextUsage(ctx, relayInfo, usage)
 	originUsage := usage
 	billingUsage := effectiveBillingUsage(usage)
+	if usage != nil && usage.CodexMetering != nil {
+		billingUsage = usage
+	}
 	if usage == nil {
 		extraContent = append(extraContent, "上游无计费信息")
 	}
@@ -509,6 +531,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		other.SetPublic("usage_semantic", "anthropic")
 	} else {
 		other = GenerateTextOtherInfo(ctx, relayInfo, summary.ModelRatio, summary.GroupRatio, summary.CompletionRatio, summary.CacheTokens, summary.CacheRatio, summary.ModelPrice, relayInfo.PriceData.GroupRatioInfo.GroupSpecialRatio)
+	}
+	if usage != nil && usage.CodexMetering != nil {
+		other.SetAdmin("codex_metering", usage.CodexMetering)
 	}
 	appendUsageBillingPathForLog(other, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens), originUsage)
 	observation := TokenObservationForLog(ctx, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens))

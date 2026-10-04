@@ -40,6 +40,8 @@ type BillingSession struct {
 	settlementErr    error
 	durable          bool
 	mu               sync.Mutex
+	codexFinalized   bool
+	completionMeter  *dto.CodexMetering
 }
 
 // SettleUncertain retains the approved charge while durably flagging missing
@@ -74,6 +76,17 @@ func (s *BillingSession) Settle(actualQuota int) error {
 	if s.durable {
 		info := s.relayInfo
 		detail := &model.Log{ModelName: info.OriginModelName, Group: info.UsingGroup, IsStream: info.IsStream}
+		if s.completionMeter != nil {
+			encoded, err := common.Marshal(map[string]any{"codex_metering": s.completionMeter})
+			if err != nil {
+				return err
+			}
+			detail.Other = string(encoded)
+			if s.completionMeter.Status == "exact" {
+				detail.PromptTokens = int(*s.completionMeter.Input)
+				detail.CompletionTokens = int(*s.completionMeter.Output)
+			}
+		}
 		if info.ChannelMeta != nil {
 			detail.ChannelId = info.ChannelId
 		}
@@ -145,7 +158,7 @@ func (s *BillingSession) ChargedQuota() int {
 // that can be lost when the process exits. Durable sessions also persist intent.
 func (s *BillingSession) Refund(c *gin.Context) {
 	s.mu.Lock()
-	if s.settled || s.refunded || !s.needsRefundLocked() {
+	if s.codexFinalized || s.settled || s.refunded || !s.needsRefundLocked() {
 		s.mu.Unlock()
 		return
 	}
@@ -607,4 +620,17 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		}
 		return session, nil
 	}
+}
+
+// ClaimCodexFinalization owns all financial and reporting side effects for one
+// request. Refund and a concurrent finalize cannot both claim the session.
+func (s *BillingSession) ClaimCodexFinalization(m *dto.CodexMetering) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.codexFinalized || s.settled || s.refunded {
+		return false
+	}
+	s.codexFinalized = true
+	s.completionMeter = m
+	return true
 }

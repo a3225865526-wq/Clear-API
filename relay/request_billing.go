@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -74,7 +75,38 @@ func RefundFailedRequestBilling(c *gin.Context, info *relaycommon.RelayInfo, api
 	}
 	apiErr = service.NormalizeViolationFeeError(apiErr)
 	if info.Billing != nil {
-		if c.GetBool("upstream_usage_uncertain") || (c.Request.Context().Err() != nil && c.GetBool("upstream_attempted")) {
+		upstream := apiErr.ToOpenAIError()
+		code, _ := upstream.Code.(string)
+		if code == "account_revoked" || code == "pool_admission_required" {
+			var evidence struct {
+				Dispatched *bool              `json:"codex_upstream_dispatched"`
+				Meter      *dto.CodexMetering `json:"codex_metering"`
+			}
+			_ = common.Unmarshal(upstream.Metadata, &evidence)
+			if evidence.Meter != nil && evidence.Meter.Status == "exact" && evidence.Meter.Validate() {
+				raw, err := common.Marshal(map[string]any{"usage": map[string]any{"codex_metering": evidence.Meter}})
+				if err == nil {
+					service.ObserveCodexMetering(c, info, raw, true)
+					if exact := service.CodexUsageForSettlement(c, info); exact != nil {
+						service.PostTextConsumeQuota(c, info, exact, nil)
+						return apiErr
+					}
+				}
+			}
+			if evidence.Dispatched != nil {
+				c.Set("upstream_usage_uncertain", *evidence.Dispatched)
+				if !*evidence.Dispatched {
+					c.Set("upstream_attempted", false)
+				}
+			} else if c.GetBool("upstream_attempted") {
+				c.Set("upstream_usage_uncertain", true)
+			}
+		}
+		if c.GetBool("upstream_usage_uncertain") || c.GetBool("upstream_attempted") {
+			if usage := service.CodexUsageForSettlement(c, info); usage != nil {
+				service.PostTextConsumeQuota(c, info, usage, nil)
+				return apiErr
+			}
 			// A disconnect does not establish that the provider did no work.
 			// Keep the reserved charge for reconciliation instead of offering a
 			// free invocation by aborting the stream before usage is received.

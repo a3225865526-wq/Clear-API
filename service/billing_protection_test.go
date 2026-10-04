@@ -187,6 +187,97 @@ func TestProtectedBillingDatabase(t *testing.T) {
 	session.Refund(ctx)
 	session.Refund(ctx)
 	balance(9250)
+	// Stage 2: one claim covers finalize, refund and all accounting side effects.
+	require.NoError(t, db.AutoMigrate(&model.BillingReviewMarker{}))
+	for _, tc := range []struct {
+		name                string
+		reserved, actual    int
+		race, unknown, fail bool
+	}{
+		{name: "codex-less", reserved: 400, actual: 150},
+		{name: "codex-more", reserved: 100, actual: 150},
+		{name: "codex-concurrent", reserved: 400, actual: 150, race: true},
+		{name: "codex-unknown", reserved: 400, unknown: true},
+		{name: "codex-db-failure", reserved: 400, actual: 150, fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			user := model.User{Username: tc.name, AffCode: tc.name, Quota: 10000, Status: common.UserStatusEnabled}
+			require.NoError(t, db.Create(&user).Error)
+			key := model.Token{UserId: user.Id, Key: "synthetic-" + tc.name, RemainQuota: 10000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+			require.NoError(t, db.Create(&key).Error)
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			info := &relaycommon.RelayInfo{UserId: user.Id, TokenId: key.Id, RequestId: tc.name, ProtectedTextBudget: true, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
+			session, apiErr := service.NewBillingSession(ctx, info, tc.reserved)
+			require.Nil(t, apiErr)
+			meter := dto.ParseCodexMetering([]byte(`{"input_tokens":100,"output_tokens":20,"total_tokens":120,"input_tokens_details":{"cached_tokens":30},"output_tokens_details":{"reasoning_tokens":7}}`))
+			if tc.unknown {
+				meter = dto.ParseCodexMetering(nil)
+			}
+			claimed := make(chan bool, 2)
+			gate := make(chan struct{})
+			for range 2 {
+				go func() { <-gate; claimed <- session.ClaimCodexFinalization(meter) }()
+			}
+			close(gate)
+			a, b := <-claimed, <-claimed
+			require.NotEqual(t, a, b)
+			if tc.fail {
+				require.NoError(t, db.Callback().Update().Before("gorm:update").Register("codex-fail", func(tx *gorm.DB) {
+					if tx.Statement.Table == "tokens" {
+						tx.AddError(errors.New("synthetic settlement failure"))
+					}
+				}))
+			}
+			result := make(chan error, 1)
+			go func() {
+				if tc.unknown {
+					result <- session.SettleUncertain()
+				} else {
+					result <- session.Settle(tc.actual)
+				}
+			}()
+			if tc.race {
+				session.Refund(ctx)
+			}
+			settlementErr := <-result
+			want := tc.actual
+			if tc.unknown {
+				want = tc.reserved
+			}
+			if tc.actual > tc.reserved {
+				require.Error(t, settlementErr)
+				want = tc.reserved
+			} else if tc.fail {
+				require.Error(t, settlementErr)
+				require.NoError(t, db.Callback().Update().Remove("codex-fail"))
+				require.NoError(t, model.RecoverBillingCompletions(100))
+				require.NoError(t, session.Settle(tc.actual))
+			} else {
+				require.NoError(t, settlementErr)
+			}
+			session.Refund(ctx)
+			session.Refund(ctx)
+			var after model.User
+			var afterKey model.Token
+			require.NoError(t, db.First(&after, user.Id).Error)
+			require.NoError(t, db.First(&afterKey, key.Id).Error)
+			assert.Equal(t, 10000-want, after.Quota)
+			assert.Equal(t, after.Quota, afterKey.RemainQuota)
+			assert.Equal(t, want, afterKey.UsedQuota)
+			var reservation model.BillingReservation
+			require.NoError(t, db.Where("request_id = ?", tc.name).First(&reservation).Error)
+			if tc.actual > tc.reserved {
+				assert.Equal(t, "needs_review", reservation.State)
+			} else {
+				assert.Equal(t, "settled", reservation.State)
+			}
+			if tc.unknown {
+				var marker model.BillingReviewMarker
+				require.NoError(t, db.Where("reservation_id = ?", reservation.ID).First(&marker).Error)
+				assert.Equal(t, "upstream_usage_unknown", marker.Reason)
+			}
+		})
+	}
 	common.RedisEnabled = true
 	require.Error(t, service.ValidateBillingProtection())
 	common.RedisEnabled = false

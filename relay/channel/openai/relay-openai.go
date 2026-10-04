@@ -123,6 +123,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 		service.ObserveTokenUsage(c, "openai", []byte(data))
+		service.ObserveCodexMetering(c, info, []byte(data), true)
 		if lastStreamData != "" {
 			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
@@ -167,6 +168,9 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 			}
 		}
 		writeIncompleteStreamError(c, info, incompleteMessage)
+		if exact := service.CodexUsageForSettlement(c, info); exact != nil {
+			return exact, nil
+		}
 		usage = reportedUsage
 		if usage != nil && usage.CompletionTokens == 0 && responseTextBuilder.Len() > 0 {
 			service.MarkTokenEstimate(c)
@@ -344,6 +348,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	}
 
 	service.ObserveTokenUsage(c, "openai", responseBody)
+	service.ObserveCodexMetering(c, info, responseBody, true)
 	err = common.Unmarshal(responseBody, &simpleResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
@@ -374,7 +379,10 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	}
 
 	usageModified := false
-	if simpleResponse.Usage.PromptTokens == 0 {
+	if exact := service.CodexUsageForSettlement(c, info); exact != nil {
+		simpleResponse.Usage = *exact
+	}
+	if simpleResponse.Usage.CodexMetering == nil && simpleResponse.Usage.PromptTokens == 0 {
 		service.MarkTokenEstimate(c)
 		completionTokens := simpleResponse.Usage.CompletionTokens
 		if completionTokens == 0 {

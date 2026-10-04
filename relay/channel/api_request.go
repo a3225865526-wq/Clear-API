@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptrace"
 	"regexp"
@@ -599,11 +598,10 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	if err != nil {
 		// net/http errors contain the full URL, including provider credentials.
 		logger.LogError(c, "upstream transport failed")
-		var timeout net.Error
-		uncertain := c.GetBool("upstream_attempted") && (errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &timeout) && timeout.Timeout()))
+		uncertain := c.GetBool("upstream_attempted")
 		if uncertain {
 			c.Set("upstream_usage_uncertain", true)
-			return nil, types.NewError(errors.New("upstream timed out after dispatch"), types.ErrorCodeDoRequestFailed, types.ErrOptionWithSkipRetry())
+			return nil, types.NewError(errors.New("upstream transport failed after dispatch"), types.ErrorCodeDoRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 		return nil, types.NewError(errors.New("upstream transport failed"), types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
@@ -622,6 +620,9 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		))
 	}
 
+	if resp.Header.Get("X-Codex-Metering") == "v1" {
+		service.EnableCodexMetering(c)
+	}
 	if upID := resp.Header.Get(common2.RequestIdKey); upID != "" {
 		c.Set(common2.UpstreamRequestIdKey, upID)
 	}

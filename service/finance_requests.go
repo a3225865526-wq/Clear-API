@@ -294,6 +294,17 @@ func CaptureFinanceTextUsage(c *gin.Context, info *relaycommon.RelayInfo, usage 
 	if !common.FinanceEnabled() || c.GetString(financeAttemptContextKey) == "" {
 		return
 	}
+	if usage != nil && usage.CodexMetering != nil {
+		m := usage.CodexMetering
+		if m.Status != "exact" {
+			CaptureFinanceUsage(c, info, map[string]*string{}, "codex_authoritative_usage_unavailable")
+			return
+		}
+		input, output, cached, reasoning, total := strconv.FormatInt(*m.Input-*m.Cached, 10), strconv.FormatInt(*m.Output, 10), strconv.FormatInt(*m.Cached, 10), strconv.FormatInt(*m.Reasoning, 10), strconv.FormatInt(*m.Total, 10)
+		zero := "0"
+		CaptureFinanceUsage(c, info, map[string]*string{"input": &input, "output": &output, "cache_read": &cached, "cache_write": &zero}, "codex_authoritative_exact", map[string]*string{"reasoning_tokens": &reasoning, "total_tokens": &total})
+		return
+	}
 	quantities := map[string]*string{}
 	observed := map[string]*string{}
 	source := "unavailable"

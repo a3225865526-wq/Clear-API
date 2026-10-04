@@ -20,6 +20,7 @@ func OaiResponsesCompactionHandler(c *gin.Context, resp *http.Response) (*dto.Us
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusBadGateway, types.ErrOptionWithSkipRetry())
 	}
 
+	service.ObserveCodexMetering(c, nil, responseBody, true)
 	var compactResp dto.OpenAIResponsesCompactionResponse
 	if err := common.Unmarshal(responseBody, &compactResp); err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
@@ -41,5 +42,8 @@ func OaiResponsesCompactionHandler(c *gin.Context, resp *http.Response) (*dto.Us
 		}
 	}
 
+	if exact := service.CodexUsageForSettlement(c, nil); exact != nil {
+		return exact, nil
+	}
 	return &usage, nil
 }
