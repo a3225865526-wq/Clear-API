@@ -116,7 +116,9 @@ export function SourceRouting() {
             }}
           >
             <SelectTrigger id='pool-route-platform' className='min-h-11 w-full'>
-              <SelectValue />
+              <SelectValue>
+                {platforms.find((item) => item.id === platform)?.name}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {platforms.map((item) => (
@@ -138,7 +140,9 @@ export function SourceRouting() {
             }}
           >
             <SelectTrigger id='pool-route-source' className='min-h-11 w-full'>
-              <SelectValue />
+              <SelectValue>
+                {source === 'api' ? t('Upstream API') : t('Account pool')}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value='api'>{t('Upstream API')}</SelectItem>

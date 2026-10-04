@@ -31,6 +31,12 @@ describe('model source control', () => {
 
   it('saves an exact API model and preserves existing routing for unconfigured models', async () => {
     mount()
+    expect(screen.getByLabelText('Request source')).toHaveTextContent(
+      'Upstream API'
+    )
+    expect(screen.getByLabelText('Pool platform')).toHaveTextContent(
+      'ChatGPT / Codex'
+    )
     fireEvent.change(screen.getByLabelText('External model name'), {
       target: { value: 'synthetic-model' },
     })
