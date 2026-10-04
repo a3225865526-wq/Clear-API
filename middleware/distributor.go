@@ -558,6 +558,9 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	if err := channel.CheckPoolChannelAdmission(); err != nil {
 		return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
+	if err := channel.CheckPoolModelRoute(modelName); err != nil {
+		return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+	}
 	service.ResetTokenObservation(c)
 	if expectedPlugin != "" && !channelMatchesExpectedTaskPlugin(c, channel, expectedPlugin) {
 		logTaskPluginChannelDecision(c, channel, modelName, "channel_rejected", "identity_mismatch")

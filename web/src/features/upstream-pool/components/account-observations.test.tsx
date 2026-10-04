@@ -164,7 +164,11 @@ describe('pool observations', () => {
         model: 'synthetic-model',
         adapter_version: 1,
         open: false,
-        reasons: ['continuous_isolation_unverified'],
+        reasons: [
+          'continuous_isolation_unverified',
+          'web_usage_is_estimated',
+          'code_assist_oauth_executor_missing',
+        ],
         metering_source: 'unknown',
         quota_capability: 'observations_only',
         capabilities: [
@@ -187,6 +191,16 @@ describe('pool observations', () => {
       await screen.findByText('External channel closed')
     ).toBeInTheDocument()
     expect(screen.getByText('Tool calls: Unverified')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'This Grok Web implementation estimates token usage and cannot provide exact metering.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'The pinned executor has no Gemini CLI / Code Assist OAuth implementation.'
+      )
+    ).toBeInTheDocument()
     expect(
       screen.getByText('No model-specific validation evidence')
     ).toBeInTheDocument()

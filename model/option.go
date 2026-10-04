@@ -252,6 +252,9 @@ func validateOptionValue(key string, value string) error {
 }
 
 func UpdateOption(key string, value string) error {
+	if IsPoolRoutingOption(key) {
+		return ErrPoolInvalid
+	}
 	if IsRequestPolicyOption(key) {
 		return UpdateRequestPolicyOptions(map[string]string{key: value})
 	}
@@ -290,6 +293,9 @@ func UpdateOptionsBulk(values map[string]string) error {
 		return nil
 	}
 	for key := range values {
+		if IsPoolRoutingOption(key) {
+			return ErrPoolInvalid
+		}
 		if IsPasskeyDomainOption(key) {
 			_, err := UpdatePasskeyDomainOptions(values, false, "")
 			return err
@@ -366,6 +372,12 @@ func updateOptionMap(key string, value string) (err error) {
 	}
 	common.OptionMapRWMutex.Lock()
 	defer common.OptionMapRWMutex.Unlock()
+	if IsPoolRoutingOption(key) {
+		var incoming, current poolRouteRecord
+		if common.UnmarshalJsonStr(value, &incoming) == nil && common.UnmarshalJsonStr(common.OptionMap[key], &current) == nil && incoming.Route.Version < current.Route.Version {
+			return nil
+		}
+	}
 	common.OptionMap[key] = value
 
 	// 检查是否是模型配置 - 使用更规范的方式处理

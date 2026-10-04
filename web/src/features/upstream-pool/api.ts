@@ -27,7 +27,23 @@ import type {
   PoolCatalog,
   PoolExecutor,
   PoolQuota,
+  PoolModelRoute,
 } from './types'
+
+export function getPoolModelRoutes(signal?: AbortSignal) {
+  return poolRequest<PoolModelRoute[]>('/model-routes', { signal })
+}
+
+export function savePoolModelRoute(
+  input: Omit<PoolModelRoute, 'version' | 'updated_at'> & {
+    expected_version: number
+  }
+) {
+  return poolRequest<PoolModelRoute>('/model-routes', {
+    method: 'PUT',
+    body: input,
+  })
+}
 
 export function getPoolExecutors(signal?: AbortSignal) {
   return poolRequest<PoolExecutor[]>('/executors', { signal })

@@ -281,7 +281,13 @@ type ChannelSelectError struct {
 // filters. The group the channel was chosen from is returned for auto-group
 // callers. The caller still applies SetupContextForSelectedChannel.
 func SelectChannelForRequest(c *gin.Context, modelName string, retry *RetryParam) (*model.Channel, string, *ChannelSelectError) {
+	if err := (*model.Channel)(nil).CheckPoolModelRoute(modelName); err != nil {
+		return nil, "", &ChannelSelectError{StatusCode: http.StatusServiceUnavailable, Message: err.Error(), Code: types.ErrorCodeGetChannelFailed}
+	}
 	constraints := GetChannelConstraints(c)
+	if route, _ := model.GetPoolModelRoute(modelName); route != nil && route.Source == "api" {
+		constraints.AddFilter(dto.ChannelFilter{Kind: dto.FilterModelSource, Source: route.Source})
+	}
 	if pin, found, overridden := constraints.ResolvedPin(); found {
 		for _, lost := range overridden {
 			logger.LogWarn(c, fmt.Sprintf(

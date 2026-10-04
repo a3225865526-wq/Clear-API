@@ -45,13 +45,25 @@ func ModelAdmissionFor(platform, accessType, modelName string) ModelAdmission {
 	if found && access.ExecutorId == ExecutorCliproxyAPI {
 		result.MeteringSource = "executor_compatibility_usage_without_field_presence_proof"
 	}
+	if platform == "gemini_code_assist" && accessType == "oauth_browser" {
+		result.Reasons = append(result.Reasons, "code_assist_oauth_executor_missing")
+	}
+	if platform == "grok_web_sso" && accessType == "cookie_import" {
+		result.MeteringSource = "local_estimate"
+		result.Reasons = append(result.Reasons, "web_usage_is_estimated")
+	}
 	for _, capability := range modelCapabilityKeys {
 		evidence := []CapabilityEvidence{}
 		if found && access.ExecutorId == ExecutorCliproxyAPI && capability == "exact_usage" {
 			evidence = append(evidence, CapabilityEvidence{Kind: "source", Reference: "CLIProxyAPI/internal/runtime/executor/helps/usage_helpers.go; new-api/relay/channel/openai/relay-openai.go",
 				Revision: "CLIProxyAPI:d33f63f8e3d98428440ebca5a5b6a981a61ff71e", AdapterVersion: AdapterVersion})
 		}
-		result.Capabilities = append(result.Capabilities, ModelCapability{Capability: capability, Status: "unverified", Evidence: evidence})
+		status := "unverified"
+		if platform == "grok_web_sso" && accessType == "cookie_import" && capability == "exact_usage" {
+			status = "unsupported"
+			evidence = append(evidence, CapabilityEvidence{Kind: "source", Reference: "grok2api/backend/internal/infra/provider/web/chat.go: estimateTokens used for input and output usage", Revision: "grok2api:906b9493b099d192381c698d4e320fafeccb851c", AdapterVersion: AdapterVersion})
+		}
+		result.Capabilities = append(result.Capabilities, ModelCapability{Capability: capability, Status: status, Evidence: evidence})
 	}
 	return result
 }

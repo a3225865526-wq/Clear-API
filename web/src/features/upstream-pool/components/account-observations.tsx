@@ -67,6 +67,19 @@ const evidenceLabels: Record<string, string> = {
   document: 'Documented',
   runtime: 'Real runtime confirmed',
 }
+const admissionReasonLabels: Record<string, string> = {
+  continuous_isolation_unverified:
+    'Continuous account isolation has not been verified.',
+  model_capabilities_unverified:
+    'This model has not passed capability admission.',
+  exact_metering_unverified:
+    'Complete upstream token metering has not been verified.',
+  access_not_admitted: 'This access type has not been admitted.',
+  code_assist_oauth_executor_missing:
+    'The pinned executor has no Gemini CLI / Code Assist OAuth implementation.',
+  web_usage_is_estimated:
+    'This Grok Web implementation estimates token usage and cannot provide exact metering.',
+}
 const metricLabels: Record<string, string> = {
   used_percent: 'Used percentage',
   remaining_percent: 'Remaining percentage',
@@ -304,6 +317,13 @@ export function AccountModelAdmissionPanel(props: { accountId: number }) {
             {t('Adapter version')} {admission.adapter_version}
           </p>
           <Badge variant='outline'>{t('External channel closed')}</Badge>
+          <ul className='list-inside list-disc text-sm'>
+            {admission.reasons.map((reason) => (
+              <li key={reason}>
+                {t(admissionReasonLabels[reason] ?? 'Admission is incomplete.')}
+              </li>
+            ))}
+          </ul>
           <p className='text-muted-foreground text-sm'>
             {t(
               'Executor usage fields do not establish complete upstream metering provenance.'

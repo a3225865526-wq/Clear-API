@@ -227,3 +227,12 @@ export interface CompletePoolAuthInput {
   code?: string
   state?: string
 }
+export type PoolModelRoute = {
+  model: string
+  platform: string
+  access_type: string
+  source: 'api' | 'pool'
+  enabled: boolean
+  version: number
+  updated_at: number
+}

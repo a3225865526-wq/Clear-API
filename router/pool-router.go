@@ -16,6 +16,8 @@ func RegisterUpstreamPoolRoutes(api *gin.RouterGroup) {
 	pool.GET("/capability", controller.PoolCapability)
 	pool.GET("/executors", controller.ListPoolExecutors)
 	pool.GET("/catalog", controller.GetPoolCatalog)
+	pool.GET("/model-routes", controller.ListPoolModelRoutes)
+	pool.PUT("/model-routes", controller.SavePoolModelRoute)
 	pool.GET("/accounts", controller.ListPoolAccounts)
 	pool.POST("/accounts", controller.CreatePoolAccount)
 	pool.GET("/accounts/:id", controller.GetPoolAccount)
