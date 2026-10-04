@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 	"net/http/httptest"
 	"testing"
 )
@@ -42,4 +43,29 @@ func TestUsageToolChainRetrySafetyPreservesRequests(t *testing.T) {
 	if c.GetBool("tool_chain_no_retry") {
 		t.Fatal("tool declaration misidentified as executed chain")
 	}
+}
+
+func TestPoolSecurityRevokeNeverRetries(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		err  *types.NewAPIError
+	}{
+		{"structured", types.WithOpenAIError(types.OpenAIError{Message: "account_revoked", Type: "security_error", Code: "account_revoked"}, 403)},
+		{"channel error", types.NewError(errors.New("account_revoked"), types.ErrorCodeChannelNoAvailableKey)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			decision := DecideRelayRetry(c, test.err, 3)
+			require.Equal(t, "stop", decision.Action)
+			require.Equal(t, "account_revoked", decision.Reason)
+		})
+	}
+}
+
+func TestPoolSecurityAdmissionTerminationNeverRetries(t *testing.T) {
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	err := types.WithOpenAIError(types.OpenAIError{Message: "pool account admission required", Type: "security_error", Code: "pool_admission_required"}, 403)
+	decision := DecideRelayRetry(c, err, 3)
+	require.Equal(t, "stop", decision.Action)
+	require.Equal(t, "pool_admission_required", decision.Reason)
 }

@@ -19,6 +19,19 @@ import (
 // DecideRelayRetry is the single retry decision for relay attempts. The reason
 // is recorded in the request policy decision events of the log details.
 func DecideRelayRetry(c *gin.Context, err *types.NewAPIError, retryTimes int) PolicyDecision {
+	// Security termination overrides channel-error and configured status retries.
+	if err != nil {
+		upstream := err.ToOpenAIError()
+		code, _ := upstream.Code.(string)
+		if code == "account_revoked" || code == "pool_admission_required" || upstream.Message == "account_revoked" {
+			reason := "account_revoked"
+			if code == "pool_admission_required" {
+				reason = code
+			}
+			return PolicyDecision{Action: "stop", Reason: reason, Source: "security"}
+		}
+	}
+
 	if err == nil {
 		return PolicyDecision{Action: "stop", Reason: "request_completed", Source: "system"}
 	}
