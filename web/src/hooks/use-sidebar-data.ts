@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Box,
   BookOpen,
+  Database,
   RadioTower,
   ClipboardList,
   CreditCard,
@@ -40,6 +41,7 @@ import { useTranslation } from 'react-i18next'
 
 import type { SidebarData } from '@/components/layout/types'
 import { useFinanceAccess } from '@/features/owner-finance/access'
+import { usePoolAccess } from '@/features/upstream-pool/access'
 import { ROLE } from '@/lib/roles'
 
 /**
@@ -51,6 +53,7 @@ import { ROLE } from '@/lib/roles'
 export function useSidebarData(): SidebarData {
   const { t } = useTranslation()
   const finance = useFinanceAccess()
+  const pool = usePoolAccess()
 
   return {
     navGroups: [
@@ -131,6 +134,15 @@ export function useSidebarData(): SidebarData {
         items: [
           ...(finance.allowed
             ? [{ title: t('Owner finance'), url: '/finance', icon: Wallet }]
+            : []),
+          ...(pool.allowed
+            ? [
+                {
+                  title: t('Upstream account pool'),
+                  url: '/pool',
+                  icon: Database,
+                },
+              ]
             : []),
           {
             title: t('Channels'),

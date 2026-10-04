@@ -94,6 +94,17 @@ var auditRouteActions = map[string]string{
 	"PUT /api/subscription/admin/plans/:id": "subscription.plan_update",
 	"POST /api/subscription/admin/bind":     "subscription.bind",
 
+	// 站长上游账号池（仅站长 ID 1；授权码/凭据不进入审计，只记路由级元数据）
+	"POST /api/owner/pool/accounts":                   "pool.account_create",
+	"POST /api/owner/pool/accounts/:id/auth/start":    "pool.auth_start",
+	"POST /api/owner/pool/accounts/:id/auth/complete": "pool.auth_complete",
+	"POST /api/owner/pool/accounts/:id/auth/cancel":   "pool.auth_cancel",
+	"POST /api/owner/pool/accounts/:id/pause":         "pool.account_pause",
+	"POST /api/owner/pool/accounts/:id/resume":        "pool.account_resume",
+	"POST /api/owner/pool/accounts/:id/reauth":        "pool.account_reauth",
+	"POST /api/owner/pool/accounts/:id/delete":        "pool.account_delete",
+	"POST /api/owner/pool/accounts/:id/sync":          "pool.account_sync",
+
 	// 日志
 	"POST /api/system-task/log-cleanup": "log.cleanup_start",
 }

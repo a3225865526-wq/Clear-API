@@ -21,6 +21,7 @@ func SetApiRouter(router *gin.Engine) {
 	apiRouter.Use(middleware.GlobalAPIRateLimit())
 	apiRouter.Use(middleware.APIRequestBodyLimit())
 	RegisterFinanceRoutes(apiRouter)
+	RegisterUpstreamPoolRoutes(apiRouter)
 	apiRouter.GET("/console/dashboard", middleware.UserAuth(), controller.GetConsoleDashboard)
 	apiRouter.GET("/console/channel-status", middleware.UserAuth(), controller.GetConsoleMonitoring)
 	apiRouter.GET("/guide", middleware.UserAuth(), controller.GetUsageGuide)
