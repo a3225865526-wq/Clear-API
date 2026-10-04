@@ -22,6 +22,9 @@ type SubscriptionCreemPayRequest struct {
 }
 
 func SubscriptionRequestCreemPay(c *gin.Context) {
+	if rejectOnlinePayments(c) {
+		return
+	}
 	if !requirePaymentCompliance(c) {
 		return
 	}

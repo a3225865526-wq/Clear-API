@@ -203,6 +203,8 @@ type PaymentSettingsSectionProps = {
   waffoPancakeProvisionedStoreID?: string
   waffoPancakeProvisionedProductID?: string
   complianceDefaults: PaymentComplianceDefaults
+  /** 后端 Option "DisableOnlinePayments"（true=在线支付关闭，当前默认）。 */
+  disableOnlinePayments?: boolean
 }
 
 function parseWaffoPayMethods(value: string): PayMethod[] {
@@ -221,10 +223,22 @@ export function PaymentSettingsSection({
   waffoPancakeProvisionedStoreID,
   waffoPancakeProvisionedProductID,
   complianceDefaults,
+  disableOnlinePayments = true,
 }: PaymentSettingsSectionProps) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const updateOption = useUpdateOption()
+  const [onlinePaymentsDisabled, setOnlinePaymentsDisabled] =
+    React.useState(disableOnlinePayments)
+
+
+  const handleOnlinePaymentsToggle = (checked: boolean) => {
+    setOnlinePaymentsDisabled(!checked)
+    updateOption.mutate({
+      key: 'DisableOnlinePayments',
+      value: checked ? 'false' : 'true',
+    })
+  }
   const initialFormValues = React.useMemo<PaymentFormValues>(
     () => ({
       ...defaultValues,
@@ -800,6 +814,37 @@ export function PaymentSettingsSection({
 
   return (
     <SettingsSection title={t('Payment Gateway')}>
+      <Alert className='mb-6'>
+        <ShieldAlert className='h-4 w-4' />
+        <AlertTitle>
+          {onlinePaymentsDisabled
+            ? t('Online payments are currently disabled')
+            : t('Online payments are enabled')}
+        </AlertTitle>
+        <AlertDescription>
+          {onlinePaymentsDisabled
+            ? t(
+                'Production currently uses third-party store redemption codes for recharge. While online payments are disabled, the gateways configured here stay hidden from users; the wallet only offers store products and redemption codes.'
+              )
+            : t(
+                'Online payment creation endpoints are live again. Make sure every gateway below is configured and tested before announcing it to users.'
+              )}
+        </AlertDescription>
+        <AlertAction>
+          <div className='flex items-center gap-2'>
+            <span className='text-muted-foreground text-xs'>
+              {t('Enable online payments')}
+            </span>
+            <Switch
+              checked={!onlinePaymentsDisabled}
+              onCheckedChange={handleOnlinePaymentsToggle}
+              disabled={updateOption.isPending}
+              aria-label={t('Enable online payments')}
+            />
+          </div>
+        </AlertAction>
+      </Alert>
+
       {!complianceConfirmed ? (
         <Alert variant='destructive' className='mb-6'>
           <ShieldAlert className='h-4 w-4' />

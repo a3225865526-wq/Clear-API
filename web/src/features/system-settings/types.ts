@@ -331,6 +331,7 @@ export type BillingSettings = {
   CreemTestMode: boolean
   CreemProducts: string
   StoreRechargeEnabled?: boolean | string
+  DisableOnlinePayments?: boolean | string
   WaffoEnabled: boolean
   WaffoApiKey: string
   WaffoPrivateKey: string

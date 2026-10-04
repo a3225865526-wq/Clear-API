@@ -20,6 +20,9 @@ type SubscriptionWaffoPancakePayRequest struct {
 }
 
 func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
+	if rejectOnlinePayments(c) {
+		return
+	}
 	if !requirePaymentCompliance(c) {
 		return
 	}

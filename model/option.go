@@ -42,6 +42,7 @@ func InitOptionMap() {
 	common.OptionMap["ImageDownloadPermission"] = strconv.Itoa(common.ImageDownloadPermission)
 	common.OptionMap["PasswordLoginEnabled"] = strconv.FormatBool(common.PasswordLoginEnabled)
 	common.OptionMap["StoreRechargeEnabled"] = strconv.FormatBool(operation_setting.StoreRechargeEnabled)
+	common.OptionMap["DisableOnlinePayments"] = strconv.FormatBool(operation_setting.DisableOnlinePayments)
 	common.OptionMap["PasswordRegisterEnabled"] = strconv.FormatBool(common.PasswordRegisterEnabled)
 	common.OptionMap["EmailVerificationEnabled"] = strconv.FormatBool(common.EmailVerificationEnabled)
 	common.OptionMap["GitHubOAuthEnabled"] = strconv.FormatBool(common.GitHubOAuthEnabled)
@@ -386,7 +387,7 @@ func updateOptionMap(key string, value string) (err error) {
 			common.ImageDownloadPermission = intValue
 		}
 	}
-	if strings.HasSuffix(key, "Enabled") || key == "DefaultCollapseSidebar" || key == "DefaultUseAutoGroup" || key == "SMTPForceAuthLogin" || key == "SMTPInsecureSkipVerify" {
+	if strings.HasSuffix(key, "Enabled") || key == "DefaultCollapseSidebar" || key == "DefaultUseAutoGroup" || key == "SMTPForceAuthLogin" || key == "SMTPInsecureSkipVerify" || key == "DisableOnlinePayments" {
 		boolValue := value == "true"
 		switch key {
 		case "PasswordRegisterEnabled":
@@ -395,6 +396,8 @@ func updateOptionMap(key string, value string) (err error) {
 			common.PasswordLoginEnabled = boolValue
 		case "StoreRechargeEnabled":
 			operation_setting.StoreRechargeEnabled = boolValue
+		case "DisableOnlinePayments":
+			operation_setting.DisableOnlinePayments = boolValue
 		case "EmailVerificationEnabled":
 			common.EmailVerificationEnabled = boolValue
 		case "GitHubOAuthEnabled":

@@ -25,15 +25,18 @@ import (
 
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
+	// 在线支付总开关关闭（当前产品模式）时，所有在线支付入口一律下发关闭，
+	// 与后端拦截保持一致；商城兑换（store_*）与 VIP 不受影响。
+	onlineDisabled := operation_setting.DisableOnlinePayments
 
 	// 获取支付方式
 	payMethods := operation_setting.PayMethods
-	if !complianceConfirmed {
+	if !complianceConfirmed || onlineDisabled {
 		payMethods = []map[string]string{}
 	}
 
 	// 如果启用了 Stripe 支付，添加到支付方法列表
-	if isStripeTopUpEnabled() {
+	if isStripeTopUpEnabled() && !onlineDisabled {
 		// 检查是否已经包含 Stripe
 		hasStripe := false
 		for _, method := range payMethods {
@@ -55,7 +58,7 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	// Waffo Pancake is displayed above the standard Waffo gateway.
-	enableWaffoPancake := isWaffoPancakeTopUpEnabled()
+	enableWaffoPancake := isWaffoPancakeTopUpEnabled() && !onlineDisabled
 	if enableWaffoPancake {
 		hasWaffoPancake := false
 		for _, method := range payMethods {
@@ -76,7 +79,7 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	// 如果启用了 Waffo 支付，添加到支付方法列表
-	enableWaffo := isWaffoTopUpEnabled()
+	enableWaffo := isWaffoTopUpEnabled() && !onlineDisabled
 	if enableWaffo {
 		hasWaffo := false
 		for _, method := range payMethods {
@@ -98,9 +101,9 @@ func GetTopUpInfo(c *gin.Context) {
 	}
 
 	data := gin.H{
-		"enable_online_topup":              isEpayTopUpEnabled(),
-		"enable_stripe_topup":              isStripeTopUpEnabled(),
-		"enable_creem_topup":               isCreemTopUpEnabled(),
+		"enable_online_topup":              isEpayTopUpEnabled() && !onlineDisabled,
+		"enable_stripe_topup":              isStripeTopUpEnabled() && !onlineDisabled,
+		"enable_creem_topup":               isCreemTopUpEnabled() && !onlineDisabled,
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
 		"enable_redemption":                complianceConfirmed,
@@ -112,7 +115,13 @@ func GetTopUpInfo(c *gin.Context) {
 			}
 			return nil
 		}(),
-		"creem_products":          setting.CreemProducts,
+		"creem_products": func() any {
+			// 在线支付关闭时不下发 Creem 商品配置，避免暴露 provider 信息。
+			if onlineDisabled {
+				return ""
+			}
+			return setting.CreemProducts
+		}(),
 		"pay_methods":             payMethods,
 		"min_topup":               operation_setting.MinTopUp,
 		"stripe_min_topup":        setting.StripeMinTopUp,
@@ -272,6 +281,9 @@ func rejectInvalidTopUpQuota(c *gin.Context, userId int, amount int64) bool {
 }
 
 func RequestEpay(c *gin.Context) {
+	if rejectOnlinePayments(c) {
+		return
+	}
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {

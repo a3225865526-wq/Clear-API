@@ -16,19 +16,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Activity, BarChart3, ReceiptText, WalletCards } from 'lucide-react'
+import { Activity, BarChart3, Crown, ReceiptText, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatQuota } from '@/lib/format'
 
-import type { UserWalletData } from '../types'
+import { formatBasisPoints } from '../lib/money'
+import type { UserWalletData, VipInfo } from '../types'
 
 interface WalletStatsCardProps {
   user: UserWalletData | null
   loading?: boolean
+  /** VIP 等级信息（来自 topup info），展示在余额下方。 */
+  vip?: VipInfo | null
   onOpenBalanceDetails?: () => void
 }
 
@@ -94,6 +98,17 @@ export function WalletStatsCard(props: WalletStatsCardProps) {
           <div className='text-foreground mt-1.5 font-mono text-sm font-bold tracking-tight break-all tabular-nums sm:mt-2.5 sm:text-2xl'>
             {item.value}
           </div>
+          {item.label === t('Current Balance') && props.vip?.name ? (
+            <div className='mt-1 flex flex-wrap items-center gap-1'>
+              <Badge variant='secondary' className='gap-1 px-1.5 py-0 text-[10px]'>
+                <Crown className='h-2.5 w-2.5' />
+                {props.vip.name}
+              </Badge>
+              <Badge variant='outline' className='px-1.5 py-0 text-[10px]'>
+                {t('Recharge bonus')} {formatBasisPoints(props.vip.bonus_basis_points)}
+              </Badge>
+            </div>
+          ) : null}
           <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>
             {item.description}
           </div>

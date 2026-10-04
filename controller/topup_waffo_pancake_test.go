@@ -229,6 +229,11 @@ func TestWaffoPancakeSignedWebhookPaymentGuard(t *testing.T) {
 		setting.WaffoPancakePrivateKey = string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privateDER}))
 		setting.WaffoPancakeMerchantID = "MER_AbCdEfGhIjKlMnOpQrStUv"
 		setting.WaffoPancakeProductID = "PROD_AbCdEfGhIjKlMnOpQrStUv"
+		// 该子测试校验在线支付下单/出站快照逻辑，属于"恢复在线支付"路径，
+		// 需显式关闭 DisableOnlinePayments 总开关。
+		oldDisableOnline := operation_setting.DisableOnlinePayments
+		operation_setting.DisableOnlinePayments = false
+		t.Cleanup(func() { operation_setting.DisableOnlinePayments = oldDisableOnline })
 		oldPrice, oldMin := setting.WaffoPancakeUnitPrice, setting.WaffoPancakeMinTopUp
 		oldClient, oldMemory := http.DefaultClient, common.MemoryCacheEnabled
 		setting.WaffoPancakeUnitPrice, setting.WaffoPancakeMinTopUp = 2.9999, 1

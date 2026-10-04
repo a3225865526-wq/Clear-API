@@ -22,6 +22,9 @@ type SubscriptionStripePayRequest struct {
 }
 
 func SubscriptionRequestStripePay(c *gin.Context) {
+	if rejectOnlinePayments(c) {
+		return
+	}
 	if !requirePaymentCompliance(c) {
 		return
 	}

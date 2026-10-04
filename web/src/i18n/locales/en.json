@@ -1,5 +1,11 @@
 {
   "translation": {
+    "Online payments are currently disabled": "Online payments are currently disabled",
+    "Online payments are enabled": "Online payments are enabled",
+    "Production currently uses third-party store redemption codes for recharge. While online payments are disabled, the gateways configured here stay hidden from users; the wallet only offers store products and redemption codes.": "Production currently uses third-party store redemption codes for recharge. While online payments are disabled, the gateways configured here stay hidden from users; the wallet only offers store products and redemption codes.",
+    "Online payment creation endpoints are live again. Make sure every gateway below is configured and tested before announcing it to users.": "Online payment creation endpoints are live again. Make sure every gateway below is configured and tested before announcing it to users.",
+    "Enable online payments": "Enable online payments",
+    "Recharge history": "Recharge history",
     "Redemption code type": "Redemption code type",
     "Legacy redemption code": "Legacy redemption code",
     "clearapi.offline.title": "Offline orders and codes",
@@ -4087,6 +4093,8 @@
     "Original value": "Original value",
     "Other": "Other",
     "Other cases": "Other cases",
+    "Other redemption methods": "Other redemption methods",
+    "Offline order codes and legacy redemption codes": "Offline order codes and legacy redemption codes",
     "Other channels": "Other channels",
     "Other groups": "Other groups",
     "Other models": "Other models",

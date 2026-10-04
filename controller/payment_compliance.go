@@ -27,6 +27,17 @@ func requirePaymentCompliance(c *gin.Context) bool {
 	return true
 }
 
+// rejectOnlinePayments 当前模式关闭在线支付（DisableOnlinePayments=true）时，
+// 统一拦截在线支付订单创建请求并返回业务错误。返回 true 表示已拦截。
+// 拦截必须先于凭证/合规检查：不 404、不 panic、不暴露任何 provider 配置。
+func rejectOnlinePayments(c *gin.Context) bool {
+	if operation_setting.DisableOnlinePayments {
+		common.ApiErrorMsg(c, "在线支付当前未开放，请通过充值商城购买兑换码后回站兑换")
+		return true
+	}
+	return false
+}
+
 func ConfirmPaymentCompliance(c *gin.Context) {
 	if c.GetBool("use_access_token") {
 		c.JSON(http.StatusForbidden, gin.H{

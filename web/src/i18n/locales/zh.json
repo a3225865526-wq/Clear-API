@@ -1,5 +1,11 @@
 {
   "translation": {
+    "Online payments are currently disabled": "在线支付当前未启用",
+    "Online payments are enabled": "在线支付已启用",
+    "Production currently uses third-party store redemption codes for recharge. While online payments are disabled, the gateways configured here stay hidden from users; the wallet only offers store products and redemption codes.": "当前生产模式使用第三方商城兑换码充值。在线支付关闭期间，此处配置的支付网关不会出现在用户端，钱包仅显示商城商品与兑换码兑换。",
+    "Online payment creation endpoints are live again. Make sure every gateway below is configured and tested before announcing it to users.": "在线支付创建接口已恢复开放。请在向用户开放前确认并测试下方所有支付网关配置。",
+    "Enable online payments": "启用在线支付",
+    "Recharge history": "充值记录",
     "Redemption code type": "兑换码类型",
     "Legacy redemption code": "原版兑换码（Legacy）",
     "clearapi.offline.title": "线下订单与兑换码",
@@ -4087,6 +4093,8 @@
     "Original value": "原始值",
     "Other": "其他",
     "Other cases": "其他情况",
+    "Other redemption methods": "其他兑换方式",
+    "Offline order codes and legacy redemption codes": "离线订单兑换码与旧版兑换码",
     "Other channels": "其他渠道",
     "Other groups": "其他分组",
     "Other models": "其他模型",
