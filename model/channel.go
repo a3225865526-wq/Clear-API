@@ -350,6 +350,21 @@ func (channel *Channel) GetAutoBan() bool {
 }
 
 func (channel *Channel) Save() error {
+	if err := channel.CheckPoolChannelAdmission(); err != nil {
+		return err
+	}
+	if channel.Id != 0 {
+		var original Channel
+		err := DB.Select("id", "base_url", "setting", "settings").First(&original, channel.Id).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err == nil {
+			if err := original.CheckPoolChannelAdmission(); err != nil {
+				return err
+			}
+		}
+	}
 	return DB.Save(channel).Error
 }
 
@@ -450,6 +465,11 @@ func GetChannelById(id int, selectAll bool) (*Channel, error) {
 }
 
 func BatchInsertChannels(channels []Channel) error {
+	for i := range channels {
+		if err := channels[i].CheckPoolChannelAdmission(); err != nil {
+			return err
+		}
+	}
 	if len(channels) == 0 {
 		return nil
 	}
@@ -546,6 +566,9 @@ func (channel *Channel) GetStatusCodeMapping() string {
 }
 
 func (channel *Channel) Insert() error {
+	if err := channel.CheckPoolChannelAdmission(); err != nil {
+		return err
+	}
 	var err error
 	err = DB.Create(channel).Error
 	if err != nil {
@@ -556,6 +579,18 @@ func (channel *Channel) Insert() error {
 }
 
 func (channel *Channel) Update() error {
+	if err := channel.CheckPoolChannelAdmission(); err != nil {
+		return err
+	}
+	if channel.Id != 0 {
+		var original Channel
+		if err := DB.Select("id", "base_url", "setting", "settings").First(&original, channel.Id).Error; err != nil {
+			return err
+		}
+		if err := original.CheckPoolChannelAdmission(); err != nil {
+			return err
+		}
+	}
 	// If this is a multi-key channel, recalculate MultiKeySize based on the current key list to avoid inconsistency after editing keys
 	if channel.ChannelInfo.IsMultiKey {
 		var keyStr string
@@ -736,6 +771,12 @@ func hasEnabledMultiKey(keys []string, statusList map[int]int) bool {
 }
 
 func UpdateChannelStatus(channelId int, usingKey string, status int, reason string) bool {
+	if status == common.ChannelStatusEnabled {
+		channel, err := GetChannelById(channelId, true)
+		if err != nil || channel.CheckPoolChannelAdmission() != nil {
+			return false
+		}
+	}
 	if common.MemoryCacheEnabled {
 		channelStatusLock.Lock()
 		defer channelStatusLock.Unlock()
@@ -989,6 +1030,9 @@ func SearchTags(keyword string, group string, model string, idSort bool) ([]*str
 }
 
 func (channel *Channel) ValidateSettings() error {
+	if err := channel.CheckPoolChannelAdmission(); err != nil {
+		return err
+	}
 	channelParams := &dto.ChannelSettings{}
 	if channel.Setting != nil && *channel.Setting != "" {
 		err := common.Unmarshal([]byte(*channel.Setting), channelParams)

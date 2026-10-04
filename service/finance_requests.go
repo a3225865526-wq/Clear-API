@@ -58,6 +58,7 @@ type FinanceAttemptSnapshot struct {
 }
 
 type FinanceUsageSnapshot struct {
+	Metering   TokenObservation    `json:"metering"`
 	Quantities map[string]*string  `json:"quantities"`
 	Source     string              `json:"source"`
 	Estimate   FinanceCostEstimate `json:"estimate"`
@@ -365,6 +366,10 @@ func CaptureFinanceUsageWithIdentity(c *gin.Context, info *relaycommon.RelayInfo
 		return
 	}
 	result := FinanceUsageSnapshot{Quantities: quantities, Source: source, Missing: append([]string{}, snapshot.Missing...), Estimate: FinanceCostEstimate{Status: "unknown", Missing: []string{"cost_rule"}}}
+	result.Metering = TokenObservationForLog(c, common.GetContextKeyBool(c, constant.ContextKeyLocalCountTokens))
+	if info != nil {
+		result.Metering.InternalModel, result.Metering.ModelAlias = info.UpstreamModelName, info.OriginModelName
+	}
 	if len(observed) > 0 {
 		merged := map[string]*string{}
 		for _, entry := range observed {

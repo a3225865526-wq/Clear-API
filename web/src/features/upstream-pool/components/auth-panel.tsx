@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { CopyButton } from '@/components/copy-button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -281,7 +282,7 @@ export function AuthPanel(props: AuthPanelProps) {
       <div className='space-y-2'>
         <p className='text-muted-foreground text-sm'>
           {t(
-            'The one-time authorization details are no longer available. Cancel this task and start again.'
+            'The one-time authorization details are no longer available. Cancellation cannot confirm that remote authorization has stopped; new authorization remains blocked until reconciliation.'
           )}
         </p>
         <Button
@@ -327,6 +328,13 @@ export function AuthPanel(props: AuthPanelProps) {
           </Button>
         </div>
       </div>
+      <Alert>
+        <AlertDescription>
+          {t(
+            'Re-authorization that overwrites the original credential file is not supported. Completion requires one newly created credential reference and a matching account identity; otherwise it is rejected. An owner pause is preserved.'
+          )}
+        </AlertDescription>
+      </Alert>
       {panelBody}
     </section>
   )

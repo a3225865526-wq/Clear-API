@@ -40,6 +40,10 @@ import {
   deletePoolAccount,
 } from './api'
 import { AccessTypeCapabilities } from './components/access-type-capabilities'
+import {
+  AccountQuotaPanel,
+  AccountModelAdmissionPanel,
+} from './components/account-observations'
 import { AccountTasks } from './components/account-tasks'
 import { AuthPanel } from './components/auth-panel'
 import {
@@ -270,6 +274,8 @@ export function PoolAccountDetail(props: { accountId: number }) {
           </dl>
         </section>
 
+        <AccountQuotaPanel accountId={account.id} />
+        <AccountModelAdmissionPanel accountId={account.id} />
         <AuthPanel
           account={account}
           pendingTask={pendingTask}

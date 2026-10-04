@@ -116,6 +116,19 @@ export interface ToolSurchargeItem {
 
 export interface LogOtherData {
   admin_info?: {
+    token_observation?: {
+      source: string
+      quality: string
+      input: number | null
+      output: number | null
+      cache_read: number | null
+      cache_write: number | null
+      reasoning: number | null
+      total: number | null
+      interrupted: boolean
+      internal_model?: string
+      model_alias?: string
+    }
     request_policy?: PolicyEvent[]
     is_multi_key?: boolean
     multi_key_index?: number

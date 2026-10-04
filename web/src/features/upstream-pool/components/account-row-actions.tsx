@@ -110,6 +110,7 @@ export function AccountRowActions(props: { account: PoolAccount }) {
               variant='ghost'
               size='icon-sm'
               className='text-muted-foreground hover:text-foreground'
+              aria-label={t('Details')}
               render={
                 <Link
                   to='/pool/$accountId'

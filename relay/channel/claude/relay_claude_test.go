@@ -13,6 +13,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/relayconvert"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,6 +30,10 @@ func TestClaudeHandlerEstimatesMissingUsageFromOutput(t *testing.T) {
 	require.NotNil(t, usage)
 	assert.Equal(t, 100, usage.PromptTokens)
 	assert.Positive(t, usage.CompletionTokens)
+	observation := service.TokenObservationForLog(ctx, false)
+	assert.Equal(t, "local_estimate", observation.Quality)
+	assert.Nil(t, observation.Input)
+	assert.Nil(t, observation.Total)
 }
 
 func commonPointer[T any](value T) *T {

@@ -26,7 +26,7 @@ const (
 
 // Adapter version bumps whenever the underlying executor integration changes
 // enough to invalidate earlier capability verification.
-const AdapterVersion = 0
+const AdapterVersion = 1
 
 const (
 	ExecutorCliproxyAPI = "cliproxyapi"
@@ -110,12 +110,13 @@ func baseManagementOps() []string {
 
 func executorClaims(usageEvidence string) []CapabilityClaim {
 	return []CapabilityClaim{
-		{Key: "text_chat", Status: ClaimStatusUnverified, Evidence: usageEvidence, Note: "pending live verification"},
+		{Key: "text_chat", Status: ClaimStatusUnverified, Evidence: usageEvidence, Note: "model-specific source and directed validation required"},
+		{Key: "stream_text", Status: ClaimStatusUnverified, Evidence: usageEvidence},
 		{Key: "tools", Status: ClaimStatusUnverified, Evidence: EvidenceNone},
 		{Key: "image_input", Status: ClaimStatusUnverified, Evidence: EvidenceNone},
 		{Key: "image_generation", Status: ClaimStatusUnverified, Evidence: EvidenceNone},
 		{Key: "long_context", Status: ClaimStatusUnverified, Evidence: EvidenceNone},
-		{Key: "exact_usage", Status: ClaimStatusUnverified, Evidence: usageEvidence, Note: "executor parses upstream usage; admission still requires live evidence"},
+		{Key: "exact_usage", Status: ClaimStatusUnverified, Evidence: usageEvidence, Note: "presence, provenance and end-to-end directed validation required; real-account testing is not mandatory"},
 	}
 }
 
@@ -262,7 +263,7 @@ func Executors() []ExecutorDescriptor {
 		"并以 CLEARAPI_POOL_CLIPROXY_DEDICATED=true 确认；未确认前授权接口拒绝执行。" +
 		"注意：DEDICATED 仅是配置声明，不是持续隔离保证——授权完成到禁用生效之间在本实例内存在调度窗口。" +
 		"第三阶段开通对外渠道前必须满足其一：(a) 执行器侧提供创建即隔离/审批机制（v8.0.4 无此能力，需上游改造或补丁）；" +
-		"(b) 在执行器入站 API 前加访问控制层（按账号准入状态放行）。两者均需单独授权，未满足前池渠道保持关闭。"
+		"(b) 分离授权暂存与服务执行器，并在执行器每次账号选择/发送前核对账号及模型准入。仅入口鉴权不能代替账号级隔离。未满足前服务端拒绝池渠道开通和调用。"
 	var cliproxyActions []string
 	if !dedicated {
 		cliproxyActions = []string{

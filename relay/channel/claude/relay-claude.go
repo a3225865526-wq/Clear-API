@@ -242,6 +242,7 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 		//上游出错
 	}
 	if claudeInfo.Usage.CompletionTokens == 0 || !claudeInfo.Done {
+		service.MarkTokenEstimate(c)
 		if common.DebugEnabled {
 			common.SysLog("claude response usage is not complete, maybe upstream error")
 		}
@@ -300,12 +301,16 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 	}
 	var err *types.NewAPIError
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+		service.ObserveTokenUsage(c, "anthropic", []byte(data))
 		err = HandleStreamResponseData(c, info, claudeInfo, data)
 		if err != nil {
 			sr.Stop(err)
 		}
 	})
 	info.StreamStatus.RequireTerminal()
+	if info.StreamStatus.ResponseOutcome() != "completed" {
+		service.MarkTokenInterrupted(c)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -357,6 +362,7 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 			}
 		}
 		if output.Len() > 0 {
+			service.MarkTokenEstimate(c)
 			claudeInfo.Usage = service.ResponseText2Usage(c, output.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 			claudeInfo.Usage.UsageSemantic = "anthropic"
 		}
@@ -433,6 +439,7 @@ func ClaudeHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
+	service.ObserveTokenUsage(c, "anthropic", responseBody)
 	logger.LogDebug(c, "responseBody: %s", responseBody)
 	handleErr := HandleClaudeResponseData(c, info, claudeInfo, resp, responseBody)
 	if handleErr != nil {

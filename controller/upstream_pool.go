@@ -125,7 +125,20 @@ func ListPoolAccounts(c *gin.Context) {
 		poolError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": accounts})
+	type accountView struct {
+		model.UpstreamPoolAccount
+		Quota accountpool.QuotaView `json:"quota"`
+	}
+	views := make([]accountView, 0, len(accounts))
+	for i := range accounts {
+		quota, err := accountpool.QuotaForAccount(&accounts[i], false)
+		if err != nil {
+			poolError(c, err)
+			return
+		}
+		views = append(views, accountView{UpstreamPoolAccount: accounts[i], Quota: quota})
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": views})
 }
 
 func CreatePoolAccount(c *gin.Context) {
@@ -164,7 +177,35 @@ func GetPoolAccount(c *gin.Context) {
 	}})
 }
 
+func GetPoolAccountQuota(c *gin.Context) {
+	if !poolReady(c) {
+		return
+	}
+	id, ok := poolAccountID(c)
+	if !ok {
+		return
+	}
+	account, err := accountpool.GetAccount(id)
+	if err != nil {
+		poolError(c, err)
+		return
+	}
+	quota, err := accountpool.QuotaForAccount(&account.Account, true)
+	if err != nil {
+		poolError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": quota})
+}
+
 func GetPoolAccountCapabilities(c *gin.Context) {
+	if len(c.Query("model")) > 200 {
+		poolError(c, model.ErrPoolInvalid)
+		return
+	}
+	if !poolReady(c) {
+		return
+	}
 	id, ok := poolAccountID(c)
 	if !ok {
 		return
@@ -186,9 +227,10 @@ func GetPoolAccountCapabilities(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
-		"platform":       platform,
-		"access_type":    accessSpec,
-		"account_status": result.Account.RunStatus,
+		"platform":        platform,
+		"access_type":     accessSpec,
+		"account_status":  result.Account.RunStatus,
+		"model_admission": accountpool.ModelAdmissionFor(result.Account.Platform, result.Account.AccessType, c.Query("model")),
 	}})
 }
 

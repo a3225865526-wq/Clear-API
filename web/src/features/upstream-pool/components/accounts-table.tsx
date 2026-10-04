@@ -28,6 +28,7 @@ import { POOL_QUERY_KEY, POOL_VIEW_MODE_STORAGE_KEY } from '../constants'
 import { formatPoolTime } from '../lib/time'
 import type { PoolAccount } from '../types'
 import { AccountCard } from './account-card'
+import { QuotaSummary } from './account-observations'
 import { AccountRowActions } from './account-row-actions'
 import { PoolAdminStatusBadge, PoolRunStatusBadge } from './pool-badges'
 
@@ -120,6 +121,11 @@ export function AccountsTable() {
           <PoolRunStatusBadge status={row.original.run_status} />
         ),
         filterFn: matchesFilterValue,
+      },
+      {
+        id: 'quota',
+        header: t('Account quota'),
+        cell: ({ row }) => <QuotaSummary quota={row.original.quota} />,
       },
       {
         accessorKey: 'credential_ref',

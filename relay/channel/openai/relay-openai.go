@@ -122,6 +122,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	var reportedUsage *dto.Usage
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
+		service.ObserveTokenUsage(c, "openai", []byte(data))
 		if lastStreamData != "" {
 			if err := HandleStreamFormat(c, info, lastStreamData, info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
 				common.SysLog("error handling stream format: " + err.Error())
@@ -150,6 +151,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	info.StreamStatus.RequireTerminal()
 	if outcome := info.StreamStatus.OutcomeSnapshot(); outcome.ExpectsTerminal && outcome.EndReason != relaycommon.StreamEndReasonDone {
+		service.MarkTokenInterrupted(c)
 		const incompleteMessage = "upstream stream ended before the terminal event"
 		info.StreamStatus.MarkFailed("incomplete_stream", "upstream_error", http.StatusBadGateway)
 		info.StreamStatus.RecordError(incompleteMessage)
@@ -167,6 +169,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		writeIncompleteStreamError(c, info, incompleteMessage)
 		usage = reportedUsage
 		if usage != nil && usage.CompletionTokens == 0 && responseTextBuilder.Len() > 0 {
+			service.MarkTokenEstimate(c)
 			fallback := service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 			usage.CompletionTokens = fallback.CompletionTokens
 			usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
@@ -175,6 +178,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		if usage == nil {
 			usage = &dto.Usage{}
 			if responseTextBuilder.Len() > 0 || toolCount > 0 {
+				service.MarkTokenEstimate(c)
 				usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 				usage.CompletionTokens += toolCount * 7
 				usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
@@ -223,6 +227,7 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	if !containStreamUsage {
+		service.MarkTokenEstimate(c)
 		usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		usage.CompletionTokens += toolCount * 7
 	}
@@ -338,6 +343,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		}
 	}
 
+	service.ObserveTokenUsage(c, "openai", responseBody)
 	err = common.Unmarshal(responseBody, &simpleResponse)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
@@ -369,6 +375,7 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 
 	usageModified := false
 	if simpleResponse.Usage.PromptTokens == 0 {
+		service.MarkTokenEstimate(c)
 		completionTokens := simpleResponse.Usage.CompletionTokens
 		if completionTokens == 0 {
 			for _, choice := range simpleResponse.Choices {

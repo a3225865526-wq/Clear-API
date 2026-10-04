@@ -26,6 +26,7 @@ import type {
   PoolAuthStart,
   PoolCatalog,
   PoolExecutor,
+  PoolQuota,
 } from './types'
 
 export function getPoolExecutors(signal?: AbortSignal) {
@@ -51,10 +52,19 @@ export function getPoolAccount(id: number, signal?: AbortSignal) {
   return poolRequest<PoolAccountDetail>(`/accounts/${id}`, { signal })
 }
 
-export function getPoolAccountCapabilities(id: number, signal?: AbortSignal) {
+export function getPoolAccountCapabilities(
+  id: number,
+  signal?: AbortSignal,
+  model?: string
+) {
   return poolRequest<PoolAccountCapabilities>(`/accounts/${id}/capabilities`, {
     signal,
+    params: { model },
   })
+}
+
+export function getPoolAccountQuota(id: number, signal?: AbortSignal) {
+  return poolRequest<PoolQuota>(`/accounts/${id}/quota`, { signal })
 }
 
 export function startPoolAccountAuth(id: number) {

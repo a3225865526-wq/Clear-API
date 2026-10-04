@@ -22,6 +22,12 @@ func DecideRelayRetry(c *gin.Context, err *types.NewAPIError, retryTimes int) Po
 	if err == nil {
 		return PolicyDecision{Action: "stop", Reason: "request_completed", Source: "system"}
 	}
+	if c.Writer.Written() {
+		return PolicyDecision{Action: "stop", Reason: "response_started", Source: "system"}
+	}
+	if c.GetBool("tool_chain_no_retry") {
+		return PolicyDecision{Action: "stop", Reason: "tool_chain_not_idempotent", Source: "system"}
+	}
 	if c.GetBool("upstream_usage_uncertain") {
 		return PolicyDecision{Action: "stop", Reason: "upstream_usage_uncertain", Source: "system"}
 	}
@@ -83,6 +89,11 @@ func ProcessChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		tokenId := c.GetInt("token_id")
 		userGroup := c.GetString("group")
 		other := model.NewLogOther()
+		observation := TokenObservationForLog(c, common.GetContextKeyBool(c, constant.ContextKeyLocalCountTokens))
+		if relayInfo != nil {
+			observation.InternalModel, observation.ModelAlias = relayInfo.UpstreamModelName, relayInfo.OriginModelName
+		}
+		other.SetAdmin("token_observation", observation)
 		if c.Request != nil && c.Request.URL != nil {
 			other.SetPublic("request_path", c.Request.URL.Path)
 		}

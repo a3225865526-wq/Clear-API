@@ -75,6 +75,7 @@ import { DetailsDialog } from '../dialogs/details-dialog'
 import { LogCostDisplay } from '../log-cost-display'
 import { ModelBadge } from '../model-badge'
 import { TimingMetricsCell, StreamTpsCell } from '../timing-metrics-cell'
+import { TokenObservationDisplay } from '../token-observation'
 import { useUsageLogsContext } from '../usage-logs-provider'
 
 interface DetailSegment {
@@ -724,6 +725,13 @@ export function useCommonLogsColumns(
           const other = parseLogOther(log.other)
 
           const promptTokens = log.prompt_tokens || 0
+          if (other?.admin_info?.token_observation) {
+            return (
+              <TokenObservationDisplay
+                observation={other.admin_info.token_observation}
+              />
+            )
+          }
           const completionTokens = log.completion_tokens || 0
           if (promptTokens === 0 && completionTokens === 0) {
             return <span className='text-muted-foreground text-xs'>-</span>

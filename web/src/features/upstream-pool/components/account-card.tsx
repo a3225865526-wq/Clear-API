@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { formatPoolTime } from '../lib/time'
 import type { PoolAccount } from '../types'
+import { QuotaSummary } from './account-observations'
 
 /**
  * Bespoke account card for the card view. Reuses the column cell renderers via
@@ -79,6 +80,7 @@ function AccountCardComponent({ row }: { row: Row<PoolAccount> }) {
         </div>
       </div>
 
+      <QuotaSummary quota={row.original.quota} />
       {row.original.note ? (
         <p className='text-muted-foreground line-clamp-2 text-xs'>
           {row.original.note}

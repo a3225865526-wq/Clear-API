@@ -1166,6 +1166,10 @@ func UpdateChannel(c *gin.Context) {
 		return
 	}
 	originProxy := originChannel.GetSetting().Proxy
+	if err := originChannel.CheckPoolChannelAdmission(); err != nil {
+		c.JSON(http.StatusConflict, gin.H{"success": false, "code": "POOL_CHANNEL_DISABLED", "message": err.Error()})
+		return
+	}
 	proxyChanged := false
 	_, settingProvided := requestData["setting"]
 	if settingProvided {

@@ -37,6 +37,11 @@ export type PoolTaskStatus =
   | 'failed'
 
 export type PoolFailReason =
+  | 'remote_start_uncertain'
+  | 'remote_cancel_unconfirmed'
+  | 'correlation_failed'
+  | 'post_auth_disable_failed'
+  | 'orphan_cleanup_failed'
   | 'expired'
   | 'identity_mismatch'
   | 'credential_ref_taken'
@@ -93,6 +98,7 @@ export interface PoolCatalog {
 }
 
 export interface PoolAccount {
+  quota?: PoolQuota
   id: number
   platform: string
   access_type: string
@@ -110,6 +116,58 @@ export interface PoolAccount {
   created_at: number
   /** Unix seconds. */
   updated_at: number
+}
+
+export interface PoolQuotaMetric {
+  query_result: PoolQuota['result']
+  kind: string
+  value: number
+  unit: string
+  scope: string
+  pool: string
+  model?: string
+  window_seconds?: number
+  reset_at?: number
+  source:
+    | 'upstream'
+    | 'upstream_derived'
+    | 'local_statistics'
+    | 'local_prediction'
+    | 'unknown'
+  updated_at: number
+  stale: boolean
+}
+
+export interface PoolQuota {
+  query_capability: 'unsupported' | 'observations_only'
+  result: 'unknown' | 'unsupported' | 'failed' | 'success'
+  metrics: PoolQuotaMetric[]
+  checked_at: number
+  next_refresh_at: number
+  stale: boolean
+  reason?: string
+}
+
+export interface ModelAdmission {
+  platform: string
+  access_type: string
+  model: string
+  adapter_version: number
+  open: boolean
+  reasons: string[]
+  metering_source: string
+  quota_capability: string
+  capabilities: {
+    capability: string
+    status: 'supported' | 'unsupported' | 'unverified'
+    native: boolean
+    evidence: {
+      kind: string
+      reference: string
+      revision: string
+      adapter_version: number
+    }[]
+  }[]
 }
 
 export interface PoolTask {
@@ -133,6 +191,7 @@ export interface PoolAccountDetail {
 }
 
 export interface PoolAccountCapabilities {
+  model_admission: ModelAdmission
   platform: PoolPlatformSpec
   access_type: PoolAccessTypeSpec | null
   account_status: PoolRunStatus

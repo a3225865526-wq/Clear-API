@@ -90,6 +90,7 @@ import {
 import { USAGE_BILLING_PATH, type LogOtherData } from '../../types'
 import { ResponseModelDetails } from '../model-badge'
 import { PluginAuthorLink } from '../plugin-author-link'
+import { TokenObservationDisplay } from '../token-observation'
 import { DetailRow, DetailSection } from './log-detail-layout'
 
 // Maps a channel-update changed-field token (as recorded by the backend audit)
@@ -373,6 +374,13 @@ function BillingBreakdown(props: {
 function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {
   const { t } = useTranslation()
   const { log, other } = props
+  if (other.admin_info?.token_observation) {
+    return (
+      <TokenObservationDisplay
+        observation={other.admin_info.token_observation}
+      />
+    )
+  }
 
   const promptTokens = log.prompt_tokens || 0
   const completionTokens = log.completion_tokens || 0

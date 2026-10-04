@@ -57,6 +57,16 @@ export const POOL_TASK_KIND_LABELS: Record<PoolTaskKind, string> = {
 }
 
 export const POOL_FAIL_REASON_LABELS: Record<PoolFailReason, string> = {
+  remote_start_uncertain:
+    'Remote authorization start is uncertain; reservation remains held',
+  remote_cancel_unconfirmed:
+    'Remote authorization termination is unconfirmed; reservation remains held',
+  correlation_failed:
+    'Credential correlation failed; manual reconciliation required',
+  post_auth_disable_failed:
+    'New credential could not be disabled; reservation remains held',
+  orphan_cleanup_failed:
+    'Remote credential cleanup failed; reservation remains held',
   expired: 'Authorization expired',
   identity_mismatch: 'Identity mismatch',
   credential_ref_taken: 'Credential reference already taken',
@@ -95,7 +105,7 @@ export const POOL_ERROR_MESSAGE_KEYS: Record<string, string> = {
   POOL_NOT_FOUND: 'The pool account or task does not exist.',
   POOL_CONFLICT:
     'This account changed while you were working. Please review the latest state and retry.',
-  POOL_TASK_EXPIRED: 'This authorization task has expired. Please start again.',
+  POOL_TASK_EXPIRED: 'This authorization task has expired. Remote session reconciliation is required before another authorization.',
   POOL_UNSUPPORTED: 'This operation is not supported.',
   POOL_EXECUTOR_OFFLINE: 'The executor is offline. Please try again later.',
   POOL_EXECUTOR_FAILED: 'The executor failed to complete this operation.',
@@ -106,7 +116,7 @@ export const POOL_ERROR_MESSAGE_KEYS: Record<string, string> = {
   POOL_CORRELATION_FAILED:
     'The new credential could not be reliably identified. Nothing was changed; please resolve manually.',
   POOL_AUTH_TIMEOUT:
-    'The authorization is still pending at the executor. Check the status later or restart the task.',
+    'The remote authorization has not been confirmed. Reconcile the previous session before starting another authorization.',
   POOL_UNAVAILABLE:
     'Pool storage is not initialized. Please run the storage migration first.',
   POOL_INTERNAL: 'Upstream account pool error. Please try again later.',

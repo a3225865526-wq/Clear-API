@@ -20,6 +20,7 @@ func RegisterUpstreamPoolRoutes(api *gin.RouterGroup) {
 	pool.POST("/accounts", controller.CreatePoolAccount)
 	pool.GET("/accounts/:id", controller.GetPoolAccount)
 	pool.GET("/accounts/:id/capabilities", controller.GetPoolAccountCapabilities)
+	pool.GET("/accounts/:id/quota", controller.GetPoolAccountQuota)
 	pool.POST("/accounts/:id/auth/start", controller.StartPoolAuth)
 	pool.POST("/accounts/:id/auth/complete", controller.CompletePoolAuth)
 	pool.POST("/accounts/:id/auth/cancel", controller.CancelPoolAuth)

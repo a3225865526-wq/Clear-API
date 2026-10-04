@@ -12,6 +12,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -29,6 +30,10 @@ func TestOaiResponsesHandlerEstimatesMissingUsageFromOutput(t *testing.T) {
 	require.NotNil(t, usage)
 	assert.Equal(t, 100, usage.PromptTokens)
 	assert.Positive(t, usage.CompletionTokens)
+	observation := service.TokenObservationForLog(ctx, false)
+	assert.Equal(t, "local_estimate", observation.Quality)
+	assert.Nil(t, observation.Input)
+	assert.Nil(t, observation.Total)
 }
 
 func TestOaiResponsesHandlerCountsOutputCallsNotDeclarations(t *testing.T) {

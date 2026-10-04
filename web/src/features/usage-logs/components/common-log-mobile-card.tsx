@@ -40,6 +40,7 @@ import {
 } from '../lib/utils'
 import { ModelBadge, ResponseModelDetails } from './model-badge'
 import { StreamTpsCell, TimingMetricsCell } from './timing-metrics-cell'
+import { TokenObservationDisplay } from './token-observation'
 import { useUsageLogsContext } from './usage-logs-provider'
 
 type FieldName =
@@ -288,31 +289,37 @@ export function CommonLogMobileCard<TData>(props: {
             )}
         </div>
       )}
-      {showTokens && (
-        <div className='text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs [overflow-wrap:anywhere]'>
-          <span>
-            {t('Input')}{' '}
-            <span className='text-foreground tabular-nums'>
-              {log.prompt_tokens.toLocaleString()}
-            </span>
-          </span>
-          <span>
-            {t('Output')}{' '}
-            <span className='text-foreground tabular-nums'>
-              {log.completion_tokens.toLocaleString()}
-            </span>
-          </span>
-          {cacheRead > 0 && (
+      {other?.admin_info?.token_observation ? (
+        <TokenObservationDisplay
+          observation={other.admin_info.token_observation}
+        />
+      ) : (
+        showTokens && (
+          <div className='text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs [overflow-wrap:anywhere]'>
             <span>
-              {t('Cache')} ↓ {cacheRead.toLocaleString()}
+              {t('Input')}{' '}
+              <span className='text-foreground tabular-nums'>
+                {log.prompt_tokens.toLocaleString()}
+              </span>
             </span>
-          )}
-          {cacheWrite > 0 && (
             <span>
-              {t('Cache')} ↑ {cacheWrite.toLocaleString()}
+              {t('Output')}{' '}
+              <span className='text-foreground tabular-nums'>
+                {log.completion_tokens.toLocaleString()}
+              </span>
             </span>
-          )}
-        </div>
+            {cacheRead > 0 && (
+              <span>
+                {t('Cache')} ↓ {cacheRead.toLocaleString()}
+              </span>
+            )}
+            {cacheWrite > 0 && (
+              <span>
+                {t('Cache')} ↑ {cacheWrite.toLocaleString()}
+              </span>
+            )}
+          </div>
+        )
       )}
       {contentCell && (
         <div className='relative min-w-0 border-t pt-2 [&_button]:min-h-8 [&_button]:w-full [&_button]:max-w-full [&_button]:pr-5 [&_button]:text-sm [&_button>span]:line-clamp-2 [&_button>span]:[overflow-wrap:anywhere] [&_button>span]:whitespace-normal'>

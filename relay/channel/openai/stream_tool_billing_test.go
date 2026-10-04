@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"github.com/QuantumNous/new-api/service"
 	"testing"
 
 	"github.com/QuantumNous/new-api/constant"
@@ -64,6 +65,31 @@ func TestOaiStreamHandlerMarksMissingDoneAsIncomplete(t *testing.T) {
 	assert.Equal(t, relaycommon.StreamEndReasonEOF, info.StreamStatus.EndReason)
 	assert.Equal(t, string(relaycommon.ResponseOutcomeFailed), info.StreamStatus.ResponseOutcome())
 	assert.True(t, info.StreamStatus.HasErrors())
+	observation := service.TokenObservationForLog(c, false)
+	assert.True(t, observation.Interrupted)
+	assert.Nil(t, observation.Total)
+}
+
+func TestUsageOaiStreamToolFramesPreserveRawMetering(t *testing.T) {
+	oldTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
+	body := `data: {"id":"synthetic","model":"test-model","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call-1","type":"function","function":{"name":"synthetic_tool","arguments":"{}"}}]}}]}` + "\n\n" +
+		`data: {"choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15,"prompt_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"completion_tokens_details":{"reasoning_tokens":0}}}` + "\n\ndata: [DONE]\n\n"
+	c, recorder, resp, info := newImageTestContext(t, body, "text/event-stream", true)
+	info.ChannelMeta = &relaycommon.ChannelMeta{UpstreamModelName: "test-model"}
+	info.RelayFormat = types.RelayFormatOpenAI
+	info.DisablePing = true
+	usage, err := OaiStreamHandler(c, info, resp)
+	require.Nil(t, err)
+	require.NotNil(t, usage)
+	assert.Equal(t, 15, usage.TotalTokens)
+	observation := service.TokenObservationForLog(c, false)
+	assert.Equal(t, "upstream_complete", observation.Quality)
+	require.NotNil(t, observation.Total)
+	assert.Equal(t, int64(15), *observation.Total)
+	assert.Contains(t, recorder.Body.String(), "synthetic_tool")
+	assert.Contains(t, recorder.Body.String(), "[DONE]")
 }
 
 func TestOaiStreamHandlerKeepsDoneForCompleteStream(t *testing.T) {

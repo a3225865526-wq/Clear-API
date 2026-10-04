@@ -195,8 +195,7 @@ func StartAuth(ownerID, accountID int, kind string) (*StartAuthView, error) {
 	if err := expireStaleTasks(accountID, now); err != nil {
 		return nil, err
 	}
-	// Reclaim claims whose task is no longer pending (crash/process-exit
-	// leftovers); the claim expiry itself covers the rest.
+	// Preserve crash/process-exit claims until remote reconciliation exists.
 	if err := model.SweepUpstreamPoolClaims(db()); err != nil {
 		return nil, err
 	}
@@ -226,72 +225,24 @@ func StartAuth(ownerID, accountID int, kind string) (*StartAuthView, error) {
 	if err != nil {
 		return nil, err
 	}
-	baseline, err := executor.ListCredentials(context.Background())
-	if err != nil {
-		_ = model.UpdateUpstreamPoolAccount(db(), account.Id, account.Version, map[string]any{
-			"run_status": model.PoolRunStatusExecutorOffline,
-			"last_error": executorErrorText(err),
-		})
-		return nil, err
-	}
-	result, err := executor.StartAuth(context.Background(), StartAuthRequest{
-		Platform: account.Platform, AccessType: account.AccessType, Kind: kind,
-	})
-	if err != nil {
-		_ = model.UpdateUpstreamPoolAccount(db(), account.Id, account.Version, map[string]any{
-			"run_status": model.PoolRunStatusExecutorOffline,
-			"last_error": executorErrorText(err),
-		})
-		return nil, err
-	}
-
-	expiresAt := result.ExpiresAt
-	if expiresAt.IsZero() || expiresAt.Sub(now) > maxAuthTaskTTL {
-		expiresAt = now.Add(maxAuthTaskTTL)
-	}
+	// Commit the reservation before any executor read or remote mutation.
 	task := &model.UpstreamPoolAuthTask{
-		AccountId:        account.Id,
-		OwnerUserId:      ownerID,
-		Platform:         account.Platform,
-		AccessType:       account.AccessType,
-		Kind:             kind,
-		Method:           result.Method,
-		ExecutorId:       account.ExecutorId,
-		ExecutorStateRef: result.StateRef,
-		BaselineRefs:     marshalBaseline(baseline),
-		Status:           model.PoolTaskStatusPending,
-		PrevRunStatus:    account.RunStatus,
-		ExpiresAt:        expiresAt.Unix(),
-		CreatedAt:        now.Unix(),
-		UpdatedAt:        now.Unix(),
+		AccountId: account.Id, OwnerUserId: ownerID, Platform: account.Platform,
+		AccessType: account.AccessType, Kind: kind, Method: "reserved",
+		ExecutorId: account.ExecutorId, Status: model.PoolTaskStatusPending,
+		PrevRunStatus: account.RunStatus, ExpiresAt: now.Add(maxAuthTaskTTL).Unix(),
+		CreatedAt: now.Unix(), UpdatedAt: now.Unix(),
 	}
 	err = db().Transaction(func(tx *gorm.DB) error {
-		if err := model.UpdateUpstreamPoolAccount(tx, account.Id, account.Version, map[string]any{
-			"run_status": model.PoolRunStatusAuthorizing,
-			"last_error": "",
-		}); err != nil {
-			return err
-		}
 		if err := tx.Create(task).Error; err != nil {
 			return err
 		}
-		// Atomic executor claim: loses on any live claim regardless of which
-		// process created it. Losing here rolls back the just-created task so
-		// no unclaimable pending row lingers.
-		released, claimErr := model.AcquireUpstreamPoolClaim(tx, account.ExecutorId, account.Id, task.Id, task.ExpiresAt)
-		if claimErr != nil {
-			return claimErr
+		if _, err := model.AcquireUpstreamPoolClaim(tx, account.ExecutorId, account.Id, task.Id, task.ExpiresAt); err != nil {
+			return err
 		}
-		if released {
-			// A taken-over claim implies its old task expired; make that
-			// explicit so no stale pending task survives beside the claim.
-			if err := tx.Model(&model.UpstreamPoolAuthTask{}).
-				Where("executor_id = ? AND status = ? AND expires_at <= ?", account.ExecutorId, model.PoolTaskStatusPending, now.Unix()).
-				Updates(map[string]any{"status": model.PoolTaskStatusExpired, "fail_reason": model.PoolTaskFailExpired, "updated_at": now.Unix()}).Error; err != nil {
-				return err
-			}
-		}
-		return nil
+		return model.UpdateUpstreamPoolAccount(tx, account.Id, account.Version, map[string]any{
+			"run_status": model.PoolRunStatusAuthorizing, "last_error": "",
+		})
 	})
 	if err != nil {
 		if errors.Is(err, model.ErrPoolConflict) {
@@ -299,6 +250,65 @@ func StartAuth(ownerID, accountID int, kind string) (*StartAuthView, error) {
 		}
 		return nil, err
 	}
+	baseline, err := executor.ListCredentials(context.Background())
+	if err != nil {
+		// No remote start was attempted, so this reservation can safely end.
+		cleanupErr := db().Transaction(func(tx *gorm.DB) error {
+			if err := tx.Model(task).Updates(map[string]any{
+				"status": model.PoolTaskStatusFailed, "fail_reason": model.PoolTaskFailExecutorError,
+			}).Error; err != nil {
+				return err
+			}
+			if err := model.ReleaseUpstreamPoolClaim(tx, task.ExecutorId, task.Id); err != nil {
+				return err
+			}
+			return model.UpdateUpstreamPoolAccount(tx, account.Id, account.Version+1, map[string]any{
+				"run_status": model.PoolRunStatusExecutorOffline, "last_error": executorErrorText(err),
+			})
+		})
+		if cleanupErr != nil {
+			return nil, cleanupErr
+		}
+		return nil, err
+	}
+	// Persist intent before the network call. A crash or lost response can
+	// otherwise leave an untraceable remote session; the claim then stays held.
+	prepared := db().Model(task).Where("status = ? AND method = ?", model.PoolTaskStatusPending, "reserved").
+		Updates(map[string]any{"method": "starting", "baseline_refs": marshalBaseline(baseline)})
+	if prepared.Error != nil {
+		return nil, prepared.Error
+	}
+	if prepared.RowsAffected != 1 {
+		return nil, ErrPoolConflict
+	}
+	result, err := executor.StartAuth(context.Background(), StartAuthRequest{
+		Platform: account.Platform, AccessType: account.AccessType, Kind: kind,
+	})
+	if err != nil {
+		// Even an error response may follow remote session creation. Without a
+		// state reference it cannot be cancelled safely; retain the claim.
+		failTask(task, "remote_start_uncertain", time.Now())
+		_ = model.UpdateUpstreamPoolAccount(db(), account.Id, account.Version+1, map[string]any{
+			"run_status": model.PoolRunStatusExecutorOffline, "last_error": "remote_start_uncertain",
+		})
+		return nil, err
+	}
+	expiresAt := result.ExpiresAt
+	if expiresAt.IsZero() || expiresAt.Sub(now) > maxAuthTaskTTL {
+		expiresAt = now.Add(maxAuthTaskTTL)
+	}
+	saved := db().Model(task).Where("status = ? AND method = ?", model.PoolTaskStatusPending, "starting").
+		Updates(map[string]any{"method": result.Method, "executor_state_ref": result.StateRef,
+			"expires_at": expiresAt.Unix(), "updated_at": time.Now().Unix()})
+	if saved.Error != nil || saved.RowsAffected != 1 {
+		// Best effort remote cancellation is not a proof of worker termination.
+		_ = executor.CancelAuth(context.Background(), result.StateRef)
+		if saved.Error != nil {
+			return nil, saved.Error
+		}
+		return nil, ErrPoolConflict
+	}
+	task.ExpiresAt = expiresAt.Unix()
 	deviceURI := ""
 	if result.Method == AuthMethodOAuthDevice {
 		// The fixed protocol returns the verification URI in "url" for device
@@ -348,6 +358,9 @@ func CompleteAuth(ownerID, accountID int, input CompleteInput) (*model.UpstreamP
 		}
 		return nil, err
 	}
+	if task.Method == "reserved" || task.Method == "starting" {
+		return nil, ErrPoolConflict
+	}
 	if task.ExpiresAt <= now.Unix() {
 		_ = expireStaleTasks(accountID, now)
 		return nil, ErrPoolTaskExpired
@@ -383,7 +396,8 @@ func CompleteAuth(ownerID, accountID int, input CompleteInput) (*model.UpstreamP
 		CallbackURL: input.CallbackURL, Deadline: deadline,
 	}); err != nil {
 		failTask(&task, model.PoolTaskFailExecutorError, now)
-		_ = model.ReleaseUpstreamPoolClaim(db(), task.ExecutorId, task.Id)
+		// A timeout or interrupted exchange can leave the remote worker alive.
+		// Retain its claim instead of allowing a second authorization.
 		restore := task.PrevRunStatus
 		if restore == "" {
 			restore = model.PoolRunStatusAwaitingAuth
@@ -682,9 +696,16 @@ func CancelAuth(ownerID, accountID, taskID int) error {
 	if task.Status != model.PoolTaskStatusPending {
 		return ErrPoolTaskConsumed
 	}
+	if task.Method == "reserved" || task.Method == "starting" {
+		return ErrPoolConflict
+	}
 	now := time.Now()
 	if executor, err := executorFor(task.ExecutorId); err == nil {
 		switch state, statusErr := executor.AuthStatus(context.Background(), task.ExecutorStateRef); {
+		case statusErr != nil || state == AuthStateUnknown || state == AuthStateExpired || state == AuthStateFailed:
+			// The pinned protocol cannot distinguish purged completed sessions
+			// from cancelled/expired ones. Keep the claim for reconciliation.
+			return ErrPoolConflict
 		case statusErr == nil && state == AuthStateCompleted:
 			// The authorization finished server-side while the task sat
 			// pending: the new credential is an orphan candidate, cleaned up
@@ -693,16 +714,35 @@ func CancelAuth(ownerID, accountID, taskID int) error {
 			// completion never deletes a credential the completion just
 			// claimed.
 			var fresh model.UpstreamPoolAuthTask
-			if err := db().First(&fresh, task.Id).Error; err == nil && fresh.Status == model.PoolTaskStatusPending {
-				if entries, listErr := executor.ListCredentials(context.Background()); listErr == nil {
-					if credential, ok := correlateCredential(entries, parseBaseline(task.BaselineRefs)); ok {
-						_ = cleanupTaskCredential(executor, credential.Name, parseBaseline(task.BaselineRefs), accountID)
-					}
-				}
+			if err := db().First(&fresh, task.Id).Error; err != nil {
+				return err
+			}
+			if fresh.Status != model.PoolTaskStatusPending {
+				return ErrPoolTaskConsumed
+			}
+			entries, err := executor.ListCredentials(context.Background())
+			if err != nil {
+				return err
+			}
+			credential, ok := correlateCredential(entries, parseBaseline(task.BaselineRefs))
+			if !ok {
+				return ErrPoolCorrelationFail
+			}
+			if err := cleanupTaskCredential(executor, credential.Name, parseBaseline(task.BaselineRefs), accountID); err != nil {
+				return err
 			}
 		case statusErr == nil && state == AuthStateWaiting:
-			_ = executor.CancelAuth(context.Background(), task.ExecutorStateRef)
+			if err := executor.CancelAuth(context.Background(), task.ExecutorStateRef); err != nil {
+				return err
+			}
+			// Cancellation removes the session registration, but the worker may
+			// already be exchanging a code or saving a credential. No terminal
+			// worker acknowledgement exists: do not unblock a new authorization.
+			failTask(&task, "remote_cancel_unconfirmed", now)
+			return ErrPoolConflict
 		}
+	} else {
+		return err
 	}
 	result := db().Model(&task).Where("id = ? AND status = ?", task.Id, model.PoolTaskStatusPending).
 		Updates(map[string]any{"status": model.PoolTaskStatusCancelled, "updated_at": now.Unix()})
@@ -760,7 +800,9 @@ func ResumeAccount(ownerID, accountID, expectedVersion int) (*model.UpstreamPool
 // admitted reports whether the account passed capability admission. Phase two
 // has no admission path, so only the reserved "available" run status counts.
 func admitted(account *model.UpstreamPoolAccount) bool {
-	return account.RunStatus == model.PoolRunStatusAvailable
+	// No executor currently enforces account/model admission continuously.
+	// A mutable status or DEDICATED declaration cannot enable scheduling.
+	return false
 }
 
 func setAdminStatus(accountID, expectedVersion int, status string) (*model.UpstreamPoolAccount, error) {
@@ -815,6 +857,15 @@ func setAdminStatus(accountID, expectedVersion int, status string) (*model.Upstr
 // executor confirms is the local record deleted, so no orphaned credential
 // stays schedulable behind a deleted UI row.
 func DeleteAccount(ownerID, accountID int) error {
+	// Deleting the registry row must not erase an unresolved remote session
+	// reservation and let another account start on the same executor.
+	var held int64
+	if err := db().Model(&model.UpstreamPoolAuthClaim{}).Where("account_id = ?", accountID).Count(&held).Error; err != nil {
+		return err
+	}
+	if held > 0 {
+		return ErrPoolConflict
+	}
 	var account model.UpstreamPoolAccount
 	if err := db().First(&account, accountID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -832,13 +883,25 @@ func DeleteAccount(ownerID, accountID int) error {
 		}
 	}
 	return db().Transaction(func(tx *gorm.DB) error {
+		var held int64
+		if err := tx.Model(&model.UpstreamPoolAuthClaim{}).Where("account_id = ?", accountID).Count(&held).Error; err != nil {
+			return err
+		}
+		if held > 0 {
+			return ErrPoolConflict
+		}
 		if err := tx.Where("account_id = ?", accountID).Delete(&model.UpstreamPoolAuthTask{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("account_id = ?", accountID).Delete(&model.UpstreamPoolAuthClaim{}).Error; err != nil {
-			return err
+		if err := tx.Where("account_id = ?", accountID).Delete(&model.UpstreamPoolQuotaSnapshot{}).Error; err != nil { return err }
+		deleted := tx.Where("id = ? AND version = ?", account.Id, account.Version).Delete(&model.UpstreamPoolAccount{})
+		if deleted.Error != nil {
+			return deleted.Error
 		}
-		return tx.Delete(&model.UpstreamPoolAccount{}, accountID).Error
+		if deleted.RowsAffected != 1 {
+			return ErrPoolConflict
+		}
+		return nil
 	})
 }
 

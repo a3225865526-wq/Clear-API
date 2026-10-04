@@ -6,18 +6,24 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/controller"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service/accountpool"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const poolRawIdentity = "secret-identity@example-upstream.com"
@@ -29,6 +35,7 @@ const poolRawIdentity = "secret-identity@example-upstream.com"
 type mockPoolExecutor struct {
 	healthErr     error
 	listErr       error
+	list          func() ([]accountpool.CredentialEntry, error)
 	startAuthErr  error
 	startAuth     func(req accountpool.StartAuthRequest) (accountpool.StartAuthResult, error)
 	completeErr   error
@@ -90,6 +97,9 @@ func (m *mockPoolExecutor) CompleteAuth(_ context.Context, req accountpool.Compl
 }
 
 func (m *mockPoolExecutor) ListCredentials(context.Context) ([]accountpool.CredentialEntry, error) {
+	if m.list != nil {
+		return m.list()
+	}
 	if m.listErr != nil {
 		return nil, m.listErr
 	}
@@ -135,13 +145,20 @@ type poolTestSetup struct {
 
 func newPoolTestSetup(t *testing.T, enabled bool) *poolTestSetup {
 	t.Helper()
-	db := financeTestDB(t)
+	db := poolFixtureDB(t)
 	previousDB, previousLogDB := model.DB, model.LOG_DB
 	previousRedis, previousMemory := common.RedisEnabled, common.MemoryCacheEnabled
 	model.DB, model.LOG_DB = db, db
 	common.RedisEnabled, common.MemoryCacheEnabled = false, false
 	previousType := common.MainDatabaseType()
-	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
+	switch os.Getenv("FINANCE_TEST_DIALECT") {
+	case "mysql":
+		common.SetMainDatabaseType(common.DatabaseTypeMySQL)
+	case "postgres":
+		common.SetMainDatabaseType(common.DatabaseTypePostgreSQL)
+	default:
+		common.SetMainDatabaseType(common.DatabaseTypeSQLite)
+	}
 	t.Setenv("CLEARAPI_POOL_ENABLED", "true")
 	if !enabled {
 		t.Setenv("CLEARAPI_POOL_ENABLED", "false")
@@ -198,6 +215,109 @@ func newPoolTestSetup(t *testing.T, enabled bool) *poolTestSetup {
 	return setup
 }
 
+// poolFixtureDB creates independent fixtures only inside explicitly isolated
+// test services. Nothing points to an existing business database.
+func poolFixtureDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	dialect := os.Getenv("FINANCE_TEST_DIALECT")
+	if dialect != "" && dialect != "sqlite" {
+		require.Equal(t, "1", os.Getenv("POOL_ISOLATED_TEST"), "external engines require explicit isolated-test mode")
+	}
+	base := financeTestDB(t)
+	if dialect == "" || dialect == "sqlite" {
+		return base
+	}
+	require.Equal(t, "1", os.Getenv("POOL_ISOLATED_TEST"), "external engines require explicit isolated-test mode")
+	name := fmt.Sprintf("pool_fixture_%d", time.Now().UnixNano())
+	dsn := os.Getenv("FINANCE_TEST_DSN")
+	var dialector gorm.Dialector
+	switch dialect {
+	case "mysql":
+		require.Contains(t, dsn, "/pool_base?")
+		require.NoError(t, base.Exec("CREATE DATABASE `"+name+"`").Error)
+		dialector = mysql.Open(strings.Replace(dsn, "/pool_base?", "/"+name+"?", 1))
+	case "postgres":
+		require.Contains(t, dsn, "dbname=pool_base")
+		require.NoError(t, base.Exec("CREATE SCHEMA "+name).Error)
+		dialector = postgres.Open(dsn + " search_path=" + name)
+	default:
+		t.Fatal("unsupported pool test dialect")
+	}
+	db, err := gorm.Open(dialector, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(4)
+	t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+	return db
+}
+
+func TestPoolQuotaMigrationLegacyIdempotenceAndPersistence(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, setup.db.AutoMigrate(&model.UpstreamPoolAccount{}, &model.UpstreamPoolAuthTask{}, &model.UpstreamPoolAuthClaim{}))
+	require.ErrorIs(t, model.UpstreamPoolReady(setup.db), model.ErrPoolUnavailable)
+	legacy := model.UpstreamPoolAccount{Platform: "codex", AccessType: "oauth_browser", ExecutorId: accountpool.ExecutorCliproxyAPI, CredentialRef: "synthetic-legacy", Note: "keep"}
+	require.NoError(t, setup.db.Create(&legacy).Error)
+	for range 2 {
+		require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	}
+	require.NoError(t, model.UpstreamPoolReady(setup.db))
+	var retained model.UpstreamPoolAccount
+	require.NoError(t, setup.db.First(&retained, legacy.Id).Error)
+	require.Equal(t, "keep", retained.Note)
+	payload := `{"query_capability":"observations_only","result":"success","metrics":[{"kind":"remaining_percent","value":75,"unit":"%","scope":"shared_pool","pool":"primary","source":"upstream_derived","updated_at":1}],"next_refresh_at":0}`
+	require.NoError(t, setup.db.Create(&model.UpstreamPoolQuotaSnapshot{AccountId: legacy.Id, CredentialRef: legacy.CredentialRef, Payload: payload}).Error)
+	view, err := accountpool.QuotaForAccount(&retained, false)
+	require.NoError(t, err)
+	require.True(t, view.Stale)
+	require.Equal(t, float64(75), view.Metrics[0].Value)
+	response := setup.request("GET", fmt.Sprintf("/api/owner/pool/accounts/%d/quota", legacy.Id), "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	require.Contains(t, response.Body.String(), "unsupported")
+}
+
+func TestPoolChannelServerGatePersistenceSelectionAndEnable(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, setup.db.AutoMigrate(&model.Channel{}))
+	endpoint := "http://synthetic-pool.invalid:8317/v1"
+	t.Setenv("CLEARAPI_POOL_CLIPROXY_URL", endpoint)
+	channel := model.Channel{Type: 1, Name: "synthetic-pool", Status: common.ChannelStatusManuallyDisabled, BaseURL: &endpoint, OtherSettings: `{"upstream_pool":{}}`}
+	require.ErrorIs(t, channel.Insert(), model.ErrPoolChannelAdmission)
+	require.ErrorIs(t, model.BatchInsertChannels([]model.Channel{channel}), model.ErrPoolChannelAdmission)
+	require.NoError(t, setup.db.Create(&channel).Error) // synthetic legacy row bypasses application intentionally
+	channel.Status = common.ChannelStatusEnabled
+	require.ErrorIs(t, channel.Update(), model.ErrPoolChannelAdmission)
+	stripped := model.Channel{Id: channel.Id, Status: common.ChannelStatusEnabled}
+	require.ErrorIs(t, stripped.Update(), model.ErrPoolChannelAdmission)
+	require.ErrorIs(t, stripped.Save(), model.ErrPoolChannelAdmission)
+	patchAPI := gin.New()
+	patchAPI.PUT("/synthetic/channel", controller.UpdateChannel)
+	patchBody := fmt.Sprintf(`{"id":%d,"type":1,"name":"synthetic","models":"synthetic-model","group":"default","settings":"{}","base_url":"https://ordinary.invalid"}`, channel.Id)
+	patchRequest := httptest.NewRequest("PUT", "/synthetic/channel", strings.NewReader(patchBody))
+	patchRequest.Header.Set("Content-Type", "application/json")
+	patchResponse := httptest.NewRecorder()
+	patchAPI.ServeHTTP(patchResponse, patchRequest)
+	require.Equal(t, http.StatusConflict, patchResponse.Code, patchResponse.Body.String())
+	require.Contains(t, patchResponse.Body.String(), "POOL_CHANNEL_DISABLED")
+	require.False(t, model.UpdateChannelStatus(channel.Id, "", common.ChannelStatusEnabled, "manual enable"))
+	require.False(t, model.UpdateChannelStatus(channel.Id, "", common.ChannelStatusEnabled, "automatic recovery"))
+	var stored model.Channel
+	require.NoError(t, setup.db.First(&stored, channel.Id).Error)
+	require.Equal(t, common.ChannelStatusManuallyDisabled, stored.Status)
+	context, _ := gin.CreateTestContext(httptest.NewRecorder())
+	context.Request = httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"unregistered","tools":[{}],"messages":[{"content":[{"type":"image_url"}]}]}`))
+	require.NotNil(t, middleware.SetupContextForSelectedChannel(context, &channel, "unregistered"))
+	require.Equal(t, 0, setup.executor.startCalls)
+	ordinary := model.Channel{Type: 1, Name: "synthetic-ordinary", Status: common.ChannelStatusEnabled, Key: "synthetic-unused"}
+	require.NoError(t, ordinary.CheckPoolChannelAdmission())
+	require.NoError(t, ordinary.Save())
+	ordinary.Name = "synthetic-ordinary-edited"
+	require.NoError(t, ordinary.Save())
+	var ordinaryStored model.Channel
+	require.NoError(t, setup.db.First(&ordinaryStored, ordinary.Id).Error)
+	require.Equal(t, ordinary.Name, ordinaryStored.Name)
+}
+
 func ownerAccount(t *testing.T, setup *poolTestSetup, platform, accessType string) map[string]any {
 	t.Helper()
 	created := setup.request("POST", "/api/owner/pool/accounts", "synthetic-owner-pat", map[string]any{
@@ -252,6 +372,7 @@ func TestPoolRequiresOwnerIdentityOnEveryEndpoint(t *testing.T) {
 		{"POST", "/accounts/1/auth/cancel"}, {"POST", "/accounts/1/pause"},
 		{"POST", "/accounts/1/resume"}, {"POST", "/accounts/1/reauth"},
 		{"POST", "/accounts/1/delete"}, {"POST", "/accounts/1/sync"},
+		{"GET", "/accounts/1/quota"},
 	}
 	actors := []struct {
 		token  string
@@ -447,8 +568,14 @@ func TestPoolAuthExpiryCancelAndPlatformMismatch(t *testing.T) {
 	require.NoError(t, setup.db.Where("account_id = ?", id).First(&expiredTask).Error)
 	assert.Equal(t, model.PoolTaskStatusExpired, expiredTask.Status)
 	assert.Zero(t, setup.executor.completeCalls)
+	assert.Equal(t, http.StatusConflict, setup.request("POST", fmt.Sprintf("/api/owner/pool/accounts/%d/auth/start", id), "synthetic-owner-pat", map[string]any{}).Code)
 
-	// Cancel while waiting: the executor session is cancelled.
+	// Separate executor fixture: an expired remote session remains unresolved.
+	setup = newPoolTestSetup(t, true)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	account = ownerAccount(t, setup, "claude", "oauth_browser")
+	id = int(accountField(account, "id"))
+	// Cancel while waiting: cancellation is attempted, termination unconfirmed.
 	start = setup.request("POST", fmt.Sprintf("/api/owner/pool/accounts/%d/auth/start", id), "synthetic-owner-pat", map[string]any{})
 	require.Equal(t, http.StatusOK, start.Code)
 	var started struct {
@@ -458,15 +585,21 @@ func TestPoolAuthExpiryCancelAndPlatformMismatch(t *testing.T) {
 	}
 	require.NoError(t, common.Unmarshal(start.Body.Bytes(), &started))
 	cancelled := setup.request("POST", fmt.Sprintf("/api/owner/pool/accounts/%d/auth/cancel", id), "synthetic-owner-pat", map[string]any{"task_id": started.Data.TaskId})
-	assert.Equal(t, http.StatusOK, cancelled.Code)
+	assert.Equal(t, http.StatusConflict, cancelled.Code)
 	assert.Equal(t, 1, setup.executor.cancelCalls)
 	assert.Equal(t, http.StatusConflict, setup.request("POST", fmt.Sprintf("/api/owner/pool/accounts/%d/auth/complete", id), "synthetic-owner-pat", map[string]any{"callback_url": "https://x.example/cb?code=a&state=b"}).Code)
 	var cancelledTask model.UpstreamPoolAuthTask
 	require.NoError(t, setup.db.Where("account_id = ?", id).Order("id desc").First(&cancelledTask).Error)
-	assert.Equal(t, model.PoolTaskStatusCancelled, cancelledTask.Status)
+	assert.Equal(t, model.PoolTaskStatusFailed, cancelledTask.Status)
+	assert.Equal(t, "remote_cancel_unconfirmed", cancelledTask.FailReason)
+	assert.Equal(t, http.StatusConflict, setup.request("POST", fmt.Sprintf("/api/owner/pool/accounts/%d/auth/start", id), "synthetic-owner-pat", map[string]any{}).Code)
 
 	// Cancel after the session silently completed: the correlated orphan
 	// credential is deleted, the pre-existing one is untouched.
+	setup = newPoolTestSetup(t, true)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	account = ownerAccount(t, setup, "claude", "oauth_browser")
+	id = int(accountField(account, "id"))
 	setup.executor.files = []accountpool.CredentialEntry{
 		{Name: "kept-existing.json", Email: "kept@existing.test", UpdatedAt: 1},
 	}
@@ -884,6 +1017,7 @@ func TestPoolConcurrentStartAtomicClaim(t *testing.T) {
 	}
 	assert.Equal(t, 1, wins)
 	assert.Equal(t, 1, conflicts)
+	assert.Equal(t, 1, setup.executor.startCalls, "the losing request must never start a remote session")
 	var pendingTasks, claims int64
 	require.NoError(t, setup.db.Model(&model.UpstreamPoolAuthTask{}).Where("status = ?", model.PoolTaskStatusPending).Count(&pendingTasks).Error)
 	require.NoError(t, setup.db.Model(&model.UpstreamPoolAuthClaim{}).Count(&claims).Error)
@@ -897,7 +1031,7 @@ func TestPoolConcurrentStartAtomicClaim(t *testing.T) {
 	assert.Equal(t, http.StatusOK, started.Code, started.Body.String())
 }
 
-func TestPoolClaimTakeoverOnExpiryAndSweep(t *testing.T) {
+func TestPoolClaimExpiryAndOrphanFailClosed(t *testing.T) {
 	setup := newPoolTestSetup(t, true)
 	require.NoError(t, model.MigrateUpstreamPool(setup.db))
 	account := ownerAccount(t, setup, "claude", "oauth_browser")
@@ -913,15 +1047,201 @@ func TestPoolClaimTakeoverOnExpiryAndSweep(t *testing.T) {
 	require.NoError(t, setup.db.Create(&model.UpstreamPoolAuthClaim{ExecutorId: "other-executor", AccountId: id, TaskId: 999999, ExpiresAt: time.Now().Add(time.Hour).Unix()}).Error)
 
 	started := setup.request("POST", fmt.Sprintf("/api/owner/pool/accounts/%d/auth/start", otherID), "synthetic-owner-pat", map[string]any{})
-	require.Equal(t, http.StatusOK, started.Code, started.Body.String())
+	require.Equal(t, http.StatusConflict, started.Code, started.Body.String())
+	assert.Zero(t, setup.executor.startCalls, "expiry does not prove the abandoned remote worker stopped")
 	var stale model.UpstreamPoolAuthTask
 	require.NoError(t, setup.db.First(&stale, staleTask.Id).Error)
-	assert.Equal(t, model.PoolTaskStatusExpired, stale.Status, "takeover expires the abandoned task")
+	assert.Equal(t, model.PoolTaskStatusPending, stale.Status)
 	var claims []model.UpstreamPoolAuthClaim
 	require.NoError(t, setup.db.Find(&claims).Error)
-	require.Len(t, claims, 1)
-	assert.Equal(t, otherID, claims[0].AccountId)
-	assert.Equal(t, startedTaskID(t, setup, otherID), claims[0].TaskId, "orphaned claim is swept, expired claim is taken over")
+	require.Len(t, claims, 2, "neither expiry nor a missing local task proves remote termination")
+}
+
+func TestPoolReservationCommittedBeforeRemoteOperations(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	first := ownerAccount(t, setup, "claude", "oauth_browser")
+	second := ownerAccount(t, setup, "codex", "oauth_browser")
+	firstID, secondID := int(accountField(first, "id")), int(accountField(second, "id"))
+	entered, release := make(chan struct{}), make(chan struct{})
+	baselineCalls := 0
+	setup.executor.list = func() ([]accountpool.CredentialEntry, error) {
+		baselineCalls++
+		var claim model.UpstreamPoolAuthClaim
+		if err := setup.db.First(&claim, "executor_id = ?", "cliproxyapi").Error; err != nil {
+			return nil, err
+		}
+		var task model.UpstreamPoolAuthTask
+		if err := setup.db.First(&task, claim.TaskId).Error; err != nil {
+			return nil, err
+		}
+		if task.Method != "reserved" || task.AccountId != firstID {
+			return nil, fmt.Errorf("reservation not committed before baseline")
+		}
+		return nil, nil
+	}
+	setup.executor.startAuth = func(accountpool.StartAuthRequest) (accountpool.StartAuthResult, error) {
+		close(entered)
+		<-release
+		return accountpool.StartAuthResult{Method: "oauth_browser", StateRef: "synthetic-held", AuthURL: "https://example.test/auth"}, nil
+	}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := accountpool.StartAuth(1, firstID, "initial")
+		finished <- err
+	}()
+	<-entered
+	_, losingErr := accountpool.StartAuth(1, secondID, "initial")
+	var task model.UpstreamPoolAuthTask
+	readErr := setup.db.Where("account_id = ?", firstID).First(&task).Error
+	// Cancellation/completion cannot release a reservation while the remote
+	// response is in flight, even if the task id is guessed by the owner.
+	cancelErr := accountpool.CancelAuth(1, firstID, task.Id)
+	_, completeErr := accountpool.CompleteAuth(1, firstID, accountpool.CompleteInput{})
+	close(release)
+	require.NoError(t, <-finished)
+	require.NoError(t, readErr)
+	assert.ErrorIs(t, losingErr, accountpool.ErrPoolConflict)
+	assert.ErrorIs(t, cancelErr, accountpool.ErrPoolConflict)
+	assert.ErrorIs(t, completeErr, accountpool.ErrPoolConflict)
+	assert.Equal(t, 1, baselineCalls)
+	assert.Equal(t, 1, setup.executor.startCalls)
+}
+
+func TestPoolRemoteStartLostResponseRetainsClaim(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	first := ownerAccount(t, setup, "claude", "oauth_browser")
+	second := ownerAccount(t, setup, "codex", "oauth_browser")
+	firstID, secondID := int(accountField(first, "id")), int(accountField(second, "id"))
+	remoteActive := false
+	setup.executor.startAuth = func(accountpool.StartAuthRequest) (accountpool.StartAuthResult, error) {
+		remoteActive = true // upstream created a session but the response was lost
+		return accountpool.StartAuthResult{}, accountpool.ErrPoolExecutorOffline
+	}
+	_, err := accountpool.StartAuth(1, firstID, "initial")
+	require.Error(t, err)
+	_, err = accountpool.StartAuth(1, secondID, "initial")
+	assert.ErrorIs(t, err, accountpool.ErrPoolConflict)
+	assert.True(t, remoteActive)
+	assert.Equal(t, 1, setup.executor.startCalls)
+	assert.Zero(t, setup.executor.cancelCalls, "an unknown state cannot be guessed")
+	var task model.UpstreamPoolAuthTask
+	require.NoError(t, setup.db.Where("account_id = ?", firstID).First(&task).Error)
+	assert.Equal(t, "remote_start_uncertain", task.FailReason)
+	assert.ErrorIs(t, accountpool.DeleteAccount(1, firstID), accountpool.ErrPoolConflict, "registry deletion cannot discard the remote reservation")
+}
+
+func TestPoolRemoteStartPersistenceFailureRetainsClaim(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	account := ownerAccount(t, setup, "claude", "oauth_browser")
+	id := int(accountField(account, "id"))
+	const callback = "synthetic:reject_remote_state_save"
+	require.NoError(t, setup.db.Callback().Update().Before("gorm:update").Register(callback, func(tx *gorm.DB) {
+		if fields, ok := tx.Statement.Dest.(map[string]any); ok && fields["executor_state_ref"] != nil {
+			tx.AddError(fmt.Errorf("synthetic persistence failure"))
+		}
+	}))
+	t.Cleanup(func() { setup.db.Callback().Update().Remove(callback) })
+	_, err := accountpool.StartAuth(1, id, "initial")
+	require.ErrorContains(t, err, "synthetic persistence failure")
+	assert.Equal(t, 1, setup.executor.startCalls)
+	assert.Equal(t, 1, setup.executor.cancelCalls, "known remote session gets a best effort cancel")
+	_, err = accountpool.StartAuth(1, id, "initial")
+	assert.ErrorIs(t, err, accountpool.ErrPoolConflict)
+	assert.Equal(t, 1, setup.executor.startCalls, "failed local save cannot permit another remote start")
+}
+
+func TestPoolReservationCommitFailureNeverTouchesExecutor(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	account := ownerAccount(t, setup, "claude", "oauth_browser")
+	id := int(accountField(account, "id"))
+	const callback = "synthetic:reject_claim"
+	require.NoError(t, setup.db.Callback().Create().Before("gorm:create").Register(callback, func(tx *gorm.DB) {
+		if _, ok := tx.Statement.Dest.(*model.UpstreamPoolAuthClaim); ok {
+			tx.AddError(fmt.Errorf("synthetic reservation failure"))
+		}
+	}))
+	t.Cleanup(func() { setup.db.Callback().Create().Remove(callback) })
+	baselineCalls := 0
+	setup.executor.list = func() ([]accountpool.CredentialEntry, error) {
+		baselineCalls++
+		return nil, nil
+	}
+	_, err := accountpool.StartAuth(1, id, "initial")
+	require.ErrorContains(t, err, "synthetic reservation failure")
+	assert.Zero(t, baselineCalls)
+	assert.Zero(t, setup.executor.startCalls)
+}
+
+func TestPoolBaselineFailureNeverStartsRemote(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	account := ownerAccount(t, setup, "claude", "oauth_browser")
+	id := int(accountField(account, "id"))
+	setup.executor.listErr = accountpool.ErrPoolExecutorOffline
+	_, err := accountpool.StartAuth(1, id, "initial")
+	require.Error(t, err)
+	assert.Zero(t, setup.executor.startCalls)
+	setup.executor.listErr = nil
+	_, err = accountpool.StartAuth(1, id, "initial")
+	require.NoError(t, err, "a baseline failure did not create a remote session")
+	assert.Equal(t, 1, setup.executor.startCalls)
+}
+
+func TestPoolRemoteCompletionTimeoutAndCancelFailureRetainClaim(t *testing.T) {
+	for _, operation := range []string{"complete", "cancel"} {
+		t.Run(operation, func(t *testing.T) {
+			setup := newPoolTestSetup(t, true)
+			require.NoError(t, model.MigrateUpstreamPool(setup.db))
+			account := ownerAccount(t, setup, "claude", "oauth_browser")
+			id := int(accountField(account, "id"))
+			started, err := accountpool.StartAuth(1, id, "initial")
+			require.NoError(t, err)
+			if operation == "complete" {
+				setup.executor.completeErr = accountpool.ErrPoolAuthTimeout
+				_, err = accountpool.CompleteAuth(1, id, accountpool.CompleteInput{Code: "synthetic-code", State: "synthetic-state"})
+				assert.ErrorIs(t, err, accountpool.ErrPoolAuthTimeout)
+			} else {
+				setup.executor.cancelErr = accountpool.ErrPoolExecutorOffline
+				err = accountpool.CancelAuth(1, id, started.TaskId)
+				assert.ErrorIs(t, err, accountpool.ErrPoolExecutorOffline)
+			}
+			_, err = accountpool.StartAuth(1, id, "initial")
+			assert.ErrorIs(t, err, accountpool.ErrPoolConflict)
+			assert.Equal(t, 1, setup.executor.startCalls)
+			assert.ErrorIs(t, accountpool.DeleteAccount(1, id), accountpool.ErrPoolConflict)
+		})
+	}
+}
+
+func TestPoolInterruptedStartAndCancelledWorkerRemainBlocked(t *testing.T) {
+	for _, method := range []string{"starting", "oauth_browser"} {
+		t.Run(method, func(t *testing.T) {
+			setup := newPoolTestSetup(t, true)
+			require.NoError(t, model.MigrateUpstreamPool(setup.db))
+			account := ownerAccount(t, setup, "claude", "oauth_browser")
+			id := int(accountField(account, "id"))
+			// Durable state left by a process exit: a remote worker can outlive
+			// the process and the local TTL. No real process or account is used.
+			task := model.UpstreamPoolAuthTask{AccountId: id, ExecutorId: "cliproxyapi", Method: method, ExecutorStateRef: "synthetic-survivor", Status: "pending", ExpiresAt: time.Now().Add(-time.Hour).Unix()}
+			require.NoError(t, setup.db.Create(&task).Error)
+			require.NoError(t, setup.db.Create(&model.UpstreamPoolAuthClaim{ExecutorId: "cliproxyapi", AccountId: id, TaskId: task.Id, ExpiresAt: task.ExpiresAt}).Error)
+			setup.executor.authState = accountpool.AuthStateWaiting
+			err := accountpool.CancelAuth(1, id, task.Id)
+			assert.ErrorIs(t, err, accountpool.ErrPoolConflict)
+			_, err = accountpool.StartAuth(1, id, "initial")
+			assert.ErrorIs(t, err, accountpool.ErrPoolConflict)
+			assert.Zero(t, setup.executor.startCalls)
+			if method == "oauth_browser" {
+				assert.Equal(t, 1, setup.executor.cancelCalls, "remote cancellation attempted but not assumed to stop the worker")
+			} else {
+				assert.Zero(t, setup.executor.cancelCalls)
+			}
+		})
+	}
 }
 
 func startedTaskID(t *testing.T, setup *poolTestSetup, accountID int) int {
@@ -978,9 +1298,19 @@ func TestPoolCancelCompleteRace(t *testing.T) {
 			assert.Equal(t, "race-new-file.json", after.CredentialRef)
 			assert.Equal(t, model.PoolRunStatusNotAdmitted, after.RunStatus)
 		} else {
-			// Cancel won: the task-created orphan is cleaned, baseline kept.
-			assert.Equal(t, []string{"race-new-file.json"}, setup.executor.deleteCalls)
 			assert.Empty(t, after.CredentialRef)
+			if len(setup.executor.deleteCalls) > 0 {
+				// Proven completion lost the local commit: its new orphan is
+				// cleaned without touching the baseline credential.
+				assert.Equal(t, []string{"race-new-file.json"}, setup.executor.deleteCalls)
+			} else {
+				// Cancellation interrupted local completion without proving
+				// remote worker termination. Keep the reservation and reject
+				// any further authorization, rather than claiming cleanup.
+				assert.Equal(t, http.StatusConflict, cancelCode)
+				_, err := accountpool.StartAuth(1, id, "initial")
+				assert.ErrorIs(t, err, accountpool.ErrPoolConflict)
+			}
 		}
 	}
 }

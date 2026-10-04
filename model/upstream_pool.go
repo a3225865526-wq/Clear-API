@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Site-owner upstream account pool. Credentials themselves never live in this
@@ -116,25 +117,33 @@ type UpstreamPoolAuthTask struct {
 }
 
 func MigrateUpstreamPool(db *gorm.DB) error {
-	return db.AutoMigrate(&UpstreamPoolAccount{}, &UpstreamPoolAuthTask{}, &UpstreamPoolAuthClaim{})
+	return db.AutoMigrate(&UpstreamPoolAccount{}, &UpstreamPoolAuthTask{}, &UpstreamPoolAuthClaim{}, &UpstreamPoolQuotaSnapshot{})
 }
 
 func UpstreamPoolReady(db *gorm.DB) error {
 	if db == nil {
 		return ErrPoolUnavailable
 	}
-	if !db.Migrator().HasTable(&UpstreamPoolAccount{}) || !db.Migrator().HasTable(&UpstreamPoolAuthTask{}) || !db.Migrator().HasTable(&UpstreamPoolAuthClaim{}) {
+	if !db.Migrator().HasTable(&UpstreamPoolAccount{}) || !db.Migrator().HasTable(&UpstreamPoolAuthTask{}) || !db.Migrator().HasTable(&UpstreamPoolAuthClaim{}) || !db.Migrator().HasTable(&UpstreamPoolQuotaSnapshot{}) {
 		return ErrPoolUnavailable
 	}
 	return nil
+}
+
+// UpstreamPoolQuotaSnapshot holds only bounded, non-secret quota observations.
+// It is independent of account version updates and never changes scheduling.
+type UpstreamPoolQuotaSnapshot struct {
+	AccountId     int    `gorm:"primaryKey"`
+	CredentialRef string `gorm:"type:varchar(191)"`
+	Payload       string `gorm:"type:text"`
 }
 
 // UpstreamPoolAuthClaim is the atomic per-executor authorization claim. The
 // primary key on executor_id makes acquisition an insert race across
 // processes: only one pending authorization may exist per executor instance
 // because completion correlates the new credential by diffing the executor
-// listing against the task baseline. Claims expire with their task; taking
-// over an expired claim is itself an atomic conditional update.
+// listing against the task baseline. ExpiresAt describes the local task TTL,
+// not proof of remote termination; unresolved claims remain held past it.
 type UpstreamPoolAuthClaim struct {
 	ExecutorId string `json:"executor_id" gorm:"primaryKey;type:varchar(64)"`
 	AccountId  int    `json:"account_id" gorm:"index"`
@@ -144,27 +153,33 @@ type UpstreamPoolAuthClaim struct {
 }
 
 // AcquireUpstreamPoolClaim claims the executor for one authorization round.
-// Returns ErrPoolConflict while a live claim exists; an expired claim is
-// taken over atomically (the caller must expire its stale task first).
-// released reports whether an existing expired claim had to be taken over.
+// Returns ErrPoolConflict while any claim exists, including expired claims.
+// released is retained for caller compatibility and is always false.
 func AcquireUpstreamPoolClaim(db *gorm.DB, executorId string, accountID, taskID int, expiresAt int64) (released bool, err error) {
 	if db == nil {
 		return false, ErrPoolUnavailable
 	}
 	claim := &UpstreamPoolAuthClaim{ExecutorId: executorId, AccountId: accountID, TaskId: taskID, ExpiresAt: expiresAt, CreatedAt: time.Now().Unix()}
-	if err := db.Create(claim).Error; err == nil {
-		return false, nil
+	// A local TTL cannot prove that a remote authorization worker stopped.
+	// Do not reclaim on expiry or on a terminal local task status. DO NOTHING
+	// also avoids aborting a PostgreSQL transaction on a uniqueness conflict.
+	insert := db.Clauses(clause.OnConflict{DoNothing: true}).Create(claim)
+	if insert.Error != nil {
+		return false, insert.Error
 	}
-	takeover := db.Model(&UpstreamPoolAuthClaim{}).
-		Where("executor_id = ? AND expires_at <= ?", executorId, time.Now().Unix()).
-		Updates(map[string]any{"account_id": accountID, "task_id": taskID, "expires_at": expiresAt, "created_at": time.Now().Unix()})
-	if takeover.Error != nil {
-		return false, takeover.Error
-	}
-	if takeover.RowsAffected == 0 {
+	if insert.RowsAffected == 0 {
 		return false, ErrPoolConflict
 	}
-	return true, nil
+	// MySQL clientFoundRows can report one affected row for a no-op duplicate
+	// update. Verify ownership instead of trusting that count as acquisition.
+	var stored UpstreamPoolAuthClaim
+	if err := db.Where("executor_id = ?", executorId).First(&stored).Error; err != nil {
+		return false, err
+	}
+	if stored.TaskId != taskID || stored.AccountId != accountID {
+		return false, ErrPoolConflict
+	}
+	return false, nil
 }
 
 // ReleaseUpstreamPoolClaim drops the claim when it belongs to the given task.
@@ -175,14 +190,14 @@ func ReleaseUpstreamPoolClaim(db *gorm.DB, executorId string, taskID int) error 
 	return db.Where("executor_id = ? AND task_id = ?", executorId, taskID).Delete(&UpstreamPoolAuthClaim{}).Error
 }
 
-// SweepUpstreamPoolClaims removes claims whose task is no longer pending
-// (crash/process-exit leftovers). GORM subquery, dialect-safe.
+// SweepUpstreamPoolClaims intentionally preserves unresolved reservations.
+// Local task settlement or absence cannot establish remote termination.
 func SweepUpstreamPoolClaims(db *gorm.DB) error {
 	if db == nil {
 		return ErrPoolUnavailable
 	}
-	live := db.Model(&UpstreamPoolAuthTask{}).Select("id").Where("status = ?", PoolTaskStatusPending)
-	return db.Where("task_id NOT IN (?)", live).Delete(&UpstreamPoolAuthClaim{}).Error
+	// Unknown remote sessions require reconciliation, never automatic deletion.
+	return nil
 }
 
 // UpdateUpstreamPoolAccount applies a column update guarded by the row

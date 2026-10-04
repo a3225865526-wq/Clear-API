@@ -511,6 +511,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		other = GenerateTextOtherInfo(ctx, relayInfo, summary.ModelRatio, summary.GroupRatio, summary.CompletionRatio, summary.CacheTokens, summary.CacheRatio, summary.ModelPrice, relayInfo.PriceData.GroupRatioInfo.GroupSpecialRatio)
 	}
 	appendUsageBillingPathForLog(other, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens), originUsage)
+	observation := TokenObservationForLog(ctx, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens))
+	observation.InternalModel, observation.ModelAlias = relayInfo.UpstreamModelName, relayInfo.OriginModelName
+	other.SetAdmin("token_observation", observation)
 	if settlementFailed {
 		other.SetAdmin("settlement_failed", true)
 		other.SetAdmin("expected_quota", expectedQuota)
