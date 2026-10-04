@@ -153,7 +153,11 @@ func PostCodexUnavailableQuota(c *gin.Context, info *relaycommon.RelayInfo, usag
 	other := model.NewLogOther()
 	other.SetAdmin("codex_metering", usage.CodexMetering)
 	other.SetAdmin("settlement_status", status)
-	other.SetAdmin("stream_interrupted", info.IsStream && info.StreamStatus.ResponseOutcome() != "completed")
+	streamInterrupted := false
+	if info.StreamStatus != nil {
+		streamInterrupted = info.IsStream && info.StreamStatus.ResponseOutcome() != "completed"
+	}
+	other.SetAdmin("stream_interrupted", streamInterrupted)
 	CaptureFinanceUsage(c, info, map[string]*string{}, "codex_authoritative_usage_unavailable")
 	CaptureFinanceBilling(info, "text_settlement", &charged, info.BillingSource, status)
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{ChannelId: info.ChannelId, ModelName: info.GetBillingModelName(), TokenId: info.TokenId, Quota: charged, IsStream: info.IsStream, Group: info.UsingGroup, Content: "Codex authoritative usage unavailable; retained reservation is not a token bill", Other: other})

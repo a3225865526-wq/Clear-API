@@ -157,6 +157,9 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, req)
+	// Ask the gateway for the versioned metering envelope; billing reads the
+	// authoritative upstream usage from it instead of estimating tokens.
+	req.Set("X-Codex-Metering", "v1")
 
 	key := strings.TrimSpace(info.ApiKey)
 	if !strings.HasPrefix(key, "{") {
