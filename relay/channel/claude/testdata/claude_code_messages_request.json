@@ -1,0 +1,81 @@
+{
+  "model": "claude-sonnet-4-5-20250929",
+  "max_tokens": 32000,
+  "metadata": {
+    "user_id": "user-synthetic__account-00000000-0000-0000-0000-000000000000_session-11111111-1111-1111-1111-111111111111"
+  },
+  "stop_sequences": ["ANTHROPIC_SYNTHETIC_STOP"],
+  "stream": true,
+  "temperature": 1,
+  "system": [
+    {
+      "type": "text",
+      "text": "You are Claude Code, Anthropic's official CLI for Claude.",
+      "cache_control": {"type": "ephemeral"}
+    },
+    {
+      "type": "text",
+      "text": "Synthetic fixture: system context block two."
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {"type": "text", "text": "List the files in the current directory."}
+      ]
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {"type": "text", "text": "I'll list the files for you."},
+        {
+          "type": "tool_use",
+          "id": "toolu_01SyntheticFixtureA",
+          "name": "Bash",
+          "input": {"command": "ls -la", "description": "list directory contents"}
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "toolu_01SyntheticFixtureA",
+          "content": [
+            {"type": "text", "text": "total 8\ndrwxr-xr-x  2 user user 4096 fixture"}
+          ],
+          "cache_control": {"type": "ephemeral"}
+        },
+        {"type": "text", "text": "Now summarize the listing."}
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "name": "Bash",
+      "description": "Executes a synthetic bash command",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "command": {"type": "string", "description": "The command to execute"},
+          "description": {"type": "string"}
+        },
+        "required": ["command"]
+      }
+    },
+    {
+      "name": "Read",
+      "description": "Reads a synthetic file",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "file_path": {"type": "string"}
+        },
+        "required": ["file_path"]
+      }
+    }
+  ],
+  "tool_choice": {"type": "auto", "disable_parallel_tool_use": false}
+}
