@@ -98,7 +98,17 @@ func ensureLogRequestId(log *Log) {
 	}
 }
 
+// errLogDBUnavailable is returned instead of panicking on a nil LOG_DB.
+// Billing has usually committed by the time logs are written; callers log
+// this error so a logging outage stays observable without corrupting
+// already-committed billing state (the durable outbox on the main DB stays
+// canonical and is delivered once the log DB returns).
+var errLogDBUnavailable = errors.New("log database is not initialized")
+
 func createLog(log *Log) error {
+	if LOG_DB == nil {
+		return errLogDBUnavailable
+	}
 	ensureLogRequestId(log)
 	if log.Type == LogTypeConsume {
 		if handled, err := EnrichBillingCompletionLog(log); handled {
