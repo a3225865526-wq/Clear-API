@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/relay/channel/openai"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
@@ -66,7 +67,30 @@ func xAIStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 		}
 	})
 
+	info.StreamStatus.RequireTerminal()
+	if outcome := info.StreamStatus.OutcomeSnapshot(); outcome.ExpectsTerminal && outcome.EndReason != relaycommon.StreamEndReasonDone {
+		// A chat-completions stream ends with [DONE]; anything else (EOF,
+		// timeout, scanner error, client cancel) means the upstream stream was
+		// cut short. Never turn that into a synthetic successful [DONE]: mark
+		// the interruption, surface an incomplete-stream error frame, and let
+		// the caller settle on flagged estimated usage.
+		service.MarkTokenInterrupted(c)
+		const incompleteMessage = "upstream stream ended before the terminal event"
+		info.StreamStatus.MarkFailed("incomplete_stream", "upstream_error", http.StatusBadGateway)
+		info.StreamStatus.RecordError(incompleteMessage)
+		logger.LogError(c, incompleteMessage)
+		openai.WriteIncompleteStreamError(c, info, incompleteMessage)
+		if !containStreamUsage {
+			service.MarkTokenEstimate(c)
+			usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+			usage.CompletionTokens += toolCount * 7
+		}
+		service.CloseResponseBodyGracefully(resp)
+		return usage, nil
+	}
+
 	if !containStreamUsage {
+		service.MarkTokenEstimate(c)
 		usage = service.ResponseText2Usage(c, responseTextBuilder.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		usage.CompletionTokens += toolCount * 7
 	}

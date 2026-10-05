@@ -247,6 +247,13 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	return usage, nil
 }
 
+// WriteIncompleteStreamError is the shared terminal-frame entry point for
+// adaptors outside this package whose stream ended before the protocol's
+// terminal event (see OaiStreamHandler's interrupted path).
+func WriteIncompleteStreamError(c *gin.Context, info *relaycommon.RelayInfo, message string) {
+	writeIncompleteStreamError(c, info, message)
+}
+
 func writeIncompleteStreamError(c *gin.Context, info *relaycommon.RelayInfo, message string) {
 	switch info.RelayFormat {
 	case types.RelayFormatClaude:
