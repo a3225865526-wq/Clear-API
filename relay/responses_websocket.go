@@ -483,6 +483,14 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 					if rejected.StatusCode < 400 || rejected.StatusCode > 599 {
 						rejected.StatusCode = http.StatusBadRequest
 					}
+					// An error frame before any response event is a definitive
+					// rejection: the provider did no work, so the dispatch fence
+					// must not turn the reservation into an uncertain settlement.
+					// Retain the fence only if a non-response event was already
+					// observed, which keeps the shared failure policy conservative.
+					if !accumulator.Started() {
+						c.Set("upstream_attempted", false)
+					}
 					return rejected
 				}
 				if strings.HasPrefix(event.Type, "response.") {

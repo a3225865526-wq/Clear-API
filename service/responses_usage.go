@@ -34,6 +34,14 @@ func NewResponsesUsageAccumulator(info *relaycommon.RelayInfo, contexts ...*gin.
 	return a
 }
 
+// Started reports whether any upstream event was fed to the accumulator. A
+// rejection that ends a stream before this became true is a definitive
+// no-work outcome: the provider answered the create with an error and never
+// produced a response event, delta, or usage observation.
+func (a *ResponsesUsageAccumulator) Started() bool {
+	return a.started
+}
+
 func (a *ResponsesUsageAccumulator) Observe(event *dto.ResponsesStreamResponse) {
 	if a == nil || event == nil || a.finished {
 		return
