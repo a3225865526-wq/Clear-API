@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-stage6-xai-3",
+  "object": "chat.completion",
+  "created": 1759650000,
+  "model": "grok-4",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Mostly sunny, 24C.",
+        "reasoning_content": "checked the weather provider first"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 50,
+    "completion_tokens": 30,
+    "total_tokens": 80,
+    "completion_tokens_details": { "reasoning_tokens": 12 }
+  }
+}

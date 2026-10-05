@@ -1,0 +1,3 @@
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Partial an"}]}}],"modelVersion":"gemini-2.5-flash","usageMetadata":{"promptTokenCount":120,"totalTokenCount":120}}
+
+data: {"candidates":[{"content":{"role":"model","parts":[{"text":"swer"}]}}],"modelVersion":"gemini-2.5-flash"}

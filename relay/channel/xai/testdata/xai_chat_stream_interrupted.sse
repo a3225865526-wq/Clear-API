@@ -1,0 +1,3 @@
+data: {"id":"chatcmpl-stage6-xai-2","object":"chat.completion.chunk","created":1759650000,"model":"grok-4","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-stage6-xai-2","object":"chat.completion.chunk","created":1759650000,"model":"grok-4","choices":[{"index":0,"delta":{"content":"Partial out"},"finish_reason":null}]}

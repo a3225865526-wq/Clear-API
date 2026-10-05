@@ -1,0 +1,71 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [
+        { "text": "What is in this picture and what tool would you use to check the weather?" },
+        { "inlineData": { "mimeType": "image/png", "data": "aW1hZ2UtYnl0ZXMtc3ludGhldGlj" } },
+        { "fileData": { "fileUri": "https://www.youtube.com/watch?v=synthetic", "mimeType": "video/webm" } }
+      ]
+    },
+    {
+      "role": "model",
+      "parts": [
+        { "text": "The picture shows a synthetic skyline." },
+        { "functionCall": { "name": "get_weather", "args": { "city": "Hangzhou" } } }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        { "functionResponse": { "name": "get_weather", "response": { "output": { "temperature": 24 } } } }
+      ]
+    }
+  ],
+  "systemInstruction": {
+    "role": "user",
+    "parts": [{ "text": "You are a helpful weather assistant." }]
+  },
+  "tools": [
+    {
+      "functionDeclarations": [
+        {
+          "name": "get_weather",
+          "description": "Look up current weather for a city",
+          "parameters": {
+            "type": "OBJECT",
+            "properties": {
+              "city": { "type": "STRING" }
+            },
+            "required": ["city"]
+          }
+        }
+      ]
+    }
+  ],
+  "toolConfig": {
+    "functionCallingConfig": { "mode": "AUTO" }
+  },
+  "safetySettings": [
+    { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH" },
+    { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "OFF" }
+  ],
+  "generationConfig": {
+    "temperature": 0.7,
+    "topP": 0.9,
+    "maxOutputTokens": 1024,
+    "stopSequences": ["END"],
+    "responseMimeType": "application/json",
+    "responseSchema": {
+      "type": "OBJECT",
+      "properties": {
+        "summary": { "type": "STRING" }
+      }
+    },
+    "thinkingConfig": {
+      "includeThoughts": true,
+      "thinkingBudget": 2048
+    }
+  },
+  "cachedContent": "cachedContents/synthetic-stage6"
+}
