@@ -49,6 +49,11 @@ type ChannelFilter struct {
 	TaskPluginKey          string
 	TaskPluginKeys         []string
 	TaskPluginChannelTypes []int
+	// AllowCanonicalPool relaxes the api-side model-source filter for
+	// unconfigured requested names: a pool-bound channel still matches when
+	// the canonical model it resolves to is pool-published. Explicit
+	// api-source/paused routes never set this.
+	AllowCanonicalPool bool
 }
 
 type ChannelConstraints struct {

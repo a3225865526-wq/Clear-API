@@ -176,25 +176,43 @@ func ResolveChannelUpstreamModel(channel *Channel, modelName string) string {
 }
 
 // CheckPoolChannelPoolAdmission is the request-time gate for a pool-bound
-// channel. It requires the master switch, channel routing permission, and
-// publication for both the requested and the resolved canonical model, so a
-// mapping from an unpublished alias to a published model — or the reverse —
-// cannot slip through either direction. Non-pool channels are validated by
-// CheckPoolModelRoute only.
+// channel. Publication is anchored on the resolved canonical model: the
+// requested name is an input/mapping-layer identity and does not need its own
+// publication record to reach a published canonical. An explicit operator
+// decision about the requested name itself (source=api or paused) still wins,
+// so a name the operator pinned away from the pool can never re-enter through
+// a mapping or a filter-less retry path. Non-pool channels are not gated here.
 func (channel *Channel) CheckPoolChannelPoolAdmission(requestedModel string) error {
 	if !channel.PoolChannelBound() {
 		return nil
 	}
-	if err := channel.CheckPoolModelRoute(requestedModel); err != nil {
+	if route, err := GetPoolModelRoute(requestedModel); err != nil {
 		return err
+	} else if route != nil && route.Source == "api" {
+		return errors.New("MODEL_SOURCE_MISMATCH")
+	} else if route != nil && !route.Enabled {
+		return errors.New("MODEL_SOURCE_PAUSED")
 	}
 	canonical := ResolveChannelUpstreamModel(channel, requestedModel)
-	if canonical != requestedModel {
-		if err := channel.CheckPoolModelRoute(canonical); err != nil {
-			return err
-		}
+	return channel.CheckPoolModelRoute(canonical)
+}
+
+// channelPoolCanonicalPublished reports whether the canonical model this
+// request resolves to on the given channel carries an active pool publication
+// (enabled, source=pool, master switch on). Corrupt route state fails closed.
+// It is the per-channel routing-side mirror of CheckPoolChannelPoolAdmission
+// and keeps pool channels from being selected for requests they would only
+// reject after dispatch.
+func channelPoolCanonicalPublished(channel *Channel, requestedModel string) bool {
+	if !channel.PoolRoutingEnabled() {
+		return false
 	}
-	return nil
+	canonical := ResolveChannelUpstreamModel(channel, requestedModel)
+	route, err := GetPoolModelRoute(canonical)
+	if err != nil || route == nil || !route.Enabled || route.Source != "pool" {
+		return false
+	}
+	return PoolMasterEnabled()
 }
 
 // PoolRouteDecisions captures the gate inputs for one request so denial logs

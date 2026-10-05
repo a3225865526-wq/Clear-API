@@ -578,9 +578,17 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 		logPoolAdmissionDecision(c, channel, modelName, err)
 		return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
-	if err := channel.CheckPoolModelRoute(modelName); err != nil {
-		logPoolAdmissionDecision(c, channel, modelName, err)
-		return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+	// Non-pool channels keep the requested-name source policy here. Pool-bound
+	// channels are governed solely by CheckPoolChannelPoolAdmission below,
+	// which anchors publication on the resolved canonical model and still
+	// honors explicit api/paused decisions about the requested name — checking
+	// the requested name here as well would demand a second publication for a
+	// mere input alias.
+	if !channel.PoolChannelBound() {
+		if err := channel.CheckPoolModelRoute(modelName); err != nil {
+			logPoolAdmissionDecision(c, channel, modelName, err)
+			return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+		}
 	}
 	// Pool channels additionally need the master switch, channel routing
 	// permission, and publication to hold for the resolved canonical model,

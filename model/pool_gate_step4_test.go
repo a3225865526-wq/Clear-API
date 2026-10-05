@@ -157,9 +157,11 @@ func TestPoolGateMatrix(t *testing.T) {
 	})
 }
 
-// E. Alias safety: operator admission is keyed on the resolved canonical model.
-// A publication on the alias alone never admits, and a published canonical
-// alone never lets an unpublished alias through either.
+// E. Alias safety: admission is anchored on the resolved canonical model.
+// The requested alias is an input/mapping-layer identity — an unpublished
+// alias may reach a published canonical — but a published alias can never
+// admit an unpublished canonical, and an explicit api/paused decision about
+// the requested name still wins over the canonical.
 func TestPoolGateCanonicalAlias(t *testing.T) {
 	channel := &Channel{
 		Id:           42,
@@ -171,6 +173,8 @@ func TestPoolGateCanonicalAlias(t *testing.T) {
 	t.Run("alias-published-canonical-not", func(t *testing.T) {
 		installPoolRoute(t, "synthetic-pool-alias", "pool", true, 1)
 		require.NoError(t, channel.CheckPoolModelRoute("synthetic-pool-alias"))
+		// The canonical model is the authorization anchor: without its own
+		// publication the alias alone never admits.
 		require.ErrorIs(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"), ErrPoolModelNotPublished)
 	})
 	t.Run("canonical-published-alias-not", func(t *testing.T) {
@@ -178,7 +182,9 @@ func TestPoolGateCanonicalAlias(t *testing.T) {
 		delete(common.OptionMap, PoolRoutingOptionPrefix+"synthetic-pool-alias")
 		common.OptionMapRWMutex.Unlock()
 		installPoolRoute(t, "synthetic-pool-model", "pool", true, 1)
-		require.Error(t, channel.CheckPoolModelRoute("synthetic-pool-alias"))
+		// The alias needs no publication of its own: canonical publication
+		// authorizes the request.
+		require.NoError(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
 	})
 	t.Run("both-published-allows", func(t *testing.T) {
 		installPoolRoute(t, "synthetic-pool-alias", "pool", true, 2)
@@ -186,24 +192,96 @@ func TestPoolGateCanonicalAlias(t *testing.T) {
 		require.NoError(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
 	})
 	t.Run("requested-name-cannot-bypass", func(t *testing.T) {
-		// An unknown requested name resolves through the mapping, but the
-		// requested name itself is unpublished: the route check denies.
+		// An unknown requested name resolves to itself: the unpublished
+		// canonical denies.
 		require.Error(t, channel.CheckPoolChannelPoolAdmission("synthetic-unknown-alias"))
+	})
+	t.Run("explicit-alias-api-source-wins", func(t *testing.T) {
+		// An operator decision that pins the requested name away from the
+		// pool must survive the canonical publication.
+		installPoolRoute(t, "synthetic-pool-alias", "api", true, 3)
+		installPoolRoute(t, "synthetic-pool-model", "pool", true, 3)
+		require.Error(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
+	})
+	t.Run("explicit-alias-paused-wins", func(t *testing.T) {
+		installPoolRoute(t, "synthetic-pool-alias", "pool", false, 4)
+		installPoolRoute(t, "synthetic-pool-model", "pool", true, 4)
+		require.Error(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
+	})
+	t.Run("canonical-paused-denies", func(t *testing.T) {
+		common.OptionMapRWMutex.Lock()
+		delete(common.OptionMap, PoolRoutingOptionPrefix+"synthetic-pool-alias")
+		common.OptionMapRWMutex.Unlock()
+		installPoolRoute(t, "synthetic-pool-model", "pool", false, 5)
+		require.Error(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
+	})
+	t.Run("corrupt-alias-route-fails-closed", func(t *testing.T) {
+		installPoolRoute(t, "synthetic-pool-model", "pool", true, 6)
+		common.OptionMapRWMutex.Lock()
+		common.OptionMap[PoolRoutingOptionPrefix+"synthetic-pool-alias"] = "{corrupt"
+		common.OptionMapRWMutex.Unlock()
+		require.Error(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
 	})
 }
 
-// The selection filter: source=pool keeps only routing-enabled channels,
-// source=api (and the default) excludes every pool-bound channel.
+// The selection filter: source=pool keeps only routing-enabled channels whose
+// canonical model is actively pool-published; source=api excludes every
+// pool-bound channel unless the requested name is unconfigured and the
+// channel's canonical model carries an active pool publication.
 func TestPoolFilterModelSource(t *testing.T) {
+	setPoolMasterOption(t, "true")
 	poolOn := boundPoolChannel()
 	poolOff := &Channel{Id: 8, OtherSettings: `{"upstream_pool":{}}`}
 	ordinary := &Channel{Id: 7}
+	alias := &Channel{
+		Id:           43,
+		OtherSettings: `{"upstream_pool":{},"pool_routing_enabled":true}`,
+		ModelMapping: func() *string { s := `{"alias":"canonical-published"}`; return &s }(),
+	}
 	poolFilter := dtoPoolFilter("pool")
 	apiFilter := dtoPoolFilter("api")
-	require.True(t, channelMatchesFilter(poolOn, "m", poolFilter))
-	require.False(t, channelMatchesFilter(poolOff, "m", poolFilter))
-	require.False(t, channelMatchesFilter(ordinary, "m", poolFilter))
-	require.False(t, channelMatchesFilter(poolOn, "m", apiFilter))
-	require.False(t, channelMatchesFilter(poolOff, "m", apiFilter))
-	require.True(t, channelMatchesFilter(ordinary, "m", apiFilter))
+	canonicalFilter := dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "api", AllowCanonicalPool: true}
+
+	t.Run("no-mapping", func(t *testing.T) {
+		installPoolRoute(t, "m", "pool", true, 1)
+		require.True(t, channelMatchesFilter(poolOn, "m", poolFilter))
+		require.False(t, channelMatchesFilter(poolOff, "m", poolFilter))
+		require.False(t, channelMatchesFilter(ordinary, "m", poolFilter))
+		require.False(t, channelMatchesFilter(poolOn, "m", apiFilter))
+		require.False(t, channelMatchesFilter(poolOff, "m", apiFilter))
+		require.True(t, channelMatchesFilter(ordinary, "m", apiFilter))
+	})
+	t.Run("unpublished-canonical-excluded-from-pool-filter", func(t *testing.T) {
+		common.OptionMapRWMutex.Lock()
+		delete(common.OptionMap, PoolRoutingOptionPrefix+"m")
+		common.OptionMapRWMutex.Unlock()
+		require.False(t, channelMatchesFilter(poolOn, "m", poolFilter))
+	})
+	t.Run("alias-reaches-published-canonical", func(t *testing.T) {
+		installPoolRoute(t, "canonical-published", "pool", true, 1)
+		// Unconfigured alias: strict api filter keeps excluding pool channels;
+		// the canonical-allowing filter admits only the pool channel.
+		require.False(t, channelMatchesFilter(alias, "alias", apiFilter))
+		require.True(t, channelMatchesFilter(alias, "alias", canonicalFilter))
+		require.True(t, channelMatchesFilter(ordinary, "alias", canonicalFilter))
+		// A routing-disabled pool channel never serves the pool even when the
+		// canonical is published.
+		require.False(t, channelMatchesFilter(poolOff, "alias", canonicalFilter))
+		// A paused canonical never admits through the alias.
+		installPoolRoute(t, "canonical-published", "pool", false, 2)
+		require.False(t, channelMatchesFilter(alias, "alias", canonicalFilter))
+		// A corrupt canonical route fails closed.
+		common.OptionMapRWMutex.Lock()
+		common.OptionMap[PoolRoutingOptionPrefix+"canonical-published"] = "{corrupt"
+		common.OptionMapRWMutex.Unlock()
+		require.False(t, channelMatchesFilter(alias, "alias", canonicalFilter))
+		installPoolRoute(t, "canonical-published", "pool", true, 3)
+		require.True(t, channelMatchesFilter(alias, "alias", canonicalFilter))
+	})
+	t.Run("master-off-fails-closed", func(t *testing.T) {
+		installPoolRoute(t, "canonical-published", "pool", true, 3)
+		setPoolMasterOption(t, "false")
+		require.False(t, channelMatchesFilter(poolOn, "canonical-published", poolFilter))
+		require.False(t, channelMatchesFilter(alias, "alias", canonicalFilter))
+	})
 }

@@ -287,12 +287,17 @@ func SelectChannelForRequest(c *gin.Context, modelName string, retry *RetryParam
 	constraints := GetChannelConstraints(c)
 	// Operator model-source policy, evaluated before any candidate is chosen:
 	// a pool-published model only ever selects pool-routing channels, and any
-	// other state (unconfigured, paused, api-source) excludes pool channels so
-	// they can never be picked and rejected after the fact.
+	// other explicit state (paused, api-source) excludes pool channels so they
+	// can never be picked and rejected after the fact. An unconfigured name
+	// keeps its existing api routing; pool-bound channels remain eligible only
+	// when the canonical model the request resolves to on that channel carries
+	// an active pool publication (checked per channel by the filter).
 	if route, _ := model.GetPoolModelRoute(modelName); route != nil && route.Source == "pool" {
 		constraints.AddFilter(dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "pool"})
-	} else {
+	} else if route != nil {
 		constraints.AddFilter(dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "api"})
+	} else {
+		constraints.AddFilter(dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "api", AllowCanonicalPool: true})
 	}
 	if pin, found, overridden := constraints.ResolvedPin(); found {
 		for _, lost := range overridden {

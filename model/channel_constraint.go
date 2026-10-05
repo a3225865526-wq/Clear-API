@@ -93,10 +93,21 @@ func channelMatchesFilter(ch *Channel, modelName string, filter dto.ChannelFilte
 	case dto.FilterModelSource:
 		if filter.Source == "pool" {
 			// A pool-published model may only be served by a channel whose
-			// operator explicitly enabled pool routing (which implies bound).
-			return ch.PoolRoutingEnabled()
+			// operator explicitly enabled pool routing (which implies bound)
+			// and whose canonical model carries an active pool publication.
+			return channelPoolCanonicalPublished(ch, modelName)
 		}
-		return filter.Source == "api" && !ch.PoolChannelBound()
+		if filter.Source != "api" {
+			return false
+		}
+		if !ch.PoolChannelBound() {
+			return true
+		}
+		// An unconfigured requested name keeps its existing api routing but
+		// may still reach a pool channel whose resolved canonical model is
+		// pool-published — the alias is an input-layer identity, publication
+		// is anchored on the canonical model.
+		return filter.AllowCanonicalPool && channelPoolCanonicalPublished(ch, modelName)
 	case dto.FilterRequestPath:
 		if filter.RequestPath == "" {
 			return true
