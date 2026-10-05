@@ -26,18 +26,17 @@ func SavePoolModelRoute(c *gin.Context) {
 		poolError(c, model.ErrPoolInvalid)
 		return
 	}
-	platform, access, found := accountpool.Lookup(input.Platform, input.AccessType)
+	platform, _, found := accountpool.Lookup(input.Platform, input.AccessType)
 	if !found || (platform.Platform != "codex" && platform.Platform != "claude" && platform.Platform != "gemini_code_assist" && platform.Platform != "grok_web_sso") {
 		poolError(c, model.ErrPoolInvalid)
 		return
 	}
-	if input.Source == "pool" && input.Enabled {
-		admission := accountpool.ModelAdmissionFor(platform.Platform, access.Type, input.Model)
-		if err := admission.Check([]string{"text_chat", "exact_usage"}, accountpool.AdapterVersion); err != nil {
-			poolError(c, accountpool.ErrPoolNotAdmitted)
-			return
-		}
-	}
+	// Publication is the operator's explicit release decision (STEP 4). It is
+	// deliberately not derived from capability grants, and the former
+	// always-failing static admission gate is gone: requests only reach the
+	// pool when master switch + channel routing + publication + group/model
+	// permissions all intersect, and the executor re-checks trust and
+	// capability per account×model at dispatch.
 	route, err := model.SavePoolModelRoute(input.PoolModelRoute, input.ExpectedVersion)
 	if err != nil {
 		poolError(c, err)

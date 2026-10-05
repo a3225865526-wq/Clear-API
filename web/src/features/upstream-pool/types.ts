@@ -236,3 +236,12 @@ export type PoolModelRoute = {
   version: number
   updated_at: number
 }
+
+export type PoolChannelView = {
+  id: number
+  name: string
+  status: number
+  pool_routing_enabled: boolean
+  models: string[]
+  published_models: string[]
+}

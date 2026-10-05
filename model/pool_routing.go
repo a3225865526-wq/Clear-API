@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	hostreasoning "github.com/QuantumNous/new-api/setting/reasoning"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -137,20 +138,120 @@ func SavePoolModelRoute(route PoolModelRoute, expectedVersion int) (*PoolModelRo
 	return &route, nil
 }
 
+// ResolveChannelUpstreamModel resolves the final upstream model name a request
+// would carry after the channel's model mapping (chain resolution with cycle
+// detection and the same thinking-suffix base fallback the relay helper uses).
+// The resolved name — not the requested alias — is what operator admission and
+// logging must key on for pool channels, so an alias can never bypass a
+// publication decision made on the canonical model.
+func ResolveChannelUpstreamModel(channel *Channel, modelName string) string {
+	if channel == nil {
+		return modelName
+	}
+	mapping := strings.TrimSpace(channel.GetModelMapping())
+	if mapping == "" || mapping == "{}" {
+		return modelName
+	}
+	modelMap := make(map[string]string)
+	if common.UnmarshalJsonStr(mapping, &modelMap) != nil {
+		// A corrupt mapping fails closed at relay time; the gate resolves to
+		// the requested name and the executor still re-checks the real model.
+		return modelName
+	}
+	current := modelName
+	visited := map[string]bool{current: true}
+	for {
+		mapped, exists := modelMap[current]
+		baseModel := hostreasoning.BaseModelName(current)
+		if (!exists || mapped == "") && baseModel != current {
+			mapped, exists = modelMap[baseModel]
+		}
+		if !exists || mapped == "" || visited[mapped] {
+			break
+		}
+		visited[mapped] = true
+		current = mapped
+	}
+	return current
+}
+
+// CheckPoolChannelPoolAdmission is the request-time gate for a pool-bound
+// channel. It requires the master switch, channel routing permission, and
+// publication for both the requested and the resolved canonical model, so a
+// mapping from an unpublished alias to a published model — or the reverse —
+// cannot slip through either direction. Non-pool channels are validated by
+// CheckPoolModelRoute only.
+func (channel *Channel) CheckPoolChannelPoolAdmission(requestedModel string) error {
+	if !channel.PoolChannelBound() {
+		return nil
+	}
+	if err := channel.CheckPoolModelRoute(requestedModel); err != nil {
+		return err
+	}
+	canonical := ResolveChannelUpstreamModel(channel, requestedModel)
+	if canonical != requestedModel {
+		if err := channel.CheckPoolModelRoute(canonical); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// PoolRouteDecisions captures the gate inputs for one request so denial logs
+// can be audited without re-deriving them. No credential material belongs in
+// this structure.
+type PoolRouteDecisions struct {
+	PoolMasterEnabled  bool   `json:"pool_master_enabled"`
+	ChannelPoolRouting bool   `json:"channel_pool_routing"`
+	ModelPublished     string `json:"model_published"`
+	CanonicalModel     string `json:"canonical_model"`
+}
+
+// CheckPoolModelRoute evaluates the model-source policy for one channel and
+// model. A nil channel validates the route-level policy before candidate
+// selection (preflight); a non-nil channel gets the full request-time gate.
+//
+// Fail-closed semantics:
+//   - corrupt route state: error (never serve)
+//   - unconfigured model: non-pool channels keep existing routing; pool-bound
+//     channels are denied (an empty publication set never serves)
+//   - paused route: denied for both sources
+//   - api source: pool-bound channels are excluded, others pass
+//   - pool source: the master switch must be on, the channel must be
+//     pool-bound with routing enabled, and non-pool channels are excluded —
+//     a published pool model never falls back to an API channel
 func (channel *Channel) CheckPoolModelRoute(modelName string) error {
 	route, err := GetPoolModelRoute(modelName)
 	if err != nil || route == nil {
-		return err
+		if err != nil {
+			return err
+		}
+		if channel != nil && channel.PoolChannelBound() {
+			return ErrPoolModelNotPublished
+		}
+		return nil
 	}
 	if !route.Enabled {
 		return errors.New("MODEL_SOURCE_PAUSED")
 	}
-	if route.Source == "pool" {
-		return ErrPoolChannelAdmission
+	if route.Source == "api" {
+		if channel != nil && channel.PoolChannelBound() {
+			return errors.New("MODEL_SOURCE_MISMATCH")
+		}
+		return nil
 	}
-	// A nil channel validates the source policy before candidate selection.
-	if channel != nil && channel.PoolChannelBound() {
+	// route.Source == "pool"
+	if !PoolMasterEnabled() {
+		return ErrPoolGloballyDisabled
+	}
+	if channel == nil {
+		return nil
+	}
+	if !channel.PoolChannelBound() {
 		return errors.New("MODEL_SOURCE_MISMATCH")
+	}
+	if !channel.PoolRoutingEnabled() {
+		return ErrPoolChannelRoutingOff
 	}
 	return nil
 }

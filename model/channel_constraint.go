@@ -91,6 +91,11 @@ func candidatePassesKindFilters(ch *Channel, exists bool, modelName string, kind
 func channelMatchesFilter(ch *Channel, modelName string, filter dto.ChannelFilter) bool {
 	switch filter.Kind {
 	case dto.FilterModelSource:
+		if filter.Source == "pool" {
+			// A pool-published model may only be served by a channel whose
+			// operator explicitly enabled pool routing (which implies bound).
+			return ch.PoolRoutingEnabled()
+		}
 		return filter.Source == "api" && !ch.PoolChannelBound()
 	case dto.FilterRequestPath:
 		if filter.RequestPath == "" {

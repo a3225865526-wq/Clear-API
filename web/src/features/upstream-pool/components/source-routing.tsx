@@ -16,7 +16,11 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { handleServerError } from '@/lib/handle-server-error'
 
-import { getPoolModelRoutes, savePoolModelRoute } from '../api'
+import {
+  getPoolModelAvailability,
+  getPoolModelRoutes,
+  savePoolModelRoute,
+} from '../api'
 import { POOL_QUERY_KEY } from '../constants'
 import type { PoolModelRoute } from '../types'
 
@@ -46,6 +50,13 @@ export function SourceRouting() {
     refetchOnWindowFocus: false,
   })
   const current = query.data?.find((route) => route.model === model.trim())
+  const availabilityQuery = useQuery({
+    queryKey: [...POOL_QUERY_KEY, 'model-availability'],
+    queryFn: ({ signal }) => getPoolModelAvailability(signal),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  })
+  const availability = availabilityQuery.data ?? {}
   const mutation = useMutation({
     mutationFn: () =>
       savePoolModelRoute({
@@ -203,7 +214,17 @@ export function SourceRouting() {
             <span className='min-w-0 break-all'>
               {route.model} ·{' '}
               {route.source === 'api' ? t('Upstream API') : t('Account pool')} ·{' '}
-              {route.enabled ? t('Enabled') : t('Paused')}
+              {route.enabled ? t('Published') : t('Paused')}
+              {route.source === 'pool' ? (
+                <>
+                  {' '}·{' '}
+                  {(availability[route.model] ?? 0) > 0
+                    ? t('{{count}} capable accounts', {
+                        count: availability[route.model],
+                      })
+                    : t('No capable account (hint only)')}
+                </>
+              ) : null}
             </span>
             <Button
               variant='outline'

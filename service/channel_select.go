@@ -285,8 +285,14 @@ func SelectChannelForRequest(c *gin.Context, modelName string, retry *RetryParam
 		return nil, "", &ChannelSelectError{StatusCode: http.StatusServiceUnavailable, Message: err.Error(), Code: types.ErrorCodeGetChannelFailed}
 	}
 	constraints := GetChannelConstraints(c)
-	if route, _ := model.GetPoolModelRoute(modelName); route != nil && route.Source == "api" {
-		constraints.AddFilter(dto.ChannelFilter{Kind: dto.FilterModelSource, Source: route.Source})
+	// Operator model-source policy, evaluated before any candidate is chosen:
+	// a pool-published model only ever selects pool-routing channels, and any
+	// other state (unconfigured, paused, api-source) excludes pool channels so
+	// they can never be picked and rejected after the fact.
+	if route, _ := model.GetPoolModelRoute(modelName); route != nil && route.Source == "pool" {
+		constraints.AddFilter(dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "pool"})
+	} else {
+		constraints.AddFilter(dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "api"})
 	}
 	if pin, found, overridden := constraints.ResolvedPin(); found {
 		for _, lost := range overridden {

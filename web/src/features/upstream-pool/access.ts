@@ -125,7 +125,7 @@ function poolError(error: unknown): Error {
 export async function poolRequest<T>(
   path: string,
   options: {
-    method?: 'GET' | 'POST'
+    method?: 'GET' | 'POST' | 'PUT'
     params?: object
     body?: unknown
     signal?: AbortSignal

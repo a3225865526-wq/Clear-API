@@ -3,12 +3,17 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getPoolModelRoutes, savePoolModelRoute } from '../api'
+import {
+  getPoolModelAvailability,
+  getPoolModelRoutes,
+  savePoolModelRoute,
+} from '../api'
 import { SourceRouting } from './source-routing'
 
 vi.mock('../api', () => ({
   getPoolModelRoutes: vi.fn(),
   savePoolModelRoute: vi.fn(),
+  getPoolModelAvailability: vi.fn(),
 }))
 
 function mount() {
@@ -27,6 +32,7 @@ describe('model source control', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getPoolModelRoutes).mockResolvedValue([])
+    vi.mocked(getPoolModelAvailability).mockResolvedValue({})
   })
 
   it('saves an exact API model and preserves existing routing for unconfigured models', async () => {

@@ -549,4 +549,90 @@ func (c *CliproxyClient) CredentialStatus(ctx context.Context, credentialRef str
 	return ExecutorCredentialStatus{}, ErrPoolExecutorFailed
 }
 
+// ---------------------------------------------------------------------------
+// Executor pool snapshots (STEP 4 availability hint)
+//
+// The site control plane may show which published models currently have at
+// least one trusted account with a verified capability. This is an
+// observability projection only: it never grants capability, never promotes
+// trust, and never publishes a model.
+// ---------------------------------------------------------------------------
+
+// PoolExecutorTrustIdentity mirrors CLIProxyAPI PoolTrustRecord (json tags).
+type PoolExecutorTrustIdentity struct {
+	AuthID               string `json:"auth_id"`
+	Provider             string `json:"provider"`
+	CredentialDigest     string `json:"credential_digest"`
+	State                string `json:"state"`
+	AuthorizationVersion uint64 `json:"authorization_version"`
+	Generation           uint64 `json:"generation"`
+}
+
+// PoolExecutorCapability mirrors CLIProxyAPI PoolModelCapability (json tags).
+type PoolExecutorCapability struct {
+	AuthID           string `json:"auth_id"`
+	Provider         string `json:"provider"`
+	CredentialDigest string `json:"credential_digest"`
+	Model            string `json:"model"`
+	State            string `json:"state"`
+	Generation       uint64 `json:"generation"`
+}
+
+// PoolExecutorModelSnapshot is one consistent read of the executor ledger.
+type PoolExecutorModelSnapshot struct {
+	Revision      uint64
+	TrustRevision uint64
+	Identities    []PoolExecutorTrustIdentity
+	Capabilities  []PoolExecutorCapability
+}
+
+func snapshotU64(decoded map[string]any, key string) uint64 {
+	if value, ok := decoded[key].(float64); ok && value >= 0 {
+		return uint64(value)
+	}
+	return 0
+}
+
+func snapshotRecords[T any](decoded map[string]any, key string) []T {
+	raw, ok := decoded[key].([]any)
+	if !ok {
+		return nil
+	}
+	records := make([]T, 0, len(raw))
+	for _, item := range raw {
+		encoded, err := common.Marshal(item)
+		if err != nil {
+			continue
+		}
+		var record T
+		if common.Unmarshal(encoded, &record) != nil {
+			continue
+		}
+		records = append(records, record)
+	}
+	return records
+}
+
+// PoolModelSnapshot reads GET /v0/management/pool/models. Any shape mismatch
+// fails closed with a fixed error; the response body is never surfaced
+// verbatim.
+func (c *CliproxyClient) PoolModelSnapshot(ctx context.Context) (PoolExecutorModelSnapshot, error) {
+	snapshot := PoolExecutorModelSnapshot{}
+	status, decoded, err := c.do(ctx, http.MethodGet, "/v0/management/pool/models", "")
+	if err != nil {
+		return snapshot, err
+	}
+	if status != http.StatusOK || decoded == nil {
+		return snapshot, ErrPoolExecutorFailed
+	}
+	snapshot.Revision = snapshotU64(decoded, "revision")
+	snapshot.TrustRevision = snapshotU64(decoded, "trust_revision")
+	snapshot.Identities = snapshotRecords[PoolExecutorTrustIdentity](decoded, "identities")
+	snapshot.Capabilities = snapshotRecords[PoolExecutorCapability](decoded, "capabilities")
+	if decoded["revision"] == nil || decoded["identities"] == nil || decoded["capabilities"] == nil {
+		return PoolExecutorModelSnapshot{}, ErrPoolExecutorFailed
+	}
+	return snapshot, nil
+}
+
 var _ ExecutorClient = (*CliproxyClient)(nil)

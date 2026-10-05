@@ -189,6 +189,11 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticRetryStatusCodes"] = operation_setting.AutomaticRetryStatusCodesToString()
 	common.OptionMap["ExposeRatioEnabled"] = strconv.FormatBool(ratio_setting.IsExposeRatioEnabled())
 
+	// The pool master switch defaults to closed. First upgrade to a version
+	// with the pool feature must never open the pool because the option row is
+	// missing; SetPoolMasterEnabled is the only write path.
+	common.OptionMap[PoolMasterOptionKey] = "false"
+
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
 	maps.Copy(common.OptionMap, modelConfigs)
@@ -255,6 +260,9 @@ func UpdateOption(key string, value string) error {
 	if IsPoolRoutingOption(key) {
 		return ErrPoolInvalid
 	}
+	if poolMasterOptionBlocked(key) {
+		return ErrPoolInvalid
+	}
 	if IsRequestPolicyOption(key) {
 		return UpdateRequestPolicyOptions(map[string]string{key: value})
 	}
@@ -294,6 +302,9 @@ func UpdateOptionsBulk(values map[string]string) error {
 	}
 	for key := range values {
 		if IsPoolRoutingOption(key) {
+			return ErrPoolInvalid
+		}
+		if poolMasterOptionBlocked(key) {
 			return ErrPoolInvalid
 		}
 		if IsPasskeyDomainOption(key) {

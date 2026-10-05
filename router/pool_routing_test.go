@@ -40,15 +40,18 @@ func TestPoolModelRoutingOwnerAndAdmission(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, route.Enabled)
 	require.Equal(t, "api", route.Source)
+	// STEP 4: publication is the operator's explicit release decision; saving a
+	// pool-source route succeeds and no longer depends on a static admission
+	// gate. Requests are still gated by master switch × channel routing at
+	// dispatch time.
 	input["source"], input["expected_version"] = "pool", 1
 	response = setup.request(http.MethodPut, "/api/owner/pool/model-routes", "synthetic-owner-pat", input)
-	require.Equal(t, http.StatusConflict, response.Code)
-	require.Contains(t, response.Body.String(), "POOL_NOT_ADMITTED")
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	route, err = model.GetPoolModelRoute("synthetic-model")
 	require.NoError(t, err)
-	require.Equal(t, "api", route.Source)
-	require.Equal(t, 1, route.Version)
-	input["enabled"] = false
+	require.Equal(t, "pool", route.Source)
+	require.Equal(t, 2, route.Version)
+	input["enabled"], input["expected_version"] = false, 2
 	response = setup.request(http.MethodPut, "/api/owner/pool/model-routes", "synthetic-owner-pat", input)
 	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 	selected := &model.Channel{Id: 123, Type: 1, Status: 1}
@@ -59,7 +62,7 @@ func TestPoolModelRoutingOwnerAndAdmission(t *testing.T) {
 	require.NotNil(t, selectErr)
 	require.Contains(t, selectErr.Message, "PAUSED")
 	require.NoError(t, selected.CheckPoolModelRoute("unconfigured-model"))
-	input["source"], input["enabled"], input["expected_version"] = "api", true, 2
+	input["source"], input["enabled"], input["expected_version"] = "api", true, 3
 	require.Equal(t, http.StatusOK, setup.request(http.MethodPut, "/api/owner/pool/model-routes", "synthetic-owner-pat", input).Code)
 	require.NoError(t, selected.CheckPoolModelRoute("synthetic-model"))
 	poolSetting := `{"upstream_pool":false}`

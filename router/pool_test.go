@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/router"
@@ -276,38 +275,40 @@ func TestPoolQuotaMigrationLegacyIdempotenceAndPersistence(t *testing.T) {
 	require.Contains(t, response.Body.String(), "unsupported")
 }
 
+// STEP 4 semantics: a pool-bound channel is a normal creatable/storable
+// channel; request admission is decided by the layered gate (master switch,
+// channel routing opt-in, publication). With everything closed the pool stays
+// unreachable and ordinary channels keep working.
 func TestPoolChannelServerGatePersistenceSelectionAndEnable(t *testing.T) {
 	setup := newPoolTestSetup(t, true)
-	require.NoError(t, setup.db.AutoMigrate(&model.Channel{}))
+	require.NoError(t, setup.db.AutoMigrate(&model.Channel{}, &model.Ability{}))
 	endpoint := "http://synthetic-pool.invalid:8317/v1"
 	t.Setenv("CLEARAPI_POOL_CLIPROXY_URL", endpoint)
 	channel := model.Channel{Type: 1, Name: "synthetic-pool", Status: common.ChannelStatusManuallyDisabled, BaseURL: &endpoint, OtherSettings: `{"upstream_pool":{}}`}
-	require.ErrorIs(t, channel.Insert(), model.ErrPoolChannelAdmission)
-	require.ErrorIs(t, model.BatchInsertChannels([]model.Channel{channel}), model.ErrPoolChannelAdmission)
-	require.NoError(t, setup.db.Create(&channel).Error) // synthetic legacy row bypasses application intentionally
+	require.NoError(t, channel.Insert())
+	require.NoError(t, model.BatchInsertChannels([]model.Channel{{Type: 1, Name: "synthetic-pool-batch", Status: common.ChannelStatusManuallyDisabled, BaseURL: &endpoint, OtherSettings: `{"upstream_pool":{}}`}}))
 	channel.Status = common.ChannelStatusEnabled
-	require.ErrorIs(t, channel.Update(), model.ErrPoolChannelAdmission)
+	require.NoError(t, channel.Update())
 	stripped := model.Channel{Id: channel.Id, Status: common.ChannelStatusEnabled}
-	require.ErrorIs(t, stripped.Update(), model.ErrPoolChannelAdmission)
-	require.ErrorIs(t, stripped.Save(), model.ErrPoolChannelAdmission)
-	patchAPI := gin.New()
-	patchAPI.PUT("/synthetic/channel", controller.UpdateChannel)
-	patchBody := fmt.Sprintf(`{"id":%d,"type":1,"name":"synthetic","models":"synthetic-model","group":"default","settings":"{}","base_url":"https://ordinary.invalid"}`, channel.Id)
-	patchRequest := httptest.NewRequest("PUT", "/synthetic/channel", strings.NewReader(patchBody))
-	patchRequest.Header.Set("Content-Type", "application/json")
-	patchResponse := httptest.NewRecorder()
-	patchAPI.ServeHTTP(patchResponse, patchRequest)
-	require.Equal(t, http.StatusConflict, patchResponse.Code, patchResponse.Body.String())
-	require.Contains(t, patchResponse.Body.String(), "POOL_CHANNEL_DISABLED")
-	require.False(t, model.UpdateChannelStatus(channel.Id, "", common.ChannelStatusEnabled, "manual enable"))
-	require.False(t, model.UpdateChannelStatus(channel.Id, "", common.ChannelStatusEnabled, "automatic recovery"))
+	require.NoError(t, stripped.Update())
+	require.NoError(t, stripped.Save())
+	require.NoError(t, setup.db.Model(&model.Channel{}).Where("id = ?", channel.Id).Update("status", common.ChannelStatusManuallyDisabled).Error)
+	require.True(t, model.UpdateChannelStatus(channel.Id, "", common.ChannelStatusEnabled, "manual enable"))
 	var stored model.Channel
 	require.NoError(t, setup.db.First(&stored, channel.Id).Error)
-	require.Equal(t, common.ChannelStatusManuallyDisabled, stored.Status)
+	require.Equal(t, common.ChannelStatusEnabled, stored.Status)
+	// The pool master switch is closed on a fresh deployment: the bound
+	// channel is enabled, but an unconfigured model request is still denied at
+	// the gate and no executor is contacted.
+	require.False(t, model.PoolMasterEnabled())
 	context, _ := gin.CreateTestContext(httptest.NewRecorder())
 	context.Request = httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(`{"model":"unregistered","tools":[{}],"messages":[{"content":[{"type":"image_url"}]}]}`))
-	require.NotNil(t, middleware.SetupContextForSelectedChannel(context, &channel, "unregistered"))
+	require.NotNil(t, middleware.SetupContextForSelectedChannel(context, &stored, "unregistered"))
 	require.Equal(t, 0, setup.executor.startCalls)
+	// A pool-routing claim without a pool binding is an incoherent
+	// configuration and is rejected wherever it is saved.
+	unbound := model.Channel{Type: 1, Name: "synthetic-unbound", OtherSettings: `{"pool_routing_enabled":true}`}
+	require.ErrorIs(t, unbound.CheckPoolChannelAdmission(), model.ErrPoolRoutingRequiresBinder)
 	ordinary := model.Channel{Type: 1, Name: "synthetic-ordinary", Status: common.ChannelStatusEnabled, Key: "synthetic-unused"}
 	require.NoError(t, ordinary.CheckPoolChannelAdmission())
 	require.NoError(t, ordinary.Save())
@@ -316,6 +317,77 @@ func TestPoolChannelServerGatePersistenceSelectionAndEnable(t *testing.T) {
 	var ordinaryStored model.Channel
 	require.NoError(t, setup.db.First(&ordinaryStored, ordinary.Id).Error)
 	require.Equal(t, ordinary.Name, ordinaryStored.Name)
+}
+
+// The STEP 4 control plane: master switch read/flip (fail-closed default),
+// channel routing opt-in with CAS + read-back, and the availability hint that
+// stays an observability projection.
+func TestPoolControlPlaneMasterChannelsAndAvailability(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, setup.db.AutoMigrate(&model.Channel{}, &model.Option{}))
+	endpoint := "http://synthetic-pool.invalid:8317/v1"
+	t.Setenv("CLEARAPI_POOL_CLIPROXY_URL", endpoint)
+	channel := model.Channel{Type: 1, Name: "synthetic-pool", Status: common.ChannelStatusEnabled, BaseURL: &endpoint, OtherSettings: `{"upstream_pool":{}}`, Models: "synthetic-pool-model"}
+	require.NoError(t, setup.db.Create(&channel).Error)
+	t.Cleanup(func() {
+		common.OptionMapRWMutex.Lock()
+		delete(common.OptionMap, model.PoolMasterOptionKey)
+		common.OptionMapRWMutex.Unlock()
+		model.DB.Where("key = ?", model.PoolMasterOptionKey).Delete(&model.Option{})
+		model.DB.Unscoped().Where("id = ?", channel.Id).Delete(&model.Channel{})
+	})
+
+	fetched := setup.request("GET", "/api/owner/pool/master", "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, fetched.Code, fetched.Body.String())
+	require.Contains(t, fetched.Body.String(), `"enabled":false`)
+
+	// A non-owner root user cannot flip the switch.
+	denied := setup.request("PUT", "/api/owner/pool/master", "synthetic-other-root-pat", map[string]any{"enabled": true})
+	require.Equal(t, http.StatusForbidden, denied.Code, denied.Body.String())
+
+	opened := setup.request("PUT", "/api/owner/pool/master", "synthetic-owner-pat", map[string]any{"enabled": true})
+	require.Equal(t, http.StatusOK, opened.Code, opened.Body.String())
+	require.True(t, model.PoolMasterEnabled())
+	// The persisted row is what a restart would load back.
+	var storedOption model.Option
+	require.NoError(t, model.DB.Where(&model.Option{Key: model.PoolMasterOptionKey}).First(&storedOption).Error)
+	require.Equal(t, "true", storedOption.Value)
+
+	closing := setup.request("PUT", "/api/owner/pool/master", "synthetic-owner-pat", map[string]any{"enabled": false})
+	require.Equal(t, http.StatusOK, closing.Code, closing.Body.String())
+	require.False(t, model.PoolMasterEnabled())
+
+	listed := setup.request("GET", "/api/owner/pool/channels", "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, listed.Code, listed.Body.String())
+	require.Contains(t, listed.Body.String(), `"pool_routing_enabled":false`)
+
+	enabled := setup.request("PUT", fmt.Sprintf("/api/owner/pool/channels/%d/pool-routing", channel.Id), "synthetic-owner-pat", map[string]any{"enabled": true})
+	require.Equal(t, http.StatusOK, enabled.Code, enabled.Body.String())
+	var stored model.Channel
+	require.NoError(t, setup.db.First(&stored, channel.Id).Error)
+	require.True(t, stored.PoolRoutingEnabled())
+	require.Contains(t, stored.OtherSettings, `"pool_routing_enabled":true`)
+
+	// Availability is a hint backed by the executor snapshot; the mock
+	// executor has no snapshot data, so the fetcher is the injection point
+	// rather than a live call.
+	previousFetcher := accountpool.PoolModelSnapshotFetcher
+	accountpool.PoolModelSnapshotFetcher = func(context.Context) (accountpool.PoolExecutorModelSnapshot, error) {
+		return accountpool.PoolExecutorModelSnapshot{
+			Revision:      4,
+			TrustRevision: 4,
+			Identities: []accountpool.PoolExecutorTrustIdentity{
+				{AuthID: "a1", Provider: "codex", CredentialDigest: "d1", State: "trusted", AuthorizationVersion: 4, Generation: 2},
+			},
+			Capabilities: []accountpool.PoolExecutorCapability{
+				{AuthID: "a1", Provider: "codex", CredentialDigest: "d1", Model: "synthetic-pool-model", State: "verified", Generation: 2},
+			},
+		}, nil
+	}
+	t.Cleanup(func() { accountpool.PoolModelSnapshotFetcher = previousFetcher })
+	availability := setup.request("GET", "/api/owner/pool/model-availability", "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, availability.Code, availability.Body.String())
+	require.Contains(t, availability.Body.String(), `"synthetic-pool-model":1`)
 }
 
 func ownerAccount(t *testing.T, setup *poolTestSetup, platform, accessType string) map[string]any {

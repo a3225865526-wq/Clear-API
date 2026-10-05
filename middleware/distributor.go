@@ -548,6 +548,25 @@ func getTaskOriginModelName(c *gin.Context) string {
 	return ""
 }
 
+// logPoolAdmissionDecision records a structured operator-admission denial for
+// the pool control plane. It never logs credential material; the reason is one
+// of the fixed POOL_/MODEL_SOURCE_ error strings.
+func logPoolAdmissionDecision(c *gin.Context, channel *model.Channel, requestedModel string, gateErr error) {
+	if gateErr == nil || channel == nil {
+		return
+	}
+	logger.LogWarn(c,
+		"pool_admission denied reason=%q channel_id=%d group=%q requested_model=%q canonical_model=%q pool_master=%t channel_pool_routing=%t",
+		gateErr.Error(),
+		channel.Id,
+		common.GetContextKeyString(c, constant.ContextKeyUsingGroup),
+		requestedModel,
+		model.ResolveChannelUpstreamModel(channel, requestedModel),
+		model.PoolMasterEnabled(),
+		channel.PoolRoutingEnabled(),
+	)
+}
+
 func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string) *types.NewAPIError {
 	c.Set("original_model", modelName) // for retry
 	expectedPlugin := c.GetString("expected_task_plugin_key")
@@ -556,9 +575,19 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 		return types.NewError(errors.New("channel is nil"), types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
 	if err := channel.CheckPoolChannelAdmission(); err != nil {
+		logPoolAdmissionDecision(c, channel, modelName, err)
 		return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
 	if err := channel.CheckPoolModelRoute(modelName); err != nil {
+		logPoolAdmissionDecision(c, channel, modelName, err)
+		return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+	}
+	// Pool channels additionally need the master switch, channel routing
+	// permission, and publication to hold for the resolved canonical model,
+	// not just the requested alias. All admission happens here, before
+	// dispatch; nothing is decided by upstream errors.
+	if err := channel.CheckPoolChannelPoolAdmission(modelName); err != nil {
+		logPoolAdmissionDecision(c, channel, modelName, err)
 		return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 	}
 	service.ResetTokenObservation(c)

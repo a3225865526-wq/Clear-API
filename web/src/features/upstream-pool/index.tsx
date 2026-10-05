@@ -30,6 +30,7 @@ import { usePoolAccess } from './access'
 import { getPoolCatalog } from './api'
 import { AccountsTable } from './components/accounts-table'
 import { CreateAccountDialog } from './components/create-account-dialog'
+import { ReleaseControls } from './components/release-controls'
 import { SourceRouting } from './components/source-routing'
 import { POOL_QUERY_KEY } from './constants'
 
@@ -81,6 +82,7 @@ export function PoolAccounts() {
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
         <div className='space-y-4'>
+          {access.allowed ? <ReleaseControls /> : null}
           {access.allowed ? <SourceRouting /> : null}
           {content}
         </div>

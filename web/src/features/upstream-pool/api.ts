@@ -27,6 +27,7 @@ import type {
   PoolCatalog,
   PoolExecutor,
   PoolQuota,
+  PoolChannelView,
   PoolModelRoute,
 } from './types'
 
@@ -43,6 +44,32 @@ export function savePoolModelRoute(
     method: 'PUT',
     body: input,
   })
+}
+
+export function getPoolMaster(signal?: AbortSignal) {
+  return poolRequest<{ enabled: boolean }>('/master', { signal })
+}
+
+export function setPoolMaster(enabled: boolean) {
+  return poolRequest<{ enabled: boolean }>('/master', {
+    method: 'PUT',
+    body: { enabled },
+  })
+}
+
+export function getPoolChannels(signal?: AbortSignal) {
+  return poolRequest<PoolChannelView[]>('/channels', { signal })
+}
+
+export function setChannelPoolRouting(id: number, enabled: boolean) {
+  return poolRequest<{ id: number; pool_routing_enabled: boolean }>(
+    `/channels/${id}/pool-routing`,
+    { method: 'PUT', body: { enabled } }
+  )
+}
+
+export function getPoolModelAvailability(signal?: AbortSignal) {
+  return poolRequest<Record<string, number>>('/model-availability', { signal })
 }
 
 export function getPoolExecutors(signal?: AbortSignal) {
