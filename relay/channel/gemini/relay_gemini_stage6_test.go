@@ -52,7 +52,6 @@ func enableGeminiStreamingTimeout(t *testing.T) {
 
 func newGeminiContext(t *testing.T) (*gin.Context, *httptest.ResponseRecorder) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest("POST", "/v1beta/models/gemini-2.5-flash:streamGenerateContent", nil)
@@ -232,7 +231,6 @@ func TestGeminiStreamMalformedFailsClosed(t *testing.T) {
 // RelayErrorHandler. (Known limitation, recorded not fixed: Retry-After is
 // not parsed on this path.)
 func TestGeminiUpstreamErrorStatusPreserved(t *testing.T) {
-	gin.SetMode(gin.TestMode)
 	body := `{"error":{"code":429,"message":"Resource exhausted","status":"RESOURCE_EXHAUSTED"}}`
 	resp := &http.Response{
 		StatusCode: http.StatusTooManyRequests,
