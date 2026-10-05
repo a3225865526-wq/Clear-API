@@ -8,6 +8,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 
+	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
 )
 
@@ -150,6 +151,21 @@ func cacheIncrUserQuota(userId int, delta int64) error {
 
 func cacheDecrUserQuota(userId int, delta int64) error {
 	return cacheIncrUserQuota(userId, -delta)
+}
+
+// goApplyUserQuotaDelta snapshots the redis flag synchronously and applies the
+// delta on a detached worker. common.RedisEnabled is only written during
+// startup/config load; reading it from an unbounded goroutine after the caller
+// returned races with whoever rewrites it (tests toggle it between cases).
+func goApplyUserQuotaDelta(userId int, delta int64) {
+	if !common.RedisEnabled {
+		return
+	}
+	gopool.Go(func() {
+		if _, err := cacheApplyUserQuotaDelta(userId, delta); err != nil {
+			common.SysLog("failed to update user quota cache: " + err.Error())
+		}
+	})
 }
 
 // syncCreditUserQuotaCache 在授信事务（充值/兑换等）提交后同步把增量补进缓存

@@ -58,7 +58,17 @@ type BillingReservationDecision struct {
 	CreatedAt     int64  `json:"created_at"`
 }
 
+// billingReadyMu serializes schema readiness probes: gorm v1.25.12
+// Schema.ParseIndexes (reached through Migrator.HasIndex) mutates the shared
+// schema index cache without synchronization, so concurrent probes on one
+// *gorm.DB are a data race. The probes are idempotent reads; serializing
+// them costs nothing meaningful and keeps concurrent finance-owner actions
+// off the racy gorm path.
+var billingReadyMu sync.Mutex
+
 func BillingReconciliationReady(db *gorm.DB) error {
+	billingReadyMu.Lock()
+	defer billingReadyMu.Unlock()
 	if err := BillingReservationsReady(db); err != nil {
 		return err
 	}

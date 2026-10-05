@@ -1338,21 +1338,13 @@ func IncreaseUserQuota(id int, quota int, db bool) (err error) {
 	}
 	if !db && common.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeUserQuota, id, quota)
-		gopool.Go(func() {
-			if err := cacheIncrUserQuota(id, int64(quota)); err != nil {
-				common.SysLog("failed to increase user quota: " + err.Error())
-			}
-		})
+		goApplyUserQuotaDelta(id, int64(quota))
 		return nil
 	}
 	if err := increaseUserQuota(id, quota); err != nil {
 		return err
 	}
-	gopool.Go(func() {
-		if err := cacheIncrUserQuota(id, int64(quota)); err != nil {
-			common.SysLog("failed to increase user quota: " + err.Error())
-		}
-	})
+	goApplyUserQuotaDelta(id, int64(quota))
 	return nil
 }
 
@@ -1380,12 +1372,7 @@ func DecreaseUserQuota(id int, quota int, db bool) (err error) {
 	if quota < 0 {
 		return errors.New("quota 不能为负数！")
 	}
-	gopool.Go(func() {
-		err := cacheDecrUserQuota(id, int64(quota))
-		if err != nil {
-			common.SysLog("failed to decrease user quota: " + err.Error())
-		}
-	})
+	goApplyUserQuotaDelta(id, -int64(quota))
 	if !db && common.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeUserQuota, id, -quota)
 		return nil
