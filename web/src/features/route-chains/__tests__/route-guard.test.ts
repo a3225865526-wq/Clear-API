@@ -18,17 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { beforeEach, describe, expect, test } from 'vitest'
 
-import { useAuthStore } from '@/stores/auth-store'
+import { Route as listRoute } from '@/routes/_authenticated/route-chains'
+import { Route as detailRoute } from '@/routes/_authenticated/route-chains/$id'
 import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 // F24: non-owners cannot open the console. The route guard mirrors the
 // backend's RootAuth — which remains the real authority (§三十九).
-
-async function loadGuards() {
-  const listRoute = await import('@/routes/_authenticated/route-chains')
-  const detailRoute = await import('@/routes/_authenticated/route-chains/$id')
-  return { listRoute, detailRoute }
-}
+// Route modules are imported statically: their cost must not land inside a
+// test's timeout window when the suite runs under load.
 
 function setUserRole(role: number) {
   useAuthStore.setState((state) => ({
@@ -52,37 +50,33 @@ describe('F24: route guards', () => {
     setUserRole(ROLE.SUPER_ADMIN)
   })
 
-  test('a super admin passes both guards', async () => {
-    const { listRoute, detailRoute } = await loadGuards()
+  test('a super admin passes both guards', () => {
     expect(() =>
-      (listRoute.Route.options.beforeLoad as () => void)()
+      (listRoute.options.beforeLoad as () => void)()
     ).not.toThrow()
     expect(() =>
-      (detailRoute.Route.options.beforeLoad as () => void)()
+      (detailRoute.options.beforeLoad as () => void)()
     ).not.toThrow()
   })
 
-  test('a plain admin is redirected away from the list', async () => {
+  test('a plain admin is redirected away from the list', () => {
     setUserRole(ROLE.ADMIN)
-    const { listRoute } = await loadGuards()
     expect(() =>
-      (listRoute.Route.options.beforeLoad as () => void)()
+      (listRoute.options.beforeLoad as () => void)()
     ).toThrow()
   })
 
-  test('a plain admin is redirected away from the detail page', async () => {
+  test('a plain admin is redirected away from the detail page', () => {
     setUserRole(ROLE.ADMIN)
-    const { detailRoute } = await loadGuards()
     expect(() =>
-      (detailRoute.Route.options.beforeLoad as () => void)()
+      (detailRoute.options.beforeLoad as () => void)()
     ).toThrow()
   })
 
-  test('a signed-out user is redirected away', async () => {
+  test('a signed-out user is redirected away', () => {
     useAuthStore.setState((state) => ({ auth: { ...state.auth, user: null } }))
-    const { listRoute } = await loadGuards()
     expect(() =>
-      (listRoute.Route.options.beforeLoad as () => void)()
+      (listRoute.options.beforeLoad as () => void)()
     ).toThrow()
   })
 })
