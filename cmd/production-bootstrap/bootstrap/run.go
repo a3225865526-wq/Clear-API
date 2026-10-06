@@ -153,6 +153,11 @@ func RunVerifyOnly(cfg *Config) int {
 		return ExitEnvironment
 	}
 	defer closeQuietly()
+	// Populate the option map and derived config globals from the database —
+	// exactly what a fresh server process does before the gate runs. Without
+	// this, ValidateProductionReadiness would read empty legal settings in a
+	// fresh process even on a correctly bootstrapped database.
+	model.InitOptionMap()
 	snapshot := TakeSnapshot()
 
 	if snapshot.MarkerCorrupt {

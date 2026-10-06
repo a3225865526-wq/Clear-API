@@ -16,6 +16,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -284,6 +285,21 @@ func TestExecuteTwoStageCompletesAndIsIdempotent(t *testing.T) {
 	stdout, _ = captureOutput(t, func() { RunVerifyOnly(&Config{VerifyOnly: true}) })
 	require.Equal(t, "verified", statusOf(t, stdout))
 	require.Equal(t, before, databaseFingerprint(t, dsn))
+
+	// verify-only must also pass in fresh-process conditions: clear the
+	// in-process option map and legal settings the stage-2 run left behind,
+	// forcing verify-only to repopulate them from the database itself.
+	oldMap := common.OptionMap
+	legal := system_setting.GetLegalSettings()
+	oldLegal := *legal
+	t.Cleanup(func() {
+		common.OptionMap = oldMap
+		*legal = oldLegal
+	})
+	common.OptionMap = nil
+	*legal = system_setting.LegalSettings{}
+	stdout, _ = captureOutput(t, func() { RunVerifyOnly(&Config{VerifyOnly: true}) })
+	require.Equal(t, "verified", statusOf(t, stdout), "verify-only must work from fresh-process state")
 }
 
 // TestExecutePopulatedDBRefusal refuses a database that already contains users
