@@ -109,10 +109,17 @@ type RouteChainAttemptRecord struct {
 	ProviderCostState      string `json:"provider_cost_state" gorm:"type:varchar(24);index"`
 	ProviderCostAmount     string `json:"provider_cost_amount" gorm:"type:varchar(64)"`
 	ProviderCostCurrency   string `json:"provider_cost_currency" gorm:"type:varchar(8)"`
-	LateEventAt            int64  `json:"late_event_at"`
-	LateEventNote          string `json:"late_event_note" gorm:"type:varchar(255)"`
-	CreatedTime            int64  `json:"created_time"`
-	UpdatedTime            int64  `json:"updated_time"`
+	// Stage 5 health observability (§四, §二十八): the independent
+	// provider-health verdict and what the breaker did with it, recorded at
+	// finalize time. Empty on pre-Stage-5 rows and when the breaker gate is
+	// off — the ledger stays observability, never the breaker's authority.
+	HealthOutcome    string `json:"health_outcome" gorm:"type:varchar(24)"`
+	BreakerEffect    string `json:"breaker_effect" gorm:"type:varchar(16)"`
+	StreamCompletion string `json:"stream_completion" gorm:"type:varchar(16)"`
+	LateEventAt      int64  `json:"late_event_at"`
+	LateEventNote    string `json:"late_event_note" gorm:"type:varchar(255)"`
+	CreatedTime      int64  `json:"created_time"`
+	UpdatedTime      int64  `json:"updated_time"`
 }
 
 // RouteChainDecisionRecord persists selection-phase skips and failover
