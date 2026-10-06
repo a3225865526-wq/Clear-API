@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
@@ -55,9 +56,15 @@ func RouteExhaustedClientError() *types.NewAPIError {
 // BindCandidate selects and binds the next eligible candidate to its exact
 // target channel (Amendment 2 C2). Selection failures skip forward as route
 // decision records (C5); the first candidate that passes exact-binding checks
-// AND channel admission is marked as the active attempt. A nil return means a
-// candidate is bound and ready to dispatch; a non-nil return means the chain
-// is exhausted and the request must end with RouteExhaustedClientError.
+// AND channel admission AND the runtime circuit breaker is marked as the
+// active attempt. A nil return means a candidate is bound and ready to
+// dispatch; a non-nil return means the chain is exhausted and the request
+// must end with RouteExhaustedClientError.
+//
+// The breaker is the LAST availability filter (Stage 5 §2.5): it runs after
+// the config/trust/admission checks, can only remove availability, and an
+// open candidate is skipped as a route decision (no attempt row, no budget
+// consumption, no upstream dispatch).
 func (s *RequestState) BindCandidate(c *gin.Context, setup SetupChannelFunc, groups []string, filters []dto.ChannelFilter) *types.NewAPIError {
 	for {
 		index, ok := s.NextCandidate()
@@ -65,6 +72,7 @@ func (s *RequestState) BindCandidate(c *gin.Context, setup SetupChannelFunc, gro
 			logger.LogInfo(c, fmt.Sprintf("route_chain subsystem=engine event=chain_exhausted chain_id=%d chain_version=%d attempts=%d consumed=%d", s.Snapshot.ChainId, s.Snapshot.Version, s.attemptsMade, len(s.visited)))
 			return RouteExhaustedClientError()
 		}
+		candidate := s.Snapshot.Candidates[index]
 		channel, selectErr := s.SelectCandidate(c, index, groups, filters)
 		if selectErr != nil {
 			s.MarkSkipped(c, index, selectErr.Error())
@@ -74,6 +82,16 @@ func (s *RequestState) BindCandidate(c *gin.Context, setup SetupChannelFunc, gro
 			// Admission failure is pre-dispatch (zero risk): skip forward.
 			s.MarkSkipped(c, index, "admission_failed:"+setupErr.Error())
 			continue
+		}
+		if common.RouteCircuitBreakerEnabled() {
+			allowed, reason, probeHeld := Breaker.AllowDispatch(c, s.Snapshot.ChainId, candidate.Id, candidate.Policy)
+			if !allowed {
+				s.MarkSkipped(c, index, reason)
+				continue
+			}
+			if probeHeld {
+				markProbeHeld(c, candidate.Id)
+			}
 		}
 		s.MarkAttempt(c, index)
 		return nil
