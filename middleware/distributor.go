@@ -112,6 +112,9 @@ func Distribute() func(c *gin.Context) {
 				// admission; the weighted selection pool never runs.
 				common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
 				if chainErr := chainState.BindCandidate(c, SetupContextForSelectedChannel, service.RouteChainCandidateGroups(c), routechain.ChainFilters(service.GetChannelConstraints(c).Filters)); chainErr != nil {
+					// Stage 4: the request never reaches the relay loop, so its
+					// ledger row would stay unfinished — close it here.
+					routechain.FinishRequestLedger(c, chainState, nil, chainErr)
 					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, chainErr.Error(), "route_exhausted")
 					return
 				}

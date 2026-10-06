@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -582,10 +583,15 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	}
 
 	financeAttempt := service.BeginFinanceAttempt(c, info)
+	// Stage 4 ledger: mark the coarse connecting phase at the transport
+	// entry, and the dispatched phase at the WroteRequest fence (the same
+	// evidence point the dispatch fence uses).
+	routechain.NoteAttemptConnecting(c)
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
 		WroteRequest: func(wrote httptrace.WroteRequestInfo) {
 			if wrote.Err == nil {
 				c.Set("upstream_attempted", true)
+				routechain.NoteAttemptDispatched(c)
 			}
 		},
 	}))

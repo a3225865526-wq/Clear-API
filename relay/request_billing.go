@@ -9,11 +9,13 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -118,10 +120,13 @@ func RefundFailedRequestBilling(c *gin.Context, info *relaycommon.RelayInfo, api
 			}
 			if err != nil {
 				logger.LogError(c, "cancelled upstream request requires billing reconciliation")
+			} else {
+				routechain.NoteRequestBilling(c, model.RouteChainBillingSettledUncertain)
 			}
 			logger.LogWarn(c, "upstream usage unknown after dispatch; reserved quota retained pending usage reconciliation")
 		} else {
 			info.Billing.Refund(c)
+			routechain.NoteRequestBilling(c, model.RouteChainBillingRefunded)
 		}
 	}
 	service.ChargeViolationFeeIfNeeded(c, info, apiErr)

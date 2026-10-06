@@ -37,6 +37,10 @@ func BeginRequest(c *gin.Context, modelName string, groupName string) *RequestSt
 	}
 	state := &RequestState{Snapshot: snapshot, visited: make(map[int]bool)}
 	c.Set(requestStateKey, state)
+	// Stage 4: the durable request record is created here — only POST relay
+	// paths the chain admits reach BeginRequest, so WS realtime / MJ / task
+	// transports never produce ledger rows (v1 transport scope).
+	BeginRequestLedger(c, snapshot)
 	logger.LogInfo(c, fmt.Sprintf("route_chain subsystem=engine event=snapshot_loaded chain_id=%d chain_version=%d candidates=%d cross_source=%t", snapshot.ChainId, snapshot.Version, len(snapshot.Candidates), snapshot.AllowCrossSource))
 	return state
 }
@@ -128,6 +132,7 @@ func (s *RequestState) MarkSkipped(c *gin.Context, index int, reason string) {
 	if s.nextIndex <= index {
 		s.nextIndex = index + 1
 	}
+	NoteSkippedDecision(c, s, candidate.Id, reason)
 	logger.LogInfo(c, fmt.Sprintf("route_chain subsystem=engine event=candidate_skipped chain_id=%d chain_version=%d candidate_id=%d type=%s target=%d reason=%q", s.Snapshot.ChainId, s.Snapshot.Version, candidate.Id, candidate.Type, candidate.TargetId, reason))
 }
 
