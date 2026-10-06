@@ -125,7 +125,9 @@ func MarkRouteChainAttemptPhase(attemptId string, from string, to string) (bool,
 }
 
 // RouteChainAttemptTerminal is the full terminal write: evidence flags,
-// classification, failure facts and provider-cost state, exactly once.
+// classification, failure facts and provider-cost state, exactly once. The
+// Stage 5 health fields are observability only — empty means "not observed"
+// (pre-Stage-5 row or breaker gate off) and never blocks the terminal write.
 type RouteChainAttemptTerminal struct {
 	TerminalState          string
 	FinalOutcome           string
@@ -142,6 +144,9 @@ type RouteChainAttemptTerminal struct {
 	UpstreamModel          string
 	UpstreamResponseId     string
 	ProviderCostState      string
+	HealthOutcome          string
+	BreakerEffect          string
+	StreamCompletion       string
 }
 
 // FinalizeRouteChainAttempt applies the terminal transition exactly once
@@ -171,6 +176,17 @@ func FinalizeRouteChainAttempt(attemptId string, terminal RouteChainAttemptTermi
 	// moment" — the terminal write must not clobber it with a default.
 	if terminal.ProviderCostState != "" {
 		updates["provider_cost_state"] = terminal.ProviderCostState
+	}
+	// Stage 5 health observability: recorded alongside the terminal write
+	// when observed; empty never blocks or rewrites anything (§二十九).
+	if terminal.HealthOutcome != "" {
+		updates["health_outcome"] = terminal.HealthOutcome
+	}
+	if terminal.BreakerEffect != "" {
+		updates["breaker_effect"] = terminal.BreakerEffect
+	}
+	if terminal.StreamCompletion != "" {
+		updates["stream_completion"] = terminal.StreamCompletion
 	}
 	result := DB.Model(&RouteChainAttemptRecord{}).
 		Where("attempt_id = ? AND terminal_state = ''", attemptId).

@@ -169,12 +169,45 @@ func authoritativeOutcome(outcome Outcome) bool {
 	return false
 }
 
+// streamCompletionLabel derives the ledger's stream-completion label from the
+// StreamStatus snapshot (§四: the interrupted detail becomes durable data).
+// Empty means the attempt had no stream observation (non-stream transport).
+func streamCompletionLabel(stream relaycommon.StreamOutcome) string {
+	if stream.EndReason == "" && stream.Response == "" {
+		return ""
+	}
+	switch stream.EndReason {
+	case relaycommon.StreamEndReasonClientGone, relaycommon.StreamEndReasonPingFail:
+		return "client_gone"
+	case relaycommon.StreamEndReasonTimeout:
+		return "timeout"
+	case relaycommon.StreamEndReasonDone, relaycommon.StreamEndReasonEOF, relaycommon.StreamEndReasonHandlerStop:
+		switch stream.Response {
+		case relaycommon.ResponseOutcomeFailed, relaycommon.ResponseOutcomeIncomplete:
+			return "abnormal"
+		}
+		return "normal"
+	default:
+		return "abnormal" // scanner_error, panic
+	}
+}
+
+// streamSnapshotOf returns the StreamStatus outcome snapshot when available.
+func streamSnapshotOf(relayInfo *relaycommon.RelayInfo) relaycommon.StreamOutcome {
+	if relayInfo == nil {
+		return relaycommon.StreamOutcome{}
+	}
+	return relayInfo.StreamStatus.OutcomeSnapshot()
+}
+
 // FinalizeAttemptForFailure writes the failed attempt's terminal record and
 // the failover decision record. Called from chainRetryDecision before the
 // per-attempt flag reset, while the attempt's evidence is still fresh.
 // preDispatchAborted marks a pre-dispatch abort (overall deadline or client
-// gone before any send) — recorded as CANCELLED, not a failure.
-func FinalizeAttemptForFailure(c *gin.Context, state *RequestState, relayInfo *relaycommon.RelayInfo, relayErr *types.NewAPIError, evidence Evidence, outcome Outcome, preDispatchAborted bool) {
+// gone before any send) — recorded as CANCELLED, not a failure. health is the
+// Stage 5 verdict computed before this call (empty when the breaker gate is
+// off — the columns stay unobserved).
+func FinalizeAttemptForFailure(c *gin.Context, state *RequestState, relayInfo *relaycommon.RelayInfo, relayErr *types.NewAPIError, evidence Evidence, outcome Outcome, preDispatchAborted bool, health AttemptHealth) {
 	attemptId := c.GetString(AttemptIDKey)
 	if attemptId == "" || c.GetBool(ledgerDisabledKey) {
 		return
@@ -203,6 +236,9 @@ func FinalizeAttemptForFailure(c *gin.Context, state *RequestState, relayInfo *r
 		UpstreamModel:          upstreamModelOf(relayInfo),
 		UpstreamResponseId:     c.GetString(common.UpstreamRequestIdKey),
 		ProviderCostState:      costState,
+		HealthOutcome:          string(health.Verdict),
+		BreakerEffect:          health.Effect,
+		StreamCompletion:       streamCompletionLabel(streamSnapshotOf(relayInfo)),
 	})
 	if err != nil {
 		recordLedgerFailure(c, "attempt_final", err)
@@ -225,7 +261,10 @@ func upstreamModelOf(info *relaycommon.RelayInfo) string {
 // FinalizeAttemptSuccess writes the SUCCEEDED terminal record for the
 // attempt that completed the request. Usage and provider cost arrive
 // separately at the authoritative usage moment (PostTextConsumeQuota).
-func FinalizeAttemptSuccess(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
+// health is the Stage 5 verdict — a normally-ended stream records
+// health_success; an abnormally cut stream records health_failure alongside
+// the SUCCEEDED terminal (the §三 separation made durable).
+func FinalizeAttemptSuccess(c *gin.Context, relayInfo *relaycommon.RelayInfo, health AttemptHealth) {
 	attemptId := c.GetString(AttemptIDKey)
 	if attemptId == "" || c.GetBool(ledgerDisabledKey) {
 		return
@@ -235,6 +274,9 @@ func FinalizeAttemptSuccess(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
 		FinalOutcome:       string(OutcomeSuccess),
 		UpstreamModel:      upstreamModelOf(relayInfo),
 		UpstreamResponseId: c.GetString(common.UpstreamRequestIdKey),
+		HealthOutcome:      string(health.Verdict),
+		BreakerEffect:      health.Effect,
+		StreamCompletion:   streamCompletionLabel(streamSnapshotOf(relayInfo)),
 		// Provider cost for a success is refined at the authoritative usage
 		// moment (NoteAttemptUsage), which has already run inside the
 		// handler; the terminal write must not overwrite it.

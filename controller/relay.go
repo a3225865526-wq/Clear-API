@@ -244,11 +244,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if newAPIError == nil {
 			if chainState != nil {
 				chainState.MarkSuccess()
-				routechain.FinalizeAttemptSuccess(c, relayInfo)
-				// Stage 5: the provider-health verdict is independent of the
-				// handler's success — an abnormally cut SSE stream reports
-				// health failure even though billing may settle partial usage.
-				routechain.ReportAttemptHealthSuccess(c, chainState, relayInfo)
+				// Stage 5: the provider-health verdict is computed before the
+				// terminal write and recorded on the ledger — an abnormally
+				// cut SSE stream reports health failure even though the
+				// handler succeeded and billing may settle partial usage.
+				health := routechain.ComputeRequestSuccessHealth(c, chainState, relayInfo)
+				routechain.FinalizeAttemptSuccess(c, relayInfo, health)
 			}
 			service.MarkRequestPolicySuccess(c, relayInfo.StreamStatus)
 			relayInfo.LastError = nil
@@ -360,14 +361,15 @@ func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayInf
 	// Stage 5: the health verdict is orthogonal to the failover decision —
 	// it feeds the candidate's runtime circuit and nothing else. A failure on
 	// a request that cannot fail over still counts (that is the breaker's
-	// value for later requests, §四十二).
-	routechain.ReportAttemptHealthFailure(c, state, routechain.HealthSignals{
+	// value for later requests, §四十二). Computed before the finalize so the
+	// verdict and effect land on the attempt row.
+	health := routechain.ComputeAttemptHealth(c, state, routechain.HealthSignals{
 		Outcome:    outcome,
 		Evidence:   evidence,
 		ContextErr: c.Request.Context().Err(),
 	})
 	preDispatchAborted := !evidence.RequestWritten && (props.DeadlineExceeded || c.Request.Context().Err() != nil)
-	routechain.FinalizeAttemptForFailure(c, state, relayInfo, relayErr, evidence, outcome, preDispatchAborted)
+	routechain.FinalizeAttemptForFailure(c, state, relayInfo, relayErr, evidence, outcome, preDispatchAborted, health)
 	if decision.Allowed {
 		// Safe by construction: the policy only advances past provably
 		// zero-work attempts, so hiding their flags from the request-end

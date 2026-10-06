@@ -91,13 +91,26 @@ func upstreamRetryAfterCooldown(c *gin.Context, httpStatus int) int {
 	return ParseRetryAfterSeconds(c.GetString(UpstreamRetryAfterKey), ResolveCircuitConfig(nil).RetryAfterMax)
 }
 
-func reportHealth(c *gin.Context, state *RequestState, signals HealthSignals) string {
+// AttemptHealth is the computed health verdict of one finished attempt plus
+// the effect the breaker applied. Both land on the attempt ledger's health
+// columns; empty (zero value) means the breaker gate left it unobserved.
+type AttemptHealth struct {
+	Verdict HealthOutcome
+	Effect  string
+}
+
+// ComputeAttemptHealth turns one finished attempt into a provider-health
+// verdict, applies it to the candidate's circuit and returns the pair for the
+// ledger's finalize write. Memory-only on the breaker side (§二十九) — a
+// ledger failure can never block these decisions, and nothing here can
+// influence billing.
+func ComputeAttemptHealth(c *gin.Context, state *RequestState, signals HealthSignals) AttemptHealth {
 	if state == nil || state.Snapshot == nil || !common.RouteCircuitBreakerEnabled() {
-		return ""
+		return AttemptHealth{}
 	}
 	candidate := state.FailingCandidate()
 	if candidate == nil {
-		return ""
+		return AttemptHealth{}
 	}
 	verdict, reason := ClassifyHealthOutcome(signals)
 	cooldownSeconds := upstreamRetryAfterCooldown(c, signals.Evidence.HTTPStatus)
@@ -109,20 +122,14 @@ func reportHealth(c *gin.Context, state *RequestState, signals HealthSignals) st
 	}
 	logger.LogInfo(c, fmt.Sprintf("route_chain subsystem=breaker event=health_report request_id=%s chain_id=%d candidate_id=%d outcome=%s verdict=%s reason=%s effect=%s cooldown_seconds=%d",
 		c.GetString(common.RequestIdKey), state.Snapshot.ChainId, candidate.Id, signals.Outcome, verdict, reason, effect, cooldownSeconds))
-	return effect
+	return AttemptHealth{Verdict: verdict, Effect: effect}
 }
 
-// ReportAttemptHealthFailure applies the health verdict of a failed attempt.
-// Called from chainRetryDecision while the attempt's evidence is fresh.
-func ReportAttemptHealthFailure(c *gin.Context, state *RequestState, signals HealthSignals) string {
-	return reportHealth(c, state, signals)
-}
-
-// ReportAttemptHealthSuccess applies the health verdict of the attempt that
-// completed the request. The stream completion status decides between a real
-// success and the SSE-abnormal failure (§四 A/B) — billing success never
-// implies provider health (§三).
-func ReportAttemptHealthSuccess(c *gin.Context, state *RequestState, relayInfo *relaycommon.RelayInfo) string {
+// ComputeRequestSuccessHealth builds the health signals of the attempt that
+// completed the request from the relay facts. The stream completion status
+// decides between a real success and the SSE-abnormal failure (§四 A/B) —
+// billing success never implies provider health (§三).
+func ComputeRequestSuccessHealth(c *gin.Context, state *RequestState, relayInfo *relaycommon.RelayInfo) AttemptHealth {
 	signals := HealthSignals{
 		Outcome: OutcomeSuccess,
 		Evidence: Evidence{
@@ -136,5 +143,5 @@ func ReportAttemptHealthSuccess(c *gin.Context, state *RequestState, relayInfo *
 	if relayInfo != nil {
 		signals.Stream = relayInfo.StreamStatus.OutcomeSnapshot()
 	}
-	return reportHealth(c, state, signals)
+	return ComputeAttemptHealth(c, state, signals)
 }

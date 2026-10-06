@@ -54,8 +54,8 @@ func TestReportHealthInertWhenGateOff(t *testing.T) {
 	common.SetRouteCircuitBreakerEnabledForTest(false)
 	t.Cleanup(func() { common.SetRouteCircuitBreakerEnabledForTest(false) })
 	state := stateFixture(1)
-	effect := ReportAttemptHealthFailure(stateTestContext(), state, HealthSignals{Outcome: OutcomeRequestWrittenOutcomeUncertain})
-	require.Equal(t, "", effect)
+	health := ComputeAttemptHealth(stateTestContext(), state, HealthSignals{Outcome: OutcomeRequestWrittenOutcomeUncertain})
+	require.Equal(t, AttemptHealth{}, health)
 }
 
 // The full failure-path orchestration: verdict + breaker update + 429
@@ -78,11 +78,12 @@ func TestReportAttemptHealthFailureOrchestration(t *testing.T) {
 	state := stateFixture(1)
 	state.MarkAttempt(c, 0) // candidate id 1 is now the failing candidate
 
-	effect := ReportAttemptHealthFailure(c, state, HealthSignals{
+	health := ComputeAttemptHealth(c, state, HealthSignals{
 		Outcome:  OutcomeRateLimitRejectionNoWork,
 		Evidence: Evidence{RequestWritten: true, HTTPStatus: 429, UpstreamErrorCode: "rate_limit_exceeded"},
 	})
-	require.Equal(t, BreakerEffectCooldown, effect)
+	require.Equal(t, BreakerEffectCooldown, health.Effect)
+	require.Equal(t, HealthNeutral, health.Verdict)
 	snap := registry.CandidateSnapshot(1, 1, nil)
 	require.Equal(t, CircuitStateOpen, snap.State)
 	require.Equal(t, 0, snap.ConsecutiveFailures, "429 must not count failures")
@@ -111,8 +112,9 @@ func TestReportAttemptHealthSuccessAbnormalStream(t *testing.T) {
 	state := stateFixture(1)
 	state.MarkAttempt(c, 0)
 
-	effect := ReportAttemptHealthSuccess(c, state, nil)
-	require.Equal(t, BreakerEffectSuccess, effect, "no stream snapshot (non-stream) → plain success")
+	health := ComputeRequestSuccessHealth(c, state, nil)
+	require.Equal(t, BreakerEffectSuccess, health.Effect, "no stream snapshot (non-stream) → plain success")
+	require.Equal(t, HealthSuccess, health.Verdict)
 
 	// Now with a stream status cut mid-stream.
 	c2, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -120,8 +122,8 @@ func TestReportAttemptHealthSuccessAbnormalStream(t *testing.T) {
 	status := relaycommon.NewStreamStatus()
 	status.SetEndReason(relaycommon.StreamEndReasonScannerErr, nil)
 	info := &relaycommon.RelayInfo{StreamStatus: status}
-	effect = ReportAttemptHealthSuccess(c2, state, info)
-	require.Equal(t, BreakerEffectFailure, effect)
+	health = ComputeRequestSuccessHealth(c2, state, info)
+	require.Equal(t, BreakerEffectFailure, health.Effect)
 	snap := registry.CandidateSnapshot(1, 1, nil)
 	require.Equal(t, CircuitStateOpen, snap.State, "single abnormal stream end trips a threshold-1 circuit")
 	require.Equal(t, string(HealthFailure), snap.LastHealthOutcome)
