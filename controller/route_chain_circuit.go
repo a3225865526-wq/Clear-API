@@ -59,11 +59,11 @@ func GetRouteChainHealth(c *gin.Context) {
 	}
 	common.ApiSuccess(c, gin.H{
 		"chain": gin.H{
-			"id":                chain.Id,
-			"model":             chain.Model,
-			"group":             chain.Group,
-			"enabled":           chain.Enabled,
-			"version":           chain.Version,
+			"id":                 chain.Id,
+			"model":              chain.Model,
+			"group":              chain.Group,
+			"enabled":            chain.Enabled,
+			"version":            chain.Version,
 			"allow_cross_source": chain.AllowCrossSource,
 		},
 		"candidates": candidates,
@@ -117,6 +117,9 @@ func ResetRouteChainCandidateCircuit(c *gin.Context) {
 		return
 	}
 	routechain.Breaker.ResetCandidate(c, chainId, candidateId)
+	recordManageAudit(c, "route_chain.circuit_reset", map[string]any{
+		"chain_id": chainId, "candidate_id": candidateId,
+	})
 	common.ApiSuccess(c, gin.H{
 		"chain_id":     chainId,
 		"candidate_id": candidateId,
@@ -147,17 +150,20 @@ func ForceOpenRouteChainCandidateCircuit(c *gin.Context) {
 		}
 	}
 	routechain.Breaker.ForceOpen(c, chainId, candidateId, body.DurationSeconds)
+	recordManageAudit(c, "route_chain.circuit_force_open", map[string]any{
+		"chain_id": chainId, "candidate_id": candidateId, "duration_seconds": body.DurationSeconds,
+	})
 	common.ApiSuccess(c, gin.H{
-		"chain_id":       chainId,
-		"candidate_id":   candidateId,
-		"circuit":        routechain.Breaker.CandidateSnapshot(chainId, candidateId, nil),
+		"chain_id":          chainId,
+		"candidate_id":      candidateId,
+		"circuit":           routechain.Breaker.CandidateSnapshot(chainId, candidateId, nil),
 		"restart_semantics": "memory-only: cleared on process restart or when the window elapses; set candidate enabled=false for a persistent disable",
 	})
 }
 
 type setCandidateEnabledRequest struct {
-	Enabled        bool `json:"enabled"`
-	ExpectedVersion int `json:"expected_version"`
+	Enabled         bool `json:"enabled"`
+	ExpectedVersion int  `json:"expected_version"`
 }
 
 // SetRouteChainCandidateEnabled toggles one candidate through the repository's
@@ -189,6 +195,9 @@ func SetRouteChainCandidateEnabled(c *gin.Context) {
 		common.ApiErrorMsg(c, "failed to update candidate")
 		return
 	}
+	recordManageAudit(c, "route_chain.candidate_enable", map[string]any{
+		"chain_id": chainId, "candidate_id": candidateId, "enabled": body.Enabled,
+	})
 	common.ApiSuccess(c, gin.H{
 		"chain_id":     chainId,
 		"candidate_id": candidateId,

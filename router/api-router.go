@@ -295,11 +295,24 @@ func SetApiRouter(router *gin.Engine) {
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
 		}
-		// Stage 5 Operator Control API: owner-only route chain circuit control.
+		// Stage 5 Operator Control API + Stage 6 Operator Console:
+		// owner-only route chain management. Every route here is RootAuth.
 		routeChainRoute := apiRouter.Group("/route-chains")
 		routeChainRoute.Use(middleware.RootAuth())
 		{
+			routeChainRoute.GET("", controller.ListRouteChains)
+			routeChainRoute.GET("/gates", controller.GetRouteChainGates)
+			routeChainRoute.GET("/targets", controller.GetRouteChainTargets)
+			routeChainRoute.POST("", controller.CreateRouteChain)
+			routeChainRoute.GET("/:id", controller.GetRouteChainDetail)
+			routeChainRoute.PUT("/:id", controller.UpdateRouteChain)
+			routeChainRoute.POST("/:id/enable", controller.SetRouteChainState)
+			routeChainRoute.POST("/:id/reorder", controller.ReorderRouteChain)
+			routeChainRoute.POST("/:id/archive", controller.ArchiveRouteChain)
+			routeChainRoute.DELETE("/:id", controller.DeleteRouteChain)
 			routeChainRoute.GET("/:id/health", controller.GetRouteChainHealth)
+			routeChainRoute.GET("/:id/attempts", controller.GetRouteChainAttempts)
+			routeChainRoute.GET("/:id/decisions", controller.GetRouteChainDecisions)
 			routeChainRoute.POST("/:id/candidates/:candidateId/circuit/reset", controller.ResetRouteChainCandidateCircuit)
 			routeChainRoute.POST("/:id/candidates/:candidateId/circuit/open", controller.ForceOpenRouteChainCandidateCircuit)
 			routeChainRoute.POST("/:id/candidates/:candidateId/enabled", controller.SetRouteChainCandidateEnabled)
