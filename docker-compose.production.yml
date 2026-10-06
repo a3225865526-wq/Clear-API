@@ -1,0 +1,160 @@
+# Production deployment template for the one-shot pre-listen bootstrap flow.
+#
+# Amendment 3: NO real secret may ever appear in this file, in any env_file or
+# .env, in the Dockerfile, in image layers, or in command arguments. Secrets
+# are provided as compose secrets backed by host files that are root-owned and
+# mode 0600; the entrypoint launcher (/entrypoint-secure.sh) exports them into
+# the process environment at start. env_file may only carry NON-sensitive
+# production configuration (feature switches, limits, origin, trusted proxies,
+# owner ID).
+#
+# The production-bootstrap service is a one-shot tool registered under the
+# "bootstrap" profile: `docker compose up` never runs it automatically.
+#
+# Operator flow:
+#   1. docker compose --profile bootstrap run --rm production-bootstrap \
+#        --execute --admin-username <name> \
+#        --admin-password-file /run/secrets/admin_password \
+#        --terms-file /etc/clearapi/legal/terms.md --terms-version v1 \
+#        --privacy-file /etc/clearapi/legal/privacy.md --privacy-version v1 \
+#        --approved-by <operator reference> \
+#        --candidate-commit <commit>
+#      (first run stops with FINANCE_OWNER_CONFIGURATION_REQUIRED and prints
+#       the real owner ID; set CLEARAPI_FINANCE_OWNER_USER_ID below and rerun)
+#   2. docker compose --profile bootstrap run --rm production-bootstrap --execute ...  (completes)
+#   3. docker compose up -d new-api
+#   4. docker compose --profile bootstrap run --rm production-bootstrap --verify-only
+#
+# Never publish postgres to the host; never expose more than the reverse proxy
+# needs (80/443) for new-api.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: new-api
+      # POSTGRES_USER / POSTGRES_PASSWORD are injected from the sql_dsn secret
+      # by initializing the database out-of-band; do NOT put real credentials
+      # here. The SQL DSN itself reaches new-api only via /run/secrets/sql_dsn.
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U newapi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  new-api:
+    image: clearapi/new-api:production-candidate
+    restart: unless-stopped
+    entrypoint: ["/entrypoint-secure.sh", "/new-api"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - GIN_MODE=release
+      - SESSION_COOKIE_SECURE=true
+      # exact HTTPS origin of the production site (operator value)
+      - SESSION_COOKIE_TRUSTED_URL=https://REPLACE-WITH-PRODUCTION-ORIGIN
+      - TRUSTED_PROXIES=none
+      - CLEARAPI_PRODUCTION=true
+      - CLEARAPI_CLOSED_LAUNCH=true
+      - CLEARAPI_DURABLE_WALLET=true
+      - CLEARAPI_BILLING_OUTBOX=true
+      - CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE=true
+      - CLEARAPI_TASK_SETTLEMENT=true
+      - CLEARAPI_STRICT_PREPAID=true
+      - CLEARAPI_TOKEN_ENCRYPTION=true
+      - CLEARAPI_TOKEN_ENCRYPTION_KEY_FILE=/run/secrets/token_encryption_key
+      - CLEARAPI_DEPLOYMENT_INSTANCES=1
+      - CLEARAPI_ENABLE_REALTIME=false
+      - CLEARAPI_FINANCE_ENABLED=true
+      # real owner id after bootstrap stage 1 (non-secret integer)
+      - CLEARAPI_FINANCE_OWNER_USER_ID=0
+      - DEBUG=false
+      - DIFY_DEBUG=false
+      - ENABLE_PPROF=false
+      - BATCH_UPDATE_ENABLED=false
+      - MAX_UPSTREAM_RESPONSE_MB=64
+      - MAX_REQUEST_BODY_MB=32
+      - RELAY_CONCURRENCY_GLOBAL=32
+      - RELAY_CONCURRENCY_USER=8
+      - RELAY_CONCURRENCY_TOKEN=4
+      - RELAY_CONCURRENCY_IP=32
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./data:/data
+      - ./logs:/app/logs
+    secrets:
+      - sql_dsn
+      - session_secret
+      - crypto_secret
+      - token_encryption_key
+    networks: [internal]
+
+  production-bootstrap:
+    image: clearapi/new-api:production-candidate
+    profiles: ["bootstrap"]
+    entrypoint: ["/entrypoint-secure.sh", "/production-bootstrap"]
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - GIN_MODE=release
+      - SESSION_COOKIE_SECURE=true
+      - SESSION_COOKIE_TRUSTED_URL=https://REPLACE-WITH-PRODUCTION-ORIGIN
+      - TRUSTED_PROXIES=none
+      - CLEARAPI_PRODUCTION=true
+      - CLEARAPI_DURABLE_WALLET=true
+      - CLEARAPI_BILLING_OUTBOX=true
+      - CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE=true
+      - CLEARAPI_TASK_SETTLEMENT=true
+      - CLEARAPI_STRICT_PREPAID=true
+      - CLEARAPI_TOKEN_ENCRYPTION=true
+      - CLEARAPI_TOKEN_ENCRYPTION_KEY_FILE=/run/secrets/token_encryption_key
+      - CLEARAPI_DEPLOYMENT_INSTANCES=1
+      - CLEARAPI_ENABLE_REALTIME=false
+      - CLEARAPI_FINANCE_ENABLED=true
+      - CLEARAPI_FINANCE_OWNER_USER_ID=0
+      - DEBUG=false
+      - DIFY_DEBUG=false
+      - ENABLE_PPROF=false
+      - BATCH_UPDATE_ENABLED=false
+      - MAX_UPSTREAM_RESPONSE_MB=64
+      - MAX_REQUEST_BODY_MB=32
+      - RELAY_CONCURRENCY_GLOBAL=32
+      - RELAY_CONCURRENCY_USER=8
+      - RELAY_CONCURRENCY_TOKEN=4
+      - RELAY_CONCURRENCY_IP=32
+    volumes:
+      # operator-provided legal documents (root-owned, read-only)
+      - /etc/clearapi/legal:/etc/clearapi/legal:ro
+    secrets:
+      - sql_dsn
+      - session_secret
+      - crypto_secret
+      - token_encryption_key
+      - admin_password
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  pg_data:
+
+secrets:
+  sql_dsn:
+    file: /etc/clearapi/secrets/sql_dsn
+  session_secret:
+    file: /etc/clearapi/secrets/session_secret
+  crypto_secret:
+    file: /etc/clearapi/secrets/crypto_secret
+  token_encryption_key:
+    file: /etc/clearapi/secrets/token_encryption_key
+  admin_password:
+    file: /etc/clearapi/secrets/admin_password
