@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service/routechain"
@@ -26,6 +27,11 @@ func newCircuitAPITestEnv(t *testing.T) (*gorm.DB, model.RouteChainWithCandidate
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	routechain.Breaker.ResetForTest()
+	// The stage 6 audit entries resolve the actor name through the user cache;
+	// the test env has no Redis, so pin the cache off like the audit tests do.
+	previousRedis := common.RedisEnabled
+	common.RedisEnabled = false
+	t.Cleanup(func() { common.RedisEnabled = previousRedis })
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "circuit-api.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
 	sqlDB, err := db.DB()
