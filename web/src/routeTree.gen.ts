@@ -54,6 +54,8 @@ import { Route as AuthenticatedPoolAccountIdRouteImport } from './routes/_authen
 import { Route as AuthenticatedPoolCapabilitiesRouteImport } from './routes/_authenticated/pool/capabilities'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedRedemptionCodesIndexRouteImport } from './routes/_authenticated/redemption-codes/index'
+import { Route as AuthenticatedRouteChainsIndexRouteImport } from './routes/_authenticated/route-chains/index'
+import { Route as AuthenticatedRouteChainsIdRouteImport } from './routes/_authenticated/route-chains/$id'
 import { Route as AuthenticatedSecurityIndexRouteImport } from './routes/_authenticated/security/index'
 import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_authenticated/subscriptions/index'
 import { Route as AuthenticatedSystemInfoIndexRouteImport } from './routes/_authenticated/system-info/index'
@@ -322,6 +324,18 @@ const AuthenticatedRedemptionCodesIndexRoute =
     path: '/redemption-codes/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedRouteChainsIndexRoute =
+  AuthenticatedRouteChainsIndexRouteImport.update({
+    id: '/route-chains/',
+    path: '/route-chains/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedRouteChainsIdRoute =
+  AuthenticatedRouteChainsIdRouteImport.update({
+    id: '/route-chains/$id',
+    path: '/route-chains/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSecurityIndexRoute =
   AuthenticatedSecurityIndexRouteImport.update({
     id: '/security/',
@@ -527,6 +541,7 @@ export interface FileRoutesByFullPath {
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/pool/$accountId': typeof AuthenticatedPoolAccountIdRoute
   '/pool/capabilities': typeof AuthenticatedPoolCapabilitiesRoute
+  '/route-chains/$id': typeof AuthenticatedRouteChainsIdRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
   '/docs/clearapi/$chapter': typeof DocsClearapiChapterRoute
@@ -540,6 +555,7 @@ export interface FileRoutesByFullPath {
   '/pool/': typeof AuthenticatedPoolIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
+  '/route-chains/': typeof AuthenticatedRouteChainsIndexRoute
   '/security/': typeof AuthenticatedSecurityIndexRoute
   '/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
   '/system-info/': typeof AuthenticatedSystemInfoIndexRoute
@@ -599,6 +615,7 @@ export interface FileRoutesByTo {
   '/models/$section': typeof AuthenticatedModelsSectionRoute
   '/pool/$accountId': typeof AuthenticatedPoolAccountIdRoute
   '/pool/capabilities': typeof AuthenticatedPoolCapabilitiesRoute
+  '/route-chains/$id': typeof AuthenticatedRouteChainsIdRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
   '/docs/clearapi/$chapter': typeof DocsClearapiChapterRoute
@@ -612,6 +629,7 @@ export interface FileRoutesByTo {
   '/pool': typeof AuthenticatedPoolIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes': typeof AuthenticatedRedemptionCodesIndexRoute
+  '/route-chains': typeof AuthenticatedRouteChainsIndexRoute
   '/security': typeof AuthenticatedSecurityIndexRoute
   '/subscriptions': typeof AuthenticatedSubscriptionsIndexRoute
   '/system-info': typeof AuthenticatedSystemInfoIndexRoute
@@ -676,6 +694,7 @@ export interface FileRoutesById {
   '/_authenticated/models/$section': typeof AuthenticatedModelsSectionRoute
   '/_authenticated/pool/$accountId': typeof AuthenticatedPoolAccountIdRoute
   '/_authenticated/pool/capabilities': typeof AuthenticatedPoolCapabilitiesRoute
+  '/_authenticated/route-chains/$id': typeof AuthenticatedRouteChainsIdRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/_authenticated/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
   '/docs/clearapi/$chapter': typeof DocsClearapiChapterRoute
@@ -689,6 +708,7 @@ export interface FileRoutesById {
   '/_authenticated/pool/': typeof AuthenticatedPoolIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
+  '/_authenticated/route-chains/': typeof AuthenticatedRouteChainsIndexRoute
   '/_authenticated/security/': typeof AuthenticatedSecurityIndexRoute
   '/_authenticated/subscriptions/': typeof AuthenticatedSubscriptionsIndexRoute
   '/_authenticated/system-info/': typeof AuthenticatedSystemInfoIndexRoute
@@ -752,6 +772,7 @@ export interface FileRouteTypes {
     | '/models/$section'
     | '/pool/$accountId'
     | '/pool/capabilities'
+    | '/route-chains/$id'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
     | '/docs/clearapi/$chapter'
@@ -765,6 +786,7 @@ export interface FileRouteTypes {
     | '/pool/'
     | '/profile/'
     | '/redemption-codes/'
+    | '/route-chains/'
     | '/security/'
     | '/subscriptions/'
     | '/system-info/'
@@ -824,6 +846,7 @@ export interface FileRouteTypes {
     | '/models/$section'
     | '/pool/$accountId'
     | '/pool/capabilities'
+    | '/route-chains/$id'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
     | '/docs/clearapi/$chapter'
@@ -837,6 +860,7 @@ export interface FileRouteTypes {
     | '/pool'
     | '/profile'
     | '/redemption-codes'
+    | '/route-chains'
     | '/security'
     | '/subscriptions'
     | '/system-info'
@@ -900,6 +924,7 @@ export interface FileRouteTypes {
     | '/_authenticated/models/$section'
     | '/_authenticated/pool/$accountId'
     | '/_authenticated/pool/capabilities'
+    | '/_authenticated/route-chains/$id'
     | '/_authenticated/usage-logs/$section'
     | '/_authenticated/usage-logs/audit'
     | '/docs/clearapi/$chapter'
@@ -913,6 +938,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pool/'
     | '/_authenticated/profile/'
     | '/_authenticated/redemption-codes/'
+    | '/_authenticated/route-chains/'
     | '/_authenticated/security/'
     | '/_authenticated/subscriptions/'
     | '/_authenticated/system-info/'
@@ -1279,6 +1305,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRedemptionCodesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/route-chains/': {
+      id: '/_authenticated/route-chains/'
+      path: '/route-chains'
+      fullPath: '/route-chains/'
+      preLoaderRoute: typeof AuthenticatedRouteChainsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/route-chains/$id': {
+      id: '/_authenticated/route-chains/$id'
+      path: '/route-chains/$id'
+      fullPath: '/route-chains/$id'
+      preLoaderRoute: typeof AuthenticatedRouteChainsIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/security/': {
       id: '/_authenticated/security/'
       path: '/security'
@@ -1585,6 +1625,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedModelsSectionRoute: typeof AuthenticatedModelsSectionRoute
   AuthenticatedPoolAccountIdRoute: typeof AuthenticatedPoolAccountIdRoute
   AuthenticatedPoolCapabilitiesRoute: typeof AuthenticatedPoolCapabilitiesRoute
+  AuthenticatedRouteChainsIdRoute: typeof AuthenticatedRouteChainsIdRoute
   AuthenticatedUsageLogsSectionRoute: typeof AuthenticatedUsageLogsSectionRoute
   AuthenticatedUsageLogsAuditRoute: typeof AuthenticatedUsageLogsAuditRoute
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
@@ -1597,6 +1638,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPoolIndexRoute: typeof AuthenticatedPoolIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedRedemptionCodesIndexRoute: typeof AuthenticatedRedemptionCodesIndexRoute
+  AuthenticatedRouteChainsIndexRoute: typeof AuthenticatedRouteChainsIndexRoute
   AuthenticatedSecurityIndexRoute: typeof AuthenticatedSecurityIndexRoute
   AuthenticatedSubscriptionsIndexRoute: typeof AuthenticatedSubscriptionsIndexRoute
   AuthenticatedSystemInfoIndexRoute: typeof AuthenticatedSystemInfoIndexRoute
@@ -1618,6 +1660,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedModelsSectionRoute: AuthenticatedModelsSectionRoute,
   AuthenticatedPoolAccountIdRoute: AuthenticatedPoolAccountIdRoute,
   AuthenticatedPoolCapabilitiesRoute: AuthenticatedPoolCapabilitiesRoute,
+  AuthenticatedRouteChainsIdRoute: AuthenticatedRouteChainsIdRoute,
   AuthenticatedUsageLogsSectionRoute: AuthenticatedUsageLogsSectionRoute,
   AuthenticatedUsageLogsAuditRoute: AuthenticatedUsageLogsAuditRoute,
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
@@ -1631,6 +1674,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedRedemptionCodesIndexRoute:
     AuthenticatedRedemptionCodesIndexRoute,
+  AuthenticatedRouteChainsIndexRoute: AuthenticatedRouteChainsIndexRoute,
   AuthenticatedSecurityIndexRoute: AuthenticatedSecurityIndexRoute,
   AuthenticatedSubscriptionsIndexRoute: AuthenticatedSubscriptionsIndexRoute,
   AuthenticatedSystemInfoIndexRoute: AuthenticatedSystemInfoIndexRoute,
