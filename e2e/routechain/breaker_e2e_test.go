@@ -162,7 +162,9 @@ func TestE2EBreakerHalfOpenProbeFailureReopens(t *testing.T) {
 	require.Equal(t, 2, mockA.count())
 	require.Eventually(t, func() bool {
 		snapshot := routechain.Breaker.CandidateSnapshot(1, 1, nil)
-		return snapshot.State == routechain.CircuitStateOpen && snapshot.Counters["circuit_open_total"] == 2
+		// Open or half_open both prove the reopen — a 1s cooldown can lazily
+		// flip to half_open while this poll runs.
+		return snapshot.State != routechain.CircuitStateClosed && snapshot.Counters["circuit_open_total"] == 2
 	}, 3*time.Second, 10*time.Millisecond, "half-open probe failure reopened the circuit")
 
 	// The reopened cooldown holds: A stays skipped while B serves.
@@ -206,8 +208,9 @@ func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	require.Equal(t, 1, mockA.count())
 	require.Eventually(t, func() bool {
 		snapshot := routechain.Breaker.CandidateSnapshot(1, 1, nil)
-		return snapshot.State == routechain.CircuitStateOpen &&
-			snapshot.ConsecutiveFailures == 0 &&
+		// Counters carry the verdict — the state itself may lazily flip to
+		// half_open once the short Retry-After window elapses mid-poll.
+		return snapshot.ConsecutiveFailures == 0 &&
 			snapshot.Counters["retry_after_cooldown_total"] == 1 &&
 			snapshot.Counters["circuit_open_total"] == 0
 	}, 3*time.Second, 10*time.Millisecond, "429 opens the cooldown window without any failure count")
@@ -232,7 +235,7 @@ func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	require.Equal(t, 2, mockA.count())
 	require.Eventually(t, func() bool {
 		snapshot := routechain.Breaker.CandidateSnapshot(1, 1, nil)
-		return snapshot.State == routechain.CircuitStateOpen &&
+		return snapshot.Counters["retry_after_cooldown_total"] == 2 &&
 			snapshot.OpenUntil >= before+1 &&
 			snapshot.OpenUntil <= after+1 // Retry-After capped to max seconds
 	}, 3*time.Second, 10*time.Millisecond, "capped cooldown window applied")
