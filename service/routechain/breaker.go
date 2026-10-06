@@ -366,7 +366,11 @@ func (r *BreakerRegistry) ReportAttemptHealth(c *gin.Context, chainId, candidate
 	}
 	if cooldownSeconds > 0 && verdict != HealthSuccess {
 		// 429 cooldown effect (§十七/§十九): a rate-limit verdict proves the
-		// provider answered — bounded open-until, no failure counting.
+		// provider answered — bounded open-until, no failure counting. The
+		// failing classification is recorded for the operator even though it
+		// never counts as a failure.
+		entry.lastFailureClass = failureClass
+		entry.lastFailureCode = failureCode
 		r.applyCooldown(entry, now, cooldownSeconds)
 		entry.retryAfterCooldowns++
 		effect = BreakerEffectCooldown

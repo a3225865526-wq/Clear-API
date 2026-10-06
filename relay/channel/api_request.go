@@ -632,6 +632,14 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	if upID := resp.Header.Get(common2.RequestIdKey); upID != "" {
 		c.Set(common2.UpstreamRequestIdKey, upID)
 	}
+	// Stage 5: capture the raw Retry-After on a 429 for the route chain
+	// breaker's bounded cooldown (§十七). The value is parsed — never
+	// trusted — at the report site; non-429 responses never read it.
+	if resp.StatusCode == http.StatusTooManyRequests {
+		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+			c.Set(routechain.UpstreamRetryAfterKey, retryAfter)
+		}
+	}
 
 	_ = req.Body.Close()
 	_ = c.Request.Body.Close()
