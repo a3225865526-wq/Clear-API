@@ -58,7 +58,14 @@ func TestClassifyHealthOutcomeMatrix(t *testing.T) {
 		// §十四: user/local causes never count.
 		{"request invalid", HealthSignals{Outcome: OutcomeRequestInvalid}, HealthNeutral, "request_local"},
 		{"route policy rejected", HealthSignals{Outcome: OutcomeRoutePolicyRejected}, HealthNeutral, "request_local"},
-		{"tool chain", HealthSignals{Outcome: OutcomeToolOutputObserved}, HealthNeutral, "tool_chain_no_retry"},
+		{"tool chain clean rejection", HealthSignals{Outcome: OutcomeToolOutputObserved, Evidence: Evidence{HTTPStatus: 400}}, HealthNeutral, "tool_chain_no_retry"},
+		// C18: the provider evidence of the attempt still counts through the
+		// no-retry flag — written 5xx, transport loss, pre-dispatch failure.
+		{"tool chain written 5xx", HealthSignals{Outcome: OutcomeToolOutputObserved, Evidence: Evidence{RequestWritten: true, HTTPStatus: 503}}, HealthFailure, "post_dispatch_abnormal_end"},
+		{"tool chain transport loss", HealthSignals{Outcome: OutcomeToolOutputObserved, Evidence: Evidence{RequestWritten: true}}, HealthFailure, "post_dispatch_abnormal_end"},
+		{"tool chain pre-dispatch transport", HealthSignals{Outcome: OutcomeToolOutputObserved}, HealthFailure, "transport_failure"},
+		{"tool chain 401", HealthSignals{Outcome: OutcomeToolOutputObserved, Evidence: Evidence{RequestWritten: true, HTTPStatus: 401}}, HealthFailure, "authoritative_rejection"},
+		{"tool chain 429 cooldown", HealthSignals{Outcome: OutcomeToolOutputObserved, Evidence: Evidence{RequestWritten: true, HTTPStatus: 429}}, HealthNeutral, "rate_limited_cooldown"},
 		// §十七: 429 is a cooldown effect, never a failure (C19/C20).
 		{"429 zero-work", HealthSignals{Outcome: OutcomeRateLimitRejectionNoWork, Evidence: Evidence{HTTPStatus: 429}}, HealthNeutral, "rate_limited_cooldown"},
 		{"429 dominates", HealthSignals{Outcome: OutcomeRequestWrittenOutcomeUncertain, Evidence: Evidence{HTTPStatus: 429, RequestWritten: true}}, HealthNeutral, "rate_limited_cooldown"},
