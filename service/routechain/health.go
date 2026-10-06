@@ -121,7 +121,23 @@ func ClassifyHealthOutcome(signals HealthSignals) (HealthOutcome, string) {
 		// upstream_usage_uncertain (design Part 1 Q6).
 		return HealthFailure, "post_dispatch_abnormal_end"
 	case OutcomeToolOutputObserved:
-		// tool_chain_no_retry is a request property, not provider evidence.
+		// The no-retry property itself is a request attribute set pre-dispatch
+		// (§十四) and never proves anything about the provider — but the
+		// underlying provider evidence of THIS attempt still counts (C18):
+		// written 5xx, post-dispatch transport loss, pre-dispatch transport
+		// failure, and candidate-scoped 401/403/404 map exactly as they would
+		// without the tool flag.
+		status := signals.Evidence.HTTPStatus
+		if signals.Evidence.RequestWritten {
+			if status == 0 || status >= 500 {
+				return HealthFailure, "post_dispatch_abnormal_end"
+			}
+			if status == 401 || status == 403 || status == 404 {
+				return HealthFailure, "authoritative_rejection"
+			}
+		} else if status == 0 {
+			return HealthFailure, "transport_failure"
+		}
 		return HealthNeutral, "tool_chain_no_retry"
 	case OutcomeRequestInvalid, OutcomeRoutePolicyRejected:
 		// User/local causes (§十四): never prove the provider unhealthy.
