@@ -383,6 +383,9 @@ func migrateDB() error {
 		&AuthzRole{},
 		&RouteChain{},
 		&RouteChainCandidate{},
+		&RouteChainRequestRecord{},
+		&RouteChainAttemptRecord{},
+		&RouteChainDecisionRecord{},
 	)
 	if err != nil {
 		return err
