@@ -49,6 +49,7 @@ const (
 	ErrorCodeJsonMarshalFailed  ErrorCode = "json_marshal_failed"
 	ErrorCodeDoRequestFailed    ErrorCode = "do_request_failed"
 	ErrorCodeGetChannelFailed   ErrorCode = "get_channel_failed"
+	ErrorCodeRouteExhausted     ErrorCode = "route_exhausted"
 	ErrorCodeGenRelayInfoFailed ErrorCode = "gen_relay_info_failed"
 
 	// channel error

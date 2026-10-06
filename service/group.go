@@ -106,6 +106,23 @@ func GetRequestAutoGroups(c *gin.Context, userGroup string) []string {
 	return FilterUserTokenAutoGroups(userGroup, groups)
 }
 
+// RouteChainCandidateGroups resolves the routing groups a route-chain
+// candidate must serve: the request's using group, expanded to the auto-group
+// list when the token uses auto routing. Chain rows bind concrete groups, so
+// auto-group requests resolve against their expansion (design §2.3).
+func RouteChainCandidateGroups(c *gin.Context) []string {
+	usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
+	if usingGroup != "" && usingGroup != "auto" {
+		return []string{usingGroup}
+	}
+	if userGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup); userGroup != "" {
+		if groups := GetRequestAutoGroups(c, userGroup); len(groups) > 0 {
+			return groups
+		}
+	}
+	return []string{usingGroup}
+}
+
 // GetGroupsEnabledModels 按 groups 顺序获取各分组启用的模型并去重
 func GetGroupsEnabledModels(groups []string) []string {
 	seen := make(map[string]struct{})

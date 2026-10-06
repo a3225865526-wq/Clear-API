@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +26,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
@@ -166,7 +168,25 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
 
-	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
+	// Route Chain mode: the chain state was created by Distribute with the
+	// first candidate already exact-bound (Amendment 2 C2). The chain engine
+	// is the ONLY cross-candidate scheduler (C1) — the legacy retry ladder is
+	// replaced by candidate iteration for chain-routed requests.
+	chainState := routechain.StateFrom(c)
+	if relayFormat == types.RelayFormatOpenAIRealtime {
+		chainState = nil // v1 transport scope: WebSocket stays out of the chain
+	}
+	relayBudget := common.RetryTimes
+	if chainState != nil {
+		relayBudget = chainState.AttemptBudget() - 1
+		if common.RouteChainOverallDeadlineMs > 0 {
+			deadlineCtx, cancelDeadline := context.WithTimeout(c.Request.Context(), time.Duration(common.RouteChainOverallDeadlineMs)*time.Millisecond)
+			defer cancelDeadline()
+			c.Request = c.Request.WithContext(deadlineCtx)
+		}
+	}
+
+	for ; retryParam.GetRetry() <= relayBudget; retryParam.IncreaseRetry() {
 		relayInfo.StreamStatus = nil
 		relayInfo.PerformanceBusinessRejection = false
 		relayInfo.PerformanceOutputTokens = 0
@@ -195,6 +215,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		}
 		c.Request.Body = io.NopCloser(bodyStorage)
 
+		var chainMeteringBefore string
+		if chainState != nil {
+			chainMeteringBefore = service.CodexMeteringAttemptID(c)
+		}
+
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
 			newAPIError = relay.WssHelper(c, relayInfo)
@@ -208,6 +233,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		service.FinishFinanceAttempt(c, relayInfo, newAPIError != nil)
 
 		if newAPIError == nil {
+			if chainState != nil {
+				chainState.MarkSuccess()
+			}
 			service.MarkRequestPolicySuccess(c, relayInfo.StreamStatus)
 			relayInfo.LastError = nil
 			return
@@ -216,13 +244,25 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError = service.NormalizeViolationFeeError(newAPIError)
 		relayInfo.LastError = newAPIError
 
-		decision := service.DecideRelayRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry())
+		var decision service.PolicyDecision
+		if chainState != nil {
+			decision = chainRetryDecision(c, chainState, newAPIError, chainMeteringBefore)
+		} else {
+			decision = service.DecideRelayRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry())
+		}
 		service.RecordPolicyFailure(c, channel.Id, newAPIError, decision)
 		processChannelError(c, *types.NewChannelError(channel.Id, channel.Type, channel.Name, channel.ChannelInfo.IsMultiKey, common.GetContextKeyString(c, constant.ContextKeyChannelKey), channel.GetAutoBan()), newAPIError, relayInfo)
 
 		if decision.Action != "retry" {
 			break
 		}
+	}
+
+	if chainState != nil && !chainState.Succeeded() && chainState.ConsumedCandidates() > 1 {
+		// Deterministic, sanitized exhaustion error (R29): multi-candidate
+		// chains never leak internal topology; single-candidate chains keep
+		// today's exact error behavior.
+		newAPIError = routechain.RouteExhaustedClientError()
 	}
 
 	useChannel := c.GetStringSlice("use_channel")
@@ -271,7 +311,78 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// chainRetryDecision runs the centralized route-chain failover policy for the
+// attempt that just failed: assemble per-attempt evidence, classify, decide.
+// No status-specific branching lives here (Amendment 2).
+func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayErr *types.NewAPIError, meteringBefore string) service.PolicyDecision {
+	meteringAfter := service.CodexMeteringAttemptID(c)
+	evidence := routechain.Evidence{
+		CandidateSelected:    true,
+		DispatchStarted:      c.GetBool("upstream_attempted"),
+		RequestWritten:       c.GetBool("upstream_attempted"),
+		WorkObserved:         meteringAfter != "" && meteringAfter != meteringBefore,
+		UsageObserved:        c.GetBool("upstream_usage_uncertain"),
+		ClientOutputObserved: c.Writer.Written(),
+		ToolOutputObserved:   c.GetBool("tool_chain_no_retry"),
+		HTTPStatus:           relayErr.StatusCode,
+		UpstreamErrorCode:    routechain.ExtractUpstreamErrorCode(relayErr),
+	}
+	outcome := routechain.Classify(evidence, false, types.IsSkipRetryError(relayErr))
+	props := routechain.RequestProperties{
+		RemainingCandidates: state.AttemptBudget() - state.AttemptsMade(),
+		DeadlineExceeded:    errors.Is(c.Request.Context().Err(), context.DeadlineExceeded),
+	}
+	var failingPolicy *model.RouteCandidatePolicy
+	if failing := state.FailingCandidate(); failing != nil {
+		failingPolicy = failing.Policy
+	}
+	decision := routechain.CanFailover(props, failingPolicy, evidence, outcome)
+	routechain.LogDecision(c, state, decision, outcome)
+	if decision.Allowed {
+		// Safe by construction: the policy only advances past provably
+		// zero-work attempts, so hiding their flags from the request-end
+		// billing read can never mask uncertain consumption.
+		routechain.ResetPerAttemptFlags(c)
+	}
+	action := "stop"
+	if decision.Allowed {
+		action = "retry"
+	}
+	return service.PolicyDecision{Action: action, Reason: decision.Reason, Source: "route_chain"}
+}
+
+// chainGroupsForRequest resolves the routing groups a chain candidate must
+// serve (auto-group expansion owned by service).
+func chainGroupsForRequest(c *gin.Context) []string {
+	return service.RouteChainCandidateGroups(c)
+}
+
 func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service.RetryParam) (*model.Channel, *types.NewAPIError) {
+	if state := routechain.StateFrom(c); state != nil {
+		if info.ChannelMeta != nil {
+			// Chain attempt n>0: bind the exact next candidate. The weighted
+			// selection pool must never run in chain mode (Amendment 2 C1/C2).
+			if bindErr := state.BindCandidate(c, middleware.SetupContextForSelectedChannel, chainGroupsForRequest(c), routechain.ChainFilters(service.GetChannelConstraints(c).Filters)); bindErr != nil {
+				return nil, bindErr
+			}
+		}
+		autoBan := c.GetBool("auto_ban")
+		autoBanInt := 1
+		if !autoBan {
+			autoBanInt = 0
+		}
+		channel := &model.Channel{
+			Id:      c.GetInt("channel_id"),
+			Type:    c.GetInt("channel_type"),
+			Name:    c.GetString("channel_name"),
+			AutoBan: &autoBanInt,
+		}
+		if info.ChannelMeta != nil {
+			info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
+		}
+		service.RequestPolicy(c).BeginAttempt(channel, info.UsingGroup)
+		return channel, nil
+	}
 	if info.ChannelMeta == nil {
 		autoBan := c.GetBool("auto_ban")
 		autoBanInt := 1

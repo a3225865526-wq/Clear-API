@@ -26,6 +26,22 @@ func EnableCodexMetering(c *gin.Context) {
 	}
 }
 
+// CodexMeteringAttemptID exposes the latest observed upstream metering
+// attempt id so the route-chain engine can derive per-attempt work evidence
+// (a changed id marks upstream work on the current attempt). Empty when no
+// metering envelope has been observed.
+func CodexMeteringAttemptID(c *gin.Context) string {
+	value, exists := c.Get(codexMeterKey)
+	if !exists {
+		return ""
+	}
+	state, ok := value.(*codexMeterState)
+	if !ok {
+		return ""
+	}
+	return state.AttemptID
+}
+
 // ObserveCodexMetering reads upstream bytes before DTO defaulting and before
 // writing to the client. A later disconnect cannot erase an observed final.
 func ObserveCodexMetering(c *gin.Context, info *relaycommon.RelayInfo, payload []byte, final bool) {
