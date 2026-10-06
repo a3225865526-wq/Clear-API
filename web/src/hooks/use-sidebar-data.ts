@@ -30,6 +30,7 @@ import {
   PlugZap,
   Radio,
   ServerCog,
+  Waypoints,
   Settings,
   ShieldCheck,
   Ticket,
@@ -144,6 +145,12 @@ export function useSidebarData(): SidebarData {
                 },
               ]
             : []),
+          {
+            title: t('Route Chains'),
+            url: '/route-chains',
+            icon: Waypoints,
+            requiredRole: ROLE.SUPER_ADMIN,
+          },
           {
             title: t('Channels'),
             url: '/channels',
