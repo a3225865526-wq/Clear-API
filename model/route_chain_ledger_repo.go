@@ -149,30 +149,32 @@ type RouteChainAttemptTerminal struct {
 // earlier finalizer won — the observation is a counted duplicate, never a
 // second authoritative write (§十八).
 func FinalizeRouteChainAttempt(attemptId string, terminal RouteChainAttemptTerminal) (bool, error) {
-	if terminal.ProviderCostState == "" {
-		terminal.ProviderCostState = RouteChainCostNone
+	updates := map[string]any{
+		"terminal_state":          terminal.TerminalState,
+		"final_outcome":           terminal.FinalOutcome,
+		"request_written":         terminal.RequestWritten,
+		"authoritative_rejection": terminal.AuthoritativeRejection,
+		"work_observed":           terminal.WorkObserved,
+		"usage_observed":          terminal.UsageObserved,
+		"client_output_observed":  terminal.ClientOutputObserved,
+		"tool_output_observed":    terminal.ToolOutputObserved,
+		"outcome_uncertain":       terminal.OutcomeUncertain,
+		"http_status":             terminal.HttpStatus,
+		"failure_class":           terminal.FailureClass,
+		"failure_code":            terminal.FailureCode,
+		"upstream_model":          terminal.UpstreamModel,
+		"upstream_response_id":    terminal.UpstreamResponseId,
+		"finished_at":             nowUnix(),
+		"updated_time":            nowUnix(),
+	}
+	// An empty cost state means "already refined at the authoritative usage
+	// moment" — the terminal write must not clobber it with a default.
+	if terminal.ProviderCostState != "" {
+		updates["provider_cost_state"] = terminal.ProviderCostState
 	}
 	result := DB.Model(&RouteChainAttemptRecord{}).
 		Where("attempt_id = ? AND terminal_state = ''", attemptId).
-		Updates(map[string]any{
-			"terminal_state":          terminal.TerminalState,
-			"final_outcome":           terminal.FinalOutcome,
-			"request_written":         terminal.RequestWritten,
-			"authoritative_rejection": terminal.AuthoritativeRejection,
-			"work_observed":           terminal.WorkObserved,
-			"usage_observed":          terminal.UsageObserved,
-			"client_output_observed":  terminal.ClientOutputObserved,
-			"tool_output_observed":    terminal.ToolOutputObserved,
-			"outcome_uncertain":       terminal.OutcomeUncertain,
-			"http_status":             terminal.HttpStatus,
-			"failure_class":           terminal.FailureClass,
-			"failure_code":            terminal.FailureCode,
-			"upstream_model":          terminal.UpstreamModel,
-			"upstream_response_id":    terminal.UpstreamResponseId,
-			"provider_cost_state":     terminal.ProviderCostState,
-			"finished_at":             nowUnix(),
-			"updated_time":            nowUnix(),
-		})
+		Updates(updates)
 	if result.Error != nil {
 		return false, result.Error
 	}
@@ -240,6 +242,17 @@ func RecordRouteChainLateEvent(attemptId string, note string) (bool, error) {
 		return false, result.Error
 	}
 	return result.RowsAffected == 1, nil
+}
+
+// SweepRouteChainAttemptUsage closes the usage of every attempt of one
+// request that never produced an authoritative observation: pending →
+// unavailable, explicitly not an exact zero (§2.8). Runs at request
+// finalization; later usage arrivals are then duplicate no-ops by CAS.
+func SweepRouteChainAttemptUsage(requestId string) (int64, error) {
+	result := DB.Model(&RouteChainAttemptRecord{}).
+		Where("request_id = ? AND usage_state = ?", requestId, RouteChainUsagePending).
+		Updates(map[string]any{"usage_state": RouteChainUsageUnavailable, "updated_time": nowUnix()})
+	return result.RowsAffected, result.Error
 }
 
 // CreateRouteChainDecision inserts one selection-skip or failover decision.

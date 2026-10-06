@@ -11,6 +11,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,6 +39,10 @@ func TestE2ENestedLegacyRetryDoesNotExist(t *testing.T) {
 	require.Equal(t, 0, mockC.count(), "legacy channel C must NEVER be called")
 	require.Equal(t, int64(1), h.countReservations())
 	require.Equal(t, int64(1), h.eventuallyConsumeLogs(1))
+	// Stage 4 L26: the ledger records exactly the two chain attempts — C is
+	// absent from the ledger as well.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+		[]string{model.RouteChainTerminalAuthoritativeRej, model.RouteChainTerminalSucceeded})
 }
 
 // §三: exact candidate binding — the configured candidate is the only
@@ -104,6 +109,18 @@ func TestE2EPoolNoEligibleFallsToAPI(t *testing.T) {
 	require.Contains(t, body, "from-b")
 	require.Equal(t, 1, executor.count(), "executor hit exactly once, no downstream dispatch")
 	require.Equal(t, 1, apiB.count(), "API candidate B served the request")
+	// Stage 4 L6: provenance-backed pool exhaustion recorded as an
+	// authoritative pre-dispatch rejection with provable zero cost.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+		[]string{model.RouteChainTerminalAuthoritativeRej, model.RouteChainTerminalSucceeded})
+	attempts := h.ledgerAttempts(t)
+	assert.Equal(t, model.RouteChainCostZeroConfirmed, attempts[0].ProviderCostState)
+	assert.Equal(t, 21, attempts[0].ChannelId)
+	// The executor is itself an HTTP upstream: new-api writes the request to
+	// it, but the provenance-backed contract proves no credential was ever
+	// dispatched downstream — zero cost is provable.
+	assert.True(t, attempts[0].RequestWritten)
+	assert.True(t, attempts[0].AuthoritativeRejection)
 }
 
 // L7 (Stage 4 provenance contract): a provider echoing error.code
@@ -126,7 +143,10 @@ func TestE2EUnprovenedExhaustionCodeDoesNotFailover(t *testing.T) {
 	require.NotEqual(t, http.StatusOK, status, "unprovened exhaustion code must not advance")
 	require.NotContains(t, body, "from-b")
 	require.Equal(t, 1, executor.count())
-	require.Equal(t, 0, apiB.count(), "missing provenance ⇒ no pool-exhaustion classification ⇒ no advance")
+	require.Equal(t, 0, apiB.count(), "missing provenance ⇒ no pool-exhaustion classification ⇒ no advance") // Stage 4 L7: classified outcome-uncertain - the ledger shows it.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalFailed, model.RouteChainBillingSettledUncertain,
+		[]string{model.RouteChainTerminalOutcomeUncertain})
+	assert.Equal(t, model.RouteChainCostUnknownReview, h.ledgerAttempts(t)[0].ProviderCostState)
 }
 
 // §六: ordinary upstream 503 — request was written, outcome uncertain, NO failover.
@@ -221,6 +241,11 @@ func TestE2E429Policy(t *testing.T) {
 		require.NotContains(t, body, "from-b")
 		require.Equal(t, 1, mockA.count())
 		require.Equal(t, 0, mockB.count())
+		// Stage 4 L11: 429 zero-work with policy off - an independent
+		// authoritative-rejection attempt record, no second attempt.
+		h.assertLedgerShape(t, model.RouteChainRequestFinalFailed, model.RouteChainBillingSettledUncertain,
+			[]string{model.RouteChainTerminalAuthoritativeRej})
+		assert.Equal(t, model.RouteChainCostZeroConfirmed, h.ledgerAttempts(t)[0].ProviderCostState)
 	})
 	t.Run("policy-on-zero-work-advances", func(t *testing.T) {
 		h := newHarness(t)
@@ -237,6 +262,9 @@ func TestE2E429Policy(t *testing.T) {
 		require.Contains(t, body, "from-b")
 		require.Equal(t, 1, mockA.count())
 		require.Equal(t, 1, mockB.count())
+		// Stage 4 L12: zero-work 429 rejection recorded, then B success.
+		h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+			[]string{model.RouteChainTerminalAuthoritativeRej, model.RouteChainTerminalSucceeded})
 	})
 	// 429 + work evidence is not constructible at this wire level (an error
 	// status carries no usage envelope); covered by classifier unit tests.
@@ -261,6 +289,13 @@ func TestE2EPreDispatchConnectFailureAdvances(t *testing.T) {
 	require.Equal(t, 1, mockB.count())
 	// Candidate A has no listener at all — the connect refusal is provably
 	// pre-dispatch (no handler could ever count a request).
+	// Stage 4 L3: the refused attempt is FAILED_SAFE_TO_ADVANCE with no
+	// upstream contact (cost NONE); B succeeds.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+		[]string{model.RouteChainTerminalFailedSafeToAdvance, model.RouteChainTerminalSucceeded})
+	attempts := h.ledgerAttempts(t)
+	assert.False(t, attempts[0].RequestWritten, "nothing reached candidate A")
+	assert.Equal(t, model.RouteChainCostNone, attempts[0].ProviderCostState)
 }
 
 // §十 (highest priority): post-dispatch disconnect — bytes written, no
@@ -281,6 +316,17 @@ func TestE2EPostDispatchDisconnectDoesNotFailover(t *testing.T) {
 	require.NotContains(t, body, "from-b")
 	require.Equal(t, 1, mockA.count(), "A received the full request")
 	require.Equal(t, 0, mockB.count(), "missing response bytes never prove safety")
+	// Stage 4 L4: one attempt, no advance. The Stage 3 classifier maps the
+	// post-dispatch disconnect (usage-uncertain flag set) to the
+	// usage_observed outcome — terminal FAILED_NO_ADVANCE, cost under review.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalFailed, model.RouteChainBillingSettledUncertain,
+		[]string{model.RouteChainTerminalFailedNoAdvance})
+	attempts := h.ledgerAttempts(t)
+	assert.True(t, attempts[0].RequestWritten)
+	assert.True(t, attempts[0].UsageObserved)
+	assert.True(t, attempts[0].OutcomeUncertain == false && attempts[0].UsageState == model.RouteChainUsageUnavailable,
+		"usage unavailable is an explicit state; the uncertain flag rides on the usage evidence")
+	assert.Equal(t, model.RouteChainCostUnknownReview, attempts[0].ProviderCostState)
 }
 
 // §十一: SSE pre-output authoritative rejection → candidate B serves the stream.
@@ -303,6 +349,12 @@ func TestE2ESSEPreOutputRejectionAdvances(t *testing.T) {
 	require.True(t, strings.HasSuffix(strings.TrimSpace(body), "data: [DONE]"))
 	require.Equal(t, 1, mockA.count())
 	require.Equal(t, 1, mockB.count())
+	// Stage 4 L14: pre-output rejection advanced; the SSE success attempt is
+	// recorded with the sse transport on the request row.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+		[]string{model.RouteChainTerminalAuthoritativeRej, model.RouteChainTerminalSucceeded})
+	requests := h.ledgerRequests(t)
+	assert.Equal(t, "sse", requests[0].Transport)
 }
 
 // §十二: SSE post-output failure — one chunk emitted then cut; NO failover.
@@ -323,6 +375,12 @@ func TestE2ESSEPostOutputDoesNotFailover(t *testing.T) {
 	require.Equal(t, 1, mockA.count())
 	require.Equal(t, 0, mockB.count(), "output observed locks the route")
 	_ = status
+	// Stage 4 L15: no second attempt exists. The stream handler settles the
+	// partial usage internally and returns without an error, so the request
+	// completes on the engine's success path (route locked, B never
+	// dispatched — the routing assertions above are the safety contract).
+	h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+		[]string{model.RouteChainTerminalSucceeded})
 }
 
 // §十三: SSE ping fires pre-dispatch → Written() locks the route
@@ -373,6 +431,11 @@ func TestE2EToolChainNeverAdvances(t *testing.T) {
 	require.Contains(t, body, "invalid_api_key")
 	require.Equal(t, 1, mockA.count())
 	require.Equal(t, 0, mockB.count(), "tool-chain requests must not fail over")
+	// Stage 4 L16: the attempt is terminal no-advance with tool evidence.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalFailed, model.RouteChainBillingSettledUncertain,
+		[]string{model.RouteChainTerminalFailedNoAdvance})
+	attempts := h.ledgerAttempts(t)
+	assert.True(t, attempts[0].ToolOutputObserved)
 }
 
 // §十五: in-flight request keeps its immutable snapshot while config changes.
@@ -553,6 +616,8 @@ func TestE2ELegacyCompatibility(t *testing.T) {
 		require.Contains(t, body, "invalid_api_key")
 		total := mockA.count() + mockB.count()
 		require.Equal(t, 1, total, "legacy RetryTimes=0 means exactly one upstream attempt")
+		// Stage 4 L25: no chain means no ledger rows.
+		require.Empty(t, h.ledgerRequests(t))
 	})
 	t.Run("gate-off-chain-inert", func(t *testing.T) {
 		h := newHarness(t)
@@ -571,6 +636,10 @@ func TestE2ELegacyCompatibility(t *testing.T) {
 		require.Contains(t, body, "invalid_api_key")
 		require.Equal(t, 1, mockA.count())
 		require.Equal(t, 0, mockB.count())
+		// Stage 4 L25: the gate off means the ledger is fully inert too.
+		require.Empty(t, h.ledgerRequests(t))
+		require.Empty(t, h.ledgerAttempts(t))
+		require.Empty(t, h.ledgerDecisions(t))
 	})
 }
 
@@ -639,4 +708,68 @@ func TestE2EPricingFailClosed(t *testing.T) {
 	require.Equal(t, 0, mockA.count(), "no dispatch may happen without pricing")
 	require.Equal(t, 0, mockB.count())
 	require.Equal(t, int64(0), h.countReservations(), "no reservation for a rejected request")
+}
+
+// Stage 4 (L1/L2/L27/L28/L29): the full ledger for a safe A→B failover —
+// one request record, two attempts sharing one request id with unique
+// attempt ids, distinct cost states, one failover decision.
+func TestE2EAttemptLedgerRecordsTheChain(t *testing.T) {
+	h := newHarness(t)
+	mockA := newMockUpstream(t, mockBehavior{status: 401, body: errorBody(401, "invalid_api_key")})
+	mockB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, mockA.srv.URL, "")
+	h.addChannel(22, mockB.srv.URL, "")
+	chain := h.setChain(t, false, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, header := h.postChat(t, e2eModel, "", false)
+	require.Equal(t, http.StatusOK, status)
+	require.Contains(t, body, "from-b")
+	require.Equal(t, int64(1), h.countReservations(), "L27: one reservation across A→B")
+
+	// The request record finalizes in a post-response defer — wait for it.
+	require.Eventually(t, func() bool {
+		rows := h.ledgerRequests(t)
+		return len(rows) == 1 && rows[0].FinalStatus != ""
+	}, 3*time.Second, 10*time.Millisecond)
+	requests := h.ledgerRequests(t)
+	require.Len(t, requests, 1)
+	request := requests[0]
+	assert.Equal(t, model.RouteChainRequestFinalSuccess, request.FinalStatus)
+	assert.Equal(t, model.RouteChainBillingSettled, request.UserBillingState)
+	assert.Equal(t, chain.Candidates[1].Id, request.FinalCandidateId, "final candidate is the succeeding B (candidate row id)")
+	assert.Equal(t, "http", request.Transport)
+	assert.Equal(t, header.Get(common.RequestIdKey), request.RequestId, "the ledger request id is the client-visible request id")
+
+	attempts := h.ledgerAttempts(t)
+	require.Len(t, attempts, 2)
+	// Attempt 1: zero-work authoritative rejection.
+	a := attempts[0]
+	assert.Equal(t, 21, a.ChannelId)
+	assert.Equal(t, model.RouteChainTerminalAuthoritativeRej, a.TerminalState)
+	assert.True(t, a.RequestWritten)
+	assert.True(t, a.AuthoritativeRejection)
+	assert.Equal(t, 401, a.HttpStatus)
+	assert.Equal(t, model.RouteChainCostZeroConfirmed, a.ProviderCostState, "zero-work rejection is provably zero cost")
+	assert.Equal(t, model.RouteChainUsageUnavailable, a.UsageState, "no usage — explicit unavailable, never exact zero")
+	// Attempt 2: success with authoritative usage.
+	b := attempts[1]
+	assert.Equal(t, 22, b.ChannelId)
+	assert.Equal(t, model.RouteChainTerminalSucceeded, b.TerminalState)
+	assert.Equal(t, a.RequestId, b.RequestId, "L28: one request id across attempts")
+	assert.NotEqual(t, a.AttemptId, b.AttemptId, "L29: canonical attempt ids are unique")
+	assert.Equal(t, request.FinalAttemptId, b.AttemptId)
+	assert.Equal(t, model.RouteChainUsageObserved, b.UsageState)
+	assert.Equal(t, int64(10), b.InputTokens, "mock usage prompt_tokens=10 recorded as-is")
+	assert.Equal(t, int64(5), b.OutputTokens)
+	assert.Equal(t, model.RouteChainCostUnknownReview, b.ProviderCostState, "usage known but no finance cost rule configured in the harness")
+
+	decisions := h.ledgerDecisions(t)
+	require.Len(t, decisions, 1)
+	assert.Equal(t, "failover_decision", decisions[0].Phase)
+	assert.Equal(t, "advance", decisions[0].Decision)
+	assert.Equal(t, chain.Candidates[0].Id, decisions[0].CandidateId, "the decision names the failing candidate row")
+	assert.Equal(t, model.RouteChainRequestFinalSuccess, requests[0].FinalStatus)
 }
