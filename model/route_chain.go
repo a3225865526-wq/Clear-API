@@ -50,8 +50,10 @@ type RouteChainCandidate struct {
 	// Priority ordering is unique per chain by app-level validation; it is a
 	// plain index on purpose — a DB unique constraint would reject the
 	// transient states of reorder/replace flows (e.g. swapped priorities).
+	// No default tag on Enabled: a default would make GORM omit the column on
+	// Create for false, silently enabling candidates the operator disabled.
 	Priority    int    `json:"priority" gorm:"index"`
-	Enabled     bool   `json:"enabled" gorm:"default:true"`
+	Enabled     bool   `json:"enabled"`
 	Policy      string `json:"policy" gorm:"type:text"`
 	CreatedTime int64  `json:"created_time"`
 	UpdatedTime int64  `json:"updated_time"`
@@ -218,10 +220,11 @@ func GetRouteChainById(id int) (*RouteChainWithCandidates, error) {
 }
 
 // GetRouteChainForModel returns the chain configured for (model, group) or
-// nil when none exists. Callers decide what Enabled means for them.
+// nil when none exists. Callers decide what Enabled means for them. The
+// lookup uses struct conditions so identifier quoting stays dialect-correct.
 func GetRouteChainForModel(modelName string, groupName string) (*RouteChainWithCandidates, error) {
 	var chain RouteChain
-	err := DB.Where("model = ? AND "+commonGroupCol+" = ?", modelName, groupName).First(&chain).Error
+	err := DB.Where(&RouteChain{Model: modelName, Group: groupName}).First(&chain).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -274,7 +277,7 @@ func UpsertRouteChain(chain *RouteChainWithCandidates, expectedVersion int) erro
 	return DB.Transaction(func(tx *gorm.DB) error {
 		if chain.Id == 0 {
 			var count int64
-			if err := tx.Model(&RouteChain{}).Where("model = ? AND "+commonGroupCol+" = ?", chain.Model, chain.Group).Count(&count).Error; err != nil {
+			if err := tx.Model(&RouteChain{}).Where(&RouteChain{Model: chain.Model, Group: chain.Group}).Count(&count).Error; err != nil {
 				return err
 			}
 			if count > 0 {

@@ -136,6 +136,14 @@ var PreConsumedQuota = 500
 
 var RetryTimes = 0
 
+// Route Chain safety caps (design §2.20/§2.21): RouteChainMaxCandidates caps
+// candidate attempts per request for chain-routed models; the operator may
+// configure it between 1 and 10. RouteChainOverallDeadlineMs caps the total
+// wall-clock budget of a chain-routed request and is inherited (never reset)
+// by every candidate; 0 disables the cap.
+var RouteChainMaxCandidates = 3
+var RouteChainOverallDeadlineMs = 0
+
 //var RootUserEmail = ""
 
 var IsMasterNode bool

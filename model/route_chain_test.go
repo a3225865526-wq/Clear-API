@@ -22,8 +22,8 @@ func routeChainFixture() *RouteChainWithCandidates {
 			Enabled: true,
 		},
 		Candidates: []RouteChainCandidate{
-			{CandidateType: RouteChainCandidateTypePool, TargetId: 11, Priority: 10},
-			{CandidateType: RouteChainCandidateTypeAPIChannel, TargetId: 22, Priority: 5},
+			{CandidateType: RouteChainCandidateTypePool, TargetId: 11, Priority: 10, Enabled: true},
+			{CandidateType: RouteChainCandidateTypeAPIChannel, TargetId: 22, Priority: 5, Enabled: true},
 		},
 	}
 }
@@ -127,6 +127,7 @@ func TestRouteChainDatabase(t *testing.T) {
 		CandidateType: RouteChainCandidateTypeAPIChannel,
 		TargetId:      33,
 		Priority:      5,
+		Enabled:       true,
 	})
 	require.NoError(t, UpsertRouteChain(chain, chain.Version))
 	require.Equal(t, 3, chain.Version)
