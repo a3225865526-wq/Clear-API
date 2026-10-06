@@ -5,9 +5,11 @@ type ChannelPinSource string
 const (
 	PinSourceToken      ChannelPinSource = "token"       // Rank 0, highest
 	PinSourceOriginTask ChannelPinSource = "origin_task" // Rank 10
+	PinSourceRouteChain ChannelPinSource = "route_chain" // Rank -1: chain candidates are exact-bound (C2) and outrank request pins
 )
 
 const (
+	PinRankRouteChain = -1
 	PinRankToken      = 0
 	PinRankOriginTask = 10
 )
