@@ -34,7 +34,8 @@ func newChainTestEnv(t *testing.T) *chainTestEnv {
 	sqlDB, err := database.DB()
 	require.NoError(t, err)
 	sqlDB.SetMaxOpenConns(1)
-	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.Ability{}))
+	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.Ability{},
+		&model.RouteChainRequestRecord{}, &model.RouteChainAttemptRecord{}, &model.RouteChainDecisionRecord{}))
 	oldDB := model.DB
 	model.DB = database
 	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
@@ -48,6 +49,7 @@ func newChainTestEnv(t *testing.T) *chainTestEnv {
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 	common.SetContextKey(ctx, constant.ContextKeyUsingGroup, "default")
 	common.SetContextKey(ctx, constant.ContextKeyUserGroup, "default")
+	ctx.Set(common.RequestIdKey, "chain-it-request")
 	return &chainTestEnv{db: database, ctx: ctx}
 }
 
@@ -142,8 +144,14 @@ func TestChainRetryDecisionMatrix(t *testing.T) {
 		ctx.Set("route_chain_request_state", state)
 		return state
 	}
+	// provenance marks executor-synthesized envelopes (Stage 4 contract);
+	// pool exhaustion classification requires code + origin together.
 	openAIError := func(status int, code string) *types.NewAPIError {
-		return types.WithOpenAIError(types.OpenAIError{Message: "upstream", Type: "server_error", Code: code}, status)
+		origin := ""
+		if code == "auth_unavailable" || code == "auth_not_found" {
+			origin = routechain.ExecutorProvenanceOrigin
+		}
+		return types.WithOpenAIError(types.OpenAIError{Message: "upstream", Type: "server_error", Code: code, Origin: origin}, status)
 	}
 
 	cases := []struct {
@@ -162,6 +170,7 @@ func TestChainRetryDecisionMatrix(t *testing.T) {
 		{"post-write transport failure stops", true, false, false, false, nil, 500, "internal_server_error", "stop", "upstream_outcome_uncertain_no_replay"},
 		{"pool structured exhaustion advances", true, false, false, false, nil, 503, "auth_unavailable", "retry", "pool_no_eligible_account"},
 		{"pool auth_not_found advances", true, false, false, false, nil, 503, "auth_not_found", "retry", "pool_no_eligible_account"},
+		{"exhaustion echo without provenance stops", true, false, false, false, nil, 503, "model_not_found", "stop", "upstream_outcome_uncertain_no_replay"},
 		{"ordinary upstream 503 stops", true, false, false, false, nil, 503, "internal_server_error", "stop", "upstream_outcome_uncertain_no_replay"},
 		{"401 explicit no-work advances", true, false, false, false, nil, 401, "invalid_api_key", "retry", "authoritative_rejection_no_work"},
 		{"403 explicit no-work advances", true, false, false, false, nil, 403, "insufficient_quota", "retry", "authoritative_rejection_no_work"},
@@ -184,7 +193,7 @@ func TestChainRetryDecisionMatrix(t *testing.T) {
 			if tc.clientOutput {
 				_, _ = env.ctx.Writer.WriteString("data: {\"delta\":1}\n\n")
 			}
-			decision := chainRetryDecision(env.ctx, state, openAIError(tc.status, tc.code), "")
+			decision := chainRetryDecision(env.ctx, state, nil, openAIError(tc.status, tc.code), "")
 			require.Equal(t, tc.wantAction, decision.Action, tc.name)
 			require.Equal(t, tc.wantReason, decision.Reason, tc.name)
 			require.Equal(t, "route_chain", decision.Source)
@@ -206,7 +215,7 @@ func TestChainRetryDecisionExhausted(t *testing.T) {
 	}
 	env.ctx.Set("route_chain_request_state", state)
 	state.MarkAttempt(env.ctx, 0)
-	decision := chainRetryDecision(env.ctx, state, types.WithOpenAIError(types.OpenAIError{Code: "x"}, 500), "")
+	decision := chainRetryDecision(env.ctx, state, nil, types.WithOpenAIError(types.OpenAIError{Code: "x"}, 500), "")
 	require.Equal(t, "stop", decision.Action)
 	require.Equal(t, "route_exhausted", decision.Reason)
 }
