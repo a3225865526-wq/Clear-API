@@ -295,6 +295,15 @@ func SetApiRouter(router *gin.Engine) {
 			ratioSyncRoute.GET("/channels", controller.GetSyncableChannels)
 			ratioSyncRoute.POST("/fetch", controller.FetchUpstreamRatios)
 		}
+		// Stage 5 Operator Control API: owner-only route chain circuit control.
+		routeChainRoute := apiRouter.Group("/route-chains")
+		routeChainRoute.Use(middleware.RootAuth())
+		{
+			routeChainRoute.GET("/:id/health", controller.GetRouteChainHealth)
+			routeChainRoute.POST("/:id/candidates/:candidateId/circuit/reset", controller.ResetRouteChainCandidateCircuit)
+			routeChainRoute.POST("/:id/candidates/:candidateId/circuit/open", controller.ForceOpenRouteChainCandidateCircuit)
+			routeChainRoute.POST("/:id/candidates/:candidateId/enabled", controller.SetRouteChainCandidateEnabled)
+		}
 		taskPluginRoute := apiRouter.Group("/plugin/task")
 		taskPluginRoute.Use(middleware.RootAuth())
 		{

@@ -199,6 +199,15 @@ type BreakerRegistry struct {
 // Breaker is the process-wide registry (memory-only, §二十二).
 var Breaker = &BreakerRegistry{circuits: map[string]*circuit{}, now: func() int64 { return time.Now().Unix() }}
 
+// ResetForTest clears every circuit — test isolation only. Production code
+// must never clear the registry at runtime: the breaker state clears itself
+// on restart, by reset API, or by window expiry, nothing else.
+func (r *BreakerRegistry) ResetForTest() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.circuits = map[string]*circuit{}
+}
+
 func circuitKey(chainId, candidateId int) string {
 	return fmt.Sprintf("%d:%d", chainId, candidateId)
 }
