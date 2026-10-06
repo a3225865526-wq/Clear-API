@@ -84,7 +84,10 @@ func Resolve(c *gin.Context, modelName string, groupName string) *Snapshot {
 	}
 	seenTypes := map[string]bool{}
 	for _, row := range chain.Candidates {
-		if !row.Enabled {
+		// Archived candidates are retired audit records (stage 6 §十七);
+		// they imply enabled=false but are skipped explicitly so the engine
+		// never depends on that invariant by accident.
+		if !row.Enabled || row.Archived {
 			continue
 		}
 		if row.CandidateType != model.RouteChainCandidateTypePool && row.CandidateType != model.RouteChainCandidateTypeAPIChannel {

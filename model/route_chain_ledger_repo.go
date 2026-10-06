@@ -341,3 +341,53 @@ func GetRouteChainDecisionsByRequest(requestId string) ([]RouteChainDecisionReco
 	err := DB.Where("request_id = ?", requestId).Order("at ASC, id ASC").Find(&rows).Error
 	return rows, err
 }
+
+// GetRouteChainRequestRecords returns the request-level rows for the given
+// request ids (owner console batch fetch: attempts join their user-billing
+// mirror without N+1 queries).
+func GetRouteChainRequestRecords(requestIds []string) ([]RouteChainRequestRecord, error) {
+	if len(requestIds) == 0 {
+		return nil, nil
+	}
+	var rows []RouteChainRequestRecord
+	err := DB.Where("request_id IN ?", requestIds).Find(&rows).Error
+	return rows, err
+}
+
+// GetRouteChainAttemptsByChain returns a chain's most recent attempt rows for
+// the owner console (stage 6 §2.3): newest first, clamped page, optionally
+// narrowed to one candidate. Rows carry only safe observability facts — the
+// ledger never stores credential material (stage 4 invariant).
+func GetRouteChainAttemptsByChain(chainId int, limit int, candidateId int) ([]RouteChainAttemptRecord, error) {
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	query := DB.Where("route_chain_id = ?", chainId)
+	if candidateId > 0 {
+		query = query.Where("candidate_id = ?", candidateId)
+	}
+	var rows []RouteChainAttemptRecord
+	err := query.Order("started_at DESC, id DESC").Limit(limit).Find(&rows).Error
+	return rows, err
+}
+
+// GetRouteChainDecisionsByChain returns a chain's most recent decision
+// records (selection skips and failover verdicts) for the owner console.
+func GetRouteChainDecisionsByChain(chainId int, limit int, candidateId int) ([]RouteChainDecisionRecord, error) {
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	query := DB.Where("chain_id = ?", chainId)
+	if candidateId > 0 {
+		query = query.Where("candidate_id = ?", candidateId)
+	}
+	var rows []RouteChainDecisionRecord
+	err := query.Order("at DESC, id DESC").Limit(limit).Find(&rows).Error
+	return rows, err
+}

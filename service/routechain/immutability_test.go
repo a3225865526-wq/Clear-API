@@ -20,6 +20,7 @@ func TestSnapshotImmutableUnderAdminEdit(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "immutable.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&model.RouteChain{}, &model.RouteChainCandidate{}))
+	require.NoError(t, db.AutoMigrate(&model.RouteChainRequestRecord{}, &model.RouteChainAttemptRecord{}, &model.RouteChainDecisionRecord{}))
 	oldDB := model.DB
 	model.DB = db
 	t.Cleanup(func() { model.DB = oldDB })

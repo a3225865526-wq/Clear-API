@@ -37,9 +37,14 @@ type RouteChain struct {
 	Group            string `json:"group" gorm:"type:varchar(64);uniqueIndex:idx_route_chain_model_group,priority:2"`
 	Enabled          bool   `json:"enabled" gorm:"default:false"`
 	AllowCrossSource bool   `json:"allow_cross_source" gorm:"default:false"`
-	Version          int    `json:"version" gorm:"default:1"`
-	CreatedTime      int64  `json:"created_time"`
-	UpdatedTime      int64  `json:"updated_time"`
+	// Archived marks a chain the operator retired (stage 6 §十七): it stays
+	// readable so historical ledger rows remain explainable, is always
+	// disabled (archive forces enabled=false) and is read-only for edits.
+	// Zero value default is enforced in code, not by a gorm default tag.
+	Archived    bool  `json:"archived"`
+	Version     int   `json:"version" gorm:"default:1"`
+	CreatedTime int64 `json:"created_time"`
+	UpdatedTime int64 `json:"updated_time"`
 }
 
 type RouteChainCandidate struct {
@@ -52,11 +57,18 @@ type RouteChainCandidate struct {
 	// transient states of reorder/replace flows (e.g. swapped priorities).
 	// No default tag on Enabled: a default would make GORM omit the column on
 	// Create for false, silently enabling candidates the operator disabled.
-	Priority    int    `json:"priority" gorm:"index"`
-	Enabled     bool   `json:"enabled"`
-	Policy      string `json:"policy" gorm:"type:text"`
-	CreatedTime int64  `json:"created_time"`
-	UpdatedTime int64  `json:"updated_time"`
+	Priority int  `json:"priority" gorm:"index"`
+	Enabled  bool `json:"enabled"`
+	// Archived candidates (stage 6 §十七): a candidate the attempt ledger
+	// references is never hard-deleted when removed from the chain — it is
+	// disabled and archived instead. TargetId is moved to ArchivedTargetId
+	// and the live slot set to -Id so the (chain, type, target) unique index
+	// frees the target for reuse while the row keeps its identity.
+	Archived         bool   `json:"archived"`
+	ArchivedTargetId int    `json:"archived_target_id"`
+	Policy           string `json:"policy" gorm:"type:text"`
+	CreatedTime      int64  `json:"created_time"`
+	UpdatedTime      int64  `json:"updated_time"`
 }
 
 // RouteChainWithCandidates pairs a chain row with its candidates ordered by
@@ -300,6 +312,27 @@ func UpsertRouteChain(chain *RouteChainWithCandidates, expectedVersion int) erro
 			}
 			return nil
 		}
+		var stored RouteChain
+		if err := tx.First(&stored, "id = ?", chain.Id).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrRouteChainNotFound
+			}
+			return err
+		}
+		if stored.Archived {
+			// An archived chain is a retired audit record: configuration is
+			// read-only (stage 6 §2.5). Reactivate by creating a new chain.
+			return ErrRouteChainInvalid
+		}
+		archivedIds, err := loadArchivedCandidateIds(tx, chain.Id)
+		if err != nil {
+			return err
+		}
+		for i := range chain.Candidates {
+			if chain.Candidates[i].Id > 0 && archivedIds[chain.Candidates[i].Id] {
+				return ErrRouteChainInvalid
+			}
+		}
 		result := tx.Model(&RouteChain{}).
 			Where("id = ? AND version = ?", chain.Id, expectedVersion).
 			Select("model", "group", "enabled", "allow_cross_source", "version", "updated_time").
@@ -332,12 +365,35 @@ func UpsertRouteChain(chain *RouteChainWithCandidates, expectedVersion int) erro
 			}
 		}
 		// Delete removed rows before touching kept ones so a new or updated
-		// candidate can take over a freed target/priority slot.
+		// candidate can take over a freed target/priority slot. A removed
+		// candidate the attempt ledger references is archived instead of
+		// deleted (stage 6 §十七): disabled, archived, its target slot freed
+		// (TargetId → -Id, original kept in ArchivedTargetId) — the ledger's
+		// candidate_id keeps a config row to join for audit interpretation.
 		for _, candidate := range existing {
-			if !keptIds[candidate.Id] {
-				if err := tx.Delete(&RouteChainCandidate{}, candidate.Id).Error; err != nil {
+			if keptIds[candidate.Id] || candidate.Archived {
+				continue
+			}
+			hasHistory, err := routeChainCandidateHasHistory(tx, chain.Id, candidate.Id)
+			if err != nil {
+				return err
+			}
+			if hasHistory {
+				if err := tx.Model(&RouteChainCandidate{}).
+					Where("id = ? AND chain_id = ?", candidate.Id, chain.Id).
+					Updates(map[string]any{
+						"enabled":            false,
+						"archived":           true,
+						"archived_target_id": candidate.TargetId,
+						"target_id":          -candidate.Id,
+						"updated_time":       now,
+					}).Error; err != nil {
 					return err
 				}
+				continue
+			}
+			if err := tx.Delete(&RouteChainCandidate{}, candidate.Id).Error; err != nil {
+				return err
 			}
 		}
 		for i := range chain.Candidates {
@@ -392,7 +448,9 @@ func SetRouteChainCandidateEnabled(chainId int, candidateId int, enabled bool, e
 }
 
 // ReorderRouteChainCandidates assigns descending priorities following the
-// payload order (first element gets the highest priority) under CAS.
+// payload order (first element gets the highest priority) under CAS. Archived
+// candidates are outside the ordering domain: they are disabled audit records,
+// so the payload must cover exactly the active set.
 func ReorderRouteChainCandidates(chainId int, orderedCandidateIds []int, expectedVersion int) error {
 	if len(orderedCandidateIds) == 0 {
 		return ErrRouteChainInvalid
@@ -402,11 +460,17 @@ func ReorderRouteChainCandidates(chainId int, orderedCandidateIds []int, expecte
 		if err != nil {
 			return err
 		}
-		if len(existing) != len(orderedCandidateIds) {
+		active := existing[:0:0]
+		for _, candidate := range existing {
+			if !candidate.Archived {
+				active = append(active, candidate)
+			}
+		}
+		if len(active) != len(orderedCandidateIds) {
 			return ErrRouteChainCandidateSet
 		}
-		existingIds := make(map[int]bool, len(existing))
-		for _, candidate := range existing {
+		existingIds := make(map[int]bool, len(active))
+		for _, candidate := range active {
 			existingIds[candidate.Id] = true
 		}
 		seen := make(map[int]bool, len(orderedCandidateIds))
@@ -465,4 +529,179 @@ func bumpRouteChainVersion(tx *gorm.DB, chainId int, expectedVersion int) error 
 		return ErrRouteChainVersionConflict
 	}
 	return nil
+}
+
+// SetRouteChainEnabled toggles the whole chain under CAS (stage 6 §2.2).
+// The engine reads Enabled per request, so this is persistent configuration,
+// not runtime state.
+func SetRouteChainEnabled(chainId int, enabled bool, expectedVersion int) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&RouteChain{}).
+			Where("id = ? AND version = ?", chainId, expectedVersion).
+			Updates(map[string]any{
+				"enabled":      enabled,
+				"version":      expectedVersion + 1,
+				"updated_time": common.GetTimestamp(),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrRouteChainVersionConflict
+		}
+		return nil
+	})
+}
+
+// ArchiveRouteChain retires a chain under CAS: enabled=false + archived=true
+// (stage 6 §2.5). The row stays readable so ledger history remains
+// explainable; archived chains are read-only for configuration edits.
+func ArchiveRouteChain(chainId int, expectedVersion int) error {
+	return DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&RouteChain{}).
+			Where("id = ? AND version = ?", chainId, expectedVersion).
+			Updates(map[string]any{
+				"enabled":      false,
+				"archived":     true,
+				"version":      expectedVersion + 1,
+				"updated_time": common.GetTimestamp(),
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrRouteChainVersionConflict
+		}
+		return nil
+	})
+}
+
+// routeChainCandidateHasHistory reports whether the attempt ledger (stage 4)
+// still references the candidate — attempts, decisions, or a request that
+// finalized on it. Referential anchor for the archive-instead-of-delete rule
+// (stage 6 §十七). Ledger tables live in the main database, so the check runs
+// on the caller's transaction; an unreadable ledger fails closed.
+func routeChainCandidateHasHistory(db *gorm.DB, chainId int, candidateId int) (bool, error) {
+	var attempt RouteChainAttemptRecord
+	err := db.Select("id").Where("route_chain_id = ? AND candidate_id = ?", chainId, candidateId).First(&attempt).Error
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+	case err != nil:
+		return false, err
+	}
+	var decision RouteChainDecisionRecord
+	err = db.Select("id").Where("chain_id = ? AND candidate_id = ?", chainId, candidateId).First(&decision).Error
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+	case err != nil:
+		return false, err
+	}
+	var request RouteChainRequestRecord
+	err = db.Select("id").Where("route_chain_id = ? AND final_candidate_id = ?", chainId, candidateId).First(&request).Error
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+// CandidateHasLedgerHistory exposes the archive guard to the management layer.
+func CandidateHasLedgerHistory(chainId int, candidateId int) (bool, error) {
+	return routeChainCandidateHasHistory(DB, chainId, candidateId)
+}
+
+// ChainHasLedgerHistory reports whether any ledger row (attempt, decision or
+// request) references the chain. A chain with history must not be hard-deleted
+// (stage 6 §十七): the delete API refuses with a conflict instead.
+func ChainHasLedgerHistory(chainId int) (bool, error) {
+	var attempt RouteChainAttemptRecord
+	err := DB.Select("id").Where("route_chain_id = ?", chainId).First(&attempt).Error
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+	case err != nil:
+		return false, err
+	}
+	var decision RouteChainDecisionRecord
+	err = DB.Select("id").Where("chain_id = ?", chainId).First(&decision).Error
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+	case err != nil:
+		return false, err
+	}
+	var request RouteChainRequestRecord
+	err = DB.Select("id").Where("route_chain_id = ?", chainId).First(&request).Error
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, gorm.ErrRecordNotFound):
+		return false, nil
+	default:
+		return false, err
+	}
+}
+
+// loadArchivedCandidateIds returns the archived candidate id set of a chain.
+func loadArchivedCandidateIds(db *gorm.DB, chainId int) (map[int]bool, error) {
+	var rows []RouteChainCandidate
+	if err := db.Select("id").Where("chain_id = ? AND archived = ?", chainId, true).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	ids := make(map[int]bool, len(rows))
+	for _, row := range rows {
+		ids[row.Id] = true
+	}
+	return ids, nil
+}
+
+// RouteChainTargetSummary is the secret-free channel projection the route
+// chain console uses for candidate target selection (stage 6 §2.1.6, §2.8):
+// identity, state and model coverage only — the SELECT is column-allowlisted
+// so key/base_url/other/credentials can never leak by construction.
+type RouteChainTargetSummary struct {
+	Id     int    `json:"id"`
+	Type   int    `json:"type"`
+	Status int    `json:"status"`
+	Name   string `json:"name"`
+	Group  string `json:"group"`
+	Models string `json:"models"`
+}
+
+// ListRouteChainTargetSummaries returns every channel as a target summary.
+func ListRouteChainTargetSummaries() ([]RouteChainTargetSummary, error) {
+	var rows []RouteChainTargetSummary
+	err := DB.Model(&Channel{}).
+		Select("id", "type", "status", "name", "group", "models").
+		Order("id ASC").Find(&rows).Error
+	return rows, err
+}
+
+// GetRouteChainChannelSummaries resolves the target summaries for specific
+// channel ids (candidate diagnostics); deleted channels are simply absent.
+func GetRouteChainChannelSummaries(ids []int) (map[int]RouteChainTargetSummary, error) {
+	result := make(map[int]RouteChainTargetSummary, len(ids))
+	if len(ids) == 0 {
+		return result, nil
+	}
+	var rows []RouteChainTargetSummary
+	err := DB.Model(&Channel{}).
+		Select("id", "type", "status", "name", "group", "models").
+		Where("id IN ?", ids).Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.Id] = row
+	}
+	return result, nil
 }
