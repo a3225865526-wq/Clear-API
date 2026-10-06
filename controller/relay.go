@@ -326,6 +326,7 @@ func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayErr
 		ToolOutputObserved:   c.GetBool("tool_chain_no_retry"),
 		HTTPStatus:           relayErr.StatusCode,
 		UpstreamErrorCode:    routechain.ExtractUpstreamErrorCode(relayErr),
+		ExecutorProvenance:   routechain.HasExecutorProvenance(relayErr),
 	}
 	outcome := routechain.Classify(evidence, false, types.IsSkipRetryError(relayErr))
 	props := routechain.RequestProperties{

@@ -11,10 +11,14 @@ import (
 )
 
 type OpenAIError struct {
-	Message  string          `json:"message"`
-	Type     string          `json:"type"`
-	Param    string          `json:"param"`
-	Code     any             `json:"code"`
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Param   string `json:"param"`
+	Code    any    `json:"code"`
+	// Origin marks errors synthesized by a trusted local executor itself
+	// (executor provenance contract, Stage 4). Forwarded provider bodies and
+	// status-derived fallbacks never carry it.
+	Origin   string          `json:"origin,omitempty"`
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
