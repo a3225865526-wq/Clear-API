@@ -40,6 +40,11 @@ func jsonScanBytes(value any) []byte {
 	}
 }
 
+// InitColumnQuotingForTest exposes dialect-aware column quoting to
+// out-of-package integration tests that drive ability queries without a full
+// InitDB. Production paths call initCol inside InitDB.
+func InitColumnQuotingForTest() { initCol() }
+
 func initCol() {
 	// init common column names
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {

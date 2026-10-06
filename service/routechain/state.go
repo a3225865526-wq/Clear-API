@@ -93,6 +93,9 @@ func (s *RequestState) MarkAttempt(c *gin.Context, index int) {
 		return
 	}
 	candidate := s.Snapshot.Candidates[index]
+	if s.visited == nil {
+		s.visited = make(map[int]bool)
+	}
 	s.visited[candidate.Id] = true
 	s.attemptsMade++
 	s.nextIndex = index + 1
@@ -108,6 +111,9 @@ func (s *RequestState) MarkSkipped(c *gin.Context, index int, reason string) {
 		return
 	}
 	candidate := s.Snapshot.Candidates[index]
+	if s.visited == nil {
+		s.visited = make(map[int]bool)
+	}
 	s.visited[candidate.Id] = true
 	if s.nextIndex <= index {
 		s.nextIndex = index + 1
