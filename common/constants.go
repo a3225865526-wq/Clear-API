@@ -144,6 +144,15 @@ var RetryTimes = 0
 var RouteChainMaxCandidates = 3
 var RouteChainOverallDeadlineMs = 0
 
+// Stage 5 circuit breaker defaults (design §2.4, §2.3): conservative global
+// defaults; a candidate's RouteCandidatePolicy.Health overrides the failure
+// threshold and cooldown. RouteChainRetryAfterMaxSeconds bounds a provider's
+// 429 Retry-After so no upstream can make a candidate permanently unusable.
+var RouteChainCircuitFailureThreshold = 3
+var RouteChainCircuitOpenSeconds = 60
+var RouteChainCircuitHalfOpenMaxProbes = 1
+var RouteChainRetryAfterMaxSeconds = 300
+
 //var RootUserEmail = ""
 
 var IsMasterNode bool
