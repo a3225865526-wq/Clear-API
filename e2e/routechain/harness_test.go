@@ -59,6 +59,7 @@ type mockBehavior struct {
 	hijackClose   bool          // raw hijack + immediate close (post-dispatch cut)
 	poolExhausted bool          // executor envelope 503 auth_unavailable with trusted provenance
 	unprovened    bool          // provider echo: 503 auth_unavailable WITHOUT executor provenance (L7)
+	retryAfter    string        // Retry-After header on a 429 response (Stage 5)
 }
 
 type mockRecord struct {
@@ -168,6 +169,9 @@ func (m *mockUpstream) handler(w http.ResponseWriter, r *http.Request) {
 		contentType = "application/json"
 	}
 	w.Header().Set("Content-Type", contentType)
+	if behavior.retryAfter != "" {
+		w.Header().Set("Retry-After", behavior.retryAfter)
+	}
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(behavior.body))
 }
