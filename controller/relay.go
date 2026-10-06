@@ -132,6 +132,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	// Stage 4 ledger: registered before the billing defer so it runs AFTER
+	// it (LIFO) — the request record finalizes once the final billing
+	// outcome (settle / refund / uncertain) is known.
+	if chainState := routechain.StateFrom(c); chainState != nil && relayFormat != types.RelayFormatOpenAIRealtime {
+		defer func() {
+			routechain.FinishRequestLedger(c, chainState, relayInfo, newAPIError)
+		}()
+	}
+
 	defer func() {
 		recovered := recover()
 		resultErr := newAPIError
@@ -235,6 +244,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if newAPIError == nil {
 			if chainState != nil {
 				chainState.MarkSuccess()
+				routechain.FinalizeAttemptSuccess(c, relayInfo)
 			}
 			service.MarkRequestPolicySuccess(c, relayInfo.StreamStatus)
 			relayInfo.LastError = nil
@@ -246,7 +256,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		var decision service.PolicyDecision
 		if chainState != nil {
-			decision = chainRetryDecision(c, chainState, newAPIError, chainMeteringBefore)
+			decision = chainRetryDecision(c, chainState, relayInfo, newAPIError, chainMeteringBefore)
 		} else {
 			decision = service.DecideRelayRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry())
 		}
@@ -313,8 +323,9 @@ var upgrader = websocket.Upgrader{
 
 // chainRetryDecision runs the centralized route-chain failover policy for the
 // attempt that just failed: assemble per-attempt evidence, classify, decide.
-// No status-specific branching lives here (Amendment 2).
-func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayErr *types.NewAPIError, meteringBefore string) service.PolicyDecision {
+// No status-specific branching lives here (Amendment 2). The failed attempt's
+// ledger row is finalized here while its evidence is still fresh.
+func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayInfo *relaycommon.RelayInfo, relayErr *types.NewAPIError, meteringBefore string) service.PolicyDecision {
 	meteringAfter := service.CodexMeteringAttemptID(c)
 	evidence := routechain.Evidence{
 		CandidateSelected:    true,
@@ -339,6 +350,11 @@ func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayErr
 	}
 	decision := routechain.CanFailover(props, failingPolicy, evidence, outcome)
 	routechain.LogDecision(c, state, decision, outcome)
+	if candidate := state.FailingCandidate(); candidate != nil {
+		routechain.NoteFailoverDecision(c, state, candidate.Id, decision, outcome)
+	}
+	preDispatchAborted := !evidence.RequestWritten && (props.DeadlineExceeded || c.Request.Context().Err() != nil)
+	routechain.FinalizeAttemptForFailure(c, state, relayInfo, relayErr, evidence, outcome, preDispatchAborted)
 	if decision.Allowed {
 		// Safe by construction: the policy only advances past provably
 		// zero-work attempts, so hiding their flags from the request-end
@@ -382,6 +398,9 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 			info.PriceData.GroupRatioInfo = helper.HandleGroupRatio(c, info)
 		}
 		service.RequestPolicy(c).BeginAttempt(channel, info.UsingGroup)
+		// Stage 4: the attempt row is created before any dispatch — a crash
+		// after dispatch can never leave the attempt missing from the ledger.
+		routechain.BeginAttemptLedger(c, state, info, channel)
 		return channel, nil
 	}
 	if info.ChannelMeta == nil {

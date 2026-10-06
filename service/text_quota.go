@@ -16,6 +16,7 @@ import (
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
@@ -419,6 +420,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		}
 	}
 	CaptureFinanceTextUsage(ctx, relayInfo, usage)
+	// Stage 4 ledger: persist the authoritative usage of the active chain
+	// attempt exactly once (no-op for legacy requests).
+	routechain.NoteAttemptUsage(ctx, usage, CodexMeteringAccountRef(ctx), CodexMeteringAttemptID(ctx))
 	originUsage := usage
 	billingUsage := effectiveBillingUsage(usage)
 	if usage != nil && usage.CodexMetering != nil {
@@ -492,6 +496,8 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			summary.Quota = session.ChargedQuota()
 		}
 		logger.LogError(ctx, "error settling billing: "+err.Error())
+	} else {
+		routechain.NoteRequestBilling(ctx, model.RouteChainBillingSettled)
 	}
 	financeCharged := &summary.Quota
 	financeStatus := "settled"

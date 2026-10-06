@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
@@ -220,7 +221,13 @@ func BeginFinanceAttempt(c *gin.Context, info *relaycommon.RelayInfo) string {
 			snapshot.Missing = append(snapshot.Missing, "missing_or_ambiguous_fx")
 		}
 	}
+	// Stage 4: a chain-routed request already carries the canonical attempt
+	// id (route ledger); the finance attempt adopts it so finance events
+	// join the ledger by attempt_id. Legacy requests keep the fresh UUID.
 	id := common.GetUUID()
+	if chainAttemptID := routechain.ActiveAttemptID(c); chainAttemptID != "" {
+		id = chainAttemptID
+	}
 	if _, ok := recordFinanceObservation(info, id, "attempt_start", snapshot); !ok {
 		return ""
 	}
