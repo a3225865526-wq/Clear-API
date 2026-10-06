@@ -606,8 +606,17 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	// mere input alias.
 	if !channel.PoolChannelBound() {
 		if err := channel.CheckPoolModelRoute(modelName); err != nil {
-			logPoolAdmissionDecision(c, channel, modelName, err)
-			return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+			// A chain with allow_cross_source_failover explicitly authorizes
+			// pool→api transitions for its candidates (design §2.8): the
+			// blanket source isolation is relaxed ONLY for chain-routed
+			// requests whose snapshot carries the operator's cross-source
+			// permission. Legacy requests and same-source chains stay
+			// fail-closed, and the pool-side gates above remain untouched.
+			if !routechain.CrossSourceChainActive(c) {
+				logPoolAdmissionDecision(c, channel, modelName, err)
+				return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+			}
+			logger.LogWarn(c, fmt.Sprintf("route_chain subsystem=engine event=cross_source_admission_relaxed channel_id=%d model=%q reason=%q", channel.Id, modelName, err.Error()))
 		}
 	}
 	// Pool channels additionally need the master switch, channel routing

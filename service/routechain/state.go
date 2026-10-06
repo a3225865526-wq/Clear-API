@@ -41,6 +41,16 @@ func BeginRequest(c *gin.Context, modelName string, groupName string) *RequestSt
 	return state
 }
 
+// CrossSourceChainActive reports whether the request is chain-routed with the
+// operator's explicit allow_cross_source_failover permission (design §2.8).
+// Only such requests may relax the blanket pool/api source isolation at the
+// per-candidate admission gate; legacy requests and same-source chains stay
+// fully fail-closed.
+func CrossSourceChainActive(c *gin.Context) bool {
+	state := StateFrom(c)
+	return state != nil && state.Snapshot != nil && state.Snapshot.AllowCrossSource
+}
+
 // StateFrom returns the active request state or nil for legacy requests.
 func StateFrom(c *gin.Context) *RequestState {
 	value, exists := c.Get(requestStateKey)
