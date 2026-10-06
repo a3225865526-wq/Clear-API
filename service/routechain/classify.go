@@ -36,6 +36,7 @@ type Evidence struct {
 	ToolOutputObserved   bool // tool-continuation semantics (request-level, set pre-loop)
 	HTTPStatus           int
 	UpstreamErrorCode    string // structured error.code from the upstream envelope (exact match only)
+	ExecutorProvenance   bool   // error envelope carries the trusted executor provenance origin (Stage 4 contract)
 }
 
 // Executor pool-exhaustion codes come from the CLIProxyAPI wire contract
@@ -51,6 +52,12 @@ const (
 func IsExecutorPoolExhaustionCode(code string) bool {
 	return code == ExecutorCodeAuthUnavailable || code == ExecutorCodeAuthNotFound
 }
+
+// ExecutorProvenanceOrigin is the trusted origin value the executor puts on
+// envelopes it synthesizes itself (Stage 4 provenance contract). A real
+// provider echoing an exhaustion code cannot hold it, and new-api must never
+// classify pool exhaustion from the code without it.
+const ExecutorProvenanceOrigin = "local_executor"
 
 // authoritativeRejectionStatuses are the upstream statuses treated as an
 // explicit, definitive rejection when the zero-work predicate holds
@@ -96,9 +103,11 @@ func Classify(evidence Evidence, success bool, localInvalid bool) Outcome {
 		}
 		return OutcomePreDispatchUnavailable
 	}
-	// Bytes reached an upstream. Only a structured, zero-work rejection may
-	// classify as safe; everything else stays uncertain (C4, R8).
-	if evidence.HTTPStatus == 503 && IsExecutorPoolExhaustionCode(evidence.UpstreamErrorCode) {
+	// Bytes reached an upstream. Only a structured, zero-work rejection with
+	// trusted executor provenance may classify as safe; everything else stays
+	// uncertain (C4, R8, Stage 4 provenance contract: a provider could echo
+	// the exhaustion code, so the code alone is never sufficient).
+	if evidence.HTTPStatus == 503 && evidence.ExecutorProvenance && IsExecutorPoolExhaustionCode(evidence.UpstreamErrorCode) {
 		return OutcomePoolNoEligibleAccount
 	}
 	if evidence.zeroWork() && authoritativeRejectionStatus(evidence.HTTPStatus) {
@@ -123,4 +132,18 @@ func ExtractUpstreamErrorCode(err *types.NewAPIError) string {
 	}
 	code, _ := openaiError.Code.(string)
 	return code
+}
+
+// HasExecutorProvenance reports whether the upstream error envelope carries
+// the trusted executor provenance origin (Stage 4 contract). Only envelopes
+// the executor synthesized itself hold it.
+func HasExecutorProvenance(err *types.NewAPIError) bool {
+	if err == nil {
+		return false
+	}
+	openaiError, ok := err.RelayError.(types.OpenAIError)
+	if !ok {
+		return false
+	}
+	return openaiError.Origin == ExecutorProvenanceOrigin
 }

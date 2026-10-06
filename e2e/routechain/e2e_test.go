@@ -106,6 +106,29 @@ func TestE2EPoolNoEligibleFallsToAPI(t *testing.T) {
 	require.Equal(t, 1, apiB.count(), "API candidate B served the request")
 }
 
+// L7 (Stage 4 provenance contract): a provider echoing error.code
+// auth_unavailable WITHOUT the executor provenance origin must NOT classify
+// as pool exhaustion — the request stays put with today's uncertain
+// post-dispatch semantics.
+func TestE2EUnprovenedExhaustionCodeDoesNotFailover(t *testing.T) {
+	h := newHarness(t)
+	h.setPoolPublication(t)
+	executor := newMockUpstream(t, mockBehavior{unprovened: true})
+	apiB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, executor.srv.URL, `{"upstream_pool":"e2e-pool","pool_routing_enabled":true}`)
+	h.addChannel(22, apiB.srv.URL, "")
+	h.setChain(t, true, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypePool, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, _ := h.postChat(t, e2eModel, "", false)
+	require.NotEqual(t, http.StatusOK, status, "unprovened exhaustion code must not advance")
+	require.NotContains(t, body, "from-b")
+	require.Equal(t, 1, executor.count())
+	require.Equal(t, 0, apiB.count(), "missing provenance ⇒ no pool-exhaustion classification ⇒ no advance")
+}
+
 // §六: ordinary upstream 503 — request was written, outcome uncertain, NO failover.
 func TestE2EOrdinary503DoesNotFailover(t *testing.T) {
 	h := newHarness(t)

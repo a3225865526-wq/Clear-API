@@ -22,8 +22,10 @@ func TestClassifyMatrix(t *testing.T) {
 		{"work observed", Evidence{RequestWritten: true, WorkObserved: true, HTTPStatus: 500}, false, false, OutcomeUpstreamWorkObserved},
 		{"local invalid pre-dispatch", Evidence{CandidateSelected: true, HTTPStatus: 413}, false, true, OutcomeRequestInvalid},
 		{"pre-dispatch unavailability", Evidence{CandidateSelected: true, HTTPStatus: 500}, false, false, OutcomePreDispatchUnavailable},
-		{"pool structured exhaustion", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503, UpstreamErrorCode: ExecutorCodeAuthUnavailable}, false, false, OutcomePoolNoEligibleAccount},
-		{"pool auth_not_found", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503, UpstreamErrorCode: ExecutorCodeAuthNotFound}, false, false, OutcomePoolNoEligibleAccount},
+		{"pool structured exhaustion", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503, UpstreamErrorCode: ExecutorCodeAuthUnavailable, ExecutorProvenance: true}, false, false, OutcomePoolNoEligibleAccount},
+		{"pool auth_not_found", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503, UpstreamErrorCode: ExecutorCodeAuthNotFound, ExecutorProvenance: true}, false, false, OutcomePoolNoEligibleAccount},
+		{"exhaustion code without executor provenance (L7)", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503, UpstreamErrorCode: ExecutorCodeAuthUnavailable}, false, false, OutcomeRequestWrittenOutcomeUncertain},
+		{"exhaustion code with foreign provenance", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503, UpstreamErrorCode: ExecutorCodeAuthUnavailable, ExecutorProvenance: false}, false, false, OutcomeRequestWrittenOutcomeUncertain},
 		{"ordinary upstream 503 not pool exhaustion", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503, UpstreamErrorCode: "internal_server_error"}, false, false, OutcomeRequestWrittenOutcomeUncertain},
 		{"503 without code not pool exhaustion", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 503}, false, false, OutcomeRequestWrittenOutcomeUncertain},
 		{"401 explicit no-work", Evidence{CandidateSelected: true, RequestWritten: true, HTTPStatus: 401}, false, false, OutcomeAuthoritativeRejectionNoWork},
@@ -57,6 +59,16 @@ func TestExtractUpstreamErrorCode(t *testing.T) {
 	if got := ExtractUpstreamErrorCode(err); got != "auth_unavailable" {
 		t.Fatalf("expected auth_unavailable, got %q", got)
 	}
+}
+
+func TestHasExecutorProvenance(t *testing.T) {
+	require.False(t, HasExecutorProvenance(nil))
+	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503}))
+	// Provenance contract: exact origin match only, never inferred.
+	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Code: "auth_unavailable"}}))
+	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Origin: "executor"}}))
+	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Origin: "local_executor_upstream"}}))
+	require.True(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Code: "auth_unavailable", Origin: ExecutorProvenanceOrigin}}))
 }
 
 func TestExecutorPoolExhaustionCodesExactMatch(t *testing.T) {

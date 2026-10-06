@@ -55,7 +55,8 @@ type mockBehavior struct {
 	disconnect    bool          // accept request, close connection without response
 	cutAfterSSE   bool          // write SSE chunks, then cut mid-stream (12)
 	hijackClose   bool          // raw hijack + immediate close (post-dispatch cut)
-	poolExhausted bool          // executor envelope 503 auth_unavailable
+	poolExhausted bool          // executor envelope 503 auth_unavailable with trusted provenance
+	unprovened    bool          // provider echo: 503 auth_unavailable WITHOUT executor provenance (L7)
 }
 
 type mockRecord struct {
@@ -127,6 +128,14 @@ func (m *mockUpstream) handler(w http.ResponseWriter, r *http.Request) {
 		panic(http.ErrAbortHandler) // cut the connection after the request was fully received
 	}
 	if behavior.poolExhausted {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"error":{"message":"auth_unavailable: no auth available","type":"server_error","code":"auth_unavailable","origin":"local_executor","retryable":true}}`))
+		return
+	}
+	if behavior.unprovened {
+		// A provider echoing the exhaustion code without the executor
+		// provenance origin must never classify as pool exhaustion (L7).
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"error":{"message":"auth_unavailable: no auth available","type":"server_error","code":"auth_unavailable","retryable":true}}`))
