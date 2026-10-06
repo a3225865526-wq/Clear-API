@@ -320,7 +320,7 @@ func RunExecute(cfg *Config) int {
 				StartedAt:            time.Now().UTC().Format(time.RFC3339),
 				AdminUserID:          user.Id,
 				AdminUsername:        user.Username,
-				BootstrapToolVersion: common.Version,
+				BootstrapToolVersion: toolVersion(),
 				CandidateCommit:      cfg.CandidateCommit,
 			}
 			return model.WriteBootstrapStateTx(tx, st)
@@ -398,7 +398,7 @@ func RunExecute(cfg *Config) int {
 				PrivacyVersion:       cfg.PrivacyVersion,
 				ApprovedBy:           cfg.ApprovedBy,
 				CandidateCommit:      cfg.CandidateCommit,
-				BootstrapToolVersion: common.Version,
+				BootstrapToolVersion: toolVersion(),
 				SelfUseMode:          cfg.SelfUseMode,
 				DemoSite:             cfg.DemoSite,
 			})
@@ -465,7 +465,7 @@ func RunExecute(cfg *Config) int {
 	}
 	marker := &model.BootstrapCompletionMarker{
 		CompletedAt:              time.Now().UTC().Format(time.RFC3339),
-		BootstrapToolVersion:     common.Version,
+		BootstrapToolVersion:     toolVersion(),
 		CandidateCommit:          cfg.CandidateCommit,
 		AdminUserID:              state.AdminUserID,
 		AdminUsername:            state.AdminUsername,
@@ -615,4 +615,14 @@ func suppliedLegalMatchesManifest(cfg *Config) (bool, error) {
 func legalSHA256(content string) string {
 	sum := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(sum[:])
+}
+
+// toolVersion reports the bootstrap tool version for audit records. The
+// release build stamps common.Version via ldflags; fall back to the package
+// default when the VERSION file is empty so markers always carry a version.
+func toolVersion() string {
+	if common.Version != "" {
+		return common.Version
+	}
+	return "v0.0.0"
 }
