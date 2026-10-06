@@ -33,6 +33,8 @@ func newCircuitAPITestEnv(t *testing.T) (*gorm.DB, model.RouteChainWithCandidate
 	sqlDB.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, model.MigrateRouteChain(db))
+	// The stage 6 archive guard reads the attempt ledger inside chain saves.
+	require.NoError(t, model.MigrateRouteChainLedger(db))
 	oldDB := model.DB
 	model.DB = db
 	t.Cleanup(func() { model.DB = oldDB })
