@@ -188,6 +188,16 @@ func main() {
 		return
 	}
 
+	// Stage 4: close ledger records left non-terminal by a previous process
+	// life. Recovery classification is hard rule §十七: OUTCOME_UNCERTAIN,
+	// never safe-to-advance — a restart can never silently replay a
+	// dispatched request. Runs once, before the listener accepts traffic.
+	if recoveredAttempts, recoveredRequests, recoverErr := model.RecoverRouteChainLedgerInFlight(); recoverErr != nil {
+		common.SysError("route chain ledger recovery failed: " + recoverErr.Error())
+	} else if recoveredAttempts > 0 || recoveredRequests > 0 {
+		common.SysLog(fmt.Sprintf("route chain ledger recovery: %d attempts and %d requests marked outcome-uncertain", recoveredAttempts, recoveredRequests))
+	}
+
 	if os.Getenv("ENABLE_PPROF") == "true" {
 		gopool.Go(func() {
 			log.Println(http.ListenAndServe("0.0.0.0:8005", nil))
