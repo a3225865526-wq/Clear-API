@@ -455,6 +455,14 @@ func (h *harness) eventuallyConsumeLogs(want int64) int64 {
 	return count
 }
 
+// reservationState returns the single reservation's canonical state.
+func (h *harness) reservationState() string {
+	h.t.Helper()
+	var reservation model.BillingReservation
+	require.NoError(h.t, h.db.First(&reservation).Error)
+	return reservation.State
+}
+
 func (h *harness) userQuota() int {
 	h.t.Helper()
 	var user model.User

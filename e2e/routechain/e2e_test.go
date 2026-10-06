@@ -773,3 +773,34 @@ func TestE2EAttemptLedgerRecordsTheChain(t *testing.T) {
 	assert.Equal(t, chain.Candidates[0].Id, decisions[0].CandidateId, "the decision names the failing candidate row")
 	assert.Equal(t, model.RouteChainRequestFinalSuccess, requests[0].FinalStatus)
 }
+
+// Stage 4 L21: consume-log capture failing (disabled) must not affect the
+// canonical ledger or billing state — settlement and ledger finalization are
+// independent of consume-log delivery.
+func TestE2EConsumeLogFailureLeavesCanonicalStateIntact(t *testing.T) {
+	h := newHarness(t)
+	oldLogConsume := common.LogConsumeEnabled
+	common.LogConsumeEnabled = false
+	t.Cleanup(func() { common.LogConsumeEnabled = oldLogConsume })
+	mockA := newMockUpstream(t, mockBehavior{status: 401, body: errorBody(401, "invalid_api_key")})
+	mockB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, mockA.srv.URL, "")
+	h.addChannel(22, mockB.srv.URL, "")
+	h.setChain(t, false, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, _ := h.postChat(t, e2eModel, "", false)
+	require.Equal(t, http.StatusOK, status)
+	require.Contains(t, body, "from-b")
+	// Settlement (intent + apply) and the consume log write can still be in
+	// flight when the response bytes reach the client — poll, don't race.
+	require.Eventually(t, func() bool {
+		return h.countConsumeLogs() == 0 && h.reservationState() == "settled"
+	}, 3*time.Second, 10*time.Millisecond, "canonical settlement must land without any consume log")
+	require.Equal(t, int64(1), h.countReservations(), "the canonical reservation settled exactly once")
+	// The ledger finalized independently of the consume log.
+	h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+		[]string{model.RouteChainTerminalAuthoritativeRej, model.RouteChainTerminalSucceeded})
+}
