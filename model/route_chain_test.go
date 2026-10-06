@@ -74,6 +74,9 @@ func TestRouteChainDatabase(t *testing.T) {
 	// Migration is idempotent: a fresh database and a repeated pass both succeed.
 	require.NoError(t, MigrateRouteChain(db))
 	require.NoError(t, MigrateRouteChain(db))
+	// The stage 6 archive guard queries the attempt ledger inside chain saves,
+	// so the ledger tables belong to this harness too.
+	require.NoError(t, MigrateRouteChainLedger(db))
 
 	chain := routeChainFixture()
 	require.NoError(t, UpsertRouteChain(chain, 0))
@@ -190,6 +193,7 @@ func TestRouteChainValidation(t *testing.T) {
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	initCol()
 	require.NoError(t, MigrateRouteChain(db))
+	require.NoError(t, MigrateRouteChainLedger(db))
 
 	rc := func(model string, group string, candidates ...RouteChainCandidate) *RouteChainWithCandidates {
 		return &RouteChainWithCandidates{RouteChain: RouteChain{Model: model, Group: group}, Candidates: candidates}
