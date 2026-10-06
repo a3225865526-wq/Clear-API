@@ -451,11 +451,17 @@ func TestSecretsNeverLogged(t *testing.T) {
 }
 
 // TestInputValidationFailures covers invalid legal inputs (tests 6/7/8) and
-// wrong database credentials (test 9) failing closed before any write.
+// wrong database credentials (test 9) failing closed. Legal input validation
+// runs at the legal phase — after stage 1 and the finance owner gate — so
+// stage 1 can complete and stop safely before approved legal content exists.
 func TestInputValidationFailures(t *testing.T) {
 	dsn := createFreshDatabase(t, requirePG(t))
 	setProductionEnv(t, dsn)
 	isolateGlobals(t)
+
+	require.Equal(t, ExitFinanceOwnerConfigRequired, RunExecute(executeConfig(t)))
+	snap := snapshotWith(t, dsn)
+	setFinanceOwner(t, snap.State.AdminUserID)
 
 	cfg := executeConfig(t)
 	cfg.TermsFile = writeInputFile(t, "\xff\xfe invalid utf8")
@@ -468,6 +474,15 @@ func TestInputValidationFailures(t *testing.T) {
 	cfg = executeConfig(t)
 	cfg.TermsFile = writeInputFile(t, strings.Repeat("a", maxLegalFileBytes+1))
 	require.Equal(t, ExitInput, RunExecute(cfg))
+
+	// Legal phase must not have written anything from the rejected inputs.
+	db := openAdminDB(t, dsn)
+	_, found, err := model.ReadBootstrapOption(db, model.LegalUserAgreementOptionKey)
+	require.NoError(t, err)
+	require.False(t, found)
+	_, found, err = model.ReadBootstrapOption(db, model.BootstrapLegalManifestOptionKey)
+	require.NoError(t, err)
+	require.False(t, found)
 
 	// Wrong credentials: the probe fails before any migration or write.
 	broken, err := url.Parse(dsn)

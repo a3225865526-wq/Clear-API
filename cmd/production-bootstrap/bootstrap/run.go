@@ -252,16 +252,10 @@ func RunExecute(cfg *Config) int {
 		}
 		password = value
 	}
-	var termsContent, privacyContent string
-	if needLegal {
-		var err error
-		termsContent, privacyContent, err = readLegalInputs(cfg)
-		if err != nil {
-			Phase("%v", err)
-			Emit("input_error", nil)
-			return ExitInput
-		}
-	}
+	// Legal inputs are deliberately NOT required here: stage 1 (migrations +
+	// admin + state) must be able to complete and stop safely at the finance
+	// owner gate even when no approved legal content exists yet; the legal
+	// phase reads its inputs right before it runs.
 
 	// Server-parity initialization: base schema, authz, log DB, option map.
 	// model.CheckSetup() is intentionally not called; the setup row is
@@ -395,7 +389,13 @@ func RunExecute(cfg *Config) int {
 		}
 	}
 	if needLegal {
-		err := model.DB.Transaction(func(tx *gorm.DB) error {
+		termsContent, privacyContent, err := readLegalInputs(cfg)
+		if err != nil {
+			Phase("%v", err)
+			Emit("input_error", map[string]any{"phase": "legal"})
+			return ExitInput
+		}
+		err = model.DB.Transaction(func(tx *gorm.DB) error {
 			return model.WriteBootstrapLegalTx(tx, model.BootstrapLegalInput{
 				UserAgreement:        termsContent,
 				PrivacyPolicy:        privacyContent,
