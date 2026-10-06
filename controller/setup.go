@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -66,16 +67,9 @@ func PostSetup(c *gin.Context) {
 		return
 	}
 
-	// If root doesn't exist, validate and create admin account
+	// If root doesn't exist, validate and create admin account through the
+	// shared root-account helper (same semantics as production bootstrap).
 	if !rootExists {
-		// Validate username length: max 12 characters to align with model.User validation
-		if len(req.Username) > 12 {
-			c.JSON(200, gin.H{
-				"success": false,
-				"message": "用户名长度不能超过12个字符",
-			})
-			return
-		}
 		// Validate password
 		if req.Password != req.ConfirmPassword {
 			c.JSON(200, gin.H{
@@ -85,37 +79,24 @@ func PostSetup(c *gin.Context) {
 			return
 		}
 
-		if err := common.ValidateNewAccountPassword(req.Password); err != nil {
+		if _, err := model.CreateRootAccount(model.DB, model.RootAccountInput{
+			Username:     req.Username,
+			Password:     req.Password,
+			DisplayName:  "Root User",
+			InitialQuota: 100000000,
+		}); err != nil {
+			message := "创建管理员账号失败: " + err.Error()
+			switch {
+			case errors.Is(err, model.ErrRootUsernameTooLong):
+				message = "用户名长度不能超过12个字符"
+			case errors.Is(err, model.ErrRootUsernameRequired):
+				message = "用户名不能为空"
+			case errors.Is(err, common.ErrAccountPasswordLength):
+				message = err.Error()
+			}
 			c.JSON(200, gin.H{
 				"success": false,
-				"message": err.Error(),
-			})
-			return
-		}
-
-		// Create root user
-		hashedPassword, err := common.HashAccountPassword(req.Password)
-		if err != nil {
-			c.JSON(200, gin.H{
-				"success": false,
-				"message": "系统错误: " + err.Error(),
-			})
-			return
-		}
-		rootUser := model.User{
-			Username:    req.Username,
-			Password:    hashedPassword,
-			Role:        common.RoleRootUser,
-			Status:      common.UserStatusEnabled,
-			DisplayName: "Root User",
-			AccessToken: nil,
-			Quota:       100000000,
-		}
-		err = model.DB.Create(&rootUser).Error
-		if err != nil {
-			c.JSON(200, gin.H{
-				"success": false,
-				"message": "创建管理员账号失败: " + err.Error(),
+				"message": message,
 			})
 			return
 		}
