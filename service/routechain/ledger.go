@@ -51,6 +51,12 @@ func LedgerCaptureFailures() int64 { return ledgerCaptureFailures.Load() }
 // chain admits ever reach it (WS realtime/MJ/tasks are excluded upstream).
 func BeginRequestLedger(c *gin.Context, snapshot *Snapshot) {
 	requestId := c.GetString(common.RequestIdKey)
+	if requestId == "" {
+		// Without a request id there is nothing to correlate; production
+		// always sets one (RequestId middleware), so this is a pure guard.
+		c.Set(ledgerDisabledKey, true)
+		return
+	}
 	record := &model.RouteChainRequestRecord{
 		RequestId:         requestId,
 		RouteChainId:      snapshot.ChainId,
@@ -229,7 +235,9 @@ func FinalizeAttemptSuccess(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
 		FinalOutcome:       string(OutcomeSuccess),
 		UpstreamModel:      upstreamModelOf(relayInfo),
 		UpstreamResponseId: c.GetString(common.UpstreamRequestIdKey),
-		ProviderCostState:  model.RouteChainCostNone,
+		// Provider cost for a success is refined at the authoritative usage
+		// moment (NoteAttemptUsage), which has already run inside the
+		// handler; the terminal write must not overwrite it.
 	})
 	if err != nil {
 		recordLedgerFailure(c, "attempt_final_success", err)

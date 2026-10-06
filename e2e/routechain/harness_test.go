@@ -25,6 +25,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -235,6 +237,7 @@ func newHarness(t *testing.T) *harness {
 		&model.Log{}, &model.Option{}, &model.BillingReservation{},
 		&model.BillingReviewMarker{}, &model.BillingReservationDecision{},
 		&model.FinanceVersion{}, &model.RouteChain{}, &model.RouteChainCandidate{},
+		&model.RouteChainRequestRecord{}, &model.RouteChainAttemptRecord{}, &model.RouteChainDecisionRecord{},
 		&model.UserSubscription{}, &model.SubscriptionPlan{}, &model.SubscriptionOrder{},
 		&model.SubscriptionPreConsumeRecord{},
 	))
@@ -264,6 +267,9 @@ func newHarness(t *testing.T) *harness {
 	require.NoError(t, database.Create(token).Error)
 
 	engine := gin.New()
+	// The production server mounts RequestId globally; the ledger keys all
+	// correlation on it, so the harness must mount it too.
+	engine.Use(middleware.RequestId())
 	router.SetRelayRouter(engine)
 	server := httptest.NewServer(engine)
 	h := &harness{t: t, db: database, engine: engine, srv: server, userID: user.Id}
@@ -366,6 +372,60 @@ func errorBody(status int, code string) string {
 }
 
 // countReservations returns the number of billing_reservations rows.
+// ledgerRequests returns the request-level ledger rows (Stage 4).
+func (h *harness) ledgerRequests(t *testing.T) []model.RouteChainRequestRecord {
+	t.Helper()
+	var rows []model.RouteChainRequestRecord
+	require.NoError(t, h.db.Find(&rows).Error)
+	return rows
+}
+
+// ledgerAttempts returns the attempt-level ledger rows.
+func (h *harness) ledgerAttempts(t *testing.T) []model.RouteChainAttemptRecord {
+	t.Helper()
+	var rows []model.RouteChainAttemptRecord
+	require.NoError(t, h.db.Order("sequence ASC").Find(&rows).Error)
+	return rows
+}
+
+// ledgerDecisions returns the decision ledger rows.
+func (h *harness) ledgerDecisions(t *testing.T) []model.RouteChainDecisionRecord {
+	t.Helper()
+	var rows []model.RouteChainDecisionRecord
+	require.NoError(t, h.db.Find(&rows).Error)
+	return rows
+}
+
+// assertLedgerShape asserts the whole Stage 4 ledger for a single-request
+// scenario: one request record with the given final status and the given
+// attempt terminal states in sequence order (cost states are asserted by
+// the callers that pin them).
+func (h *harness) assertLedgerShape(t *testing.T, wantFinalStatus string, wantBilling string, wantTerminals []string) {
+	t.Helper()
+	// The request record finalizes in a defer that runs after the response
+	// bytes have reached the client — poll until it lands before asserting.
+	require.Eventually(t, func() bool {
+		requests := h.ledgerRequests(t)
+		return len(requests) == 1 && requests[0].FinalStatus != ""
+	}, 3*time.Second, 10*time.Millisecond, "request ledger record must finalize")
+	requests := h.ledgerRequests(t)
+	require.Len(t, requests, 1)
+	assert.Equal(t, wantFinalStatus, requests[0].FinalStatus)
+	assert.Equal(t, wantBilling, requests[0].UserBillingState)
+	attempts := h.ledgerAttempts(t)
+	require.Len(t, attempts, len(wantTerminals))
+	ids := make(map[string]bool, len(attempts))
+	for i, attempt := range attempts {
+		assert.Equal(t, i+1, attempt.Sequence)
+		assert.Equal(t, requests[0].RequestId, attempt.RequestId, "L28: all attempts share the request id")
+		assert.NotEqual(t, "", attempt.AttemptId)
+		require.False(t, ids[attempt.AttemptId], "L29: attempt ids must be unique")
+		ids[attempt.AttemptId] = true
+		assert.Equal(t, wantTerminals[i], attempt.TerminalState, "attempt %d", i+1)
+		assert.Equal(t, requests[0].FinalAttemptId, attempts[len(attempts)-1].AttemptId)
+	}
+}
+
 func (h *harness) countReservations() int64 {
 	h.t.Helper()
 	var count int64
