@@ -376,10 +376,12 @@ func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayInf
 	})
 	preDispatchAborted := !evidence.RequestWritten && (props.DeadlineExceeded || c.Request.Context().Err() != nil)
 	routechain.FinalizeAttemptForFailure(c, state, relayInfo, relayErr, evidence, outcome, preDispatchAborted, health)
-	if decision.Allowed {
-		// Safe by construction: the policy only advances past provably
-		// zero-work attempts, so hiding their flags from the request-end
-		// billing read can never mask uncertain consumption.
+	if routechain.ShouldRefundZeroWork(evidence, outcome) || decision.Allowed {
+		// Zero-work refund eligibility is independent of whether another
+		// candidate exists. Keep the request reserve open during failover;
+		// final failure refunds it once, final success settles it once.
+		// Preserve flag reset on existing safe advances for other outcomes;
+		// their terminal billing policy is unchanged when advance is denied.
 		routechain.ResetPerAttemptFlags(c)
 	}
 	action := "stop"

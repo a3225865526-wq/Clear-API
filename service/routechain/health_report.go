@@ -105,7 +105,15 @@ type AttemptHealth struct {
 // ledger failure can never block these decisions, and nothing here can
 // influence billing.
 func ComputeAttemptHealth(c *gin.Context, state *RequestState, signals HealthSignals) AttemptHealth {
-	if state == nil || state.Snapshot == nil || !common.RouteCircuitBreakerEnabled() {
+	if state == nil || state.Snapshot == nil {
+		return AttemptHealth{}
+	}
+	if !common.RouteCircuitBreakerEnabled() {
+		// Proven admission rejection is neutral even with the breaker off.
+		// Persist the verdict without feeding any provider circuit.
+		if signals.Outcome == OutcomePoolNoEligibleAccount {
+			return AttemptHealth{Verdict: HealthNeutral, Effect: "breaker_disabled"}
+		}
 		return AttemptHealth{}
 	}
 	candidate := state.FailingCandidate()

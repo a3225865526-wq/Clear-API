@@ -43,14 +43,15 @@ type Evidence struct {
 // (sdk/cliproxy/auth Error.Code, carried into the error body's error.code
 // field). Exact match only — substring matching is forbidden (C4).
 const (
-	ExecutorCodeAuthUnavailable = "auth_unavailable"
-	ExecutorCodeAuthNotFound    = "auth_not_found"
+	ExecutorCodeAuthUnavailable       = "auth_unavailable"
+	ExecutorCodeAuthNotFound          = "auth_not_found"
+	ExecutorCodePoolNoEligibleAccount = "pool_no_eligible_account"
 )
 
 // IsExecutorPoolExhaustionCode reports whether a structured upstream error
 // code identifies executor-side pool exhaustion (no eligible credential).
 func IsExecutorPoolExhaustionCode(code string) bool {
-	return code == ExecutorCodeAuthUnavailable || code == ExecutorCodeAuthNotFound
+	return code == ExecutorCodeAuthUnavailable || code == ExecutorCodeAuthNotFound || code == ExecutorCodePoolNoEligibleAccount
 }
 
 // ExecutorProvenanceOrigin is the trusted origin value the executor puts on
