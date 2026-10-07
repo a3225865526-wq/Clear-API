@@ -685,6 +685,9 @@ func TestMgmtChainEnableArchiveFlows(t *testing.T) {
 	newManagementTestEnv(t)
 	addMgmtChannel(t, 21, "primary", false)
 	chain := addMgmtChain(t, "gpt-chain", "default", 21)
+	require.NoError(t, model.CreateRouteChainRequestRecord(&model.RouteChainRequestRecord{RequestId: "archive-history", RouteChainId: chain.Id, RouteChainVersion: chain.Version}))
+	require.NoError(t, model.CreateRouteChainAttempt(&model.RouteChainAttemptRecord{AttemptId: "archive-attempt", RequestId: "archive-history", Sequence: 1, RouteChainId: chain.Id, CandidateId: chain.Candidates[0].Id}))
+	require.NoError(t, model.CreateRouteChainDecision(&model.RouteChainDecisionRecord{RequestId: "archive-history", ChainId: chain.Id, CandidateId: chain.Candidates[0].Id}))
 
 	// Disable the chain.
 	recorder := callMgmtHandler(t, SetRouteChainState, http.MethodPost, "/api/route-chains/1/enable",
@@ -709,6 +712,13 @@ func TestMgmtChainEnableArchiveFlows(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, stored.Archived)
 	require.False(t, stored.Enabled)
+	require.Nil(t, stored.ActiveScopeKey)
+	recorder = callMgmtHandler(t, ArchiveRouteChain, http.MethodPost, "/api/route-chains/1/archive",
+		map[string]any{"expected_version": chain.Version}, chainParams(chain.Id))
+	require.Equal(t, http.StatusConflict, recorder.Code)
+	recorder = callMgmtHandler(t, SetRouteChainState, http.MethodPost, "/api/route-chains/1/enable",
+		map[string]any{"enabled": true, "expected_version": stored.Version}, chainParams(chain.Id))
+	require.Equal(t, http.StatusConflict, recorder.Code)
 
 	// The engine keeps it inert: no enabled chain resolves.
 	resolved, err := model.GetEnabledRouteChainForModel("gpt-chain", "default")
@@ -721,11 +731,43 @@ func TestMgmtChainEnableArchiveFlows(t *testing.T) {
 	recorder = callMgmtHandler(t, UpdateRouteChain, http.MethodPut, "/api/route-chains/1", spec, chainParams(chain.Id))
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
 
+	// Same-scope creation goes through handler -> management -> repository.
+	created := apiSuccess(t, callMgmtHandler(t, CreateRouteChain, http.MethodPost, "/api/route-chains",
+		validChainSpec("gpt-chain", "default", false, candidateSpec(21, 1, nil)), nil))
+	activeId := int(created["data"].(map[string]any)["chain"].(map[string]any)["id"].(float64))
+	require.NotEqual(t, chain.Id, activeId)
+	resolved, err = model.GetEnabledRouteChainForModel("gpt-chain", "default")
+	require.NoError(t, err)
+	require.Equal(t, activeId, resolved.Id)
+	detail := apiSuccess(t, callMgmtHandler(t, GetRouteChainDetail, http.MethodGet, "/api/route-chains/1", nil, chainParams(chain.Id)))
+	archivedView := detail["data"].(map[string]any)["chain"].(map[string]any)
+	require.True(t, archivedView["archived"].(bool))
+	for _, candidate := range archivedView["candidates"].([]any) {
+		require.Equal(t, "ARCHIVED", candidate.(map[string]any)["health_summary"])
+	}
+	health := apiSuccess(t, callMgmtHandler(t, GetRouteChainHealth, http.MethodGet, "/api/route-chains/1/health", nil, chainParams(chain.Id)))
+	require.Equal(t, "ARCHIVED", health["data"].(map[string]any)["candidates"].([]any)[0].(map[string]any)["health_summary"])
+	for _, handler := range []gin.HandlerFunc{ResetRouteChainCandidateCircuit, ForceOpenRouteChainCandidateCircuit} {
+		rejected := callMgmtHandler(t, handler, http.MethodPost, "/api/route-chains/1/candidates/1/circuit", nil, candidateParams(chain.Id, chain.Candidates[0].Id))
+		require.Equal(t, false, apiBody(t, rejected)["success"])
+	}
+	attempts := apiSuccess(t, callMgmtHandler(t, GetRouteChainAttempts, http.MethodGet, "/api/route-chains/1/attempts", nil, chainParams(chain.Id)))
+	require.Len(t, attempts["data"].(map[string]any)["items"].([]any), 1)
+	decisions := apiSuccess(t, callMgmtHandler(t, GetRouteChainDecisions, http.MethodGet, "/api/route-chains/1/decisions", nil, chainParams(chain.Id)))
+	require.Len(t, decisions["data"].(map[string]any)["items"].([]any), 1)
+	recorder = callMgmtHandler(t, DeleteRouteChain, http.MethodDelete, "/api/route-chains/1", map[string]any{"expected_version": stored.Version}, chainParams(chain.Id))
+	require.Equal(t, http.StatusConflict, recorder.Code)
+	require.Equal(t, "ROUTE_CHAIN_HAS_HISTORY", apiBody(t, recorder)["code"])
+	listed := apiSuccess(t, callMgmtHandler(t, ListRouteChains, http.MethodGet, "/api/route-chains?include_archived=true", nil, nil))
+	require.Len(t, listed["data"].(map[string]any)["items"].([]any), 2)
+	listed = apiSuccess(t, callMgmtHandler(t, ListRouteChains, http.MethodGet, "/api/route-chains", nil, nil))
+	require.Len(t, listed["data"].(map[string]any)["items"].([]any), 1)
+
 	// Model+group are immutable on update.
 	chain2 := addMgmtChain(t, "gpt-two", "default", 21)
 	mutate := validChainSpec("gpt-renamed", "default", false, candidateSpec(21, 1, nil))
 	mutate["expected_version"] = chain2.Version
-	recorder = callMgmtHandler(t, UpdateRouteChain, http.MethodPut, "/api/route-chains/2", mutate, chainParams(chain2.Id))
+	recorder = callMgmtHandler(t, UpdateRouteChain, http.MethodPut, "/api/route-chains/3", mutate, chainParams(chain2.Id))
 	require.Equal(t, http.StatusBadRequest, recorder.Code)
 	require.True(t, containsCode(issueCodes(t, apiBody(t, recorder)), "route_chain.model_group_immutable"))
 }

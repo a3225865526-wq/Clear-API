@@ -1,14 +1,13 @@
 package controller
 
 import (
-	"errors"
-	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service/routechain"
+	"github.com/QuantumNous/new-api/service/routemgmt"
 
 	"github.com/gin-gonic/gin"
 )
@@ -37,15 +36,19 @@ func GetRouteChainHealth(c *gin.Context) {
 	candidates := make([]gin.H, 0, len(chain.Candidates))
 	for i := range chain.Candidates {
 		cand := &chain.Candidates[i]
-		policy, policyErr := model.ParseRouteCandidatePolicy(cand.Policy)
-		if policyErr != nil {
-			policy = nil // resolve-time validation rejects corrupt policies anyway
-		}
-		snapshot := routechain.Breaker.CandidateSnapshot(chain.Id, cand.Id, policy)
-		summary := snapshot.HealthSummary()
-		if !cand.Enabled {
-			// DISABLED is persistent configuration, not a breaker state (§六).
-			summary = "DISABLED"
+		var snapshot routechain.CircuitSnapshot
+		summary := routemgmt.HealthArchived
+		if !chain.Archived && !cand.Archived {
+			policy, policyErr := model.ParseRouteCandidatePolicy(cand.Policy)
+			if policyErr != nil {
+				policy = nil // resolve-time validation rejects corrupt policies anyway
+			}
+			snapshot = routechain.Breaker.CandidateSnapshot(chain.Id, cand.Id, policy)
+			summary = snapshot.HealthSummary()
+			if !cand.Enabled {
+				// DISABLED is persistent configuration, not a breaker state (§六).
+				summary = "DISABLED"
+			}
 		}
 		candidates = append(candidates, gin.H{
 			"id":             cand.Id,
@@ -96,8 +99,12 @@ func requireChainCandidate(c *gin.Context, chainId, candidateId int) bool {
 		common.ApiErrorMsg(c, "route chain not found")
 		return false
 	}
+	if chain.Archived {
+		common.ApiErrorMsg(c, "archived route chain is read-only")
+		return false
+	}
 	for i := range chain.Candidates {
-		if chain.Candidates[i].Id == candidateId {
+		if chain.Candidates[i].Id == candidateId && !chain.Candidates[i].Archived {
 			return true
 		}
 	}
@@ -183,16 +190,7 @@ func SetRouteChainCandidateEnabled(c *gin.Context) {
 		common.ApiErrorMsg(c, "invalid request body")
 		return
 	}
-	if err := model.SetRouteChainCandidateEnabled(chainId, candidateId, body.Enabled, body.ExpectedVersion); err != nil {
-		if errors.Is(err, model.ErrRouteChainVersionConflict) {
-			c.JSON(http.StatusConflict, gin.H{"success": false, "message": "route chain version conflict"})
-			return
-		}
-		if errors.Is(err, model.ErrRouteChainNotFound) {
-			common.ApiErrorMsg(c, "candidate not found in this chain")
-			return
-		}
-		common.ApiErrorMsg(c, "failed to update candidate")
+	if err := routemgmt.SetCandidateEnabled(chainId, candidateId, body.Enabled, body.ExpectedVersion); routeChainManagementError(c, err, nil) {
 		return
 	}
 	recordManageAudit(c, "route_chain.candidate_enable", map[string]any{

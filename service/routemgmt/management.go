@@ -383,6 +383,10 @@ func SetChainEnabled(id int, enabled bool, expectedVersion int) error {
 	return mapRepoError(model.SetRouteChainEnabled(id, enabled, expectedVersion))
 }
 
+func SetCandidateEnabled(chainId, candidateId int, enabled bool, expectedVersion int) error {
+	return mapRepoError(model.SetRouteChainCandidateEnabled(chainId, candidateId, enabled, expectedVersion))
+}
+
 // ReorderCandidates persists a new candidate order under CAS (§十八): the
 // payload order becomes descending priority; the server order is canonical
 // afterwards.

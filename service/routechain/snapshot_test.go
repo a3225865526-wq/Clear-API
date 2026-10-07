@@ -49,6 +49,20 @@ func TestResolveInertCases(t *testing.T) {
 		[]model.RouteChainCandidate{{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 1, Priority: 1, Enabled: true}})
 	require.Nil(t, Resolve(c, "gpt-x", "default"), "disabled chain must be inert")
 
+	// Archived history never shadows the new active scope, even if its enabled
+	// flag is inconsistent in imported historical data.
+	archived := &model.RouteChain{Model: "gpt-retired", Group: "default", Archived: true, Version: 2}
+	insertChain(t, db, archived, []model.RouteChainCandidate{{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 91, Priority: 1, Enabled: true}})
+	require.NoError(t, db.Model(&model.RouteChain{}).Where("id = ?", archived.Id).Update("enabled", true).Error)
+	require.Nil(t, Resolve(c, archived.Model, archived.Group))
+	active := &model.RouteChain{Model: archived.Model, Group: archived.Group, Enabled: true, Version: 1}
+	insertChain(t, db, active, []model.RouteChainCandidate{{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 92, Priority: 1, Enabled: true}})
+	resolved := Resolve(c, active.Model, active.Group)
+	require.NotNil(t, resolved)
+	require.Equal(t, active.Id, resolved.ChainId)
+	require.Len(t, resolved.Candidates, 1)
+	require.Equal(t, 92, resolved.Candidates[0].TargetId)
+
 	insertChain(t, db, &model.RouteChain{Model: "gpt-bad", Group: "default", Enabled: true, Version: 1},
 		[]model.RouteChainCandidate{{CandidateType: "magic", TargetId: 1, Priority: 1, Enabled: true}})
 	require.Nil(t, Resolve(c, "gpt-bad", "default"), "unknown candidate type must fail closed to inert")

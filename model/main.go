@@ -339,6 +339,9 @@ func migrateDB() error {
 		common.SysError("failed to migrate options primary key: " + err.Error())
 	}
 
+	if err := MigrateRouteChain(DB); err != nil {
+		return err
+	}
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},
@@ -382,8 +385,6 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&CasbinRule{},
 		&AuthzRole{},
-		&RouteChain{},
-		&RouteChainCandidate{},
 		&RouteChainRequestRecord{},
 		&RouteChainAttemptRecord{},
 		&RouteChainDecisionRecord{},
