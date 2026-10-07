@@ -2,7 +2,11 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, closed]
+  push:
+    branches:
+      - 'codex/production-cicd'
+      - 'main'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -13,10 +17,9 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend vet, build, and test
-    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    name: Backend vet, build, test, migration binaries
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       GOWORK: 'off'
 
@@ -24,8 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          repository: ${{ github.event.pull_request.base.repo.full_name }}
-          ref: ${{ github.event.action == 'closed' && github.event.pull_request.base.ref || github.ref }}
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
@@ -54,12 +56,21 @@ jobs:
         working-directory: relaykit
         run: go build ./...
 
+      - name: Build bootstrap and migration binaries
+        run: |
+          go build -o /tmp/ci-bin/production-bootstrap ./cmd/production-bootstrap
+          go build -o /tmp/ci-bin/finance-migrate ./cmd/finance-migrate
+          go build -o /tmp/ci-bin/billing-migrate ./cmd/billing-migrate
+          /tmp/ci-bin/billing-migrate 2>&1 | grep -q "No migration executed" || {
+            echo "billing-migrate binary does not honor the no-approval fail-closed contract"
+            exit 1
+          }
+
       - name: Test root and relaykit modules
         run: make test
 
   frontend:
     name: Frontend typecheck and test
-    if: github.event.action != 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -70,8 +81,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          repository: ${{ github.event.pull_request.base.repo.full_name }}
-          ref: ${{ github.event.action == 'closed' && github.event.pull_request.base.ref || github.ref }}
+          persist-credentials: false
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -86,3 +96,17 @@ jobs:
 
       - name: Test
         run: bun run test
+
+  secret-scan:
+    name: Secret scan and forbidden files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Scan tracked files for secrets and forbidden artifacts
+        run: bash scripts/ci/secret-scan.sh

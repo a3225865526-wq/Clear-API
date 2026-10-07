@@ -37,6 +37,18 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
 
+# Release provenance metadata (OCI). Empty by default; CI passes them at
+# build time. These only affect image config, never runtime behavior.
+ARG SOURCE_COMMIT=""
+ARG SOURCE_REPO=""
+ARG BUILD_TIMESTAMP=""
+ARG VERSION_LABEL=""
+
+LABEL org.opencontainers.image.revision="${SOURCE_COMMIT}" \
+      org.opencontainers.image.source="${SOURCE_REPO}" \
+      org.opencontainers.image.created="${BUILD_TIMESTAMP}" \
+      org.opencontainers.image.version="${VERSION_LABEL}"
+
 COPY --from=builder2 /build/new-api /
 COPY --from=builder2 /build/production-bootstrap /
 COPY --from=builder2 /build/finance-migrate /

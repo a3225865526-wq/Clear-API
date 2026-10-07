@@ -1,0 +1,258 @@
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GHCR_IMAGE: ghcr.io/a3225865526-wq/clearapi
+
+jobs:
+  race:
+    name: Race — billing/reservation critical packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GOWORK: 'off'
+      CGO_ENABLED: '1'
+      BOOTSTRAP_TEST_PG_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/postgres?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Create frontend embed placeholder
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Race test critical packages
+        run: go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/... ./controller/... ./cmd/production-bootstrap/...
+
+  db-matrix:
+    name: DB matrix — ${{ matrix.dialect }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dialect: sqlite
+          - dialect: mysql
+          - dialect: postgres
+
+    services:
+      mysql:
+        image: mysql:8.4.6@sha256:c296d65ee6ab3ce2f608c1d1b2bdd3c08b087a5834101d76a6db2e00875216cc
+        env:
+          MYSQL_ROOT_PASSWORD: clearapi_test
+          MYSQL_USER: clearapi
+          MYSQL_PASSWORD: clearapi_test
+          MYSQL_DATABASE: clearapi_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u clearapi -pclearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: clearapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi -d clearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GOWORK: 'off'
+      TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Create frontend embed placeholder
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Select dialect env (sqlite default; explicit DSN for mysql/postgres)
+        run: |
+          case "${{ matrix.dialect }}" in
+            sqlite)   echo 'TEST_BILLING_DIALECT=sqlite' >> "$GITHUB_ENV" ;;
+            mysql)    echo 'TEST_BILLING_DIALECT=mysql'  >> "$GITHUB_ENV"
+                      echo "TEST_BILLING_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV" ;;
+            postgres) echo 'TEST_BILLING_DIALECT=postgres' >> "$GITHUB_ENV"
+                      echo "TEST_BILLING_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV" ;;
+            *) echo "unknown dialect"; exit 1 ;;
+          esac
+
+      - name: Test billing-critical packages against ${{ matrix.dialect }}
+        run: go test -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/...
+
+  frontend-release:
+    name: Frontend production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Test
+        run: bun run test
+
+      - name: Production build
+        env:
+          VITE_REACT_APP_VERSION: candidate-${{ github.sha }}
+        run: DISABLE_ESLINT_PLUGIN='true' bun run build
+
+  docker:
+    name: Docker build, GHCR push, exact digest
+    needs: [race, db-matrix, frontend-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_digest: ${{ steps.digest.outputs.image_digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Login to GHCR (password-stdin)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build image from exact commit
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          SOURCE_REPO: https://github.com/${{ github.repository }}
+          BUILD_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
+        run: |
+          BUILD_TS="${BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+          docker build \
+            --build-arg SOURCE_COMMIT="${SOURCE_COMMIT}" \
+            --build-arg SOURCE_REPO="${SOURCE_REPO}" \
+            --build-arg BUILD_TIMESTAMP="${BUILD_TS}" \
+            --build-arg VERSION_LABEL="candidate-${GITHUB_SHA::7}" \
+            -t "$GHCR_IMAGE:sha-${GITHUB_SHA}" \
+            -t "$GHCR_IMAGE:candidate-${GITHUB_SHA::7}" \
+            .
+
+      - name: Push sha tag
+        run: docker push "$GHCR_IMAGE:sha-${GITHUB_SHA}" 2>&1 | tee /tmp/push-sha.log
+
+      - name: Push candidate tag
+        run: docker push "$GHCR_IMAGE:candidate-${GITHUB_SHA::7}" 2>&1 | tee /tmp/push-candidate.log
+
+      - name: Extract exact digest
+        id: digest
+        run: |
+          DIGEST="$(grep -oE 'digest: sha256:[a-f0-9]{64}' /tmp/push-sha.log | head -1 | cut -d' ' -f2)"
+          if [ -z "$DIGEST" ]; then
+            echo "push output did not contain a digest"
+            exit 1
+          fi
+          echo "image_digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+
+      - name: Verify digest pull and provenance labels
+        run: |
+          docker pull "$GHCR_IMAGE@$IMAGE_DIGEST"
+          REVISION="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$GHCR_IMAGE@$IMAGE_DIGEST")"
+          if [ "$REVISION" != "${GITHUB_SHA}" ]; then
+            echo "image revision label '$REVISION' does not match source commit '${GITHUB_SHA}'"
+            exit 1
+          fi
+          DOCKERFILE_HASH="$(sha256sum Dockerfile | cut -d' ' -f1)"
+          {
+            echo "## Release candidate provenance"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| source commit | ${GITHUB_SHA} |"
+            echo "| workflow run | ${GITHUB_RUN_ID} |"
+            echo "| image | ${GHCR_IMAGE} |"
+            echo "| digest | ${IMAGE_DIGEST} |"
+            echo "| Dockerfile sha256 | ${DOCKERFILE_HASH} |"
+            echo "| created | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Logout from GHCR
+        if: always()
+        run: docker logout ghcr.io

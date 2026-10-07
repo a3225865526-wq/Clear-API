@@ -1,0 +1,131 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: 'Exact image digest (sha256:<64 hex>) to deploy'
+        required: true
+        type: string
+      expected_commit:
+        description: 'Expected source commit (full 40 hex) of the image'
+        required: true
+        type: string
+      migration_compatible:
+        description: 'Is the candidate migration backward-compatible with the previous image?'
+        required: true
+        type: choice
+        default: 'false'
+        options:
+          - 'false'
+          - 'true'
+      confirmation:
+        description: 'Type DEPLOY_PRODUCTION to confirm'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Controlled production deploy (exact digest)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+
+    env:
+      PROD_SSH_HOST: ${{ vars.PROD_SSH_HOST }}
+      PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+      PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
+      PROD_SSH_ALIAS: clearapi-vps
+
+    steps:
+      - name: Checkout deploy assets
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Validate manual gate inputs
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.confirmation }}" != "DEPLOY_PRODUCTION" ]; then
+            echo "confirmation input does not match DEPLOY_PRODUCTION — refusing to deploy"
+            exit 1
+          fi
+          if [ ! "${{ inputs.expected_commit }}" =~ ^[0-9a-f]{40}$ ]; then
+            echo "expected_commit is not a full 40-hex commit SHA"
+            exit 1
+          fi
+          if [ "${{ inputs.expected_commit }}" != "${{ github.sha }}" ]; then
+            echo "expected_commit '${{ inputs.expected_commit }}' does not match the workflow's own commit '${{ github.sha }}'"
+            exit 1
+          fi
+          if [ ! "${{ inputs.image_digest }}" =~ ^sha256:[a-f0-9]{64}$ ]; then
+            echo "image_digest must be an exact 'sha256:<64 hex>' digest — tags and 'latest' are forbidden"
+            exit 1
+          fi
+          case "${{ inputs.migration_compatible }}" in
+            true|false) ;;
+            *) echo "migration_compatible must be true or false"; exit 1 ;;
+          esac
+
+      - name: Set up SSH with pinned host key
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then
+            echo "environment secrets PROD_SSH_PRIVATE_KEY / PROD_KNOWN_HOSTS are not configured"
+            exit 1
+          fi
+          if [ -z "$PROD_SSH_HOST" ] || [ -z "$PROD_SSH_USER" ]; then
+            echo "environment variables PROD_SSH_HOST / PROD_SSH_USER are not configured"
+            exit 1
+          fi
+          PORT="${PROD_SSH_PORT:-22}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/ci_known_hosts
+          chmod 0644 ~/.ssh/ci_known_hosts
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/ci_deploy_key
+          chmod 0600 ~/.ssh/ci_deploy_key
+          {
+            echo "Host ${PROD_SSH_ALIAS}"
+            echo "  HostName ${PROD_SSH_HOST}"
+            echo "  Port ${PORT}"
+            echo "  User ${PROD_SSH_USER}"
+            echo "  IdentityFile ~/.ssh/ci_deploy_key"
+            echo "  UserKnownHostsFile ~/.ssh/ci_known_hosts"
+            echo "  StrictHostKeyChecking yes"
+            echo "  IdentitiesOnly yes"
+            echo "  BatchMode yes"
+          } > ~/.ssh/config
+          chmod 0600 ~/.ssh/config
+
+      - name: Install version-matched deploy script on VPS
+        run: |
+          set -euo pipefail
+          scp scripts/production-deploy.sh \
+            "${PROD_SSH_ALIAS}:/tmp/clearapi-production-deploy.sh.${{ github.run_id }}"
+          ssh "${PROD_SSH_ALIAS}" "
+            sudo install -m 0750 /tmp/clearapi-production-deploy.sh.${{ github.run_id }} /opt/clearapi/bin/production-deploy.sh &&
+            rm -f /tmp/clearapi-production-deploy.sh.${{ github.run_id }}
+          "
+
+      - name: Run controlled deploy on VPS
+        run: |
+          ssh "${PROD_SSH_ALIAS}" \
+            "sudo /opt/clearapi/bin/production-deploy.sh \
+              --digest '${{ inputs.image_digest }}' \
+              --commit '${{ inputs.expected_commit }}' \
+              --workflow-run '${{ github.run_id }}' \
+              --migration-compatible '${{ inputs.migration_compatible }}'"
+
+      - name: Clear deploy key material
+        if: always()
+        run: rm -f ~/.ssh/ci_deploy_key ~/.ssh/ci_known_hosts ~/.ssh/config
