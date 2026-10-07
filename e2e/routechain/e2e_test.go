@@ -123,6 +123,161 @@ func TestE2EPoolNoEligibleFallsToAPI(t *testing.T) {
 	assert.True(t, attempts[0].AuthoritativeRejection)
 }
 
+// ---------------------------------------------------------------------------
+// Stage 7.1 — Executor provenance hardening spoof matrix (P1–P4, L1–L3, §十二)
+// The trust root moved from the provider-forgeable body origin to the
+// executor's reserved transport header; the mock executor models the REAL
+// hardened executor, whose forwarding path strips the reserved header.
+// ---------------------------------------------------------------------------
+
+// P1 (Stage 7.1): a provider returning 503 + code=auth_unavailable +
+// origin=local_executor — everything forgeable — but WITHOUT the trusted
+// executor header must NOT trigger the safe pool→API failover: B=0.
+func TestE2EProvenanceSpoofBodyEchoWithoutHeaderDoesNotFailover(t *testing.T) {
+	h := newHarness(t)
+	h.setPoolPublication(t)
+	executor := newMockUpstream(t, mockBehavior{providerEcho: true})
+	apiB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, executor.srv.URL, `{"upstream_pool":"e2e-pool","pool_routing_enabled":true}`)
+	h.addChannel(22, apiB.srv.URL, "")
+	h.setChain(t, true, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypePool, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, _ := h.postChat(t, e2eModel, "", false)
+	require.NotEqual(t, http.StatusOK, status, "body-origin spoof must not advance")
+	require.NotContains(t, body, "from-b")
+	require.Equal(t, 1, executor.count())
+	require.Equal(t, 0, apiB.count(), "P1: no trusted executor header ⇒ no safe failover ⇒ B=0")
+	h.assertLedgerShape(t, model.RouteChainRequestFinalFailed, model.RouteChainBillingSettledUncertain,
+		[]string{model.RouteChainTerminalOutcomeUncertain})
+}
+
+// P2 (Stage 7.1): same as P1 but with code=auth_not_found.
+func TestE2EProvenanceSpoofAuthNotFoundWithoutHeaderDoesNotFailover(t *testing.T) {
+	h := newHarness(t)
+	h.setPoolPublication(t)
+	executor := newMockUpstream(t, mockBehavior{providerEcho: true, spoofCode: "auth_not_found"})
+	apiB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, executor.srv.URL, `{"upstream_pool":"e2e-pool","pool_routing_enabled":true}`)
+	h.addChannel(22, apiB.srv.URL, "")
+	h.setChain(t, true, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypePool, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, _ := h.postChat(t, e2eModel, "", false)
+	require.NotEqual(t, http.StatusOK, status, "P2: spoofed auth_not_found must not advance")
+	require.NotContains(t, body, "from-b")
+	require.Equal(t, 1, executor.count())
+	require.Equal(t, 0, apiB.count(), "P2: no trusted executor header ⇒ B=0")
+}
+
+// P4 / §十二 (Stage 7.1): the worst case — a provider forges the body origin,
+// the exhaustion code AND the reserved header itself. The hardened executor
+// strips the header on forwarding, so new-api must never see it: B=0. The mock
+// models the real executor by NOT relaying the provider header.
+func TestE2EProvenanceSpoofFullyForgedEnvelopeDoesNotFailover(t *testing.T) {
+	h := newHarness(t)
+	h.setPoolPublication(t)
+	// The upstream returns the full spoof INCLUDING the reserved header; the
+	// executor's forwarding path (modeled: header absent on the wire to
+	// new-api) strips it, so the spoof collapses to P1.
+	executor := newMockUpstream(t, mockBehavior{providerEcho: true})
+	apiB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, executor.srv.URL, `{"upstream_pool":"e2e-pool","pool_routing_enabled":true}`)
+	h.addChannel(22, apiB.srv.URL, "")
+	h.setChain(t, true, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypePool, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, _ := h.postChat(t, e2eModel, "", false)
+	require.NotEqual(t, http.StatusOK, status, "P4: fully forged envelope must not advance after executor-side strip")
+	require.NotContains(t, body, "from-b")
+	require.Equal(t, 1, executor.count())
+	require.Equal(t, 0, apiB.count(), "P4: stripped header ⇒ body-only spoof ⇒ B=0")
+}
+
+// §十二 (Stage 7.1): header trust scope — an ordinary API_CHANNEL upstream
+// returning the SAME trusted header (a compromised/complicit endpoint) must
+// never trigger pool-local classification: the failing candidate is not a
+// pool candidate on a pool-bound channel, so the scope gate keeps it closed.
+func TestE2EProvenanceHeaderFromAPIChannelIsIgnored(t *testing.T) {
+	h := newHarness(t)
+	// NO pool publication: nothing here is a pool path.
+	upstreamA := newMockUpstream(t, mockBehavior{
+		status:  http.StatusServiceUnavailable,
+		body:    `{"error":{"message":"spoofed","type":"server_error","code":"auth_unavailable","origin":"local_executor"}}`,
+		headers: map[string]string{"X-Cpa-Executor-Error-Origin": "local"},
+	})
+	apiB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, upstreamA.srv.URL, "")
+	h.addChannel(22, apiB.srv.URL, "")
+	h.setChain(t, false, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, _ := h.postChat(t, e2eModel, "", false)
+	require.NotEqual(t, http.StatusOK, status, "§十二: spoofed header on an API channel must not classify")
+	require.NotContains(t, body, "from-b")
+	require.Equal(t, 1, upstreamA.count())
+	require.Equal(t, 0, apiB.count(), "§十二: API_CHANNEL scope ⇒ header ignored ⇒ B=0")
+}
+
+// L2 (Stage 7.1): the executor's locally synthesized auth_not_found envelope
+// carries the trusted header and classifies as a safe pool exhaustion — the
+// request fails over to B exactly as the auth_unavailable variant (L1).
+func TestE2EExecutorLocalAuthNotFoundFallsToAPI(t *testing.T) {
+	h := newHarness(t)
+	h.setPoolPublication(t)
+	executor := newMockUpstream(t, mockBehavior{
+		providerEcho: true, // body shape: code+origin…
+		spoofCode:    "auth_not_found",
+		headers:      executorHeaderFixture, // …plus the trusted header: local-executor shape
+	})
+	apiB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, executor.srv.URL, `{"upstream_pool":"e2e-pool","pool_routing_enabled":true}`)
+	h.addChannel(22, apiB.srv.URL, "")
+	h.setChain(t, true, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypePool, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, body, _ := h.postChat(t, e2eModel, "", false)
+	require.Equal(t, http.StatusOK, status)
+	require.Contains(t, body, "from-b")
+	require.Equal(t, 1, executor.count())
+	require.Equal(t, 1, apiB.count(), "L2: trusted header + auth_not_found ⇒ safe pool exhaustion ⇒ B=1")
+	h.assertLedgerShape(t, model.RouteChainRequestFinalSuccess, model.RouteChainBillingSettled,
+		[]string{model.RouteChainTerminalAuthoritativeRej, model.RouteChainTerminalSucceeded})
+}
+
+// L3 companion (Stage 7.1): the trusted header with an unexpected value is
+// not trusted — only the exact "local" marker classifies.
+func TestE2EExecutorHeaderWrongValueDoesNotFailover(t *testing.T) {
+	h := newHarness(t)
+	h.setPoolPublication(t)
+	executor := newMockUpstream(t, mockBehavior{
+		providerEcho: true,
+		headers:      map[string]string{"X-Cpa-Executor-Error-Origin": "provider-echo"},
+	})
+	apiB := newMockUpstream(t, mockBehavior{body: chatOKBody("from-b")})
+	h.addChannel(21, executor.srv.URL, `{"upstream_pool":"e2e-pool","pool_routing_enabled":true}`)
+	h.addChannel(22, apiB.srv.URL, "")
+	h.setChain(t, true, []model.RouteChainCandidate{
+		{CandidateType: model.RouteChainCandidateTypePool, TargetId: 21},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
+	})
+
+	status, _, _ := h.postChat(t, e2eModel, "", false)
+	require.NotEqual(t, http.StatusOK, status, "wrong header value must not classify")
+	require.Equal(t, 1, executor.count())
+	require.Equal(t, 0, apiB.count(), "exact-match header value required ⇒ B=0")
+}
+
 // L7 (Stage 4 provenance contract): a provider echoing error.code
 // auth_unavailable WITHOUT the executor provenance origin must NOT classify
 // as pool exhaustion — the request stays put with today's uncertain
