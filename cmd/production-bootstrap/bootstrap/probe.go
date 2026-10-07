@@ -29,6 +29,7 @@ type Snapshot struct {
 
 	// Read-only schema readiness probes (mirrors what the gate inspects).
 	ReservationsReady    bool
+	AuthSnapshotsReady   bool
 	OutboxReady          bool
 	ReconciliationReady  bool
 	SettlementReady      bool
@@ -89,6 +90,7 @@ func TakeSnapshot() *Snapshot {
 	}
 
 	snapshot.ReservationsReady = probe(func() error { return model.BillingReservationsReady(db) })
+	snapshot.AuthSnapshotsReady = probe(func() error { return model.BillingAuthSnapshotsReady(db) })
 	snapshot.OutboxReady = probe(func() error { return model.BillingCompletionOutboxReady(db, model.LOG_DB) })
 	snapshot.ReconciliationReady = probe(func() error { return model.BillingReconciliationReady(db) })
 	snapshot.SettlementReady = probe(func() error { return model.TaskSettlementReady(db) })

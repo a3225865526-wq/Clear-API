@@ -554,6 +554,7 @@ type billingStep struct {
 func billingMigrationSteps() []billingStep {
 	return []billingStep{
 		{"billing-reservations-v1", func() error { return model.MigrateBillingReservations(model.DB) }},
+		{"billing-auth-snapshots-v1", func() error { return model.MigrateBillingAuthSnapshots(model.DB) }},
 		{"billing-reconciliation-v1", func() error { return model.MigrateBillingReconciliation(model.DB) }},
 		{"task-settlement-v1", func() error { return model.MigrateTaskSettlements(model.DB) }},
 		{"task-settlement-logs-v1", func() error { return model.MigrateTaskSettlementLogs(model.LOG_DB) }},

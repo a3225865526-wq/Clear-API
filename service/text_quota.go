@@ -437,6 +437,7 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	var tieredResult *billingexpr.TieredResult
 	var tieredTokens billingexpr.TokenParams
 	tieredBillingApplied := false
+	var tieredUsedVars map[string]bool
 	snap := relayInfo.TieredBillingSnapshot
 	// Providers normally estimate missing usage before settlement. Preserve the
 	// same prompt estimate when a fixed-price expression reaches us without it;
@@ -445,7 +446,6 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		billingUsage = &dto.Usage{PromptTokens: summary.PromptTokens, CompletionTokens: summary.CompletionTokens, TotalTokens: summary.TotalTokens}
 	}
 	if billingUsage != nil {
-		var tieredUsedVars map[string]bool
 		if snap := relayInfo.TieredBillingSnapshot; snap != nil {
 			tieredUsedVars = billingexpr.UsedVarsByHash(snap.ExprString, snap.ExprHash)
 		}
@@ -458,6 +458,29 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			summary.FixedPriceBilling = isFixedPriceSettlement(relayInfo, tieredRes)
 			if summary.FixedPriceBilling {
 				summary.AudioInputPrice = 0
+			}
+		}
+	}
+
+	// Reservation hardening: usage that escaped the approved hidden domain is
+	// an anomaly. While the target still fits the approved reservation, retain
+	// the reservation for review instead of treating it as ordinary income;
+	// targets beyond the reservation keep the existing needs_review boundary.
+	var hardeningAnomaly *UsageAnomaly
+	hardeningRetained := false
+	if billingUsage != nil {
+		if session, ok := relayInfo.Billing.(*BillingSession); ok && session.Durable() && summary.hasBillableUsage() {
+			anomaly := EvaluateTextUsageAnomaly(relayInfo, billingUsage, summary.IsClaudeUsageSemantic, tieredUsedVars)
+			if anomaly.Anomaly && summary.Quota <= session.GetPreConsumedQuota() {
+				if err := model.MarkBillingReviewMarker(relayInfo.RequestId, anomaly.Reason); err == nil {
+					summary.Quota = session.GetPreConsumedQuota()
+					hardeningRetained = true
+				} else {
+					logger.LogError(ctx, "reserve anomaly review marker could not be persisted: "+err.Error())
+				}
+			}
+			if anomaly.Anomaly || anomaly.ProfileSource != "" {
+				hardeningAnomaly = &anomaly
 			}
 		}
 	}
@@ -502,6 +525,11 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			financeStatus = "settlement_unknown"
 		}
 	}
+	if hardeningRetained {
+		// A retained reservation is not confirmed consumption: the finance
+		// processor parks it instead of allocating income.
+		financeStatus = "retained_pending_review"
+	}
 	CaptureFinanceBilling(relayInfo, "text_settlement", financeCharged, relayInfo.BillingSource, financeStatus)
 	if summary.hasBillableUsage() {
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
@@ -543,6 +571,13 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		other.SetAdmin("settlement_failed", true)
 		other.SetAdmin("expected_quota", expectedQuota)
 		other.SetAdmin("charged_quota", summary.Quota)
+	}
+	if hardeningAnomaly != nil {
+		other.SetAdmin("reserve_anomaly", hardeningAnomaly)
+		if hardeningRetained {
+			other.SetAdmin("usage_retained_for_review", true)
+			other.SetAdmin("expected_quota", expectedQuota)
+		}
 	}
 	if common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens) {
 		other.SetPublic("usage_estimated", true)

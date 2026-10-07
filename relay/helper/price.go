@@ -651,8 +651,6 @@ func requestToolBudget(info *relaycommon.RelayInfo) (float64, error) {
 	return quota, nil
 }
 
-// PrepareOutboundTextBudget repeats reservation after conversion, injected
-// prompts and administrator overrides, using the frozen pricing snapshot.
 func RequiresOutboundTextBudget(info *relaycommon.RelayInfo) bool {
 	if info != nil && (strings.Contains(info.RequestURLPath, ":embedContent") || strings.Contains(info.RequestURLPath, ":batchEmbedContents")) {
 		return false
@@ -660,6 +658,11 @@ func RequiresOutboundTextBudget(info *relaycommon.RelayInfo) bool {
 	return info != nil && info.Request != nil && !info.IsChannelTest && !info.PriceData.FreeModel && (info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions || info.RelayMode == relayconstant.RelayModeResponses || info.RelayFormat == types.RelayFormatClaude || info.RelayFormat == types.RelayFormatGemini)
 }
 
+// PrepareOutboundTextBudget repeats reservation after conversion, injected
+// prompts and administrator overrides, using the frozen pricing snapshot.
+// With reservation hardening enforced it resolves the approved hidden usage
+// envelope for the dispatch candidate and rejects before dispatch when the
+// required reservation is unobtainable — it never clamps and sends.
 func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body []byte) error {
 	if !RequiresOutboundTextBudget(info) {
 		return nil
@@ -691,8 +694,8 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 	}
 	price := info.PriceData
 	quota := 0.0
+	images := 1
 	if snap := info.TieredBillingSnapshot; snap != nil {
-		images := 1
 		if snap.EstimatedImageCount != nil {
 			images = *snap.EstimatedImageCount
 		}
@@ -713,12 +716,47 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 		return err
 	}
 	quota = max(float64(price.QuotaToPreConsume), quota+toolQuota*price.GroupRatioInfo.GroupRatio)
-	target, err := common.QuotaFromFloatStrict(math.Ceil(quota))
+	legacyTarget, err := common.QuotaFromFloatStrict(math.Ceil(quota))
 	if err != nil {
 		return err
 	}
 	if info.Billing == nil {
 		return fmt.Errorf("paid outbound request has no billing reservation")
 	}
-	return info.Billing.Reserve(target)
+
+	if hardening := operation_setting.ReservationHardeningMode(); hardening != operation_setting.ReserveModeOff {
+		if session, ok := info.Billing.(*service.BillingSession); ok && session.Durable() {
+			estimate, estimateErr := service.EstimateDispatchReservation(info, prompt, output, images, toolQuota)
+			switch hardening {
+			case operation_setting.ReserveModeEnforce:
+				if estimateErr != nil {
+					return fmt.Errorf("billing admission rejected before dispatch: %w", estimateErr)
+				}
+				target := max(legacyTarget, estimate.RequiredQuota)
+				if target > estimate.CapQuota {
+					return fmt.Errorf("billing admission rejected before dispatch: required reservation %d exceeds authorization cap %d (profile %s)", target, estimate.CapQuota, estimate.ProfileSource)
+				}
+				estimate.ReservedQuota = target
+				session.SetDispatchAuth(estimate.ToAuthSnapshot(info.RequestId))
+				if err := info.Billing.Reserve(target); err != nil {
+					return fmt.Errorf("billing admission reservation failed before dispatch: %w", err)
+				}
+				if err := session.PersistDispatchAuth(); err != nil {
+					return fmt.Errorf("billing authorization snapshot could not be persisted: %w", err)
+				}
+				return nil
+			case operation_setting.ReserveModeMonitor:
+				if estimateErr != nil {
+					logger.LogWarn(c, "reserve hardening monitor: dispatch would be rejected: "+estimateErr.Error())
+				} else {
+					estimate.ReservedQuota = max(legacyTarget, estimate.RequiredQuota)
+					wouldReject := estimate.ReservedQuota > estimate.CapQuota
+					logger.LogInfo(c, fmt.Sprintf("reserve hardening monitor: profile=%s required=%d cap=%d current=%d would_reject=%t",
+						estimate.ProfileSource, estimate.ReservedQuota, estimate.CapQuota, info.Billing.GetPreConsumedQuota(), wouldReject))
+					session.SetDispatchAuth(estimate.ToAuthSnapshot(info.RequestId))
+				}
+			}
+		}
+	}
+	return info.Billing.Reserve(legacyTarget)
 }

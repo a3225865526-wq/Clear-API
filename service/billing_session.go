@@ -42,6 +42,34 @@ type BillingSession struct {
 	mu               sync.Mutex
 	codexFinalized   bool
 	completionMeter  *dto.CodexMetering
+	dispatchAuth     *model.BillingAuthSnapshot // 发送前冻结的授权快照（hardening）
+}
+
+// Durable reports whether this session settles through the durable wallet
+// reservation ledger. Reservation hardening only admits durable sessions.
+func (s *BillingSession) Durable() bool {
+	return s.durable
+}
+
+// SetDispatchAuth freezes the dispatch-time authorization estimate. The next
+// Reserve raise persists it in the same transaction; when no raise is needed
+// PersistDispatchAuth writes it before the request is sent.
+func (s *BillingSession) SetDispatchAuth(snapshot *model.BillingAuthSnapshot) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.dispatchAuth = snapshot
+}
+
+// PersistDispatchAuth durably records the frozen authorization facts.
+func (s *BillingSession) PersistDispatchAuth() error {
+	s.mu.Lock()
+	snapshot := s.dispatchAuth
+	s.mu.Unlock()
+	if snapshot == nil {
+		return nil
+	}
+	snapshot.ReservedQuota = s.preConsumedQuota
+	return model.UpsertBillingAuthSnapshot(snapshot)
 }
 
 // SettleUncertain retains the approved charge while durably flagging missing
@@ -264,7 +292,7 @@ func (s *BillingSession) Reserve(targetQuota int) error {
 		if BillingProtectionEnabled() {
 			return errors.New("protected request cannot exceed its frozen reservation")
 		}
-		if err := model.RaiseBillingReservation(s.relayInfo.RequestId, targetQuota); err != nil {
+		if err := model.RaiseBillingReservationWithAuth(s.relayInfo.RequestId, targetQuota, s.dispatchAuth); err != nil {
 			return err
 		}
 		s.preConsumedQuota = targetQuota

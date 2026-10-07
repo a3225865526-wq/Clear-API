@@ -7,6 +7,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 )
 
 // Protection is opt-in and never migrates a running database automatically.
@@ -25,6 +26,13 @@ func ValidateBillingProtection() error {
 	}
 	if model.BillingOutboxEnabled() {
 		if err := model.BillingCompletionOutboxReady(model.DB, model.LOG_DB); err != nil {
+			return err
+		}
+	}
+	// Enforce-mode reservation hardening guarantees a durable authorization
+	// snapshot for every dispatch; a missing additive schema fails closed.
+	if operation_setting.ReservationHardeningMode() == operation_setting.ReserveModeEnforce {
+		if err := model.BillingAuthSnapshotsReady(model.DB); err != nil {
 			return err
 		}
 	}
