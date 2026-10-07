@@ -93,3 +93,18 @@ func CanFailover(props RequestProperties, policy *model.RouteCandidatePolicy, ev
 		return blocked("unknown_outcome")
 	}
 }
+
+// ShouldRefundZeroWork is independent of candidate budget and failover policy.
+// Usage availability and refund eligibility are separate dimensions.
+func ShouldRefundZeroWork(evidence Evidence, outcome Outcome) bool {
+	if !evidence.zeroWork() {
+		return false
+	}
+	switch outcome {
+	case OutcomePoolNoEligibleAccount:
+		return evidence.HTTPStatus == 503 && evidence.ExecutorProvenance && IsExecutorPoolExhaustionCode(evidence.UpstreamErrorCode)
+	case OutcomePreDispatchUnavailable, OutcomeRequestInvalid:
+		return !evidence.RequestWritten
+	}
+	return false
+}

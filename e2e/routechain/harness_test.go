@@ -17,6 +17,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -258,6 +259,13 @@ func newHarness(t *testing.T) *harness {
 	t.Setenv("CLEARAPI_FINANCE_OWNER_USER_ID", "1")
 	t.Setenv("CLEARAPI_DURABLE_WALLET", "true")
 	t.Setenv("CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE", "true")
+	// Legacy Stage 7.2 cases run in an isolated test subprocess, so finance
+	// globals never change underneath the existing durable E2E cases.
+	if os.Getenv("STAGE72_LEGACY_CHILD") == "1" {
+		t.Setenv("CLEARAPI_FINANCE_ENABLED", "false")
+		t.Setenv("CLEARAPI_DURABLE_WALLET", "false")
+		t.Setenv("CLEARAPI_BILLING_PROTECTION", "false")
+	}
 	// Finance config globals are identical for every harness; initialize them
 	// once per process. Re-initializing while a previous harness's in-flight
 	// settlement goroutine still reads them is a data race (found by -race).

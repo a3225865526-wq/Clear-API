@@ -137,9 +137,9 @@ const (
 )
 
 // ResetPerAttemptFlags clears the cross-attempt dispatch/uncertainty residue
-// between chain candidates. This is safe ONLY on the advance path of the
-// centralized policy: an attempt the policy advanced past was classified as
-// provably zero-work, so hiding its flags from the request-end billing read
+// between chain candidates or before the final zero-work refund. This is safe
+// ONLY when ShouldRefundZeroWork proves the attempt did no work,
+// so hiding its flags from the request-end billing read
 // can never mask uncertain consumption. Chain mode only — legacy requests
 // never call this.
 func ResetPerAttemptFlags(c *gin.Context) {
