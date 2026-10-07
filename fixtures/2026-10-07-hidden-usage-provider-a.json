@@ -1,0 +1,17 @@
+{
+  "fixture": "hidden-usage-provider-a",
+  "kind": "design-fixture",
+  "source": "2026-10-07 production real-provider billing acceptance evidence, desensitized per H1 spec section 13",
+  "provenance_limits": "V=16 is a reconstruction test input; historical reserved/target are frozen evidence; no real request ids, user identifiers, credentials or prompt content",
+  "channel": {"id": 1, "host_hint": "historical reseller A", "model": "gpt-6-luna"},
+  "visible_request": {"kind": "tiny text", "max_tokens": 30, "stream": false, "reconstruction": {"visible_prompt_tokens": 16, "pre_consume_multiplier": 1, "output_budget": 30, "group_ratio": 1.0, "quota_per_unit": 500000}},
+  "provider_usage": {"prompt_tokens": 4396, "prompt_tokens_details": {"cached_tokens": 3840}, "completion_tokens": 5},
+  "pricing": {
+    "mode": "tiered_expr",
+    "tier_boundary_len": 272000,
+    "tier1": {"input": 0.02, "output": 0.10, "cache_read": 0.002, "cache_write": 0.025, "cache_write_1h": 0.025},
+    "tier2": {"input": 0.04, "output": 0.15, "cache_read": 0.04, "cache_write": 0.05, "cache_write_1h": 0.05}
+  },
+  "historical_outcome": {"reserved": 4, "target": 10, "state": "needs_review", "reservation_id_hint": "id=1"},
+  "h2_expected": {"cold_reserve": 52, "warm_reserve": 14, "target": 10, "cold_reserve_over_target": 5.2}
+}

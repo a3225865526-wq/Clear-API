@@ -1,0 +1,5 @@
+go test fuzz v1
+string("10000000000000000+1+1")
+uint64(4424)
+uint64(3888)
+uint64(96)
