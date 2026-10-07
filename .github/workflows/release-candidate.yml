@@ -230,6 +230,7 @@ jobs:
           fi
           echo "image_digest=$DIGEST" >> "$GITHUB_OUTPUT"
           echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+          echo "image digest: $DIGEST"
 
       - name: Verify digest pull and provenance labels
         run: |
