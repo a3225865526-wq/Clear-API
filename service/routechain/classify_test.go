@@ -62,13 +62,28 @@ func TestExtractUpstreamErrorCode(t *testing.T) {
 }
 
 func TestHasExecutorProvenance(t *testing.T) {
-	require.False(t, HasExecutorProvenance(nil))
-	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503}))
-	// Provenance contract: exact origin match only, never inferred.
-	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Code: "auth_unavailable"}}))
-	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Origin: "executor"}}))
-	require.False(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Origin: "local_executor_upstream"}}))
-	require.True(t, HasExecutorProvenance(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Code: "auth_unavailable", Origin: ExecutorProvenanceOrigin}}))
+	// Stage 7.1: the trust root is the executor's reserved transport header.
+	// The body-level origin is advisory — a provider can echo it verbatim.
+	bodySpoof := types.OpenAIError{Code: "auth_unavailable", Origin: ExecutorProvenanceOrigin}
+	// Body origin alone (old executor shape, or provider echo relayed by a
+	// pre-hardening executor) never proves provenance.
+	require.False(t, HasExecutorProvenance(withExecutorOrigin(&types.NewAPIError{StatusCode: 503, RelayError: bodySpoof}, "")))
+	// Exact header match only, never inferred from a near-miss value.
+	require.False(t, HasExecutorProvenance(withExecutorOrigin(&types.NewAPIError{StatusCode: 503, RelayError: bodySpoof}, "executor")))
+	require.False(t, HasExecutorProvenance(withExecutorOrigin(&types.NewAPIError{StatusCode: 503, RelayError: bodySpoof}, "local ")))
+	// Trusted header present, body carries no origin (header is the root).
+	require.True(t, HasExecutorProvenance(withExecutorOrigin(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Code: "auth_unavailable"}}, types.ExecutorErrorOriginLocal)))
+	// Trusted header present, body origin agrees (normal Stage 7.1 envelope).
+	require.True(t, HasExecutorProvenance(withExecutorOrigin(&types.NewAPIError{StatusCode: 503, RelayError: bodySpoof}, types.ExecutorErrorOriginLocal)))
+	// Header present but the body origin disagrees — spoof-shaped envelope.
+	require.False(t, HasExecutorProvenance(withExecutorOrigin(&types.NewAPIError{StatusCode: 503, RelayError: types.OpenAIError{Code: "auth_unavailable", Origin: "provider"}}, types.ExecutorErrorOriginLocal)))
+}
+
+// withExecutorOrigin builds a NewAPIError carrying a captured provenance
+// header value, mirroring RelayErrorHandler's capture.
+func withExecutorOrigin(err *types.NewAPIError, origin string) *types.NewAPIError {
+	types.WithExecutorErrorOrigin(origin)(err)
+	return err
 }
 
 func TestExecutorPoolExhaustionCodesExactMatch(t *testing.T) {

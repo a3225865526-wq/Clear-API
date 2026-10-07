@@ -19,6 +19,30 @@ import (
 // orchestrate, this package decides).
 type SetupChannelFunc func(c *gin.Context, channel *model.Channel, modelName string) *types.NewAPIError
 
+// PoolChannelProvenanceScopeKey records on the request context that the
+// currently bound channel is pool-bound (Stage 7.1 provenance scope).
+const PoolChannelProvenanceScopeKey = "route_chain_pool_provenance_scope"
+
+// SetPoolProvenanceScope marks whether the last bound attempt ran on a
+// pool-bound executor channel. BindCandidate sets it from the bound channel;
+// the decision-matrix test sets it explicitly to model the real path.
+func SetPoolProvenanceScope(c *gin.Context, poolBound bool) {
+	if c == nil {
+		return
+	}
+	c.Set(PoolChannelProvenanceScopeKey, poolBound)
+}
+
+// PoolProvenanceScopeFrom reports whether the last bound attempt ran on a
+// pool-bound executor channel. Only then may the executor provenance header
+// classify a pool-exhaustion outcome.
+func PoolProvenanceScopeFrom(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	return c.GetBool(PoolChannelProvenanceScopeKey)
+}
+
 // ChainFilters strips the model_source filter: in chain mode source
 // compatibility is owned by the candidate-type check (R28) plus the
 // per-candidate STEP-4 admission gates, so the blanket isolation filter must
@@ -83,6 +107,12 @@ func (s *RequestState) BindCandidate(c *gin.Context, setup SetupChannelFunc, gro
 			s.MarkSkipped(c, index, "admission_failed:"+setupErr.Error())
 			continue
 		}
+		// Stage 7.1 provenance scope: the executor provenance header is only
+		// trusted on the pool-executor path. Record whether the bound channel
+		// is pool-bound (executor-authority match) so evidence assembly can
+		// scope the pool-exhaustion classification; an API_CHANNEL upstream
+		// returning a spoofed header never enters the trust scope.
+		SetPoolProvenanceScope(c, channel.PoolChannelBound())
 		if common.RouteCircuitBreakerEnabled() {
 			allowed, reason, probeHeld := Breaker.AllowDispatch(c, s.Snapshot.ChainId, candidate.Id, candidate.Policy)
 			if !allowed {
