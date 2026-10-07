@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -65,6 +65,10 @@ jobs:
           }
 
       - name: Test root and relaykit modules (baseline-aware)
+        # -p=2: the 2-vCPU runner starves SQLite-backed concurrency tests
+        # when every package runs in parallel (SQLITE_BUSY flakes).
+        env:
+          GOFLAGS: -p=2
         run: bash scripts/ci/go-test-baseline.sh make test
 
   frontend:

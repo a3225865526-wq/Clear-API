@@ -59,6 +59,8 @@ jobs:
           touch web/dist/index.html
 
       - name: Race test critical packages (baseline-aware)
+        env:
+          GOFLAGS: -p=2
         run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/... ./controller/... ./cmd/production-bootstrap/...
 
   db-matrix:
