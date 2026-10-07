@@ -49,18 +49,34 @@ var financeOnce sync.Once
 
 // mockBehavior scripts one upstream response.
 type mockBehavior struct {
-	status        int           // HTTP status (default 200)
-	contentType   string        // default application/json
-	body          string        // non-stream body (default empty JSON ok)
-	sse           []string      // when set: 200 SSE with these chunks then [DONE]
-	delay         time.Duration // delay before responding
-	disconnect    bool          // accept request, close connection without response
-	cutAfterSSE   bool          // write SSE chunks, then cut mid-stream (12)
-	hijackClose   bool          // raw hijack + immediate close (post-dispatch cut)
-	poolExhausted bool          // executor envelope 503 auth_unavailable with trusted provenance
-	unprovened    bool          // provider echo: 503 auth_unavailable WITHOUT executor provenance (L7)
-	retryAfter    string        // Retry-After header on a 429 response (Stage 5)
+	status        int               // HTTP status (default 200)
+	contentType   string            // default application/json
+	body          string            // non-stream body (default empty JSON ok)
+	sse           []string          // when set: 200 SSE with these chunks then [DONE]
+	delay         time.Duration     // delay before responding
+	disconnect    bool              // accept request, close connection without response
+	cutAfterSSE   bool              // write SSE chunks, then cut mid-stream (12)
+	hijackClose   bool              // raw hijack + immediate close (post-dispatch cut)
+	poolExhausted bool              // Stage 7.1 L1 shape: 503 auth_unavailable + body origin + trusted executor header
+	unprovened    bool              // provider echo: 503 auth_unavailable WITHOUT provenance of any kind (L7)
+	providerEcho  bool              // Stage 7.1 P1/P2 shape: provider echoes 503 + exhaustion code + body origin, but no trusted header
+	spoofCode     string            // error.code for the providerEcho fixture (default auth_unavailable)
+	retryAfter    string            // Retry-After header on a 429 response (Stage 5)
+	headers       map[string]string // extra response headers (e.g. a spoofed reserved header)
 }
+
+// applyExtraHeaders writes behavior.headers onto the response - used to model
+// an upstream that returns arbitrary headers (including a spoofed reserved
+// header that a real hardened executor would strip).
+func (b *mockBehavior) applyExtraHeaders(w http.ResponseWriter) {
+	for k, v := range b.headers {
+		w.Header().Set(k, v)
+	}
+}
+
+// executorHeaderFixture is what the REAL hardened executor puts on its locally
+// synthesized exhaustion envelopes (Stage 7.1 contract).
+var executorHeaderFixture = map[string]string{"X-Cpa-Executor-Error-Origin": "local"}
 
 type mockRecord struct {
 	path     string
@@ -112,6 +128,7 @@ func (m *mockUpstream) handler(w http.ResponseWriter, r *http.Request) {
 	}
 	m.mu.Unlock()
 
+	behavior.applyExtraHeaders(w)
 	if behavior.delay > 0 {
 		time.Sleep(behavior.delay)
 	}
@@ -132,8 +149,24 @@ func (m *mockUpstream) handler(w http.ResponseWriter, r *http.Request) {
 	}
 	if behavior.poolExhausted {
 		w.Header().Set("Content-Type", "application/json")
+		for k, v := range executorHeaderFixture {
+			w.Header().Set(k, v)
+		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte(`{"error":{"message":"auth_unavailable: no auth available","type":"server_error","code":"auth_unavailable","origin":"local_executor","retryable":true}}`))
+		return
+	}
+	if behavior.providerEcho {
+		// Stage 7.1 P1/P2 shape: a provider echoing BOTH the exhaustion code
+		// AND the body origin — everything forgeable — but (because the real
+		// executor strips it) never the trusted transport header.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		code := behavior.spoofCode
+		if code == "" {
+			code = "auth_unavailable"
+		}
+		_, _ = w.Write([]byte(`{"error":{"message":"auth_unavailable: no auth available","type":"server_error","code":"` + code + `","origin":"local_executor","retryable":true}}`))
 		return
 	}
 	if behavior.unprovened {

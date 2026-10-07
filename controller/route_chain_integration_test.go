@@ -144,14 +144,23 @@ func TestChainRetryDecisionMatrix(t *testing.T) {
 		ctx.Set("route_chain_request_state", state)
 		return state
 	}
-	// provenance marks executor-synthesized envelopes (Stage 4 contract);
-	// pool exhaustion classification requires code + origin together.
+	// Stage 7.1 provenance: the trust root is the executor's reserved
+	// transport header captured by RelayErrorHandler; the body origin is
+	// advisory. Pool exhaustion classification additionally requires the
+	// failing attempt to sit on a pool-bound executor channel — the matrix
+	// models that with the poolScope column (BindCandidate sets the flag from
+	// the bound channel on the real path).
 	openAIError := func(status int, code string) *types.NewAPIError {
+		trusted := code == "auth_unavailable" || code == "auth_not_found"
 		origin := ""
-		if code == "auth_unavailable" || code == "auth_not_found" {
+		if trusted {
 			origin = routechain.ExecutorProvenanceOrigin
 		}
-		return types.WithOpenAIError(types.OpenAIError{Message: "upstream", Type: "server_error", Code: code, Origin: origin}, status)
+		err := types.WithOpenAIError(types.OpenAIError{Message: "upstream", Type: "server_error", Code: code, Origin: origin}, status)
+		if trusted {
+			types.WithExecutorErrorOrigin(types.ExecutorErrorOriginLocal)(err)
+		}
+		return err
 	}
 
 	cases := []struct {
@@ -163,30 +172,33 @@ func TestChainRetryDecisionMatrix(t *testing.T) {
 		policy         *model.RouteCandidatePolicy
 		status         int
 		code           string
+		poolScope      bool
 		wantAction     string
 		wantReason     string
 	}{
-		{"pre-dispatch 5xx advances", false, false, false, false, nil, 500, "internal_server_error", "retry", "pre_dispatch_failure"},
-		{"post-write transport failure stops", true, false, false, false, nil, 500, "internal_server_error", "stop", "upstream_outcome_uncertain_no_replay"},
-		{"pool structured exhaustion advances", true, false, false, false, nil, 503, "auth_unavailable", "retry", "pool_no_eligible_account"},
-		{"pool auth_not_found advances", true, false, false, false, nil, 503, "auth_not_found", "retry", "pool_no_eligible_account"},
-		{"exhaustion echo without provenance stops", true, false, false, false, nil, 503, "model_not_found", "stop", "upstream_outcome_uncertain_no_replay"},
-		{"ordinary upstream 503 stops", true, false, false, false, nil, 503, "internal_server_error", "stop", "upstream_outcome_uncertain_no_replay"},
-		{"401 explicit no-work advances", true, false, false, false, nil, 401, "invalid_api_key", "retry", "authoritative_rejection_no_work"},
-		{"403 explicit no-work advances", true, false, false, false, nil, 403, "insufficient_quota", "retry", "authoritative_rejection_no_work"},
-		{"404 default policy advances", true, false, false, false, nil, 404, "model_not_found", "retry", "authoritative_rejection_no_work"},
-		{"429 default policy stops", true, false, false, false, nil, 429, "rate_limit_exceeded", "stop", "failover_on_429_disabled"},
-		{"429 with policy on advances", true, false, false, false, &model.RouteCandidatePolicy{Failure: &model.RouteFailurePolicy{FailoverOn429: boolPtr(true)}}, 429, "rate_limit_exceeded", "retry", "rate_limit_rejection_no_work"},
-		{"404 with policy off stops", true, false, false, false, &model.RouteCandidatePolicy{Failure: &model.RouteFailurePolicy{FailoverOn404: boolPtr(false)}}, 404, "model_not_found", "stop", "failover_on_404_disabled"},
-		{"client output locks route", true, false, true, false, nil, 500, "internal_server_error", "stop", "route_locked_after_client_output"},
-		{"tool chain request never advances", false, false, false, true, nil, 500, "internal_server_error", "stop", "tool_chain_not_idempotent"},
-		{"usage uncertainty stops", true, true, false, false, nil, 500, "internal_server_error", "stop", "usage_observed_no_replay"},
+		{"pre-dispatch 5xx advances", false, false, false, false, nil, 500, "internal_server_error", false, "retry", "pre_dispatch_failure"},
+		{"post-write transport failure stops", true, false, false, false, nil, 500, "internal_server_error", false, "stop", "upstream_outcome_uncertain_no_replay"},
+		{"pool structured exhaustion advances", true, false, false, false, nil, 503, "auth_unavailable", true, "retry", "pool_no_eligible_account"},
+		{"pool auth_not_found advances", true, false, false, false, nil, 503, "auth_not_found", true, "retry", "pool_no_eligible_account"},
+		{"exhaustion code without pool scope stops", true, false, false, false, nil, 503, "auth_unavailable", false, "stop", "upstream_outcome_uncertain_no_replay"},
+		{"exhaustion echo without provenance stops", true, false, false, false, nil, 503, "model_not_found", true, "stop", "upstream_outcome_uncertain_no_replay"},
+		{"ordinary upstream 503 stops", true, false, false, false, nil, 503, "internal_server_error", true, "stop", "upstream_outcome_uncertain_no_replay"},
+		{"401 explicit no-work advances", true, false, false, false, nil, 401, "invalid_api_key", false, "retry", "authoritative_rejection_no_work"},
+		{"403 explicit no-work advances", true, false, false, false, nil, 403, "insufficient_quota", false, "retry", "authoritative_rejection_no_work"},
+		{"404 default policy advances", true, false, false, false, nil, 404, "model_not_found", false, "retry", "authoritative_rejection_no_work"},
+		{"429 default policy stops", true, false, false, false, nil, 429, "rate_limit_exceeded", false, "stop", "failover_on_429_disabled"},
+		{"429 with policy on advances", true, false, false, false, &model.RouteCandidatePolicy{Failure: &model.RouteFailurePolicy{FailoverOn429: boolPtr(true)}}, 429, "rate_limit_exceeded", false, "retry", "rate_limit_rejection_no_work"},
+		{"404 with policy off stops", true, false, false, false, &model.RouteCandidatePolicy{Failure: &model.RouteFailurePolicy{FailoverOn404: boolPtr(false)}}, 404, "model_not_found", false, "stop", "failover_on_404_disabled"},
+		{"client output locks route", true, false, true, false, nil, 500, "internal_server_error", false, "stop", "route_locked_after_client_output"},
+		{"tool chain request never advances", false, false, false, true, nil, 500, "internal_server_error", false, "stop", "tool_chain_not_idempotent"},
+		{"usage uncertainty stops", true, true, false, false, nil, 500, "internal_server_error", false, "stop", "usage_observed_no_replay"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newChainTestEnv(t)
 			state := baseState(t, env.ctx, tc.policy)
 			state.MarkAttempt(env.ctx, 0)
+			routechain.SetPoolProvenanceScope(env.ctx, tc.poolScope)
 			env.ctx.Set("upstream_attempted", tc.attempted)
 			env.ctx.Set("upstream_usage_uncertain", tc.usageUncertain)
 			env.ctx.Set("tool_chain_no_retry", tc.toolChain)
