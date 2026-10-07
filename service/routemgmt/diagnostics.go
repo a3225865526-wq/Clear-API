@@ -297,7 +297,7 @@ func candidateView(chain *model.RouteChainWithCandidates, candidate *model.Route
 		policy = nil // resolve-time validation rejects corrupt policies anyway
 	}
 	view.EffectiveBreaker = effectiveBreakerView(policy)
-	if candidate.Archived {
+	if chain.Archived || candidate.Archived {
 		// Archived rows are audit records: identity and original target
 		// matter, runtime diagnostics do not (§三十五).
 		view.HealthSummary = HealthArchived

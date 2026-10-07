@@ -32,11 +32,12 @@ var (
 )
 
 type RouteChain struct {
-	Id               int    `json:"id"`
-	Model            string `json:"model" gorm:"type:varchar(255);uniqueIndex:idx_route_chain_model_group,priority:1"`
-	Group            string `json:"group" gorm:"type:varchar(64);uniqueIndex:idx_route_chain_model_group,priority:2"`
-	Enabled          bool   `json:"enabled" gorm:"default:false"`
-	AllowCrossSource bool   `json:"allow_cross_source" gorm:"default:false"`
+	Id               int     `json:"id"`
+	Model            string  `json:"model" gorm:"type:varchar(255)"`
+	Group            string  `json:"group" gorm:"type:varchar(64)"`
+	ActiveScopeKey   *string `json:"-" gorm:"type:varchar(64);uniqueIndex:idx_route_chain_active_scope"`
+	Enabled          bool    `json:"enabled" gorm:"default:false"`
+	AllowCrossSource bool    `json:"allow_cross_source" gorm:"default:false"`
 	// Archived marks a chain the operator retired (stage 6 §十七): it stays
 	// readable so historical ledger rows remain explainable, is always
 	// disabled (archive forces enabled=false) and is read-only for edits.
@@ -206,10 +207,6 @@ func validateRouteChain(chain *RouteChainWithCandidates) error {
 	return nil
 }
 
-func MigrateRouteChain(db *gorm.DB) error {
-	return db.AutoMigrate(&RouteChain{}, &RouteChainCandidate{})
-}
-
 func loadRouteChainCandidates(db *gorm.DB, chainId int) ([]RouteChainCandidate, error) {
 	var candidates []RouteChainCandidate
 	err := db.Where("chain_id = ?", chainId).Order("priority DESC, id ASC").Find(&candidates).Error
@@ -232,11 +229,11 @@ func GetRouteChainById(id int) (*RouteChainWithCandidates, error) {
 }
 
 // GetRouteChainForModel returns the chain configured for (model, group) or
-// nil when none exists. Callers decide what Enabled means for them. The
-// lookup uses struct conditions so identifier quoting stays dialect-correct.
+// nil when none exists. Archived history is outside the configurable scope.
+// The scope hash gives the same exact-string lookup semantics on all dialects.
 func GetRouteChainForModel(modelName string, groupName string) (*RouteChainWithCandidates, error) {
 	var chain RouteChain
-	err := DB.Where(&RouteChain{Model: modelName, Group: groupName}).First(&chain).Error
+	err := DB.Where("active_scope_key = ? AND archived = ?", routeChainActiveScopeKey(modelName, groupName), false).First(&chain).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -254,7 +251,7 @@ func GetRouteChainForModel(modelName string, groupName string) (*RouteChainWithC
 // request keeps legacy routing.
 func GetEnabledRouteChainForModel(modelName string, groupName string) (*RouteChainWithCandidates, error) {
 	chain, err := GetRouteChainForModel(modelName, groupName)
-	if err != nil || chain == nil || !chain.Enabled {
+	if err != nil || chain == nil || !chain.Enabled || chain.Archived {
 		return nil, err
 	}
 	return chain, nil
@@ -285,21 +282,19 @@ func UpsertRouteChain(chain *RouteChainWithCandidates, expectedVersion int) erro
 	if err := validateRouteChain(chain); err != nil {
 		return err
 	}
+	if chain.Archived {
+		return ErrRouteChainInvalid
+	}
+	key := routeChainActiveScopeKey(chain.Model, chain.Group)
+	chain.ActiveScopeKey = &key
 	now := common.GetTimestamp()
 	return DB.Transaction(func(tx *gorm.DB) error {
 		if chain.Id == 0 {
-			var count int64
-			if err := tx.Model(&RouteChain{}).Where(&RouteChain{Model: chain.Model, Group: chain.Group}).Count(&count).Error; err != nil {
-				return err
-			}
-			if count > 0 {
-				return ErrRouteChainExists
-			}
 			chain.Version = 1
 			chain.CreatedTime = now
 			chain.UpdatedTime = now
 			if err := tx.Create(&chain.RouteChain).Error; err != nil {
-				return err
+				return routeChainScopeError(err)
 			}
 			for i := range chain.Candidates {
 				chain.Candidates[i].Id = 0
@@ -334,18 +329,19 @@ func UpsertRouteChain(chain *RouteChainWithCandidates, expectedVersion int) erro
 			}
 		}
 		result := tx.Model(&RouteChain{}).
-			Where("id = ? AND version = ?", chain.Id, expectedVersion).
-			Select("model", "group", "enabled", "allow_cross_source", "version", "updated_time").
+			Where("id = ? AND version = ? AND archived = ?", chain.Id, expectedVersion, false).
+			Select("model", "group", "active_scope_key", "enabled", "allow_cross_source", "version", "updated_time").
 			Updates(RouteChain{
 				Model:            chain.Model,
 				Group:            chain.Group,
+				ActiveScopeKey:   &key,
 				Enabled:          chain.Enabled,
 				AllowCrossSource: chain.AllowCrossSource,
 				Version:          expectedVersion + 1,
 				UpdatedTime:      now,
 			})
 		if result.Error != nil {
-			return result.Error
+			return routeChainScopeError(result.Error)
 		}
 		if result.RowsAffected == 0 {
 			return ErrRouteChainVersionConflict
@@ -435,7 +431,7 @@ func SetRouteChainCandidateEnabled(chainId int, candidateId int, enabled bool, e
 			return err
 		}
 		result := tx.Model(&RouteChainCandidate{}).
-			Where("id = ? AND chain_id = ?", candidateId, chainId).
+			Where("id = ? AND chain_id = ? AND archived = ?", candidateId, chainId, false).
 			Updates(map[string]any{"enabled": enabled, "updated_time": common.GetTimestamp()})
 		if result.Error != nil {
 			return result.Error
@@ -520,7 +516,7 @@ func DeleteRouteChain(id int, expectedVersion int) error {
 
 func bumpRouteChainVersion(tx *gorm.DB, chainId int, expectedVersion int) error {
 	result := tx.Model(&RouteChain{}).
-		Where("id = ? AND version = ?", chainId, expectedVersion).
+		Where("id = ? AND version = ? AND archived = ?", chainId, expectedVersion, false).
 		Updates(map[string]any{"version": expectedVersion + 1, "updated_time": common.GetTimestamp()})
 	if result.Error != nil {
 		return result.Error
@@ -537,7 +533,7 @@ func bumpRouteChainVersion(tx *gorm.DB, chainId int, expectedVersion int) error 
 func SetRouteChainEnabled(chainId int, enabled bool, expectedVersion int) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&RouteChain{}).
-			Where("id = ? AND version = ?", chainId, expectedVersion).
+			Where("id = ? AND version = ? AND archived = ?", chainId, expectedVersion, false).
 			Updates(map[string]any{
 				"enabled":      enabled,
 				"version":      expectedVersion + 1,
@@ -553,18 +549,19 @@ func SetRouteChainEnabled(chainId int, enabled bool, expectedVersion int) error 
 	})
 }
 
-// ArchiveRouteChain retires a chain under CAS: enabled=false + archived=true
+// ArchiveRouteChain retires a chain under CAS: disabled, archived, slot released
 // (stage 6 §2.5). The row stays readable so ledger history remains
 // explainable; archived chains are read-only for configuration edits.
 func ArchiveRouteChain(chainId int, expectedVersion int) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&RouteChain{}).
-			Where("id = ? AND version = ?", chainId, expectedVersion).
+			Where("id = ? AND version = ? AND archived = ?", chainId, expectedVersion, false).
 			Updates(map[string]any{
-				"enabled":      false,
-				"archived":     true,
-				"version":      expectedVersion + 1,
-				"updated_time": common.GetTimestamp(),
+				"enabled":          false,
+				"archived":         true,
+				"active_scope_key": nil,
+				"version":          expectedVersion + 1,
+				"updated_time":     common.GetTimestamp(),
 			})
 		if result.Error != nil {
 			return result.Error
