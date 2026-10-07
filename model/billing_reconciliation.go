@@ -99,13 +99,26 @@ func MigrateBillingReconciliation(db *gorm.DB) error {
 }
 
 func MarkBillingUsageUncertain(requestID string) error {
+	return MarkBillingReviewMarker(requestID, "upstream_usage_unknown")
+}
+
+// MarkBillingReviewMarker appends the first review marker for a reservation.
+// Markers are unique per reservation: a later different reason never
+// overwrites the original evidence.
+func MarkBillingReviewMarker(requestID string, reason string) error {
 	// Without the additive schema, retain an active reservation for review
 	// rather than silently settling an untraceable unknown-usage charge.
 	var r BillingReservation
 	if err := DB.Where("request_id = ?", requestID).First(&r).Error; err != nil {
 		return err
 	}
-	marker := BillingReviewMarker{ReservationID: r.ID, Reason: "upstream_usage_unknown", CreatedAt: time.Now().Unix()}
+	if len(reason) > 32 {
+		reason = reason[:32]
+	}
+	if reason == "" {
+		reason = "usage_domain_anomaly"
+	}
+	marker := BillingReviewMarker{ReservationID: r.ID, Reason: reason, CreatedAt: time.Now().Unix()}
 	return DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&marker).Error
 }
 
