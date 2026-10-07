@@ -342,7 +342,13 @@ func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayInf
 		ToolOutputObserved:   c.GetBool("tool_chain_no_retry"),
 		HTTPStatus:           relayErr.StatusCode,
 		UpstreamErrorCode:    routechain.ExtractUpstreamErrorCode(relayErr),
-		ExecutorProvenance:   routechain.HasExecutorProvenance(relayErr),
+		// Stage 7.1: the provenance header is only a trust root on the
+		// pool-executor path — the failing attempt must sit on a pool-bound
+		// executor channel (PoolProvenanceScopeFrom) and the header must carry
+		// the exact trusted value (HasExecutorProvenance). A body-level origin
+		// alone, or the header returned by an API_CHANNEL upstream, never
+		// classifies as pool exhaustion.
+		ExecutorProvenance: routechain.HasExecutorProvenance(relayErr) && routechain.PoolProvenanceScopeFrom(c),
 	}
 	outcome := routechain.Classify(evidence, false, types.IsSkipRetryError(relayErr))
 	props := routechain.RequestProperties{

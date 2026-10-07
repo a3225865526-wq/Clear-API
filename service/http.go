@@ -9,6 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/relaykit/types"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,6 +33,12 @@ func ShouldCopyUpstreamHeader(c *gin.Context, k string, v []string) bool {
 	// An upstream must not set local credentials, cookies or proxy controls.
 	switch strings.ToLower(k) {
 	case "content-length", "set-cookie", "set-cookie2", "authorization", "proxy-authorization", "proxy-authenticate", "www-authenticate", "x-api-key", "api-key", "x-goog-api-key", "connection", "keep-alive", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade":
+		return false
+	}
+	// Stage 7.1: the executor provenance header is internal to the
+	// gateway↔executor trust boundary — it is consumed for classification and
+	// never forwarded to end users, whatever the upstream is.
+	if strings.EqualFold(k, types.ExecutorErrorOriginHeader) {
 		return false
 	}
 	if strings.EqualFold(k, common.RequestIdKey) {

@@ -134,16 +134,26 @@ func ExtractUpstreamErrorCode(err *types.NewAPIError) string {
 	return code
 }
 
-// HasExecutorProvenance reports whether the upstream error envelope carries
-// the trusted executor provenance origin (Stage 4 contract). Only envelopes
-// the executor synthesized itself hold it.
+// HasExecutorProvenance reports whether the upstream error response carries
+// the trusted executor provenance (Stage 7.1 contract). The trust root is the
+// executor's reserved transport header (types.ExecutorErrorOriginHeader ==
+// types.ExecutorErrorOriginLocal) which CLIProxyAPI stamps only on envelopes
+// it synthesized itself and strips from every forwarded provider response.
+// The body-level error.origin is advisory only — a provider can echo it inside
+// a verbatim JSON body — so when the body carries an origin at all it must
+// agree with the executor's marker, otherwise the envelope is spoof-shaped and
+// fails closed.
 func HasExecutorProvenance(err *types.NewAPIError) bool {
 	if err == nil {
 		return false
 	}
-	openaiError, ok := err.RelayError.(types.OpenAIError)
-	if !ok {
+	if err.GetExecutorErrorOrigin() != types.ExecutorErrorOriginLocal {
 		return false
 	}
-	return openaiError.Origin == ExecutorProvenanceOrigin
+	if openaiError, ok := err.RelayError.(types.OpenAIError); ok {
+		if openaiError.Origin != "" && openaiError.Origin != ExecutorProvenanceOrigin {
+			return false
+		}
+	}
+	return true
 }
