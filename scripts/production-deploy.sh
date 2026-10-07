@@ -7,7 +7,7 @@
 #     are rejected before anything else runs.
 #   * fixed step order (PRODUCTION CI/CD ACCEPTANCE spec, section 20);
 #     any critical failure stops the deployment.
-#   * automatic rollback to the previous exact digest is attempted ONLY when
+#   * automatic rollback to the previous exact image is attempted ONLY when
 #     the new container fails post-replace checks AND the caller explicitly
 #     declared the candidate migration backward-compatible. The database is
 #     never restored automatically.
@@ -15,30 +15,39 @@
 #     GHCR pull token and the migration DSN are read from root-owned files /
 #     container secrets.
 #
+# Rollback references:
+#   * if the previous deployment came from GHCR, rollback uses its exact
+#     registry digest ref.
+#   * for the FIRST CI/CD deploy the previous production image exists only
+#     as a local image (hand-built era): rollback re-pins the recorded local
+#     tag and then verifies the running image ID equals the manifest-recorded
+#     exact image ID — exact, never "latest" or guesswork.
+#
 # Usage:
 #   production-deploy.sh --digest sha256:<64hex> --commit <40hex-sha> \
 #     [--workflow-run <id>] [--migration-compatible true|false]
 #
-# Operator-owned configuration: /opt/clearapi/etc/deploy.env (mode 0600,
-# not in the repository). Defaults below document every supported key.
+# Operator-owned configuration: /opt/clearapi/config/deploy.env (mode 0600,
+# not in the repository). Defaults below document every supported key and
+# match the live VPS as verified during CI/CD acceptance (2026-10-07).
 
 set -euo pipefail
 umask 077
 
 # ---------------------------------------------------------------------------
-# Defaults (overridable via deploy.env)
+# Defaults (overridable via deploy.env) — verified against live VPS
 # ---------------------------------------------------------------------------
 APP_DIR="${DEPLOY_APP_DIR:-/opt/clearapi/app}"
-COMPOSE_FILE="${DEPLOY_COMPOSE_FILE:-docker-compose.production.yml}"
+COMPOSE_FILE="${DEPLOY_COMPOSE_FILE:-docker-compose.prod.yml}"
 SERVICE="${DEPLOY_SERVICE:-new-api}"
 PG_SERVICE="${DEPLOY_PG_SERVICE:-postgres}"
-PG_USER="${DEPLOY_PG_USER:-newapi}"
-PG_DB="${DEPLOY_PG_DB:-new-api}"
+PG_USER="${DEPLOY_PG_USER:-clearapi_app}"
+PG_DB="${DEPLOY_PG_DB:-clearapi}"
 NETWORK_NAME="${DEPLOY_NETWORK_NAME:-clearapi_internal}"
 
 IMAGE_BASE="${DEPLOY_IMAGE_BASE:-ghcr.io/a3225865526-wq/clearapi}"
 GHCR_USER="${DEPLOY_GHCR_USER:-clearapi-deploy}"
-GHCR_TOKEN_FILE="${DEPLOY_GHCR_TOKEN_FILE:-/opt/clearapi/etc/ghcr-pull-token}"
+GHCR_TOKEN_FILE="${DEPLOY_GHCR_TOKEN_FILE:-/opt/clearapi/secrets/ghcr-pull-token}"
 
 BACKUP_SERVICE="${DEPLOY_BACKUP_SERVICE:-clearapi-backup.service}"
 BACKUP_TIMER="${DEPLOY_BACKUP_TIMER:-clearapi-backup.timer}"
@@ -46,21 +55,23 @@ BACKUP_DIR="${DEPLOY_BACKUP_DIR:-/opt/clearapi/backups}"
 
 LOCAL_HEALTH_URL="${DEPLOY_LOCAL_HEALTH_URL:-http://127.0.0.1:3000/api/status}"
 PUBLIC_HEALTH_URL="${DEPLOY_PUBLIC_HEALTH_URL:-https://www.clear999.com/api/status}"
-CADDYFILE="${DEPLOY_CADDYFILE:-/opt/clearapi/caddy/Caddyfile}"
-CADDYFILE_MD5="${DEPLOY_CADDYFILE_MD5:-ef1f8411218d727b9382918973ec7e6e}"
+CADDYFILE="${DEPLOY_CADDYFILE:-/opt/clearapi/edge/Caddyfile}"
+# Frozen post-real-IP H4 baseline (see cloudflare-edge-migration-acceptance).
+CADDYFILE_MD5="${DEPLOY_CADDYFILE_MD5:-295647360d0db904c6208b79411d5408}"
 
 VERIFY_BOOTSTRAP="${DEPLOY_VERIFY_BOOTSTRAP:-true}"
 BOOTSTRAP_SERVICE="${DEPLOY_BOOTSTRAP_SERVICE:-production-bootstrap}"
 MIGRATION_FLAGS="${DEPLOY_MIGRATION_FLAGS:-}"
 
-# Frozen negative-gate expectations (H4 edge acceptance baseline).
+# Frozen negative-gate expectations (H4 acceptance baseline, live-verified).
 EXPECT_ENV_KEYS="${DEPLOY_EXPECT_ENV_KEYS:-CLEARAPI_ENABLE_RESPONSES_WEBSOCKET=false CLEARAPI_ENABLE_REALTIME=false CLEARAPI_CLOSED_LAUNCH=true}"
 EXPECT_CHANNELS="${DEPLOY_EXPECT_CHANNELS:-1,2}"
-EXPECT_USER="${DEPLOY_EXPECT_USER:-user2}"
-EXPECT_TOKENS="${DEPLOY_EXPECT_TOKENS:-token1,token2}"
-EXPECT_RESERVATIONS="${DEPLOY_EXPECT_RESERVATIONS:-reservation1=4/10/4/needs_review reservation2=41/93/41/needs_review}"
+EXPECT_USER_ID="${DEPLOY_EXPECT_USER_ID:-2}"
+EXPECT_TOKEN_IDS="${DEPLOY_EXPECT_TOKEN_IDS:-1,2}"
+EXPECT_REVIEW_ROWS="${DEPLOY_EXPECT_REVIEW_ROWS:-4/10/4 41/93/41}"
 EXPECT_EMPTY_TABLES="${DEPLOY_EXPECT_EMPTY_TABLES:-store_products,top_ups,offline_orders,subscription_orders}"
 POOL_OPTION_PATTERN="${DEPLOY_POOL_OPTION_PATTERN:-%pool%}"
+POLICY_MODE_KEY="${DEPLOY_POLICY_MODE_KEY:-billing_reserve_policy.mode}"
 
 AUDIT_LOG="${DEPLOY_AUDIT_LOG:-/opt/clearapi/logs/deployments.log}"
 MANIFEST="${DEPLOY_MANIFEST:-${APP_DIR}/release-manifest.json}"
@@ -88,11 +99,11 @@ printf '%s' "$COMMIT" | grep -Eq '^[0-9a-f]{40}$' || {
 [ "$MIGRATION_COMPATIBLE" = "true" ] || [ "$MIGRATION_COMPATIBLE" = "false" ] || {
   echo "REFUSING: --migration-compatible must be true or false" >&2; exit 2; }
 
-if [ -f /opt/clearapi/etc/deploy.env ]; then
+if [ -f /opt/clearapi/config/deploy.env ]; then
   # shellcheck disable=SC1090
-  . /opt/clearapi/etc/deploy.env
+  . /opt/clearapi/config/deploy.env
 else
-  echo "REFUSING: /opt/clearapi/etc/deploy.env is missing (operator-owned, mode 0600)" >&2; exit 2
+  echo "REFUSING: /opt/clearapi/config/deploy.env is missing (operator-owned, mode 0600)" >&2; exit 2
 fi
 
 # ---------------------------------------------------------------------------
@@ -101,8 +112,8 @@ fi
 TS_NOW() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 audit() { # audit <event> <result> <detail>
   mkdir -p "$(dirname "$AUDIT_LOG")"
-  printf '{"ts":"%s","event":"%s","result":"%s","digest":"%s","previous_digest":"%s","commit":"%s","workflow_run":"%s","detail":"%s"}\n' \
-    "$(TS_NOW)" "$1" "$2" "${DIGEST:-}" "${PREV_DIGEST:-}" "${COMMIT:-}" "${WORKFLOW_RUN:-}" "$3" >> "$AUDIT_LOG"
+  printf '{"ts":"%s","event":"%s","result":"%s","digest":"%s","previous_image":"%s","commit":"%s","workflow_run":"%s","detail":"%s"}\n' \
+    "$(TS_NOW)" "$1" "$2" "${DIGEST:-}" "${PREV_IMAGE_ID:-}" "${COMMIT:-}" "${WORKFLOW_RUN:-}" "$3" >> "$AUDIT_LOG"
 }
 log() { printf '[deploy %s] %s\n' "$(TS_NOW)" "$*" >&2; }
 
@@ -112,7 +123,7 @@ die() {
   audit "deploy_failed" "failed" "$*"
   if [ "$REPLACE_DONE" = "1" ] && [ "$MIGRATION_COMPATIBLE" = "true" ]; then
     rollback "$*"
-    exit 1 # rollback() exits, but be explicit
+    exit 1
   fi
   if [ "$REPLACE_DONE" = "1" ]; then
     log "no automatic rollback (migration_compatible=${MIGRATION_COMPATIBLE}) — MANUAL REVIEW REQUIRED"
@@ -120,7 +131,7 @@ die() {
   exit 1
 }
 
-compose() { docker compose --project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}" "$@"; }
+compose() { sudo docker compose --project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}" "$@"; }
 service_id() { compose ps -q "$SERVICE" | head -1; }
 psql_q() { # read-only single query against the production database
   compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1"
@@ -142,12 +153,12 @@ health_retry() { # health_retry <url> <retries> <sleep_s> [<require_header>]
   done
   return 1
 }
-write_override() { # write_override <digest>
+write_override() { # write_override <image ref> — exact digest ref, or exact local image for legacy rollback
   cat > "$OVERRIDE_FILE" <<EOF
 # Generated by production-deploy.sh at $(TS_NOW). Exact-digest pin.
 services:
   ${SERVICE}:
-    image: ${IMAGE_BASE}@$1
+    image: $1
 EOF
   chmod 0600 "$OVERRIDE_FILE"
 }
@@ -156,26 +167,33 @@ set_manifest_status() { # set_manifest_status <status>
 import json, sys
 with open(sys.argv[1]) as f:
     m = json.load(f)
-m["status"] = sys.argv[2]
+m["releases"]["current"]["status"] = sys.argv[2]
 with open(sys.argv[1], "w") as f:
     json.dump(m, f, indent=2)
     f.write("\n")
 PYEOF
 }
 rollback() {
-  log "rollback: switching back to previous exact digest ${PREV_DIGEST}"
-  write_override "$PREV_DIGEST"
+  log "rollback: switching back to previous exact image (${ROLLBACK_REF})"
+  write_override "$ROLLBACK_REF"
   if ! compose up -d "$SERVICE"; then
-    audit "rollback" "failed" "compose up failed for previous digest ${PREV_DIGEST}"
+    audit "rollback" "failed" "compose up failed for previous image ${ROLLBACK_REF}"
     log "ROLLBACK FAILED — MANUAL INTERVENTION REQUIRED"
+    return 1
+  fi
+  RID="$(service_id)"
+  RUN_IMG="$(sudo docker inspect --format '{{.Image}}' "$RID")"
+  if [ "$RUN_IMG" != "$PREV_IMAGE_ID" ]; then
+    audit "rollback" "failed" "running image ${RUN_IMG} does not match recorded previous ${PREV_IMAGE_ID}"
+    log "ROLLBACK IMAGE MISMATCH — MANUAL INTERVENTION REQUIRED"
     return 1
   fi
   if health_retry "$LOCAL_HEALTH_URL" 30 2 && health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray"; then
     set_manifest_status "rolled_back"
-    audit "rollback" "rolled_back" "previous digest ${PREV_DIGEST} healthy again"
-    log "rollback complete; deployment remains FAILED but production is healthy on ${PREV_DIGEST}"
+    audit "rollback" "rolled_back" "previous image ${PREV_IMAGE_ID} healthy again"
+    log "rollback complete; deployment remains FAILED but production is healthy on the previous image"
   else
-    audit "rollback" "failed" "previous digest deployed but health checks fail; MANUAL INTERVENTION REQUIRED"
+    audit "rollback" "failed" "previous image deployed but health checks fail; MANUAL INTERVENTION REQUIRED"
     log "ROLLBACK DEPLOYED BUT UNHEALTHY — MANUAL INTERVENTION REQUIRED"
   fi
 }
@@ -198,24 +216,22 @@ log "step 2: candidate metadata validated (digest ${DIGEST}, commit ${COMMIT}, m
 # ===========================================================================
 CUR_ID="$(service_id)"
 [ -n "$CUR_ID" ] || die "step 3: running ${SERVICE} container not found; refusing first-deploy-by-script without a live baseline"
-PREV_DIGEST="$(docker inspect --format '{{.Image}}' "$CUR_ID")"
-log "step 3: current production image = ${PREV_DIGEST}"
+PREV_IMAGE_ID="$(sudo docker inspect --format '{{.Image}}' "$CUR_ID")"
+log "step 3: current production image ID = ${PREV_IMAGE_ID}"
 
 if [ -f "$MANIFEST" ]; then
-  if python3 - "$MANIFEST" "$PREV_DIGEST" <<'PYEOF'
+  if python3 - "$MANIFEST" "$PREV_IMAGE_ID" <<'PYEOF'
 import json, sys
 with open(sys.argv[1]) as f:
     m = json.load(f)
-recorded = m.get("image_digest") or m.get("image_digest_current")
+cur = (m.get("releases") or {}).get("current") or {}
+recorded = cur.get("new_api_image_id")
 if recorded and recorded != sys.argv[2]:
     sys.exit(1)
 sys.exit(0)
 PYEOF
   then :; else
-    MANIFEST_STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-    mv "$MANIFEST" "${MANIFEST}.pre-cicd.${MANIFEST_STAMP}"
-    log "step 3: manifest pre-dates the CI/CD record format; archived as ${MANIFEST}.pre-cicd.${MANIFEST_STAMP}, rebuilt from live state"
-    audit "manifest_upgraded" "ok" "archived pre-cicd manifest; live state was ${PREV_DIGEST}"
+    die "step 3: manifest releases.current.new_api_image_id does not match the running image; state divergence — manual resolution required"
   fi
 fi
 
@@ -251,7 +267,8 @@ else
 fi
 docker pull --platform linux/amd64 "$IMAGE_REF" || die "step 6: docker pull ${IMAGE_REF} failed"
 if [ "$LOGGED_IN" = "1" ]; then docker logout ghcr.io >/dev/null 2>&1 || true; fi
-log "step 6: pulled ${IMAGE_REF}"
+CANDIDATE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")"
+log "step 6: pulled ${IMAGE_REF} (image ID ${CANDIDATE_IMAGE_ID})"
 
 # ===========================================================================
 # 7. verify image digest + provenance
@@ -306,37 +323,85 @@ else
 fi
 
 # ===========================================================================
-# 12/13. record old image + stage new release manifest
+# 12/13. record old image + update release manifest (merge into live schema)
 # ===========================================================================
-STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-[ -f "$MANIFEST" ] && cp "$MANIFEST" "${MANIFEST}.bak.${STAMP}"
+STAMP="$(TS_NOW)"
+[ -f "$MANIFEST" ] && cp "$MANIFEST" "${MANIFEST}.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+PREV_TAG="$(python3 - "$MANIFEST" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        m = json.load(f)
+    print((m.get("releases") or {}).get("current", {}).get("tag", ""))
+except Exception:
+    print("")
+PYEOF
+)"
+# Rollback reference: exact registry ref when the previous release came from
+# GHCR; otherwise the recorded local tag (verified against the exact image ID
+# after rollback — see rollback()).
+if python3 - "$MANIFEST" <<'PYEOF'
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        m = json.load(f)
+    cur = (m.get("releases") or {}).get("current") or {}
+    sys.exit(0 if cur.get("image_digest") else 1)
+except Exception:
+    sys.exit(1)
+PYEOF
+then
+  PREV_DIGEST_FIELD="$(python3 -c "import json;m=json.load(open('$MANIFEST'));print(m['releases']['current']['image_digest'])")"
+  ROLLBACK_REF="${IMAGE_BASE}@${PREV_DIGEST_FIELD}"
+else
+  ROLLBACK_REF="$PREV_TAG"
+fi
+[ -n "$ROLLBACK_REF" ] || die "step 12: cannot determine a previous exact image reference for rollback"
+
 MIGRATION_VERSION="${MIGRATION_FLAGS:-preflight-only (no flags configured)}"
 MANIFEST_TMP="${MANIFEST}.tmp.$$"
-python3 - "$MANIFEST_TMP" "$COMMIT" "$IMAGE_REF" "$DIGEST" "$PREV_DIGEST" "$WORKFLOW_RUN" "$MIGRATION_VERSION" "$STAMP" <<'PYEOF'
+python3 - "$MANIFEST" "$MANIFEST_TMP" "$COMMIT" "$IMAGE_REF" "$DIGEST" "$CANDIDATE_IMAGE_ID" \
+  "$PREV_IMAGE_ID" "$WORKFLOW_RUN" "$MIGRATION_VERSION" "$STAMP" <<'PYEOF'
 import json, sys
-path, commit, image_ref, digest, prev, run_id, migration_version, stamp = sys.argv[1:9]
-manifest = {
-    "source_commit": commit,
-    "image_ref": image_ref,
+src, dst, commit, image_ref, digest, image_id, prev_id, run_id, migration_version, stamp = sys.argv[1:11]
+try:
+    with open(src) as f:
+        m = json.load(f)
+except Exception:
+    m = {"schema_version": 1, "releases": {}}
+rel = m.setdefault("releases", {})
+old_current = rel.get("current") or {}
+new_current = {
+    "tag": image_ref + "@" + digest,
+    "candidate_commit": commit,
+    "new_api_image_id": image_id,
     "image_digest": digest,
-    "previous_digest": prev if prev.startswith("sha256:") else ("sha256:" + prev if prev else ""),
+    "image_ref": image_ref,
+    "previous_image_id": prev_id,
     "workflow_run": run_id,
-    "deployed_at": stamp,
+    "deployed_at_utc": stamp,
     "deployment_method": "ghcr-exact-digest",
-    "migration_version": migration_version,
+    "migration_mode": migration_version,
     "status": "pending",
 }
-with open(path, "w") as f:
-    json.dump(manifest, f, indent=2)
+if old_current.get("postgres_image"):
+    new_current["postgres_image"] = old_current["postgres_image"]
+if old_current.get("migrations_applied"):
+    new_current["migrations_applied"] = old_current["migrations_applied"]
+rel["previous"] = old_current or rel.get("previous") or {}
+rel["current"] = new_current
+m["updated_at_utc"] = stamp
+with open(dst, "w") as f:
+    json.dump(m, f, indent=2)
     f.write("\n")
 PYEOF
 mv "$MANIFEST_TMP" "$MANIFEST"
-log "step 12/13: release manifest staged (previous ${PREV_DIGEST})"
+log "step 12/13: release manifest updated (previous image ${PREV_IMAGE_ID}, rollback ref ${ROLLBACK_REF})"
 
 # ===========================================================================
 # 14. controlled replace
 # ===========================================================================
-write_override "$DIGEST"
+write_override "$IMAGE_REF"
 compose up -d "$SERVICE" || die "step 14: compose replace failed"
 REPLACE_DONE=1
 log "step 14: container replaced with ${IMAGE_REF}"
@@ -358,7 +423,7 @@ log "step 16: public HTTPS health via Cloudflare PASS"
 # ===========================================================================
 NEW_ID="$(service_id)"
 [ -n "$NEW_ID" ] || die "step 17: ${SERVICE} container missing after replace"
-cenv() { docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$NEW_ID"; }
+cenv() { sudo docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$NEW_ID"; }
 
 for pair in $EXPECT_ENV_KEYS; do
   key="${pair%%=*}"; expected="${pair#*=}"
@@ -366,18 +431,18 @@ for pair in $EXPECT_ENV_KEYS; do
   [ "$actual" = "$expected" ] || die "step 17: env gate ${key}='${actual}' expected '${expected}'"
 done
 
-PORTS_3000="$(docker port "$NEW_ID" 3000/tcp 2>/dev/null || true)"
+PORTS_3000="$(sudo docker port "$NEW_ID" 3000/tcp 2>/dev/null || true)"
 printf '%s' "$PORTS_3000" | grep -q "127.0.0.1:3000" || die "step 17: new-api must bind 127.0.0.1:3000 only (got: ${PORTS_3000:-<unpublished>})"
 
 PG_ID="$(compose ps -q "$PG_SERVICE")"
 [ -n "$PG_ID" ] || die "step 17: postgres container missing"
-PG_PORTS="$(docker port "$PG_ID" 2>/dev/null || true)"
+PG_PORTS="$(sudo docker port "$PG_ID" 2>/dev/null || true)"
 [ -z "$PG_PORTS" ] || die "step 17: postgres must not publish ports (got: ${PG_PORTS})"
 
-NETWORKS="$(docker inspect --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}} {{end}}' "$NEW_ID")"
+NETWORKS="$(sudo docker inspect --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}} {{end}}' "$NEW_ID")"
 printf '%s' "$NETWORKS" | grep -qw "$NETWORK_NAME" || die "step 17: new-api not attached to ${NETWORK_NAME} (networks: ${NETWORKS})"
 
-EXECUTORS="$(docker ps -a --format '{{.Names}}' | grep -Eic 'executor|route.?chain' || true)"
+EXECUTORS="$(sudo docker ps -a --format '{{.Names}}' | grep -Eic 'executor|route.?chain' || true)"
 [ "$EXECUTORS" = "0" ] || die "step 17: ${EXECUTORS} executor/route-chain container(s) present; Pool must stay OFF"
 
 [ -f "$CADDYFILE" ] || die "step 17: Caddyfile ${CADDYFILE} missing"
@@ -388,36 +453,27 @@ systemctl is-active --quiet "$BACKUP_TIMER" || die "step 17: ${BACKUP_TIMER} not
 log "step 17: runtime negative gates PASS (env, binding, PG ports, network, pool, Caddyfile, backup timer)"
 
 # ===========================================================================
-# 18. billing invariants (read-only)
+# 18. billing invariants (read-only, least-privileged app role)
 # ===========================================================================
-POLICY_JSONS="$(psql_q "SELECT value FROM options WHERE key ILIKE '%reserve%policy%';")"
-[ -n "$POLICY_JSONS" ] || die "step 18: billing reserve policy option row missing"
-printf '%s\n' "$POLICY_JSONS" | python3 -c '
-import json, sys
-rows = [l for l in sys.stdin.read().splitlines() if l.strip()]
-if not rows:
-    sys.exit(1)
-if not all(json.loads(r).get("mode") == "enforce" for r in rows):
-    sys.exit(1)
-' || die "step 18: reserve policy mode is not enforce"
+POLICY_MODE="$(psql_q "SELECT value FROM options WHERE key='${POLICY_MODE_KEY}';")"
+[ "$POLICY_MODE" = "enforce" ] || die "step 18: ${POLICY_MODE_KEY}='${POLICY_MODE}' expected 'enforce'"
 
-for rid_pair in $EXPECT_RESERVATIONS; do
-  rid="${rid_pair%%=*}"; expected="${rid_pair#*=}"
-  actual="$(psql_q "SELECT reserved||'/'||target||'/'||applied||'/'||state FROM billing_reservations WHERE request_id='${rid}';")"
-  [ "$actual" = "$expected" ] || die "step 18: reservation ${rid}='${actual}' expected '${expected}'"
-done
+REVIEW_ROWS="$(psql_q "SELECT reserved||'/'||target||'/'||applied FROM billing_reservations WHERE state='needs_review' ORDER BY reserved, id;")"
+ACTUAL_SORTED="$(printf '%s\n' "$REVIEW_ROWS" | sort | tr '\n' ' ' | sed 's/ $//')"
+EXPECTED_SORTED="$(printf '%s\n' $EXPECT_REVIEW_ROWS | sort | tr '\n' ' ' | sed 's/ $//')"
+[ "$ACTUAL_SORTED" = "$EXPECTED_SORTED" ] || die "step 18: needs_review reservations '${ACTUAL_SORTED}' expected '${EXPECTED_SORTED}'"
 
 for ch in $(printf '%s' "$EXPECT_CHANNELS" | tr ',' ' '); do
   status="$(psql_q "SELECT status FROM channels WHERE id=${ch};")"
   [ "$status" = "2" ] || die "step 18: channel ${ch} status='${status}' expected 2 (disabled)"
 done
 
-U_STATUS="$(psql_q "SELECT status FROM users WHERE username='${EXPECT_USER}';")"
-[ "$U_STATUS" = "2" ] || die "step 18: user ${EXPECT_USER} status='${U_STATUS}' expected 2 (disabled)"
+U_STATUS="$(psql_q "SELECT status FROM users WHERE id=${EXPECT_USER_ID};")"
+[ "$U_STATUS" = "2" ] || die "step 18: user id ${EXPECT_USER_ID} status='${U_STATUS}' expected 2 (disabled)"
 
-for tok in $(printf '%s' "$EXPECT_TOKENS" | tr ',' ' '); do
-  t_status="$(psql_q "SELECT status FROM tokens WHERE name='${tok}';")"
-  [ "$t_status" = "2" ] || die "step 18: token ${tok} status='${t_status}' expected 2 (disabled)"
+for tok in $(printf '%s' "$EXPECT_TOKEN_IDS" | tr ',' ' '); do
+  t_status="$(psql_q "SELECT status FROM tokens WHERE id=${tok};")"
+  [ "$t_status" = "2" ] || die "step 18: token id ${tok} status='${t_status}' expected 2 (disabled)"
 done
 
 for tbl in $(printf '%s' "$EXPECT_EMPTY_TABLES" | tr ',' ' '); do
@@ -427,16 +483,17 @@ done
 
 POOL_ROWS="$(psql_q "SELECT count(*) FROM options WHERE key ILIKE '${POOL_OPTION_PATTERN}';")"
 [ "$POOL_ROWS" = "0" ] || die "step 18: ${POOL_ROWS} pool option row(s) present; Pool must stay OFF"
-log "step 18: billing invariants PASS (policy enforce, reservations, channels/user/tokens disabled, store tables empty, no pool rows)"
+log "step 18: billing invariants PASS (mode=enforce, needs_review set frozen, channels/user/token disabled, store tables empty, no pool rows)"
 
 # ===========================================================================
 # 19. mark deployment success
 # ===========================================================================
 set_manifest_status "success"
-audit "deploy_success" "success" "digest=${DIGEST} previous=${PREV_DIGEST}"
+audit "deploy_success" "success" "digest=${DIGEST} previous_image=${PREV_IMAGE_ID}"
 log "step 19: DEPLOYMENT SUCCESS"
 log "  commit:      ${COMMIT}"
 log "  digest:      ${DIGEST}"
-log "  previous:    ${PREV_DIGEST}"
+log "  image ID:    ${CANDIDATE_IMAGE_ID}"
+log "  previous:    ${PREV_IMAGE_ID}"
 log "  manifest:    ${MANIFEST}"
 log "PRODUCTION DEPLOY COMPLETED"
