@@ -64,8 +64,8 @@ jobs:
             exit 1
           }
 
-      - name: Test root and relaykit modules
-        run: make test
+      - name: Test root and relaykit modules (baseline-aware)
+        run: bash scripts/ci/go-test-baseline.sh make test
 
   frontend:
     name: Frontend typecheck and test

@@ -58,8 +58,8 @@ jobs:
           mkdir -p web/dist
           touch web/dist/index.html
 
-      - name: Race test critical packages
-        run: go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/... ./controller/... ./cmd/production-bootstrap/...
+      - name: Race test critical packages (baseline-aware)
+        run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/... ./controller/... ./cmd/production-bootstrap/...
 
   db-matrix:
     name: DB matrix — ${{ matrix.dialect }}

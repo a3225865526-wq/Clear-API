@@ -1,0 +1,24 @@
+# Known frozen-baseline test failures — PRODUCTION CI/CD ACCEPTANCE spec §11.
+#
+# CI must distinguish "known baseline issue" from "new regression": any test
+# failure NOT listed here fails the pipeline. Entries are exact top-level Go
+# test names (package/Test); subtests are covered by their parent entry.
+#
+# Evidence: reproduced at commit 00e2fd0d922ad10d0498d4bce92ddf7fb3cd1c18
+# (= frozen candidate 603b217 + CI/CD files only; CI/CD files are outside
+# every Go test path) in GitHub Actions run 37642721791 on 2026-10-07.
+#
+# Root cause shared by all three entries: the H2 reservation hardening
+# admission gate (c8c5f32, 6af33fb) rejects outbound requests without a
+# billing reservation at the relay/router level. The three tests predate the
+# gate and their harnesses do not provision reservations. These packages
+# were outside the H2 acceptance `-race` scope (model/service/setting/
+# controller-setup/cmd/production-bootstrap), so the conflicts were never
+# surfaced by the frozen acceptance runs. Fixing them means modifying
+# business test code — forbidden during the zero-change CI/CD stage.
+#
+# Final Launch Gate should decide whether these baseline repairs are
+# hardened before public launch.
+controller/TestResponsesHTTPHealthCountsFinalResult
+relay/TestPrepareResponsesRequestRetainsConvertedAdaptor
+router/TestGetOpenAIVideoRouteRendersJimengTask
