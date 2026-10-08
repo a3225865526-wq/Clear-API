@@ -61,7 +61,22 @@ jobs:
       - name: Race test critical packages (baseline-aware)
         env:
           GOFLAGS: -p=2
-        run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/... ./controller/... ./cmd/production-bootstrap/...
+        run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/... ./controller/...
+
+      - name: Race test production-bootstrap serially (stdout capture is process-global)
+        # cmd/production-bootstrap's tests capture output by swapping the
+        # process-global os.Stdout/os.Stderr and restoring them via t.Cleanup.
+        # Under -race with parallel package execution, another test in the same
+        # package can write between the swap and the restore, so two JSON
+        # documents end up interleaved and json.Unmarshal fails with
+        # "invalid character '/' after top-level value". Observed once in
+        # Release Candidate run 37732661437; the identical test passed in run
+        # 37727302534, so it is a concurrency flake, not a regression -- it is
+        # isolated by serialisation rather than added to the baseline, and it
+        # must still pass.
+        env:
+          GOFLAGS: -p=1
+        run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./cmd/production-bootstrap/...
 
   db-matrix:
     name: DB matrix — ${{ matrix.dialect }}
