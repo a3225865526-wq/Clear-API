@@ -158,6 +158,8 @@ jobs:
       GOWORK: 'off'
       TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
       TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
+      TEST_SERVICE_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_service_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_SERVICE_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_service_test?sslmode=disable
 
     steps:
       - name: Checkout
@@ -189,19 +191,53 @@ jobs:
             sqlite)   echo 'TEST_BILLING_DIALECT=sqlite' >> "$GITHUB_ENV" ;;
             mysql)    echo 'TEST_BILLING_DIALECT=mysql'  >> "$GITHUB_ENV"
                       echo "TEST_BILLING_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV"
-                      echo "TEST_TASK_LOG_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV" ;;
+                      echo "TEST_TASK_LOG_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_SERVICE_DSN=$TEST_SERVICE_MYSQL_DSN" >> "$GITHUB_ENV" ;;
             postgres) echo 'TEST_BILLING_DIALECT=postgres' >> "$GITHUB_ENV"
                       echo "TEST_BILLING_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV"
-                      echo "TEST_TASK_LOG_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV" ;;
+                      echo "TEST_TASK_LOG_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_SERVICE_DSN=$TEST_SERVICE_POSTGRES_DSN" >> "$GITHUB_ENV" ;;
             *) echo "unknown dialect"; exit 1 ;;
           esac
 
-      - name: Test billing-critical packages against ${{ matrix.dialect }}
+      - name: Provision isolated service-package database (${{ matrix.dialect }})
+        # Model and Service test databases are isolated: model-package tests
+        # migrate the additive billing schema into their database first, and
+        # service-package tests assert fail-closed behavior on a pristine
+        # schema. Sharing one database made the service legs depend on package
+        # execution order (Final Launch Gate audit §2.A). sqlite legs are
+        # already isolated per-test via t.TempDir() and need no provisioning.
+        if: matrix.dialect != 'sqlite'
+        run: |
+          case "${{ matrix.dialect }}" in
+            mysql)
+              mysql --host 127.0.0.1 --port 3306 --user root --password=clearapi_test \
+                -e "CREATE DATABASE IF NOT EXISTS clearapi_service_test; GRANT ALL PRIVILEGES ON clearapi_service_test.* TO 'clearapi'@'%'; FLUSH PRIVILEGES;"
+              ;;
+            postgres)
+              if ! PGPASSWORD=clearapi_test psql --host 127.0.0.1 --username clearapi --dbname clearapi_test --tuples-only \
+                   --command "SELECT 1 FROM pg_database WHERE datname = 'clearapi_service_test'" | grep -q 1; then
+                PGPASSWORD=clearapi_test psql --host 127.0.0.1 --username clearapi --dbname clearapi_test \
+                  --command "CREATE DATABASE clearapi_service_test"
+              fi
+              ;;
+          esac
+
+      - name: Test model-side billing-critical packages against ${{ matrix.dialect }}
         # Baseline-aware per spec §11: the DB matrix must distinguish a known
         # frozen-baseline failure from a new dialect regression, exactly like
         # the main CI test job. Failures not listed in test-baseline.txt still
         # turn this job red.
-        run: bash scripts/ci/go-test-baseline.sh go test -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/...
+        run: bash scripts/ci/go-test-baseline.sh go test -count=1 ./pkg/billingexpr/... ./model/... ./setting/...
+
+      - name: Test service package against isolated ${{ matrix.dialect }} database
+        env:
+          TEST_BILLING_DSN: ${{ env.TEST_SERVICE_DSN || '' }}
+          # No service test currently opens a second (log-database) handle;
+          # kept aligned with the isolated database so a future one inherits
+          # the same isolation instead of silently reaching the shared DB.
+          TEST_TASK_LOG_DSN: ${{ env.TEST_SERVICE_DSN || '' }}
+        run: bash scripts/ci/go-test-baseline.sh go test -count=1 ./service/...
 
   frontend-release:
     name: Frontend production build

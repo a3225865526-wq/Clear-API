@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -66,11 +67,23 @@ func TestProtectedBillingDatabase(t *testing.T) {
 	sqlDB.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	model.DB = db
+	// The DB matrix hands every package one shared database, and the model
+	// package (which runs first in the same job) migrates the additive
+	// reservation schema into it. The fail-closed precondition asserted below
+	// must be constructed by this test, never assumed: drop any leftover
+	// billing_reservations table so the "missing schema" assertion holds
+	// regardless of package order or prior database state.
+	if db.Migrator().HasTable(&model.BillingReservation{}) {
+		require.NoError(t, db.Migrator().DropTable(&model.BillingReservation{}))
+	}
 	// Representative existing account tables, before the additive migration.
 	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Token{}, &model.UserSubscription{}))
-	u := model.User{Username: "billing-protection-synthetic", Quota: 10000, Status: common.UserStatusEnabled}
+	// Fixture identity must be collision-proof against any prior state in a
+	// shared database (unique username / token key / aff_code indexes).
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	u := model.User{Username: "billing-protection-synthetic-" + suffix, AffCode: suffix, Quota: 10000, Status: common.UserStatusEnabled}
 	require.NoError(t, db.Create(&u).Error)
-	token := model.Token{UserId: u.Id, Key: "synthetic-billing-protection", RemainQuota: 10000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+	token := model.Token{UserId: u.Id, Key: "sbp" + suffix, RemainQuota: 10000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
 	require.NoError(t, db.Create(&token).Error)
 	require.Error(t, service.ValidateBillingProtection())
 	require.NoError(t, model.MigrateBillingReservations(db))

@@ -24,36 +24,21 @@ relay/TestPrepareResponsesRequestRetainsConvertedAdaptor
 router/TestGetOpenAIVideoRouteRendersJimengTask
 
 # ---------------------------------------------------------------------------
-# Dialect-matrix baseline entry (separate root cause from the group above).
+# Removed entry: service/TestProtectedBillingDatabase
+#
+# The registered root cause ("GORM-generated DROP INDEX encodes a SQLite-shaped
+# expectation") was proven WRONG by the Final Launch Gate Phase 0 read-only
+# audit (2026-10-08): the real root cause was CI test-database sharing — the
+# DB matrix handed every package one shared database, model-package tests
+# migrated billing_reservations into it first, and the service package's
+# fail-closed precondition (`require.Error` before its own additive migration)
+# was already broken on arrival. On pristine isolated PostgreSQL 17.6 and
+# MySQL 8.4 databases the test passes unmodified.
+#
+# Fix (this commit): (1) the DB matrix now provisions an isolated service
+# package database (clearapi_service_test) and runs ./service/... against it;
+# (2) TestProtectedBillingDatabase constructs its own fail-closed precondition
+# by dropping any leftover billing_reservations table, so it no longer depends
+# on package execution order. The whitelist entry is removed accordingly: any
+# future failure of this test is a genuine regression and must turn CI red.
 # ---------------------------------------------------------------------------
-#
-# Entry: service/TestProtectedBillingDatabase
-#
-# Evidence: reproduced at commit 811cbdd01b9dc672adc8559440ffb0ad05973913
-# in GitHub Actions run 37725832045 ("Release Candidate", push event) on
-# 2026-10-08. Fails identically in two of the three matrix dialects:
-#   - DB matrix — mysql    (jobs/113143646487): billing_protection_test.go:75
-#   - DB matrix — postgres (jobs/113143646571): billing_protection_test.go:75
-# Both report `An error is expected but got nil.` at the same line, i.e. the
-# failure is deterministic and dialect-consistent, not a flake. DB matrix —
-# sqlite passes, but that is not evidence of correctness: the test only runs
-# its assertion body for non-sqlite dialects.
-#
-# Root cause: billing_protection_test.go:75 asserts that
-# ValidateBillingProtection() returns an error after
-# `db.Migrator().DropIndex(&model.BillingReservation{},
-# "idx_billing_request_id")` removes the unique index. On PostgreSQL and MySQL
-# the GORM-generated DROP INDEX does not leave the database in the state the
-# assertion assumes, so the protection validator still sees the index and
-# returns nil. The test encodes a SQLite-shaped expectation.
-#
-# Blast radius: the DB matrix exists precisely to prove billing-critical
-# packages are dialect-portable, so this entry means the PostgreSQL and MySQL
-# legs of that proof are currently NOT green for this test. It is registered
-# rather than silently dropped so the gap stays visible.
-#
-# Fixing it means changing business test code (and possibly the validator's
-# index-presence probe) — forbidden during the zero-change CI/CD stage.
-# Final Launch Gate should decide whether this dialect gap is hardened before
-# public launch.
-service/TestProtectedBillingDatabase
