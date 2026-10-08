@@ -2,6 +2,15 @@ name: Release Candidate
 
 on:
   workflow_dispatch:
+  # GitHub only registers a workflow for API dispatch once its file exists on
+  # the default branch. During acceptance the candidate pipeline lives on
+  # codex/production-cicd, so workflow_dispatch returns 404 until the PR is
+  # merged. Branch-scoped push keeps the pipeline runnable in the meantime and
+  # still preserves the original intent: pushes to main never build a
+  # candidate image.
+  push:
+    branches:
+      - 'codex/production-cicd'
 
 permissions:
   contents: read
