@@ -102,24 +102,13 @@ while [ $# -gt 0 ]; do
     # policy is not acceptable. The flag is explicit, auditable and changes
     # nothing about which principal may run this wrapper.
     --ghcr-token-stdin) GHCR_TOKEN_STDIN="1"; shift 1 ;;
-    # Read-only drift probe: running image == compose effective image ==
-    # manifest current. Changes nothing; safe to run from a systemd timer
+    # Identity drift probe: running image == compose effective image ==
+    # manifest current. Appends an audit record; safe to run from a systemd timer
     # (monitoring minimal set) or before any manual container operation.
     --verify) VERIFY_ONLY="1"; shift 1 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
-if [ "$VERIFY_ONLY" != "1" ]; then
-  [ -n "$DIGEST" ] && [ -n "$COMMIT" ] || { echo "--digest and --commit are required" >&2; exit 2; }
-fi
-
-printf '%s' "$DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$' || {
-  echo "REFUSING: --digest must be an exact 'sha256:<64 hex>' reference (got: ${DIGEST})" >&2; exit 2; }
-printf '%s' "$COMMIT" | grep -Eq '^[0-9a-f]{40}$' || {
-  echo "REFUSING: --commit must be a full 40-hex commit SHA" >&2; exit 2; }
-[ "$MIGRATION_COMPATIBLE" = "true" ] || [ "$MIGRATION_COMPATIBLE" = "false" ] || {
-  echo "REFUSING: --migration-compatible must be true or false" >&2; exit 2; }
-
 if [ -f /opt/clearapi/config/deploy.env ]; then
   # shellcheck disable=SC1090
   . /opt/clearapi/config/deploy.env
@@ -282,8 +271,8 @@ rollback() {
   fi
 }
 
-# Read-only --verify mode: run the identity check and exit. Kept after helper
-# definitions and before step 1 so it never touches the deploy lock, the
+# Identity-only --verify mode: run the check, append its audit record, and exit.
+# Kept after helper definitions and before step 1 so it never touches the deploy lock, the
 # backup subsystem, or any container.
 if [ "$VERIFY_ONLY" = "1" ]; then
   if verify_running_identity; then
@@ -293,6 +282,15 @@ if [ "$VERIFY_ONLY" = "1" ]; then
   audit "verify" "drift" "identity check failed; no changes were made"
   exit 1
 fi
+
+# Deploy-only validation stays strict; verification needs no candidate metadata.
+[ -n "$DIGEST" ] && [ -n "$COMMIT" ] || { echo "--digest and --commit are required" >&2; exit 2; }
+printf '%s' "$DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$' || {
+  echo "REFUSING: --digest must be an exact 'sha256:<64 hex>' reference (got: ${DIGEST})" >&2; exit 2; }
+printf '%s' "$COMMIT" | grep -Eq '^[0-9a-f]{40}$' || {
+  echo "REFUSING: --commit must be a full 40-hex commit SHA" >&2; exit 2; }
+[ "$MIGRATION_COMPATIBLE" = "true" ] || [ "$MIGRATION_COMPATIBLE" = "false" ] || {
+  echo "REFUSING: --migration-compatible must be true or false" >&2; exit 2; }
 
 # ===========================================================================
 # 1. acquire deploy lock

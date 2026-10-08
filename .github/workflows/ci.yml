@@ -121,3 +121,9 @@ jobs:
 
       - name: Scan tracked files for secrets and forbidden artifacts
         run: bash scripts/ci/secret-scan.sh
+
+      - name: Validate deployment wrapper modes
+        run: |
+          bash -n scripts/production-deploy.sh
+          shellcheck --severity=warning scripts/production-deploy.sh
+          python3 scripts/ci/test-production-deploy.py
