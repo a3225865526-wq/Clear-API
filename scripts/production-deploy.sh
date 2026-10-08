@@ -48,6 +48,12 @@ NETWORK_NAME="${DEPLOY_NETWORK_NAME:-clearapi_internal}"
 IMAGE_BASE="${DEPLOY_IMAGE_BASE:-ghcr.io/a3225865526-wq/clearapi}"
 GHCR_USER="${DEPLOY_GHCR_USER:-clearapi-deploy}"
 GHCR_TOKEN_FILE="${DEPLOY_GHCR_TOKEN_FILE:-/opt/clearapi/secrets/ghcr-pull-token}"
+# Ephemeral pull credential. When set, the caller (GitHub Actions) pipes a
+# short-lived GITHUB_TOKEN in on stdin and the token is never written to a
+# persistent docker config; DOCKER_CONFIG points at a throwaway directory that
+# is removed on exit. The long-lived token file above stays optional and is
+# only a fallback for environments where the job token cannot pull.
+GHCR_TOKEN_STDIN="${DEPLOY_GHCR_TOKEN_STDIN:-0}"
 
 BACKUP_SERVICE="${DEPLOY_BACKUP_SERVICE:-clearapi-backup.service}"
 BACKUP_TIMER="${DEPLOY_BACKUP_TIMER:-clearapi-backup.timer}"
@@ -257,16 +263,37 @@ printf '    %s\n' $NEW_ARTIFACTS >&2
 # 6. pull exact digest
 # ===========================================================================
 IMAGE_REF="${IMAGE_BASE}@${DIGEST}"
-if [ -f "$GHCR_TOKEN_FILE" ]; then
+# Ephemeral, isolated pull credential: a throwaway DOCKER_CONFIG keeps the
+# token out of /root/.docker/config.json so nothing long-lived is left behind.
+EPHEMERAL_DOCKER_CONFIG=""
+cleanup_ephemeral() {
+  if [ -n "$EPHEMERAL_DOCKER_CONFIG" ] && [ -d "$EPHEMERAL_DOCKER_CONFIG" ]; then
+    rm -rf "$EPHEMERAL_DOCKER_CONFIG"
+  fi
+}
+trap cleanup_ephemeral EXIT
+
+if [ "$GHCR_TOKEN_STDIN" = "1" ]; then
+  EPHEMERAL_DOCKER_CONFIG="$(mktemp -d)"
+  chmod 0700 "$EPHEMERAL_DOCKER_CONFIG"
+  export DOCKER_CONFIG="$EPHEMERAL_DOCKER_CONFIG"
+  docker login ghcr.io -u "$GHCR_USER" --password-stdin \
+    || die "step 6: GHCR login failed (ephemeral job credential)"
+  LOGGED_IN=1
+  log "step 6: authenticated with ephemeral job credential (throwaway DOCKER_CONFIG)"
+elif [ -f "$GHCR_TOKEN_FILE" ]; then
   docker login ghcr.io -u "$GHCR_USER" --password-stdin < "$GHCR_TOKEN_FILE" \
     || die "step 6: GHCR login failed (token file ${GHCR_TOKEN_FILE})"
   LOGGED_IN=1
+  log "step 6: authenticated with stored pull token"
 else
   LOGGED_IN=0
-  log "step 6: no GHCR token file configured; attempting anonymous pull (works only for public images)"
+  log "step 6: no pull credential configured; attempting anonymous pull (works only for public images)"
 fi
 docker pull --platform linux/amd64 "$IMAGE_REF" || die "step 6: docker pull ${IMAGE_REF} failed"
 if [ "$LOGGED_IN" = "1" ]; then docker logout ghcr.io >/dev/null 2>&1 || true; fi
+cleanup_ephemeral
+unset DOCKER_CONFIG
 CANDIDATE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")"
 log "step 6: pulled ${IMAGE_REF} (image ID ${CANDIDATE_IMAGE_ID})"
 

@@ -26,6 +26,9 @@ on:
 
 permissions:
   contents: read
+  # packages: read lets the job's short-lived GITHUB_TOKEN pull the private
+  # GHCR candidate on the VPS. It grants no write access to any package.
+  packages: read
 
 concurrency:
   group: production
@@ -107,20 +110,38 @@ jobs:
           } > ~/.ssh/config
           chmod 0600 ~/.ssh/config
 
-      - name: Install version-matched deploy script on VPS
+      - name: Verify installed deploy wrapper matches this commit
+        # The wrapper on the VPS is the audited, version-controlled script that
+        # was installed out-of-band as root-owned 0750. This job does NOT upload
+        # and overwrite production deployment logic -- it only proves that what
+        # is already installed is byte-identical to the script in this exact
+        # commit. A mismatch means the VPS copy was tampered with or is from a
+        # different release, and the deploy is blocked.
         run: |
           set -euo pipefail
-          scp scripts/production-deploy.sh \
-            "${PROD_SSH_ALIAS}:/tmp/clearapi-production-deploy.sh.${{ github.run_id }}"
-          ssh "${PROD_SSH_ALIAS}" "
-            sudo install -m 0750 /tmp/clearapi-production-deploy.sh.${{ github.run_id }} /opt/clearapi/bin/production-deploy.sh &&
-            rm -f /tmp/clearapi-production-deploy.sh.${{ github.run_id }}
-          "
+          LOCAL_SHA="$(sha256sum scripts/production-deploy.sh | cut -d' ' -f1)"
+          REMOTE_SHA="$(ssh "${PROD_SSH_ALIAS}" "sudo sha256sum /opt/clearapi/bin/production-deploy.sh | cut -d' ' -f1")"
+          if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+            echo "deploy wrapper integrity check FAILED"
+            echo "  repo (${{ github.sha }}): $LOCAL_SHA"
+            echo "  VPS  /opt/clearapi/bin/production-deploy.sh: $REMOTE_SHA"
+            echo "refusing to deploy; the installed wrapper is not the audited script for this commit"
+            exit 1
+          fi
+          echo "deploy wrapper integrity PASS: $LOCAL_SHA"
 
       - name: Run controlled deploy on VPS
+        env:
+          GH_PULL_TOKEN: ${{ github.token }}
         run: |
-          ssh "${PROD_SSH_ALIAS}" \
-            "sudo /opt/clearapi/bin/production-deploy.sh \
+          set -euo pipefail
+          # Short-lived job token piped over stdin; the wrapper logs into a
+          # throwaway DOCKER_CONFIG and logs out again, so nothing persistent is
+          # written to /root/.docker/config.json and the credential dies with
+          # the job.
+          printf '%s' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
+            "sudo DEPLOY_GHCR_TOKEN_STDIN=1 DEPLOY_GHCR_USER=clearapi-deploy \
+             /opt/clearapi/bin/production-deploy.sh \
               --digest '${{ inputs.image_digest }}' \
               --commit '${{ inputs.expected_commit }}' \
               --workflow-run '${{ github.run_id }}' \
