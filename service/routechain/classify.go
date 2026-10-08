@@ -11,6 +11,7 @@ type Outcome string
 const (
 	OutcomeSuccess                        Outcome = "success"
 	OutcomeRequestInvalid                 Outcome = "request_invalid"
+	OutcomeExecutorLocalRejectedNoWork    Outcome = "executor_local_rejected_no_work"
 	OutcomePreDispatchUnavailable         Outcome = "pre_dispatch_unavailable"
 	OutcomePoolNoEligibleAccount          Outcome = "pool_no_eligible_account"
 	OutcomeAuthoritativeRejectionNoWork   Outcome = "authoritative_rejection_no_work"
@@ -37,6 +38,7 @@ type Evidence struct {
 	HTTPStatus           int
 	UpstreamErrorCode    string // structured error.code from the upstream envelope (exact match only)
 	ExecutorProvenance   bool   // error envelope carries the trusted executor provenance origin (Stage 4 contract)
+	ExecutorZeroDispatch bool   // trusted reserved phase + not_started transport proof, on a pool-bound path
 }
 
 // Executor pool-exhaustion codes come from the CLIProxyAPI wire contract
@@ -110,6 +112,9 @@ func Classify(evidence Evidence, success bool, localInvalid bool) Outcome {
 	// the exhaustion code, so the code alone is never sufficient).
 	if evidence.HTTPStatus == 503 && evidence.ExecutorProvenance && IsExecutorPoolExhaustionCode(evidence.UpstreamErrorCode) {
 		return OutcomePoolNoEligibleAccount
+	}
+	if evidence.HTTPStatus == 400 && evidence.UpstreamErrorCode == "model_not_found" && evidence.ExecutorProvenance && evidence.ExecutorZeroDispatch {
+		return OutcomeExecutorLocalRejectedNoWork
 	}
 	if evidence.zeroWork() && authoritativeRejectionStatus(evidence.HTTPStatus) {
 		if evidence.HTTPStatus == 429 {

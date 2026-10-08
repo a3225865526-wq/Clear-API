@@ -348,7 +348,8 @@ func chainRetryDecision(c *gin.Context, state *routechain.RequestState, relayInf
 		// the exact trusted value (HasExecutorProvenance). A body-level origin
 		// alone, or the header returned by an API_CHANNEL upstream, never
 		// classifies as pool exhaustion.
-		ExecutorProvenance: routechain.HasExecutorProvenance(relayErr) && routechain.PoolProvenanceScopeFrom(c),
+		ExecutorProvenance:   routechain.HasExecutorProvenance(relayErr) && routechain.PoolProvenanceScopeFrom(c),
+		ExecutorZeroDispatch: relayErr.HasExecutorModelResolutionProof() && routechain.HasExecutorProvenance(relayErr) && routechain.PoolProvenanceScopeFrom(c),
 	}
 	outcome := routechain.Classify(evidence, false, types.IsSkipRetryError(relayErr))
 	props := routechain.RequestProperties{
