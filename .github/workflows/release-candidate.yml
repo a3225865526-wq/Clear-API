@@ -139,18 +139,29 @@ jobs:
           touch web/dist/index.html
 
       - name: Select dialect env (sqlite default; explicit DSN for mysql/postgres)
+        # TEST_TASK_LOG_DSN is the task-settlement harness's secondary
+        # (log-database) handle. TestTaskSettlementDatabase opens a second GORM
+        # connection for it and asserts the DSN is non-empty, so every dialect
+        # needs the value -- pointing it at the same database as the main DSN is
+        # correct here because the harness provisions its own isolated schema.
         run: |
           case "${{ matrix.dialect }}" in
             sqlite)   echo 'TEST_BILLING_DIALECT=sqlite' >> "$GITHUB_ENV" ;;
             mysql)    echo 'TEST_BILLING_DIALECT=mysql'  >> "$GITHUB_ENV"
-                      echo "TEST_BILLING_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV" ;;
+                      echo "TEST_BILLING_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_TASK_LOG_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV" ;;
             postgres) echo 'TEST_BILLING_DIALECT=postgres' >> "$GITHUB_ENV"
-                      echo "TEST_BILLING_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV" ;;
+                      echo "TEST_BILLING_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_TASK_LOG_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV" ;;
             *) echo "unknown dialect"; exit 1 ;;
           esac
 
       - name: Test billing-critical packages against ${{ matrix.dialect }}
-        run: go test -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/...
+        # Baseline-aware per spec §11: the DB matrix must distinguish a known
+        # frozen-baseline failure from a new dialect regression, exactly like
+        # the main CI test job. Failures not listed in test-baseline.txt still
+        # turn this job red.
+        run: bash scripts/ci/go-test-baseline.sh go test -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/...
 
   frontend-release:
     name: Frontend production build
