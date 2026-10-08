@@ -146,7 +146,16 @@ die() {
   exit 1
 }
 
-compose() { sudo docker compose --project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}" "$@"; }
+compose() {
+  # The override file (exact-digest pin, written by write_override) MUST be
+  # part of every compose invocation; without it `compose up -d` sees an
+  # unchanged image ref and silently does nothing while the deploy reports
+  # success (observed in run 37762896277: manifest updated, container not
+  # replaced). Attach it whenever it exists.
+  local args=(--project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}")
+  [ -f "$OVERRIDE_FILE" ] && args+=(-f "$OVERRIDE_FILE")
+  sudo docker compose "${args[@]}" "$@"
+}
 service_id() { compose ps -q "$SERVICE" | head -1; }
 psql_q() { # read-only single query against the production database
   compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1"
@@ -440,7 +449,15 @@ log "step 12/13: release manifest updated (previous image ${PREV_IMAGE_ID}, roll
 write_override "$IMAGE_REF"
 compose up -d "$SERVICE" || die "step 14: compose replace failed"
 REPLACE_DONE=1
-log "step 14: container replaced with ${IMAGE_REF}"
+# Hard identity gate: prove the running container actually IS the candidate
+# image before any health check can call this deploy a success. compose may
+# legitimately no-op when it believes nothing changed; without this check a
+# no-op would sail through health checks on the OLD image and be recorded as
+# a successful deploy (exactly what run 37762896277 did).
+REPLACED_ID="$(sudo docker inspect --format '{{.Image}}' "$(service_id)")"
+[ "$REPLACED_ID" = "$CANDIDATE_IMAGE_ID" ] \
+  || die "step 14: replace did not take effect — running image ${REPLACED_ID} != candidate ${CANDIDATE_IMAGE_ID}"
+log "step 14: container replaced with ${IMAGE_REF} (running image verified: ${REPLACED_ID})"
 
 # ===========================================================================
 # 15. localhost health
