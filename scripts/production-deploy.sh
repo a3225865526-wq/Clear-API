@@ -89,7 +89,7 @@ OVERRIDE_FILE="${DEPLOY_OVERRIDE_FILE:-${APP_DIR}/compose-candidate.yaml}"
 # ---------------------------------------------------------------------------
 # Args (validated before any state change)
 # ---------------------------------------------------------------------------
-DIGEST=""; COMMIT=""; WORKFLOW_RUN=""; MIGRATION_COMPATIBLE="false"; GHCR_TOKEN_STDIN=""
+DIGEST=""; COMMIT=""; WORKFLOW_RUN=""; MIGRATION_COMPATIBLE="false"; GHCR_TOKEN_STDIN=""; VERIFY_ONLY="0"
 while [ $# -gt 0 ]; do
   case "$1" in
     --digest) DIGEST="$2"; shift 2 ;;
@@ -102,10 +102,16 @@ while [ $# -gt 0 ]; do
     # policy is not acceptable. The flag is explicit, auditable and changes
     # nothing about which principal may run this wrapper.
     --ghcr-token-stdin) GHCR_TOKEN_STDIN="1"; shift 1 ;;
+    # Read-only drift probe: running image == compose effective image ==
+    # manifest current. Changes nothing; safe to run from a systemd timer
+    # (monitoring minimal set) or before any manual container operation.
+    --verify) VERIFY_ONLY="1"; shift 1 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
-[ -n "$DIGEST" ] && [ -n "$COMMIT" ] || { echo "--digest and --commit are required" >&2; exit 2; }
+if [ "$VERIFY_ONLY" != "1" ]; then
+  [ -n "$DIGEST" ] && [ -n "$COMMIT" ] || { echo "--digest and --commit are required" >&2; exit 2; }
+fi
 
 printf '%s' "$DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$' || {
   echo "REFUSING: --digest must be an exact 'sha256:<64 hex>' reference (got: ${DIGEST})" >&2; exit 2; }
@@ -157,6 +163,57 @@ compose() {
   sudo docker compose "${args[@]}" "$@"
 }
 service_id() { compose ps -q "$SERVICE" | head -1; }
+
+compose_effective_image() {
+  # The image ref compose would actually use for the service right now:
+  # base file + override (exact-digest pin) merged. Anti-drift probe: if the
+  # override was deleted or pinned to a stale ref, the effective ref diverges
+  # from the manifest and a container rebuild would silently roll production
+  # back (observed during the 2026-10-08 rollback+redeploy drill: cleanup
+  # deleted the live pin and "manifest current != compose effective" appeared).
+  local args=(--project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}")
+  [ -f "$OVERRIDE_FILE" ] && args+=(-f "$OVERRIDE_FILE")
+  sudo docker compose "${args[@]}" config --format json 2>/dev/null \
+    | python3 -c 'import json, sys
+d = json.load(sys.stdin)
+svc = (d.get("services") or {}).get("'"$SERVICE"'") or {}
+print(svc.get("image") or "")'
+}
+
+verify_running_identity() { # read-only: running image == compose effective image == manifest current
+  local cid eff_ref eff_id manifest_id
+  cid="$(service_id)"
+  [ -n "$cid" ] || { log "verify: running ${SERVICE} container not found"; return 1; }
+  PREV_IMAGE_ID="$(sudo docker inspect --format '{{.Image}}' "$cid")"
+  [ -f "$OVERRIDE_FILE" ] || {
+    log "verify: DRIFT — digest pin override ${OVERRIDE_FILE} is missing; a container rebuild would silently revert to the base compose image"
+    return 1
+  }
+  eff_ref="$(compose_effective_image)"
+  [ -n "$eff_ref" ] || { log "verify: compose effective image could not be resolved (compose config failed)"; return 1; }
+  eff_id="$(sudo docker image inspect --format '{{.Id}}' "$eff_ref" 2>/dev/null || true)"
+  [ -n "$eff_id" ] || { log "verify: effective image ${eff_ref} is not present locally"; return 1; }
+  [ "$eff_id" = "$PREV_IMAGE_ID" ] || {
+    log "verify: DRIFT — compose effective image ${eff_ref} (${eff_id}) != running image (${PREV_IMAGE_ID})"
+    return 1
+  }
+  if [ -f "$MANIFEST" ]; then
+    manifest_id="$(python3 - "$MANIFEST" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as f:
+    m = json.load(f)
+print(((m.get("releases") or {}).get("current") or {}).get("new_api_image_id") or "")
+PYEOF
+)"
+    [ -n "$manifest_id" ] || { log "verify: manifest has no releases.current.new_api_image_id"; return 1; }
+    [ "$manifest_id" = "$PREV_IMAGE_ID" ] || {
+      log "verify: DRIFT — manifest current (${manifest_id}) != running image (${PREV_IMAGE_ID})"
+      return 1
+    }
+  fi
+  log "verify: identity OK — running == compose effective (${eff_ref}) == manifest current"
+  return 0
+}
 psql_q() { # read-only single query against the production database
   compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1"
 }
@@ -222,6 +279,18 @@ rollback() {
   fi
 }
 
+# Read-only --verify mode: run the identity check and exit. Kept after helper
+# definitions and before step 1 so it never touches the deploy lock, the
+# backup subsystem, or any container.
+if [ "$VERIFY_ONLY" = "1" ]; then
+  if verify_running_identity; then
+    audit "verify" "ok" "running == compose effective == manifest current"
+    exit 0
+  fi
+  audit "verify" "drift" "identity check failed; no changes were made"
+  exit 1
+fi
+
 # ===========================================================================
 # 1. acquire deploy lock
 # ===========================================================================
@@ -258,6 +327,13 @@ PYEOF
     die "step 3: manifest releases.current.new_api_image_id does not match the running image; state divergence — manual resolution required"
   fi
 fi
+
+# Drift gate: the running image, the image compose would actually recreate
+# (base + exact-digest override) and the manifest current entry must agree
+# before anything mutates. Catches a deleted or stale override pin before it
+# can silently roll production back on an unrelated container rebuild.
+verify_running_identity \
+  || die "step 3: production identity drift (running image vs compose effective vs manifest current); refusing to deploy on an inconsistent baseline"
 
 # ===========================================================================
 # 4. encrypted pre-deploy backup (hard gate)
