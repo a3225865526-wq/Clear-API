@@ -74,7 +74,11 @@ jobs:
   frontend:
     name: Frontend typecheck and test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # b581f111: the 10-minute cap was hit (10m19s wall clock), which
+    # cancelled the vitest step mid-run rather than reporting a test
+    # failure. Dependency install + vitest + rsbuild production build
+    # needs headroom on a cold 2-vendor runner.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: web

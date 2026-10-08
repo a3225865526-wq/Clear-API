@@ -146,7 +146,9 @@ jobs:
   frontend-release:
     name: Frontend production build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Matches the CI frontend budget: the 10-minute CI cap was hit and
+    # cancelled vitest mid-run, so the candidate build gets the same headroom.
+    timeout-minutes: 25
     defaults:
       run:
         working-directory: web
