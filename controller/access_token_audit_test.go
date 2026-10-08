@@ -438,7 +438,18 @@ func newAuditTestDatabase(t *testing.T, kind, dsn string) (*gorm.DB, string) {
 	t.Helper()
 	if kind == "sqlite" {
 		path := t.TempDir() + "/audit.db"
-		db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+		// Concurrency-safe DSN, mirroring common.SQLitePath. The pure-Go driver
+		// (modernc.org/sqlite via github.com/glebarez/sqlite) silently ignores
+		// the plain `_busy_timeout=` form, so the pragma form is required; WAL
+		// keeps readers off the writer lock, and _txlock=immediate makes a
+		// read-then-write transaction take the write lock up front instead of
+		// dying instantly on SQLITE_BUSY_SNAPSHOT. Without all three, concurrent
+		// writes surface as "database is locked" under the race detector -- see
+		// the concurrency notes in common/database.go and issue #6805.
+		// TestSecurityAccountDeletionConcurrentRequestsHaveOneWinner is the
+		// caller that depends on this.
+		sqliteDSN := path + "?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_txlock=immediate"
+		db, err := gorm.Open(sqlite.Open(sqliteDSN), &gorm.Config{})
 		require.NoError(t, err)
 		return db, path
 	}

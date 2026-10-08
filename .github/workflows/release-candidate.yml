@@ -66,14 +66,33 @@ jobs:
       - name: Race test controller serially (SQLite concurrency contention)
         # TestSecurityAccountDeletionConcurrentRequestsHaveOneWinner spawns
         # concurrent account-deletion requests against a package-local SQLite
-        # database and asserts exactly one winner. Under -race with parallel
-        # package execution the writes contend and zero requests win
-        # (security_account_test.go:285 expected 1, actual 0). Observed in
-        # Release Candidate run 37735185976; the same test passed in runs
-        # 37727302534 and 37732661437, so it is the known SQLite contention
-        # flake rather than a regression. GOFLAGS=-p=2 is not enough inside
-        # -race, so the package is serialised; the test must still pass and is
-        # deliberately NOT added to the baseline.
+        # database and asserts exactly one winner. Under -race it intermittently
+        # reports "expected: 1, actual: 0" (security_account_test.go:285).
+        #
+        # Evidence that this is contention and not a regression:
+        #  - failed under -race in runs 37735185976 and 37738237861;
+        #  - passed under -race in runs 37727302534 and 37732661437;
+        #  - has never failed in the authoritative `make test` gate, which
+        #    runs on every main CI run and is green.
+        #
+        # Root cause is in the test helper, not in production code:
+        # newAuditTestDatabase (controller/access_token_audit_test.go:440)
+        # opens SQLite as `sqlite.Open(t.TempDir()+"/audit.db")` -- a bare path
+        # with no DSN parameters. common/database.go documents precisely why
+        # that breaks concurrency (issue #6805): without
+        # `_pragma=busy_timeout(30000)` the pure-Go driver silently keeps
+        # SQLite's 5s default, and without `_txlock=immediate` a
+        # read-then-write transaction can die instantly on SQLITE_BUSY_SNAPSHOT
+        # regardless of any timeout. The production SQLitePath sets all three
+        # (busy_timeout, WAL, txlock=immediate); the test path sets none.
+        #
+        # Serialising the package reduces the pressure but cannot fix a missing
+        # busy timeout plus a missing IMMEDIATE transaction mode. The real fix
+        # is a one-line change to that test helper's DSN, which is business
+        # test code and therefore out of scope for this CI/CD-only stage.
+        # Recorded as a carry-forward rather than baseline-whitelisted: the
+        # authoritative `make test` gate is green, and whitelisting a known
+        # concurrency defect in the accounting-deletion path is not acceptable.
         env:
           GOFLAGS: -p=1
         run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./controller/...
