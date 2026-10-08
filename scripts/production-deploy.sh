@@ -53,7 +53,10 @@ GHCR_TOKEN_FILE="${DEPLOY_GHCR_TOKEN_FILE:-/opt/clearapi/secrets/ghcr-pull-token
 # persistent docker config; DOCKER_CONFIG points at a throwaway directory that
 # is removed on exit. The long-lived token file above stays optional and is
 # only a fallback for environments where the job token cannot pull.
-GHCR_TOKEN_STDIN="${DEPLOY_GHCR_TOKEN_STDIN:-0}"
+# The stdin mode is enabled exclusively via the --ghcr-token-stdin CLI flag:
+# sudo env_reset discards caller-set environment variables for allowlisted
+# commands, so an env-based switch cannot reach this script.
+GHCR_TOKEN_STDIN=""
 
 BACKUP_SERVICE="${DEPLOY_BACKUP_SERVICE:-clearapi-backup.service}"
 BACKUP_TIMER="${DEPLOY_BACKUP_TIMER:-clearapi-backup.timer}"
@@ -86,13 +89,19 @@ OVERRIDE_FILE="${DEPLOY_OVERRIDE_FILE:-${APP_DIR}/compose-candidate.yaml}"
 # ---------------------------------------------------------------------------
 # Args (validated before any state change)
 # ---------------------------------------------------------------------------
-DIGEST=""; COMMIT=""; WORKFLOW_RUN=""; MIGRATION_COMPATIBLE="false"
+DIGEST=""; COMMIT=""; WORKFLOW_RUN=""; MIGRATION_COMPATIBLE="false"; GHCR_TOKEN_STDIN=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --digest) DIGEST="$2"; shift 2 ;;
     --commit) COMMIT="$2"; shift 2 ;;
     --workflow-run) WORKFLOW_RUN="$2"; shift 2 ;;
     --migration-compatible) MIGRATION_COMPATIBLE="$2"; shift 2 ;;
+    # The pull credential is piped in on stdin. This is a CLI flag rather than
+    # an environment variable because sudo env_reset discards caller-set env
+    # vars for allowlisted commands, and widening the sudoers environment
+    # policy is not acceptable. The flag is explicit, auditable and changes
+    # nothing about which principal may run this wrapper.
+    --ghcr-token-stdin) GHCR_TOKEN_STDIN="1"; shift 1 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done

@@ -138,10 +138,12 @@ jobs:
           # Short-lived job token piped over stdin; the wrapper logs into a
           # throwaway DOCKER_CONFIG and logs out again, so nothing persistent is
           # written to /root/.docker/config.json and the credential dies with
-          # the job.
+          # the job. The stdin mode is selected with an explicit CLI flag:
+          # sudo env_reset discards caller-set env vars for allowlisted
+          # commands, so an env-based switch cannot reach the wrapper.
           printf '%s' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
-            "sudo DEPLOY_GHCR_TOKEN_STDIN=1 DEPLOY_GHCR_USER=clearapi-deploy \
-             /opt/clearapi/bin/production-deploy.sh \
+            "sudo /opt/clearapi/bin/production-deploy.sh \
+              --ghcr-token-stdin \
               --digest '${{ inputs.image_digest }}' \
               --commit '${{ inputs.expected_commit }}' \
               --workflow-run '${{ github.run_id }}' \
