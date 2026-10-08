@@ -468,7 +468,35 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	// targets beyond the reservation keep the existing needs_review boundary.
 	var hardeningAnomaly *UsageAnomaly
 	hardeningRetained := false
-	if billingUsage != nil {
+	// Interrupted stream without upstream exact usage (Final Launch Gate §3):
+	// hidden usage (unflushed output, reasoning tokens, cache writes, tool
+	// rounds) is unknowable, so a local estimate or a partial upstream frame
+	// is not a final settlement. Fail closed exactly like the Codex path's
+	// SettleUncertain: retain the approved reservation and park the request
+	// for reconciliation instead of silently undercharging. The observation
+	// flags are set by the relay handlers (MarkTokenInterrupted /
+	// MarkTokenEstimate), so this single settlement-side hook covers every
+	// text-stream provider (OpenAI, Claude, xAI, responses) uniformly.
+	interruptedUnknownRetained := false
+	if session, ok := relayInfo.Billing.(*BillingSession); ok && session.Durable() &&
+		summary.hasBillableUsage() && summary.Quota <= session.GetPreConsumedQuota() &&
+		// Exact codex metering is upstream-exact usage even on an interrupted
+		// stream: settle it exactly, retention would overcharge.
+		(usage == nil || usage.CodexMetering == nil) {
+		if obs := TokenObservationForLog(ctx, false); obs.Interrupted &&
+			(obs.Quality == "local_estimate" || obs.Quality == "upstream_partial") {
+			// Retention must not depend on the marker committing: the
+			// reserved charge is the fail-closed floor, the marker is only
+			// the reconciliation pointer.
+			summary.Quota = session.GetPreConsumedQuota()
+			hardeningRetained = true
+			interruptedUnknownRetained = true
+			if err := model.MarkBillingReviewMarker(relayInfo.RequestId, "interrupted_unknown_usage"); err != nil {
+				logger.LogError(ctx, "interrupted usage review marker could not be persisted: "+err.Error())
+			}
+		}
+	}
+	if billingUsage != nil && !interruptedUnknownRetained {
 		if session, ok := relayInfo.Billing.(*BillingSession); ok && session.Durable() && summary.hasBillableUsage() {
 			anomaly := EvaluateTextUsageAnomaly(relayInfo, billingUsage, summary.IsClaudeUsageSemantic, tieredUsedVars)
 			if anomaly.Anomaly && summary.Quota <= session.GetPreConsumedQuota() {
@@ -578,6 +606,11 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			other.SetAdmin("usage_retained_for_review", true)
 			other.SetAdmin("expected_quota", expectedQuota)
 		}
+	}
+	if interruptedUnknownRetained {
+		other.SetAdmin("interrupted_unknown_usage", true)
+		other.SetAdmin("usage_retained_for_review", true)
+		other.SetAdmin("expected_quota", expectedQuota)
 	}
 	if common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens) {
 		other.SetPublic("usage_estimated", true)
