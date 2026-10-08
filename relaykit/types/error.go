@@ -106,7 +106,9 @@ type NewAPIError struct {
 	// the upstream response, if any. Stage 7.1 provenance contract: this is
 	// the trust root for executor-local pre-dispatch classifications; the
 	// body-level error.origin field is advisory only.
-	executorErrorOrigin string
+	executorErrorOrigin       string
+	executorDispatchPhase     string
+	executorProviderTransport string
 }
 
 // ExecutorErrorOriginHeader is the reserved response header the trusted local
@@ -118,8 +120,19 @@ const (
 	ExecutorErrorOriginHeader = "X-Cpa-Executor-Error-Origin"
 	// ExecutorErrorOriginLocal is the only trusted value of
 	// ExecutorErrorOriginHeader.
-	ExecutorErrorOriginLocal = "local"
+	ExecutorErrorOriginLocal        = "local"
+	ExecutorDispatchPhaseHeader     = "X-Cpa-Executor-Dispatch-Phase"
+	ExecutorProviderTransportHeader = "X-Cpa-Executor-Provider-Transport"
 )
+
+// WithExecutorDispatchProof captures reserved response headers, never request metadata.
+func WithExecutorDispatchProof(phase, transport string) NewAPIErrorOptions {
+	return func(e *NewAPIError) { e.executorDispatchPhase, e.executorProviderTransport = phase, transport }
+}
+
+func (e *NewAPIError) HasExecutorModelResolutionProof() bool {
+	return e != nil && e.executorErrorOrigin == ExecutorErrorOriginLocal && e.executorDispatchPhase == "model_resolution" && e.executorProviderTransport == "not_started"
+}
 
 // WithExecutorErrorOrigin captures the executor provenance header value from
 // an upstream response onto the error.

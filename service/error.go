@@ -90,7 +90,8 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	// trust root for executor-local classifications; the body origin is only
 	// advisory (routechain.HasExecutorProvenance).
 	executorOrigin := resp.Header.Get(types.ExecutorErrorOriginHeader)
-	newApiErr = types.InitOpenAIError(types.ErrorCodeBadResponseStatusCode, resp.StatusCode, types.WithExecutorErrorOrigin(executorOrigin))
+	dispatchPhase, providerTransport := resp.Header.Get(types.ExecutorDispatchPhaseHeader), resp.Header.Get(types.ExecutorProviderTransportHeader)
+	newApiErr = types.InitOpenAIError(types.ErrorCodeBadResponseStatusCode, resp.StatusCode, types.WithExecutorErrorOrigin(executorOrigin), types.WithExecutorDispatchProof(dispatchPhase, providerTransport))
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -122,7 +123,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		// General format error (OpenAI, Anthropic, Gemini, etc.)
 		oaiError := errResponse.TryToOpenAIError()
 		if oaiError != nil {
-			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode, types.WithExecutorErrorOrigin(executorOrigin))
+			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode, types.WithExecutorErrorOrigin(executorOrigin), types.WithExecutorDispatchProof(dispatchPhase, providerTransport))
 			if showBodyWhenFail {
 				newApiErr.Err = buildErrWithBody(newApiErr.Error())
 			}
@@ -135,7 +136,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		// raw body so the upstream failure remains diagnosable.
 		logger.LogError(ctx, fmt.Sprintf("bad response status code %d with empty error message, body: %s", resp.StatusCode, responseBodyPreview))
 	}
-	newApiErr = types.NewOpenAIError(errors.New(message), types.ErrorCodeBadResponseStatusCode, resp.StatusCode, types.WithExecutorErrorOrigin(executorOrigin))
+	newApiErr = types.NewOpenAIError(errors.New(message), types.ErrorCodeBadResponseStatusCode, resp.StatusCode, types.WithExecutorErrorOrigin(executorOrigin), types.WithExecutorDispatchProof(dispatchPhase, providerTransport))
 	if showBodyWhenFail {
 		newApiErr.Err = buildErrWithBody(newApiErr.Error())
 	}

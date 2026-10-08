@@ -59,6 +59,8 @@ func CanFailover(props RequestProperties, policy *model.RouteCandidatePolicy, ev
 		return blocked("upstream_work_observed_no_replay")
 	case OutcomeRequestInvalid:
 		return blocked("request_invalid")
+	case OutcomeExecutorLocalRejectedNoWork:
+		return blocked("executor_local_rejection_no_replay")
 	case OutcomeRoutePolicyRejected:
 		return blocked("route_policy_rejected")
 	case OutcomeRequestWrittenOutcomeUncertain:
@@ -101,6 +103,8 @@ func ShouldRefundZeroWork(evidence Evidence, outcome Outcome) bool {
 		return false
 	}
 	switch outcome {
+	case OutcomeExecutorLocalRejectedNoWork:
+		return evidence.HTTPStatus == 400 && evidence.UpstreamErrorCode == "model_not_found" && evidence.ExecutorProvenance && evidence.ExecutorZeroDispatch
 	case OutcomePoolNoEligibleAccount:
 		return evidence.HTTPStatus == 503 && evidence.ExecutorProvenance && IsExecutorPoolExhaustionCode(evidence.UpstreamErrorCode)
 	case OutcomePreDispatchUnavailable, OutcomeRequestInvalid:

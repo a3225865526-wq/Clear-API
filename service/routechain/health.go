@@ -139,7 +139,7 @@ func ClassifyHealthOutcome(signals HealthSignals) (HealthOutcome, string) {
 			return HealthFailure, "transport_failure"
 		}
 		return HealthNeutral, "tool_chain_no_retry"
-	case OutcomeRequestInvalid, OutcomeRoutePolicyRejected:
+	case OutcomeRequestInvalid, OutcomeRoutePolicyRejected, OutcomeExecutorLocalRejectedNoWork:
 		// User/local causes (§十四): never prove the provider unhealthy.
 		return HealthNeutral, "request_local"
 	}

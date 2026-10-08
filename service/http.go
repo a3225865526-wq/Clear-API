@@ -38,7 +38,7 @@ func ShouldCopyUpstreamHeader(c *gin.Context, k string, v []string) bool {
 	// Stage 7.1: the executor provenance header is internal to the
 	// gateway↔executor trust boundary — it is consumed for classification and
 	// never forwarded to end users, whatever the upstream is.
-	if strings.EqualFold(k, types.ExecutorErrorOriginHeader) {
+	if strings.EqualFold(k, types.ExecutorErrorOriginHeader) || strings.EqualFold(k, types.ExecutorDispatchPhaseHeader) || strings.EqualFold(k, types.ExecutorProviderTransportHeader) {
 		return false
 	}
 	if strings.EqualFold(k, common.RequestIdKey) {

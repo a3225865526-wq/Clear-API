@@ -145,7 +145,7 @@ func terminalMapping(outcome Outcome, evidence Evidence, financeEnabled bool) (s
 		return model.RouteChainTerminalSucceeded, model.RouteChainCostNone
 	case OutcomePreDispatchUnavailable, OutcomeRequestInvalid:
 		return model.RouteChainTerminalFailedSafeToAdvance, model.RouteChainCostNone
-	case OutcomePoolNoEligibleAccount, OutcomeAuthoritativeRejectionNoWork, OutcomeRateLimitRejectionNoWork:
+	case OutcomePoolNoEligibleAccount, OutcomeAuthoritativeRejectionNoWork, OutcomeRateLimitRejectionNoWork, OutcomeExecutorLocalRejectedNoWork:
 		return model.RouteChainTerminalAuthoritativeRej, model.RouteChainCostZeroConfirmed
 	case OutcomeRequestWrittenOutcomeUncertain:
 		return model.RouteChainTerminalOutcomeUncertain, model.RouteChainCostUnknownReview
@@ -163,7 +163,7 @@ func terminalMapping(outcome Outcome, evidence Evidence, financeEnabled bool) (s
 
 func authoritativeOutcome(outcome Outcome) bool {
 	switch outcome {
-	case OutcomePoolNoEligibleAccount, OutcomeAuthoritativeRejectionNoWork, OutcomeRateLimitRejectionNoWork:
+	case OutcomePoolNoEligibleAccount, OutcomeAuthoritativeRejectionNoWork, OutcomeRateLimitRejectionNoWork, OutcomeExecutorLocalRejectedNoWork:
 		return true
 	}
 	return false
