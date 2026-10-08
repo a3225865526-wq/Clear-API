@@ -173,11 +173,14 @@ compose_effective_image() {
   # deleted the live pin and "manifest current != compose effective" appeared).
   local args=(--project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}")
   [ -f "$OVERRIDE_FILE" ] && args+=(-f "$OVERRIDE_FILE")
-  sudo docker compose "${args[@]}" config --format json 2>/dev/null \
+  # A failed probe must yield an empty string instead of aborting the wrapper
+  # under set -e, so the caller can log the drift verdict and audit it.
+  { sudo docker compose "${args[@]}" config --format json 2>/dev/null \
     | python3 -c 'import json, sys
 d = json.load(sys.stdin)
 svc = (d.get("services") or {}).get("'"$SERVICE"'") or {}
 print(svc.get("image") or "")'
+  } || true
 }
 
 verify_running_identity() { # read-only: running image == compose effective image == manifest current
