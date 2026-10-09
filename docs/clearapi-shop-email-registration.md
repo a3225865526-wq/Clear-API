@@ -83,14 +83,14 @@ Changed files:
 - Real database matrix: SQLite 3.50.4, MySQL 8.4.11 and PostgreSQL 17.11. Final related registration/login tests passed on isolated synthetic databases. No schema change needs migration. Production databases were never used.
 - Existing Redemption/StoreRedeem regressions: passed locally. No formal code or live order was used.
 - Full local Go runner: environment-blocked by a missing pre-existing json-iterator module in the offline cache, then intentionally stopped. This is not a passing full-suite result. Existing CI remains authoritative for frozen/full dependencies.
-- Full local frontend suite: running; final result must be recorded before readiness is declared.
+- Full local frontend suite: 200/202 files passed; 2126 tests passed and 160 failed, concentrated in unchanged lobe-icon and usage-logs/model-badge suites (missing provider SVG/image rendering). Two representative Claude/Perplexity failures reproduced on a separate untouched checkout of starting main with the same installed dependencies. This confirms a local baseline icon issue; it does not individually baseline-test every failing assertion. Frozen-dependency CI determines the full-suite integration outcome.
 - Browser QA: desktop and 390x844 mobile shop; dark theme; mobile single column; no horizontal overflow (scrollWidth=clientWidth=390). Mocked-status registration at 390x844 shows exactly email/password/code plus sign-in. No actual account or purchase was created through the browser.
 
 Security review used [OWASP Authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html), [Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html) and [ASVS 5.0.0](https://owasp.org/projects/asvs). Applicable focus: server enforcement, uniform responses, password hash preservation, identity ambiguity, replay/expiry/throttling and secret-free logs. This is a scoped regression review, not a certification of whole-application ASVS compliance. Actual SMTP delivery remains unverified.
 
 ## 6. Integration
 
-Commit / PR / CI / merge / RC / exact digest / OCI revision: pending. Standard server-side merge controls must be honored without admin bypass. GitHub protection/rules API returned 403 explaining this private repository's account does not support the feature; no protection changes are made.
+Implementation commit: `0a56e830e5c38b9984edd9dbbe72ed5f48d53058`. PR: [#7](https://github.com/a3225865526-wq/Clear-API/pull/7). Initial CI: [37934063485](https://github.com/a3225865526-wq/Clear-API/actions/runs/37934063485), running when this report was written. Merge, post-merge CI, RC, exact digest and OCI revision remain pending; the final development result will record their actual outcomes. Standard server-side merge controls must be honored without admin bypass. GitHub protection/rules API returned 403 explaining this private repository's account does not support the feature; no protection changes are made.
 
 ## 7. Operator information still needed before activation
 
