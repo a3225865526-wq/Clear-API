@@ -44,6 +44,7 @@ func TestInterruptedStreamLocalEstimateRetainsReservation(t *testing.T) {
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 	flow.Info.IsStream = true
 	require.NoError(t, flow.dispatch(t))
+	flow.Ctx.Set("upstream_attempted", true) // Successful transport write, not budget preparation.
 	reserved := reservationOf(t, flow.RequestID).Reserved
 	require.Greater(t, reserved, 10)
 
@@ -77,6 +78,7 @@ func TestInterruptedStreamUpstreamPartialRetainsReservation(t *testing.T) {
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 	flow.Info.IsStream = true
 	require.NoError(t, flow.dispatch(t))
+	flow.Ctx.Set("upstream_attempted", true)
 	reserved := reservationOf(t, flow.RequestID).Reserved
 
 	// A mid-stream upstream usage frame arrives, then the stream is
@@ -108,6 +110,7 @@ func TestInterruptedStreamExactMeterSettlesExactly(t *testing.T) {
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 	flow.Info.IsStream = true
 	require.NoError(t, flow.dispatch(t))
+	flow.Ctx.Set("upstream_attempted", true)
 	reserved := reservationOf(t, flow.RequestID).Reserved
 
 	service.MarkTokenInterrupted(flow.Ctx)
@@ -139,6 +142,7 @@ func TestCompletedStreamEstimateSettlesEstimate(t *testing.T) {
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 	flow.Info.IsStream = true
 	require.NoError(t, flow.dispatch(t))
+	flow.Ctx.Set("upstream_attempted", true)
 	reserved := reservationOf(t, flow.RequestID).Reserved
 
 	service.MarkTokenEstimate(flow.Ctx)
@@ -149,6 +153,57 @@ func TestCompletedStreamEstimateSettlesEstimate(t *testing.T) {
 	assert.Less(t, row.Applied, reserved)
 	wallet := walletOf(t, u)
 	assert.Equal(t, u.Balance-row.Applied, wallet.UserQuota)
+	_, ok := markerOf(t, flow.RequestID)
+	assert.False(t, ok)
+}
+
+func TestR7UndispatchedUnknownUsageDoesNotRetain(t *testing.T) {
+	for _, quality := range []string{"missing", "local_estimate", "upstream_partial"} {
+		t.Run(quality, func(t *testing.T) {
+			newHardeningDB(t)
+			configureTieredModel(t, h2ModelA, fixtureAExpr)
+			enforceColdPolicy(t, nil)
+			u := createHardeningUser(t, model.DB, "r7-undispatched-"+quality, 10000)
+			flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
+			require.NoError(t, flow.dispatch(t)) // Prepared budget is not a transport write.
+			switch quality {
+			case "local_estimate":
+				service.MarkTokenEstimate(flow.Ctx)
+			case "upstream_partial":
+				service.ObserveTokenUsage(flow.Ctx, "openai", []byte(`{"usage":{"total_tokens":0}}`))
+			}
+			service.MarkTokenInterrupted(flow.Ctx)
+			require.Equal(t, quality, service.TokenObservationForLog(flow.Ctx, false).Quality)
+			flow.settle(t, &dto.Usage{})
+			row := reservationOf(t, flow.RequestID)
+			assert.Zero(t, row.Applied)
+			assert.Equal(t, walletState{u.Balance, u.Balance}, walletOf(t, u))
+			_, ok := markerOf(t, flow.RequestID)
+			assert.False(t, ok)
+		})
+	}
+}
+
+func TestR7InterruptedExactZeroSettlesZero(t *testing.T) {
+	newHardeningDB(t)
+	configureTieredModel(t, h2ModelA, fixtureAExpr)
+	enforceColdPolicy(t, nil)
+	u := createHardeningUser(t, model.DB, "r7-exact-zero", 10000)
+	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
+	require.NoError(t, flow.dispatch(t))
+	flow.Ctx.Set("upstream_attempted", true)
+	service.MarkTokenInterrupted(flow.Ctx)
+	usage := &dto.Usage{CodexMetering: dto.ParseCodexMetering([]byte(`{"input_tokens":0,"output_tokens":0,"total_tokens":0,"input_tokens_details":{"cached_tokens":0},"output_tokens_details":{"reasoning_tokens":0}}`))}
+	require.NotNil(t, usage.CodexMetering)
+	require.Equal(t, "exact", usage.CodexMetering.Status)
+	flow.settle(t, usage)
+	flow.settle(t, usage)
+	flow.Info.Billing.Refund(flow.Ctx)
+	row := reservationOf(t, flow.RequestID)
+	assert.Equal(t, "settled", row.State)
+	assert.Zero(t, row.Target)
+	assert.Zero(t, row.Applied)
+	assert.Equal(t, walletState{u.Balance, u.Balance}, walletOf(t, u))
 	_, ok := markerOf(t, flow.RequestID)
 	assert.False(t, ok)
 }
