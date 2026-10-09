@@ -471,20 +471,22 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	// Interrupted stream without upstream exact usage (Final Launch Gate §3):
 	// hidden usage (unflushed output, reasoning tokens, cache writes, tool
 	// rounds) is unknowable, so a local estimate or a partial upstream frame
-	// is not a final settlement. Fail closed exactly like the Codex path's
+	// or missing usage is not a final settlement. Fail closed like the Codex path's
 	// SettleUncertain: retain the approved reservation and park the request
 	// for reconciliation instead of silently undercharging. The observation
 	// flags are set by the relay handlers (MarkTokenInterrupted /
 	// MarkTokenEstimate), so this single settlement-side hook covers every
 	// text-stream provider (OpenAI, Claude, xAI, responses) uniformly.
 	interruptedUnknownRetained := false
+	// DoRequest sets upstream_attempted only after a successful HTTP request
+	// write. Budget preparation, cancellation and zero output cannot prove dispatch.
 	if session, ok := relayInfo.Billing.(*BillingSession); ok && session.Durable() &&
-		summary.hasBillableUsage() && summary.Quota <= session.GetPreConsumedQuota() &&
+		ctx.GetBool("upstream_attempted") && summary.Quota <= session.GetPreConsumedQuota() &&
 		// Exact codex metering is upstream-exact usage even on an interrupted
 		// stream: settle it exactly, retention would overcharge.
 		(usage == nil || usage.CodexMetering == nil) {
 		if obs := TokenObservationForLog(ctx, false); obs.Interrupted &&
-			(obs.Quality == "local_estimate" || obs.Quality == "upstream_partial") {
+			(obs.Quality == "missing" || obs.Quality == "local_estimate" || obs.Quality == "upstream_partial") {
 			// Retention must not depend on the marker committing: the
 			// reserved charge is the fail-closed floor, the marker is only
 			// the reconciliation pointer.
