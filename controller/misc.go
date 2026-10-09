@@ -222,12 +222,23 @@ func SendEmailVerification(c *gin.Context) {
 		return
 	}
 
+	if !common.ReserveVerificationEmailSend(email) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"success": false, "message": "Please wait 60 seconds before requesting another code"})
+		return
+	}
 	if model.IsEmailAlreadyTaken(email) {
 		c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 		return
 	}
-	code := common.GenerateVerificationCode(6)
-	common.RegisterVerificationCodeWithKey(email, code, common.EmailVerificationPurpose)
+	code, err := common.GenerateEmailVerificationCode()
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Verification is temporarily unavailable"})
+		return
+	}
+	if !common.RegisterVerificationCodeWithKey(email, code, common.EmailVerificationPurpose) {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"success": false, "message": "Verification is temporarily unavailable"})
+		return
+	}
 	subject := fmt.Sprintf("%s邮箱验证邮件", common.SystemName)
 	content := fmt.Sprintf("<p>您好，你正在进行%s邮箱验证。</p>"+
 		"<p>您的验证码为: <strong>%s</strong></p>"+

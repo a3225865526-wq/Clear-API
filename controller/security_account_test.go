@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -22,6 +23,8 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/oauth"
 	"github.com/QuantumNous/new-api/service"
@@ -898,4 +901,286 @@ func TestSecurityAccountUnbindPreservesUsableLoginMethod(t *testing.T) {
 			}
 		})
 	}
+}
+
+// All identities and mailboxes in these tests are synthetic and isolated.
+func setupVerifiedRegistrationTest(t *testing.T) *gin.Engine {
+	t.Helper()
+	setupManageUserTestDB(t)
+	oldRegister, oldPassword, oldEmail := common.RegisterEnabled, common.PasswordRegisterEnabled, common.EmailVerificationEnabled
+	oldQuota, oldDefaultToken := common.QuotaForNewUser, constant.GenerateDefaultToken
+	oldDomain, oldAlias := common.EmailDomainRestrictionEnabled, common.EmailAliasRestrictionEnabled
+	common.RegisterEnabled, common.PasswordRegisterEnabled, common.EmailVerificationEnabled = true, true, true
+	common.QuotaForNewUser, constant.GenerateDefaultToken = 0, false
+	common.EmailDomainRestrictionEnabled, common.EmailAliasRestrictionEnabled = false, false
+	t.Cleanup(func() {
+		common.RegisterEnabled, common.PasswordRegisterEnabled, common.EmailVerificationEnabled = oldRegister, oldPassword, oldEmail
+		common.QuotaForNewUser, constant.GenerateDefaultToken = oldQuota, oldDefaultToken
+		common.EmailDomainRestrictionEnabled, common.EmailAliasRestrictionEnabled = oldDomain, oldAlias
+	})
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.POST("/api/user/register", Register)
+	engine.GET("/api/verification", middleware.EmailVerificationRateLimit(), SendEmailVerification)
+	return engine
+}
+
+func registrationRequest(engine *gin.Engine, email, code, username string) *httptest.ResponseRecorder {
+	body, _ := common.Marshal(map[string]string{"email": email, "verification_code": code, "username": username, "password": "test-registration-password"})
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest("POST", "/api/user/register", strings.NewReader(string(body))))
+	return w
+}
+
+func registrationSucceeded(t *testing.T, response *httptest.ResponseRecorder) bool {
+	t.Helper()
+	var result struct{ Success bool }
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &result))
+	return result.Success
+}
+
+func TestVerifiedRegistrationSMTPFlowAndLegacyCompatibility(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	mailbox := newSecurityMailbox(t)
+	var appLogs bytes.Buffer
+	common.LogWriterMu.Lock()
+	previousWriter, previousErrorWriter := gin.DefaultWriter, gin.DefaultErrorWriter
+	gin.DefaultWriter, gin.DefaultErrorWriter = &appLogs, &appLogs
+	common.LogWriterMu.Unlock()
+	t.Cleanup(func() {
+		common.LogWriterMu.Lock()
+		defer common.LogWriterMu.Unlock()
+		gin.DefaultWriter, gin.DefaultErrorWriter = previousWriter, previousErrorWriter
+	})
+	common.SMTPToken = "synthetic-smtp-credential"
+
+	password, err := common.HashAccountPassword("legacy-test-password")
+	require.NoError(t, err)
+	legacy := &model.User{Username: "legacy-user", Password: password, Quota: 123, Group: "default", Status: common.UserStatusEnabled}
+	require.NoError(t, model.DB.Create(legacy).Error)
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, httptest.NewRequest("GET", "/api/verification?email=Verified-New@Example.com", nil))
+	require.Equal(t, http.StatusOK, response.Code)
+	code := mailbox.code(t, "verified-new@example.com")
+	require.Regexp(t, `^[0-9]{6}$`, code)
+	response = registrationRequest(engine, " Verified-New@Example.com ", code, "chosen-name")
+	require.True(t, registrationSucceeded(t, response), response.Body.String())
+	user, err := model.GetUniqueUserByEmail("verified-new@example.com")
+	require.NoError(t, err)
+	assert.Regexp(t, `^u_[a-f0-9]{18}$`, user.Username)
+	assert.NotContains(t, user.Username, "verified-new")
+	assert.Equal(t, "default", user.Group)
+	assert.Equal(t, common.RoleCommonUser, user.Role)
+	assert.Zero(t, user.Quota)
+	assert.NotEqual(t, "test-registration-password", user.Password)
+	assert.True(t, common.ValidatePasswordAndHash("test-registration-password", user.Password))
+	login := model.User{Username: "VERIFIED-NEW@EXAMPLE.COM", Password: "test-registration-password"}
+	require.NoError(t, login.ValidateAndFill())
+	assert.Equal(t, user.Id, login.Id)
+	oldLogin := model.User{Username: "legacy-user", Password: "legacy-test-password"}
+	require.NoError(t, oldLogin.ValidateAndFill())
+	assert.Equal(t, legacy.Id, oldLogin.Id)
+	assert.Equal(t, 123, oldLogin.Quota)
+	assert.False(t, registrationSucceeded(t, registrationRequest(engine, user.Email, code, "replay")))
+	common.RegisterVerificationCodeWithKey(user.Email, "123456", common.EmailVerificationPurpose)
+	assert.False(t, registrationSucceeded(t, registrationRequest(engine, user.Email, "123456", "duplicate")))
+	var count int64
+	require.NoError(t, model.DB.Model(&model.User{}).Count(&count).Error)
+	assert.EqualValues(t, 2, count)
+	assert.NotContains(t, appLogs.String(), "test-registration-password")
+	assert.NotContains(t, appLogs.String(), "legacy-test-password")
+	assert.NotContains(t, appLogs.String(), "synthetic-smtp-credential")
+	assert.NotContains(t, appLogs.String(), "<strong>"+code+"</strong>")
+	assert.NotContains(t, appLogs.String(), "验证码为: "+code)
+
+}
+
+func TestVerifiedRegistrationRejectsMissingWrongExpiredAndExhaustedProof(t *testing.T) {
+	for _, scenario := range []string{"missing", "wrong", "expired", "exhausted", "wrong purpose", "wrong mailbox"} {
+		t.Run(scenario, func(t *testing.T) {
+			engine := setupVerifiedRegistrationTest(t)
+			email := "reject-" + strings.ReplaceAll(scenario, " ", "-") + "@example.com"
+			code := "123456"
+			purpose := common.EmailVerificationPurpose
+			if scenario == "wrong purpose" {
+				purpose = common.PasswordResetPurpose
+			}
+			common.RegisterVerificationCodeWithKey(email, code, purpose)
+			t.Cleanup(func() { common.DeleteKey(email, purpose) })
+			switch scenario {
+			case "missing":
+				code = ""
+			case "wrong":
+				code = "654321"
+			case "expired":
+				previous := common.VerificationValidMinutes
+				common.VerificationValidMinutes = 0
+				t.Cleanup(func() { common.VerificationValidMinutes = previous })
+			case "exhausted":
+				for range 5 {
+					assert.False(t, registrationSucceeded(t, registrationRequest(engine, email, "bad", "legacy-bypass")))
+				}
+			case "wrong mailbox":
+				email = "different@example.com"
+			}
+			assert.False(t, registrationSucceeded(t, registrationRequest(engine, email, code, "legacy-bypass")))
+			var count int64
+			require.NoError(t, model.DB.Model(&model.User{}).Count(&count).Error)
+			assert.Zero(t, count)
+		})
+	}
+}
+
+func TestVerifiedRegistrationConcurrentProofHasOneWinner(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	email := "concurrent-registration@example.com"
+	common.RegisterVerificationCodeWithKey(email, "123456", common.EmailVerificationPurpose)
+	responses := make(chan *httptest.ResponseRecorder, 2)
+	var wg sync.WaitGroup
+	for range 2 {
+		wg.Add(1)
+		go func() { defer wg.Done(); responses <- registrationRequest(engine, email, "123456", "") }()
+	}
+	wg.Wait()
+	close(responses)
+	winners := 0
+	for response := range responses {
+		if registrationSucceeded(t, response) {
+			winners++
+		}
+	}
+	assert.Equal(t, 1, winners)
+	var count int64
+	require.NoError(t, model.DB.Model(&model.User{}).Count(&count).Error)
+	assert.EqualValues(t, 1, count)
+}
+
+func TestVerifiedRegistrationDoesNotClaimLegacyEmailAndRejectsGiftMisconfiguration(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	existing := &model.User{Username: "reserved-legacy", Email: "reserved-registration@example.com", Quota: 456}
+	require.NoError(t, model.DB.Create(existing).Error)
+	common.RegisterVerificationCodeWithKey(existing.Email, "123456", common.EmailVerificationPurpose)
+	assert.False(t, registrationSucceeded(t, registrationRequest(engine, existing.Email, "123456", "")))
+	require.NoError(t, model.DB.First(existing, existing.Id).Error)
+	assert.Equal(t, 456, existing.Quota)
+	common.QuotaForNewUser = 123
+	email := "gift-misconfiguration@example.com"
+	common.RegisterVerificationCodeWithKey(email, "123456", common.EmailVerificationPurpose)
+	assert.False(t, registrationSucceeded(t, registrationRequest(engine, email, "123456", "")))
+}
+
+func TestVerifiedRegistrationSMTPFailureAndEmailCooldown(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	newSecurityMailbox(t)
+	common.SMTPServer = "" // fail locally without contacting any real service
+	email := "smtp-failure-registration@example.com"
+	common.RegisterVerificationCodeWithKey(email, "123456", common.EmailVerificationPurpose)
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, httptest.NewRequest("GET", "/api/verification?email="+email, nil))
+	require.Equal(t, http.StatusOK, response.Code)
+	assert.False(t, common.VerifyCodeWithKey(email, "123456", common.EmailVerificationPurpose))
+	assert.False(t, registrationSucceeded(t, registrationRequest(engine, email, "123456", "")))
+	response = httptest.NewRecorder()
+	request := httptest.NewRequest("GET", "/api/verification?email=SMTP-FAILURE-REGISTRATION@example.com", nil)
+	request.RemoteAddr = "203.0.113.91:1234"
+	engine.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusTooManyRequests, response.Code)
+	assert.NotContains(t, response.Body.String(), common.SMTPFrom)
+}
+
+func TestVerifiedRegistrationIPThrottleAppliesAcrossMailboxes(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	newSecurityMailbox(t)
+	for index, email := range []string{"ip-one@example.com", "ip-two@example.com", "ip-three@example.com"} {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest("GET", "/api/verification?email="+email, nil)
+		request.RemoteAddr = "203.0.113.92:1234"
+		engine.ServeHTTP(response, request)
+		expected := http.StatusOK
+		if index == 2 {
+			expected = http.StatusTooManyRequests
+		}
+		assert.Equal(t, expected, response.Code)
+	}
+}
+
+func TestEmailLoginNormalizesAndFailsClosedOnHistoricalDuplicates(t *testing.T) {
+	setupVerifiedRegistrationTest(t)
+	password, err := common.HashAccountPassword("legacy-test-password")
+	require.NoError(t, err)
+	first := &model.User{Username: "first-legacy", AffCode: "first-aff", Email: "Same@example.com", Password: password, Status: common.UserStatusEnabled}
+	second := &model.User{Username: "second-legacy", AffCode: "second-aff", Email: "same@example.com", Password: password, Status: common.UserStatusEnabled}
+	require.NoError(t, model.DB.Create(first).Error)
+	require.NoError(t, model.DB.Create(second).Error)
+	login := model.User{Username: "SAME@EXAMPLE.COM", Password: "legacy-test-password"}
+	assert.ErrorIs(t, login.ValidateAndFill(), model.ErrInvalidCredentials)
+	login = model.User{Username: first.Username, Password: "legacy-test-password"}
+	require.NoError(t, login.ValidateAndFill())
+	assert.Equal(t, first.Id, login.Id)
+	// A legacy username shaped like an email retains exact-match priority.
+	usernameOwner := &model.User{Username: "same@example.com", AffCode: "username-aff", Password: password, Status: common.UserStatusEnabled}
+	require.NoError(t, model.DB.Create(usernameOwner).Error)
+	login = model.User{Username: "same@example.com", AffCode: "username-aff", Password: "legacy-test-password"}
+	require.NoError(t, login.ValidateAndFill())
+	assert.Equal(t, usernameOwner.Id, login.Id)
+}
+
+func TestVerifiedRegistrationRejectsEmailShapedLegacyUsername(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	existing := &model.User{Username: "Legacy@Example.com", AffCode: "email-name-aff", Quota: 789}
+	require.NoError(t, model.DB.Create(existing).Error)
+	email := "legacy@example.com"
+	common.RegisterVerificationCodeWithKey(email, "123456", common.EmailVerificationPurpose)
+	assert.False(t, registrationSucceeded(t, registrationRequest(engine, email, "123456", "")))
+	var count int64
+	require.NoError(t, model.DB.Model(&model.User{}).Count(&count).Error)
+	assert.EqualValues(t, 1, count)
+}
+
+func TestVerifiedRegistrationBlocksOAuthCreationButPreservesLinkedLogin(t *testing.T) {
+	setupVerifiedRegistrationTest(t)
+	provider := &oauth.GitHubProvider{}
+	existing := &model.User{Username: "oauth-existing", AffCode: "oauth-aff", GitHubId: "linked-user"}
+	require.NoError(t, model.DB.Create(existing).Error)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/api/oauth/test", nil)
+	_, _, err := findOrCreateOAuthUser(c, provider, &oauth.OAuthUser{ProviderUserID: "fresh-user"}, nil, "")
+	require.Error(t, err)
+	var disabled *OAuthRegistrationDisabledError
+	assert.ErrorAs(t, err, &disabled)
+	user, _, err := findOrCreateOAuthUser(c, provider, &oauth.OAuthUser{ProviderUserID: "linked-user"}, nil, "")
+	require.NoError(t, err)
+	assert.Equal(t, existing.Id, user.Id)
+}
+
+func TestVerifiedRegistrationBlocksWeChatCreation(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	previousEnabled, previousAddress, previousToken := common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"success":true,"data":"fresh-wechat-user"}`))
+	}))
+	defer server.Close()
+	common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken = true, server.URL, "synthetic-wechat-test-token"
+	t.Cleanup(func() {
+		common.WeChatAuthEnabled, common.WeChatServerAddress, common.WeChatServerToken = previousEnabled, previousAddress, previousToken
+	})
+	engine.GET("/wechat", WeChatAuth)
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, httptest.NewRequest("GET", "/wechat?code=synthetic-code", nil))
+	assert.False(t, registrationSucceeded(t, response))
+	var count int64
+	require.NoError(t, model.DB.Model(&model.User{}).Count(&count).Error)
+	assert.Zero(t, count)
+}
+
+func TestLegacyRegistrationRemainsAvailableBeforeEmailRollout(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	common.EmailVerificationEnabled = false
+	response := registrationRequest(engine, "ignored@example.com", "", "legacy-registration")
+	require.True(t, registrationSucceeded(t, response), response.Body.String())
+	var stored model.User
+	require.NoError(t, model.DB.Where("username = ?", "legacy-registration").First(&stored).Error)
+	assert.Empty(t, stored.Email)
+	assert.Equal(t, "default", stored.Group)
+	assert.Zero(t, stored.Quota)
 }

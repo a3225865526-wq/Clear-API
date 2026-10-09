@@ -29,17 +29,43 @@ export const loginFormSchema = z.object({
   password: z.string().min(1, 'Please enter your password'),
 })
 
-export const registerFormSchema = z
-  .object({
-    username: z.string().min(1, 'Please enter your username'),
-    email: z.string().optional(),
-    password: accountPasswordSchema,
-    confirmPassword: z.string().min(1, 'Please confirm your password'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match.",
-    path: ['confirmPassword'],
-  })
+export function createRegisterFormSchema(emailRequired: boolean) {
+  return z
+    .object({
+      username: z.string(),
+      email: z.string().optional(),
+      password: accountPasswordSchema,
+      confirmPassword: z.string(),
+    })
+    .superRefine((data, ctx) => {
+      if (emailRequired) {
+        if (!z.string().email().safeParse(data.email).success) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Please enter a valid email address',
+            path: ['email'],
+          })
+        }
+      } else {
+        if (!data.username.trim()) {
+          ctx.addIssue({
+            code: 'custom',
+            message: 'Please enter your username',
+            path: ['username'],
+          })
+        }
+        if (data.password !== data.confirmPassword) {
+          ctx.addIssue({
+            code: 'custom',
+            message: "Passwords don't match.",
+            path: ['confirmPassword'],
+          })
+        }
+      }
+    })
+}
+
+export const registerFormSchema = createRegisterFormSchema(false)
 
 export const forgotPasswordFormSchema = z.object({
   email: z.string().email({
@@ -66,7 +92,7 @@ export const OTP_REGEX = /^\d{6}$/
 // Countdown Constants
 // ============================================================================
 
-export const EMAIL_VERIFICATION_COUNTDOWN = 30 // seconds
+export const EMAIL_VERIFICATION_COUNTDOWN = 60 // seconds
 export const PASSWORD_RESET_COUNTDOWN = 30 // seconds
 
 // ============================================================================

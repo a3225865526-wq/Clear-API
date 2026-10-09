@@ -64,6 +64,7 @@ it.each([null, { id: 1, username: 'example', role: 1 }])(
       '/',
       '/dashboard',
       '/pricing',
+      '/shop',
     ])
   }
 )
