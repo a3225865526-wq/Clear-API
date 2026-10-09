@@ -34,6 +34,11 @@
 set -euo pipefail
 umask 077
 
+# Reserve the caller's credential stream; checks/configuration must never read it.
+exec 3<&0
+exec </dev/null
+unset GHCR_PULL_TOKEN
+
 # Operator configuration is authoritative over inherited DEPLOY_* variables.
 # Derive aliases only after sourcing; absent keys retain the caller/default value.
 if [ -f /opt/clearapi/config/deploy.env ]; then
@@ -127,6 +132,18 @@ while [ $# -gt 0 ]; do
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
+
+# The workflow sends one newline-terminated record. Capture it only in stdin
+# mode, before external probes, and never export it or include it in diagnostics.
+if [ "$GHCR_TOKEN_STDIN" = "1" ]; then
+  if ! IFS= read -r GHCR_PULL_TOKEN <&3 || [ -z "$GHCR_PULL_TOKEN" ]; then
+    exec 3<&-
+    unset GHCR_PULL_TOKEN
+    echo "REFUSING: empty or incomplete GHCR credential input" >&2
+    exit 2
+  fi
+fi
+exec 3<&-
 
 # ---------------------------------------------------------------------------
 # Helpers (all defined before any step executes)
@@ -439,8 +456,11 @@ if [ "$GHCR_TOKEN_STDIN" = "1" ]; then
   EPHEMERAL_DOCKER_CONFIG="$(mktemp -d)"
   chmod 0700 "$EPHEMERAL_DOCKER_CONFIG"
   export DOCKER_CONFIG="$EPHEMERAL_DOCKER_CONFIG"
-  docker login ghcr.io -u "$GHCR_USER" --password-stdin \
-    || die "step 6: GHCR login failed (ephemeral job credential)"
+  if ! printf '%s' "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin; then
+    unset GHCR_PULL_TOKEN
+    die "step 6: GHCR login failed (ephemeral job credential)"
+  fi
+  unset GHCR_PULL_TOKEN
   LOGGED_IN=1
   log "step 6: authenticated with ephemeral job credential (throwaway DOCKER_CONFIG)"
 elif [ -f "$GHCR_TOKEN_FILE" ]; then
