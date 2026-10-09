@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Exercise wrapper modes with isolated files and fail-closed Docker probes."""
 
+import hashlib
 import json
 import os
 from pathlib import Path
 import shlex
 import subprocess
 import tempfile
+import textwrap
 import unittest
 
 
@@ -219,6 +221,216 @@ print(json.dumps({"success":True,"data":{
         self.assertEqual(len(commands), 2)
         for command in commands:
             self.assertEqual(command[-5:], ["up", "-d", "--timeout", "150", "new-api"])
+
+
+class WorkflowStdinTest(unittest.TestCase):
+    """Run the real workflow shell through SSH/sudo into all wrapper steps.
+
+    Only host commands are substituted. Every non-login command attempts to
+    drain stdin, so this detects the production regression rather than merely
+    asserting that a helper contains a redirection.
+    """
+
+    setUp = WrapperModesTest.setUp
+
+    def run_chain(self, failure="", payload="non-secret-ci-credential", framed=True,
+                  legacy=False):
+        workflow = SOURCE.parents[1] / ".github/workflows/deploy-production.yml"
+        block = workflow.read_text().split("      - name: Run controlled deploy on VPS\n")[1]
+        block = textwrap.dedent(block.split("        run: |\n", 1)[1].split(
+            "\n      - name:", 1)[0])
+        for expression, value in {"inputs.image_digest": DIGEST,
+                                  "inputs.expected_commit": COMMIT,
+                                  "inputs.migration_compatible": "false",
+                                  "github.run_id": "123"}.items():
+            block = block.replace("${{ " + expression + " }}", value)
+        if not framed:
+            block = block.replace("printf '%s\\n'", "printf '%s'")
+        source = self.wrapper.read_text().replace("/run/lock", str(self.root / "lock"))
+        if legacy:
+            # Mutation control: remove only the stream isolation. Full-chain
+            # probes then consume the marker and the login rejects empty stdin.
+            source = source.replace("exec 3<&0\nexec </dev/null", ": # deliberately unsafe stdin")
+            start = source.index("# The workflow sends one newline-terminated record.")
+            end = source.index("# Helpers (all defined before any step executes)", start)
+            source = source[:start] + source[end:]
+            source = source.replace("printf '%s' \"$GHCR_PULL_TOKEN\" | ", "")
+        self.wrapper.write_text(source)
+        self.wrapper.chmod(0o755)
+        self.manifest.write_text(json.dumps({"releases": {"current": {
+            "new_api_image_id": "sha256:running-local-id", "image_digest": DIGEST
+        }}}))
+        backup = self.root / "backup"
+        backup.mkdir()
+        caddy = self.root / "Caddyfile"
+        caddy.write_text("fixture")
+        with self.config.open("a") as f:
+            f.write("\nDEPLOY_LAUNCH_BASELINE=commercial\nDEPLOY_EXPECT_CHANNELS=2\n"
+                    "DEPLOY_EXPECT_ENV_KEYS='CLEARAPI_CLOSED_LAUNCH=false'\n"
+                    "DEPLOY_GHCR_TOKEN_FILE=" + str(self.root / "absent-token") + "\n"
+                    "DEPLOY_BACKUP_DIR=" + str(backup) + "\nDEPLOY_CADDYFILE=" + str(caddy) +
+                    "\nDEPLOY_CADDYFILE_MD5=" + hashlib.md5(b"fixture").hexdigest() + "\n")
+            if not legacy:
+                f.write('if IFS= read -r unexpected; then echo "configuration consumed stdin" >&2; exit 1; fi\n')
+        fake = self.root / "host-command"
+        fake.write_text("#!/usr/bin/env python3\n" + r'''
+import hashlib, json, os, pathlib, subprocess, sys
+name=pathlib.Path(sys.argv[0]).name; a=sys.argv[1:]; root=pathlib.Path(os.environ['TEST_ROOT'])
+def record(**more):
+    with open(os.environ['TEST_TRACE'],'a') as f: f.write(json.dumps(dict(name=name,args=a,**more))+'\n')
+if name=='ssh':
+    record()
+    # SSH preserves stdin but does not forward the runner's token environment.
+    os.environ.pop('GH_PULL_TOKEN',None)
+    command=a[-1].replace('/opt/clearapi/bin/production-deploy.sh',str(root/'wrapper.sh'))
+    os.execvp('bash',['bash','-c',command])
+if name=='sudo': os.execvp(a[0],a)
+data=sys.stdin.buffer.read()
+assert 'GHCR_PULL_TOKEN' not in os.environ
+if name=='docker' and a[:1]==['login']:
+    record(stdin_length=len(data),stdin_sha256=hashlib.sha256(data).hexdigest(),
+           docker_config=os.environ.get('DOCKER_CONFIG'))
+    if data!=b'non-secret-ci-credential' or os.environ['TEST_FAILURE']=='login': sys.exit(1)
+    pathlib.Path(os.environ['DOCKER_CONFIG'],'config.json').write_text('non-secret fixture')
+    sys.exit(0)
+record(stdin_length=len(data))
+if data: sys.exit('Non-login command consumed shared stdin')
+fail=os.environ['TEST_FAILURE']
+if name=='systemctl':
+    if a[0]=='start':
+        if fail=='backup': sys.exit(1)
+        (root/'backup'/'encrypted-fixture').write_text('non-secret artifact')
+    elif a[0]=='show': print('0')
+    sys.exit(0)
+if name=='curl':
+    body=json.dumps({'success':True,'data':{'register_enabled':True,'password_register_enabled':True,'email_verification':False}})
+    if '-D' in a: pathlib.Path(a[a.index('-D')+1]).write_text('CF-Ray: fixture\n')
+    if '-o' in a: pathlib.Path(a[a.index('-o')+1]).write_text(body)
+    else: print(body)
+    sys.exit(0)
+if name!='docker': sys.exit('Forbidden host command')
+if a[0]=='pull': (root/'logged-in').touch(); sys.exit(0)
+if a[0]=='logout': sys.exit(0)
+if a[:2]==['image','inspect']:
+    fmt=a[3]
+    if fmt=='{{.Id}}': print('sha256:candidate-local-id' if (root/'logged-in').exists() else 'sha256:running-local-id')
+    elif 'RepoDigests' in fmt: print('registry/example@sha256:'+('c' if fail=='digest' else 'a')*64)
+    elif 'revision' in fmt: print(('c' if fail=='revision' else 'b')*40)
+    else: sys.exit('Forbidden image probe')
+elif a[0]=='run':
+    if '--entrypoint' in a and a[a.index('--entrypoint')+1]=='/billing-migrate': sys.exit(1)
+elif a[0]=='inspect':
+    if 'NetworkSettings' in a[2]: print('clearapi_internal')
+    else: print('sha256:candidate-local-id' if (root/'replaced').exists() else 'sha256:running-local-id')
+elif a[0]=='port':
+    if '3000/tcp' in a: print('127.0.0.1:3000')
+elif a[:2]==['ps','-a']: pass
+elif a[0]=='compose':
+    if 'ps' in a: print('postgres-container' if a[-1]=='postgres' else 'running-container')
+    elif 'config' in a:
+        print(json.dumps({'services':{'new-api':{'image':'registry/example@sha256:'+'a'*64,
+              'stop_signal':'SIGTERM','stop_grace_period':'2m30s','environment':{'SHUTDOWN_TIMEOUT_SECONDS':'120'}}}}))
+    elif 'printenv' in a: print('false')
+    elif 'psql' in a:
+        q=a[-1]
+        if 'id=1 AND status=1' in q: print('0' if fail=='provider' else '1')
+        elif 'FROM abilities' in q: print('0' if 'NOT' in q else '1')
+        elif 'DisableOnlinePayments' in q: print('2')
+        elif 'count(*)' in q: print('0')
+        elif 'SELECT status' in q: print('2')
+        elif 'needs_review' in q: print('4/10/4\n41/93/41')
+        elif 'SELECT value' in q: print('enforce')
+        else: sys.exit('Forbidden query')
+    elif 'up' in a: (root/'replaced').touch()
+    elif 'run' in a: pass
+    else: sys.exit('Forbidden compose operation')
+else: sys.exit('Forbidden docker operation')
+''')
+        fake.chmod(0o755)
+        for name in ("ssh", "sudo", "docker", "systemctl", "curl"):
+            (self.root / name).unlink(missing_ok=True)
+            (self.root / name).symlink_to(fake)
+        env = dict(self.env, TEST_ROOT=str(self.root), TEST_FAILURE=failure,
+                   GH_PULL_TOKEN=payload, PROD_SSH_ALIAS="fixture-vps",
+                   GHCR_PULL_TOKEN="must-not-be-exported",
+                   TMPDIR=str(self.root))
+        result = subprocess.run(["bash", "-c", block], env=env, capture_output=True,
+                                text=True, timeout=20)
+        trace = [json.loads(line) for line in self.trace.read_text().splitlines()]
+        output = result.stdout + result.stderr
+        if self.audit.exists():
+            output += self.audit.read_text()
+        if payload:
+            self.assertNotIn(payload, output)
+            self.assertNotIn(payload, self.trace.read_text())
+        logins = [x for x in trace if x["name"] == "docker" and x["args"][0] == "login"]
+        for login in logins:
+            self.assertFalse(Path(login["docker_config"]).exists(), "ephemeral credential config retained")
+        return result, trace, logins
+
+    def test_full_workflow_credential_ownership_and_commercial_deploy(self):
+        result, trace, logins = self.run_chain()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("DEPLOYMENT SUCCESS", result.stderr)
+        self.assertEqual(len(logins), 1)
+        self.assertEqual(logins[0]["stdin_sha256"], hashlib.sha256(b"non-secret-ci-credential").hexdigest())
+        self.assertTrue(all(x.get("stdin_length", 0) == 0 for x in trace if x not in logins))
+        queries = [x["args"][-1] for x in trace if "psql" in x["args"]]
+        self.assertTrue(any("id=1 AND status=1" in q for q in queries))
+        self.assertTrue(any("SELECT status FROM channels WHERE id=2" in q for q in queries))
+        self.assertFalse(any("SELECT status FROM channels WHERE id=1;" in q for q in queries))
+        self.assertTrue(any(x["args"][-5:] == ["up","-d","--timeout","150","new-api"] for x in trace))
+
+    def test_empty_and_truncated_frames_rejected_before_probes(self):
+        result, trace, logins = self.run_chain(payload="")
+        self.assertEqual(result.returncode, 2)
+        self.assertFalse(logins)
+        self.assertEqual([x["name"] for x in trace], ["ssh"])
+
+    def test_truncated_frame_rejected(self):
+        result, trace, logins = self.run_chain(framed=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("incomplete", result.stderr)
+        self.assertFalse(logins)
+
+    def test_wrong_credential_rejected_without_logging(self):
+        result, trace, logins = self.run_chain(payload="truncated-non-secret")
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_baseline_failure_prevents_login(self):
+        result, trace, logins = self.run_chain(failure="provider")
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(logins)
+        self.assertIn("Channel 1", result.stderr)
+
+    def test_backup_failure_prevents_login(self):
+        result, trace, logins = self.run_chain(failure="backup")
+        self.assertEqual(result.returncode, 1)
+        self.assertFalse(logins)
+
+    def test_login_failure_cleans_ephemeral_config(self):
+        result, trace, logins = self.run_chain(failure="login")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(len(logins), 1)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_digest_mismatch_prevents_replace(self):
+        result, trace, logins = self.run_chain(failure="digest")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("RepoDigests", result.stderr)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_revision_mismatch_prevents_replace(self):
+        result, trace, logins = self.run_chain(failure="revision")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("revision label", result.stderr)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_regression_control_detects_stdin_consumer(self):
+        result, trace, logins = self.run_chain(legacy=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(any(x.get("stdin_length", 0)>0 for x in trace if x["name"]!='ssh'))
 
 
 if __name__ == "__main__":
