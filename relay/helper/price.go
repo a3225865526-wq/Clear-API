@@ -94,10 +94,35 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(billingModelName) == billing_setting.BillingModeTieredExpr {
-		if billingProtectionEnabled() {
-			return hosttypes.PriceData{}, fmt.Errorf("protected billing has no proven upper bound for expression-priced models")
+		price, err := modelPriceHelperTiered(c, info, billingModelName, promptTokens, meta, groupRatioInfo)
+		if err != nil || !billingProtectionEnabled() {
+			return price, err
 		}
-		return modelPriceHelperTiered(c, info, billingModelName, promptTokens, meta, groupRatioInfo)
+		// Read middleware's first-channel metadata on a copy. Populating the
+		// real RelayInfo here would make the controller treat it as a retry.
+		admission := *info
+		if admission.ChannelMeta == nil {
+			admission.InitChannelMeta(c)
+		}
+		if err := service.ValidateProtectedTieredSnapshot(&admission); err != nil {
+			return hosttypes.PriceData{}, err
+		}
+		estimate, err := service.EstimateDispatchReservation(&admission, promptTokens, float64(protectedOutput), 1, 0)
+		if err != nil {
+			return hosttypes.PriceData{}, err
+		}
+		price.QuotaToPreConsume = max(price.QuotaToPreConsume, estimate.RequiredQuota)
+		if price.QuotaToPreConsume > estimate.CapQuota {
+			return hosttypes.PriceData{}, fmt.Errorf("protected expression reservation exceeds authorization cap")
+		}
+		info.PriceData = price
+		info.ProtectedTextBudget = true
+		info.ProtectedTieredBudget = true
+		admission.ProtectedTextBudget, admission.ProtectedTieredBudget = true, true
+		if err := ValidateProtectedTextChannel(&admission); err != nil {
+			return hosttypes.PriceData{}, err
+		}
+		return price, nil
 	}
 
 	var preConsumedQuota int

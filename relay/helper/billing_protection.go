@@ -14,6 +14,7 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 	hosttypes "github.com/QuantumNous/new-api/types"
 )
@@ -127,6 +128,12 @@ func ValidateProtectedTextChannel(info *relaycommon.RelayInfo) error {
 	}
 	if info.ChannelType != constant.ChannelTypeOpenAI || len(info.ParamOverride) != 0 || len(info.HeadersOverride) != 0 || info.UseRuntimeHeadersOverride || info.ChannelSetting.PassThroughBodyEnabled || info.ChannelSetting.SystemPrompt != "" || model_setting.GetGlobalSettings().PassThroughRequestEnabled {
 		return errors.New("protected billing requires a direct OpenAI channel without overrides, passthrough or injected prompts")
+	}
+	if info.TieredBillingSnapshot != nil {
+		if !info.ProtectedTieredBudget {
+			return errors.New("protected expression budget is missing")
+		}
+		return service.ValidateProtectedTieredSnapshot(info)
 	}
 	return nil
 }

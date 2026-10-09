@@ -540,8 +540,20 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 			if err := ValidateBillingProtection(); err != nil {
 				return nil, types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 			}
-			if BillingProtectionEnabled() && (!relayInfo.ProtectedTextBudget || relayInfo.IsPlayground || relayInfo.TokenGroup == "auto" || relayInfo.TieredBillingSnapshot != nil) {
+			if BillingProtectionEnabled() && (!relayInfo.ProtectedTextBudget || relayInfo.IsPlayground || relayInfo.TokenGroup == "auto") {
 				return nil, types.NewError(errors.New("billing protection requires a fixed-group wallet text request"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+			}
+			if BillingProtectionEnabled() && relayInfo.TieredBillingSnapshot != nil {
+				if !relayInfo.ProtectedTieredBudget {
+					return nil, types.NewError(errors.New("protected expression budget is missing"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+				}
+				admission := *relayInfo
+				if admission.ChannelMeta == nil {
+					admission.InitChannelMeta(c)
+				}
+				if err := ValidateProtectedTieredSnapshot(&admission); err != nil {
+					return nil, types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+				}
 			}
 			if err := model.ReserveBillingRequest(relayInfo.RequestId, relayInfo.UserId, relayInfo.TokenId, preConsumedQuota); err != nil {
 				if errors.Is(err, model.ErrBillingReservationQuota) {
