@@ -143,6 +143,7 @@ elif a[-3:] == ["config", "--format", "json"]:
         "stop_grace_period":f.get("grace", "2m30s"),
         "environment":{"SHUTDOWN_TIMEOUT_SECONDS":f.get("timeout", "120")}}}}))
 elif "psql" in a:
+    if f.get("sql_error"): sys.exit(1)
     q = a[-1]
     if "id=1 AND status=1" in q: print(f.get("provider", "1"))
     elif "FROM abilities" in q and "NOT" not in q: print(f.get("ability", "1"))
@@ -187,7 +188,7 @@ print(json.dumps({"success":True,"data":{
                         {"email":True}, {"provider":"0"}, {"ability":"0"},
                         {"extra_ability":"1"}, {"extra_channel":"1"},
                         {"disabled":"1"}, {"off":"1"}, {"grace":"10s"},
-                        {"signal":"SIGKILL"}, {"timeout":"180"}):
+                        {"signal":"SIGKILL"}, {"timeout":"180"}, {"sql_error":True}):
             with self.subTest(fixture=fixture):
                 r = self.run_gate("verify_launch_baseline; verify_stop_policy",
                                   "DEPLOY_LAUNCH_BASELINE=commercial", **fixture)

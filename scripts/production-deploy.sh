@@ -219,11 +219,13 @@ PYEOF
   return 0
 }
 psql_q() { # read-only single query against the production database
-  compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1"
+  compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1" \
+    || die "read-only database probe failed"
 }
 verify_launch_baseline() {
   local actual approved other status ch
-  actual="$(compose exec -T "$SERVICE" printenv CLEARAPI_CLOSED_LAUNCH)"
+  actual="$(compose exec -T "$SERVICE" printenv CLEARAPI_CLOSED_LAUNCH)" \
+    || die "launch baseline: CLOSED_LAUNCH unavailable"
   [ "$actual" = "$CLOSED_LAUNCH" ] || die "launch baseline: CLOSED_LAUNCH expected ${CLOSED_LAUNCH}"
   # Check effective process options, not only persisted values (closed-launch
   # enforcement can override options during application startup).
@@ -624,7 +626,7 @@ cenv() { compose exec -T "$SERVICE" printenv "$1"; }
 
 for pair in $EXPECT_ENV_KEYS; do
   key="${pair%%=*}"; expected="${pair#*=}"
-  actual="$(cenv "$key")"
+  actual="$(cenv "$key")" || die "step 17: required env key ${key} unavailable"
   [ "$actual" = "$expected" ] || die "step 17: env gate ${key}='${actual}' expected '${expected}'"
 done
 verify_launch_baseline
