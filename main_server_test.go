@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -11,6 +13,81 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHTTPShutdownDrainsHTTPAndSSEAndRejectsNewRequests(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(fmt.Sprint("stream=", stream), func(t *testing.T) {
+			started, finish := make(chan struct{}), make(chan struct{})
+			server := newHTTPServer("127.0.0.1:0", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if stream {
+					w.Header().Set("Content-Type", "text/event-stream")
+					_, _ = io.WriteString(w, "data: first\n\n")
+					w.(http.Flusher).Flush()
+				}
+				close(started)
+				<-finish
+				_, _ = io.WriteString(w, "completed\n")
+			}))
+			listener, err := net.Listen("tcp", server.Addr)
+			listenerClosed := make(chan struct{})
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = server.Close() })
+			go func() { _ = server.Serve(listener); close(listenerClosed) }()
+			client := &http.Client{Timeout: 5 * time.Second}
+			url := "http://" + listener.Addr().String()
+			result := make(chan string, 1)
+			clientErr := make(chan error, 1)
+			go func() {
+				response, err := client.Get(url)
+				if err != nil {
+					clientErr <- err
+					return
+				}
+				defer response.Body.Close()
+				body, err := io.ReadAll(response.Body)
+				if err != nil {
+					clientErr <- err
+					return
+				}
+				result <- string(body)
+			}()
+			select {
+			case <-started:
+			case <-time.After(5 * time.Second):
+				t.Fatal("handler did not start")
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+			defer cancel()
+			shutdown := make(chan error, 1)
+			go func() { shutdown <- server.Shutdown(ctx) }()
+			select {
+			case <-listenerClosed:
+			case <-time.After(5 * time.Second):
+				t.Fatal("listener did not close")
+			}
+			_, err = client.Get(url)
+			require.Error(t, err, "new arrivals must fail during single-instance shutdown")
+			select {
+			case err := <-shutdown:
+				t.Fatalf("shutdown returned before handler completion: %v", err)
+			default:
+			}
+			close(finish)
+			select {
+			case body := <-result:
+				assert.Contains(t, body, "completed\n")
+				if stream {
+					assert.Contains(t, body, "data: first\n\n")
+				}
+			case err := <-clientErr:
+				t.Fatal(err)
+			case <-time.After(5 * time.Second):
+				t.Fatal("request did not finish")
+			}
+			require.NoError(t, <-shutdown)
+		})
+	}
+}
 
 func TestHTTPServerReclaimsSlowBodyWithoutCuttingStream(t *testing.T) {
 	finish := make(chan struct{})

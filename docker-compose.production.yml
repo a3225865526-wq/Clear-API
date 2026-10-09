@@ -49,12 +49,15 @@ services:
   new-api:
     image: clearapi/new-api:production-candidate
     restart: unless-stopped
+    stop_signal: SIGTERM
+    stop_grace_period: 150s
     entrypoint: ["/entrypoint-secure.sh", "/new-api"]
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       - GIN_MODE=release
+      - SHUTDOWN_TIMEOUT_SECONDS=120
       - SESSION_COOKIE_SECURE=true
       # exact HTTPS origin of the production site (operator value)
       - SESSION_COOKIE_TRUSTED_URL=https://REPLACE-WITH-PRODUCTION-ORIGIN

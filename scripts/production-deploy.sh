@@ -34,6 +34,21 @@
 set -euo pipefail
 umask 077
 
+# Operator configuration is authoritative over inherited DEPLOY_* variables.
+# Derive aliases only after sourcing; absent keys retain the caller/default value.
+if [ -f /opt/clearapi/config/deploy.env ]; then
+  # shellcheck disable=SC1090
+  . /opt/clearapi/config/deploy.env
+else
+  echo "REFUSING: /opt/clearapi/config/deploy.env is missing (operator-owned, mode 0600)" >&2; exit 2
+fi
+LAUNCH_BASELINE="${DEPLOY_LAUNCH_BASELINE:-closed}"
+case "$LAUNCH_BASELINE" in
+  closed) CLOSED_LAUNCH=true; DEFAULT_CHANNELS=1,2 ;;
+  commercial) CLOSED_LAUNCH=false; DEFAULT_CHANNELS=2 ;;
+  *) echo "REFUSING: DEPLOY_LAUNCH_BASELINE must be closed or commercial" >&2; exit 2 ;;
+esac
+
 # ---------------------------------------------------------------------------
 # Defaults (overridable via deploy.env) — verified against live VPS
 # ---------------------------------------------------------------------------
@@ -73,8 +88,11 @@ BOOTSTRAP_SERVICE="${DEPLOY_BOOTSTRAP_SERVICE:-production-bootstrap}"
 MIGRATION_FLAGS="${DEPLOY_MIGRATION_FLAGS:-}"
 
 # Frozen negative-gate expectations (H4 acceptance baseline, live-verified).
-EXPECT_ENV_KEYS="${DEPLOY_EXPECT_ENV_KEYS:-CLEARAPI_ENABLE_RESPONSES_WEBSOCKET=false CLEARAPI_ENABLE_REALTIME=false CLEARAPI_CLOSED_LAUNCH=true}"
-EXPECT_CHANNELS="${DEPLOY_EXPECT_CHANNELS:-1,2}"
+EXPECT_ENV_KEYS="${DEPLOY_EXPECT_ENV_KEYS:-CLEARAPI_ENABLE_RESPONSES_WEBSOCKET=false CLEARAPI_ENABLE_REALTIME=false}"
+EXPECT_CHANNELS="${DEPLOY_EXPECT_CHANNELS:-$DEFAULT_CHANNELS}"
+if [ "$LAUNCH_BASELINE" = commercial ] && [ "$EXPECT_CHANNELS" != 2 ]; then
+  echo "REFUSING: commercial baseline requires DEPLOY_EXPECT_CHANNELS=2" >&2; exit 2
+fi
 EXPECT_USER_ID="${DEPLOY_EXPECT_USER_ID:-2}"
 EXPECT_TOKEN_IDS="${DEPLOY_EXPECT_TOKEN_IDS:-1,2}"
 EXPECT_REVIEW_ROWS="${DEPLOY_EXPECT_REVIEW_ROWS:-4/10/4 41/93/41}"
@@ -109,12 +127,6 @@ while [ $# -gt 0 ]; do
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
-if [ -f /opt/clearapi/config/deploy.env ]; then
-  # shellcheck disable=SC1090
-  . /opt/clearapi/config/deploy.env
-else
-  echo "REFUSING: /opt/clearapi/config/deploy.env is missing (operator-owned, mode 0600)" >&2; exit 2
-fi
 
 # ---------------------------------------------------------------------------
 # Helpers (all defined before any step executes)
@@ -209,6 +221,57 @@ PYEOF
 psql_q() { # read-only single query against the production database
   compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1"
 }
+verify_launch_baseline() {
+  local actual approved other status ch
+  actual="$(compose exec -T "$SERVICE" printenv CLEARAPI_CLOSED_LAUNCH)"
+  [ "$actual" = "$CLOSED_LAUNCH" ] || die "launch baseline: CLOSED_LAUNCH expected ${CLOSED_LAUNCH}"
+  # Check effective process options, not only persisted values (closed-launch
+  # enforcement can override options during application startup).
+  curl -fsS --max-time 15 "$LOCAL_HEALTH_URL" | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+expected = sys.argv[1] == "commercial"
+v = d.get("data", {})
+if d.get("success") is not True or any(v.get(k) is not expected for k in
+    ("register_enabled", "password_register_enabled")) or v.get("email_verification") is not False:
+    sys.exit(1)
+' "$LAUNCH_BASELINE" || die "launch baseline: effective registration/email verification mismatch"
+  if [ "$LAUNCH_BASELINE" = commercial ]; then
+    approved="$(psql_q "SELECT count(*) FROM channels WHERE id=1 AND status=1 AND base_url='https://api.88token.net' AND models='gpt-6-luna' AND \"group\"='default';")"
+    [ "$approved" = 1 ] || die "launch baseline: Channel 1 approved provider/model/group mismatch"
+    approved="$(psql_q "SELECT count(*) FROM abilities WHERE channel_id=1 AND enabled=true AND model='gpt-6-luna' AND \"group\"='default';")"
+    [ "$approved" = 1 ] || die "launch baseline: Channel 1 approved ability missing"
+    other="$(psql_q "SELECT count(*) FROM abilities WHERE enabled=true AND NOT (channel_id=1 AND model='gpt-6-luna' AND \"group\"='default');")"
+    [ "$other" = 0 ] || die "launch baseline: unapproved enabled abilities"
+    other="$(psql_q "SELECT count(*) FROM channels WHERE id<>1 AND status<>2;")"
+  else
+    other="$(psql_q "SELECT count(*) FROM channels WHERE status<>2;")"
+  fi
+  [ "$other" = 0 ] || die "launch baseline: unapproved channel state"
+  for ch in $(printf '%s' "$EXPECT_CHANNELS" | tr ',' ' '); do
+    status="$(psql_q "SELECT status FROM channels WHERE id=${ch};")"
+    [ "$status" = 2 ] || die "launch baseline: channel ${ch} expected disabled"
+  done
+  actual="$(psql_q "SELECT count(*) FROM options WHERE (key='DisableOnlinePayments' AND value='true') OR (key='StoreRechargeEnabled' AND value='false');")"
+  [ "$actual" = 2 ] || die "launch baseline: Payment/Store must stay OFF"
+}
+
+verify_stop_policy() {
+  compose config --format json | python3 -c '
+import json, re, sys
+s = json.load(sys.stdin)["services"][sys.argv[1]]
+e = s.get("environment") or {}
+timeout = int(e.get("SHUTDOWN_TIMEOUT_SECONDS", "120"))
+# Compose canonical JSON can normalize 150s into 2m30s.
+grace = s.get("stop_grace_period", "0s")
+if not re.fullmatch(r"(?:[0-9]+(?:\.[0-9]+)?[hms])+", str(grace)):
+    sys.exit(1)
+seconds = sum(float(n) * {"h":3600,"m":60,"s":1}[u]
+              for n, u in re.findall(r"([0-9]+(?:\.[0-9]+)?)([hms])", str(grace)))
+if timeout != 120 or seconds < timeout + 30 or s.get("stop_signal") != "SIGTERM":
+    sys.exit(1)
+' "$SERVICE" || die "stop policy: require SIGTERM, 120s application shutdown and at least 150s grace"
+}
 health_retry() { # health_retry <url> <retries> <sleep_s> [<require_header>]
   local url="$1" retries="$2" sleep_s="$3" header="${4:-}" i=0
   while [ "$i" -lt "$retries" ]; do
@@ -249,7 +312,7 @@ PYEOF
 rollback() {
   log "rollback: switching back to previous exact image (${ROLLBACK_REF})"
   write_override "$ROLLBACK_REF"
-  if ! compose up -d "$SERVICE"; then
+  if ! compose up -d --timeout 150 "$SERVICE"; then
     audit "rollback" "failed" "compose up failed for previous image ${ROLLBACK_REF}"
     log "ROLLBACK FAILED — MANUAL INTERVENTION REQUIRED"
     return 1
@@ -335,6 +398,8 @@ fi
 # can silently roll production back on an unrelated container rebuild.
 verify_running_identity \
   || die "step 3: production identity drift (running image vs compose effective vs manifest current); refusing to deploy on an inconsistent baseline"
+verify_launch_baseline
+verify_stop_policy
 
 # ===========================================================================
 # 4. encrypted pre-deploy backup (hard gate)
@@ -524,7 +589,9 @@ log "step 12/13: release manifest updated (previous image ${PREV_IMAGE_ID}, roll
 # 14. controlled replace
 # ===========================================================================
 write_override "$IMAGE_REF"
-compose up -d "$SERVICE" || die "step 14: compose replace failed"
+# Explicit timeout also protects the OLD container on the first rollout;
+# its persisted stop timeout may predate the new Compose grace policy.
+compose up -d --timeout 150 "$SERVICE" || die "step 14: compose replace failed"
 REPLACE_DONE=1
 # Hard identity gate: prove the running container actually IS the candidate
 # image before any health check can call this deploy a success. compose may
@@ -553,13 +620,15 @@ log "step 16: public HTTPS health via Cloudflare PASS"
 # ===========================================================================
 NEW_ID="$(service_id)"
 [ -n "$NEW_ID" ] || die "step 17: ${SERVICE} container missing after replace"
-cenv() { sudo docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$NEW_ID"; }
+cenv() { compose exec -T "$SERVICE" printenv "$1"; }
 
 for pair in $EXPECT_ENV_KEYS; do
   key="${pair%%=*}"; expected="${pair#*=}"
-  actual="$(cenv | grep -E "^${key}=" | head -1 | cut -d= -f2-)"
+  actual="$(cenv "$key")"
   [ "$actual" = "$expected" ] || die "step 17: env gate ${key}='${actual}' expected '${expected}'"
 done
+verify_launch_baseline
+verify_stop_policy
 
 PORTS_3000="$(sudo docker port "$NEW_ID" 3000/tcp 2>/dev/null || true)"
 printf '%s' "$PORTS_3000" | grep -q "127.0.0.1:3000" || die "step 17: new-api must bind 127.0.0.1:3000 only (got: ${PORTS_3000:-<unpublished>})"
