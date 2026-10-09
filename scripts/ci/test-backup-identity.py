@@ -119,6 +119,7 @@ class BackupIdentityTest(unittest.TestCase):
         self.assertEqual(identity["oci_revision"], revision)
         self.assertEqual(identity["docker_image_id"], image_id)
         self.assertEqual(identity["ghcr_digest"], digest)
+        self.full_backup()
 
     def test_missing_revision_rejected(self):
         self.state["image"]["Config"]["Labels"] = {}
@@ -221,9 +222,9 @@ class BackupIdentityTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(len(manifests), 1)
         manifest = json.loads(manifests[0].read_text())
-        self.assertEqual(manifest["candidate_commit"], REVISION)
-        self.assertEqual(manifest["new_api_image_id"], IMAGE_ID)
-        self.assertEqual(manifest["ghcr_repo_digest"], REF)
+        self.assertEqual(manifest["candidate_commit"], self.current["candidate_commit"])
+        self.assertEqual(manifest["new_api_image_id"], self.current["new_api_image_id"])
+        self.assertEqual(manifest["ghcr_repo_digest"], self.current["image_ref"])
         artifact = manifest["encryption"]["encrypted_artifact"]
         encrypted = base / "encrypted" / manifest["backup_id"] / artifact["name"]
         offsite = self.root / "offsite.gpg"
