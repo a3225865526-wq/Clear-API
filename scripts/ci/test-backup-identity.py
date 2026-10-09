@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""Offline backup regression: fake Docker accepts read/dump probes only.
+
+Full backup tests use real tar, SHA256 and GPG with an ephemeral test-only key.
+No production socket, credentials, database or container is accessed.
+"""
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import tarfile
+import tempfile
+import unittest
+
+
+SCRIPTS = Path(__file__).resolve().parents[1]
+REVISION = "fb0d30f59d8c6cc17de3f323eeef71029ca8f26e"
+IMAGE_ID = "sha256:" + "1" * 64
+DIGEST = "sha256:" + "2" * 64  # Intentionally different from Docker Image ID.
+REF = "ghcr.io/a3225865526-wq/clearapi@" + DIGEST
+
+FAKE_DOCKER = '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+p = Path(os.environ["TEST_STATE"])
+s = json.loads(p.read_text())
+a = sys.argv[1:]
+with open(os.environ["TEST_TRACE"], "a") as f: f.write(json.dumps(a) + "\\n")
+if a[0] == "compose" and a[-3:] == ["ps", "-q", "new-api"]:
+    print("container")
+elif a[0] == "compose" and a[-3:] == ["config", "--format", "json"]:
+    print(json.dumps({"services": {"new-api": {"image": s["reference"]}}}))
+elif a[0] == "compose" and a[-4:] == ["config", "--no-consistency", "--format", "json"]:
+    print(json.dumps({"services": {"new-api": {"image": s.get("override_reference", s["reference"])}}}))
+elif a == ["inspect", "container"]:
+    print(json.dumps([s["container"]]))
+elif a[:2] == ["image", "inspect"]:
+    if a[2] == s["reference"]: print(json.dumps([s["effective_image"]]))
+    elif a[2] == s["container"]["Image"]: print(json.dumps([s["image"]]))
+    else: sys.exit("unexpected image")
+elif a[:3] == ["exec", "clearapi-postgres-1", "pg_dump"]:
+    print("isolated dump fixture")
+    if s.get("drift_on_dump"):
+        s["container"]["Id"] = "replacement-container"
+        p.write_text(json.dumps(s))
+elif a[:3] == ["exec", "clearapi-postgres-1", "pg_dumpall"]:
+    print("isolated globals fixture")
+elif a[:3] == ["exec", "clearapi-postgres-1", "psql"]:
+    print("isolated marker hash")
+elif a[0] == "run" and "pg_restore" in a and a[-3] == "pg_restore" and a[-2] == "-l":
+    print("isolated TOC fixture")
+else: sys.exit("Forbidden Docker operation: " + repr(a))
+'''
+
+
+class BackupIdentityTest(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.app = self.root / "opt/clearapi/app"
+        self.app.mkdir(parents=True)
+        self.override = self.app / "compose-candidate.yaml"
+        self.override.write_text("services:\n  new-api:\n    image: " + REF + "\n")
+        (self.app / "docker-compose.prod.yml").write_text("services: {}\n")
+        self.manifest = self.app / "release-manifest.json"
+        self.current = dict(candidate_commit=REVISION, new_api_image_id=IMAGE_ID,
+                            image_digest=DIGEST, image_ref=REF)
+        self.write_release()
+        self.state = dict(reference=REF,
+                          container={"Id": "container", "Image": IMAGE_ID,
+                                     "State": {"Running": True}, "Created": "2026-10-08T22:06:32Z"},
+                          image={"Id": IMAGE_ID, "RepoDigests": [REF], "Config": {
+                              "Labels": {"org.opencontainers.image.revision": REVISION}}},
+                          effective_image={"Id": IMAGE_ID})
+        self.state_path = self.root / "state.json"
+        self.trace = self.root / "trace.jsonl"
+        fake = self.root / "docker"
+        fake.write_text(FAKE_DOCKER)
+        fake.chmod(0o755)
+        self.env = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ["PATH"],
+                        TEST_STATE=str(self.state_path), TEST_TRACE=str(self.trace))
+
+    def write_release(self):
+        self.manifest.write_text(json.dumps({"releases": {"current": self.current}}))
+
+    def tool(self, mode="capture", *extra):
+        self.state_path.write_text(json.dumps(self.state))
+        return subprocess.run(["python3", str(SCRIPTS / "backup-identity.py"), mode,
+                               "--app-dir", str(self.app), *extra], env=self.env,
+                              capture_output=True, text=True, timeout=10)
+
+    def test_actual_old_release_and_distinct_identity_semantics(self):
+        result = self.tool()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        identity = json.loads(result.stdout)
+        self.assertEqual(identity["oci_revision"], REVISION)
+        self.assertEqual(identity["docker_image_id"], IMAGE_ID)
+        self.assertEqual(identity["ghcr_digest"], DIGEST)
+        self.assertNotEqual(identity["docker_image_id"], identity["ghcr_digest"])
+
+    def test_new_running_release_is_automatically_captured(self):
+        revision = "a" * 40
+        image_id = "sha256:" + "3" * 64
+        digest = "sha256:" + "4" * 64
+        reference = "ghcr.io/a3225865526-wq/clearapi@" + digest
+        self.state["container"]["Image"] = image_id
+        self.state["image"].update(Id=image_id, RepoDigests=[reference])
+        self.state["effective_image"]["Id"] = image_id
+        self.state["reference"] = reference
+        self.override.write_text("services:\n  new-api:\n    image: " + reference + "\n")
+        self.state["image"]["Config"]["Labels"]["org.opencontainers.image.revision"] = revision
+        self.current.update(candidate_commit=revision, new_api_image_id=image_id,
+                            image_digest=digest, image_ref=reference)
+        self.write_release()
+        identity = json.loads(self.tool().stdout)
+        self.assertEqual(identity["oci_revision"], revision)
+        self.assertEqual(identity["docker_image_id"], image_id)
+        self.assertEqual(identity["ghcr_digest"], digest)
+        self.full_backup()
+
+    def test_missing_revision_rejected(self):
+        self.state["image"]["Config"]["Labels"] = {}
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_missing_override_rejected(self):
+        self.override.unlink()
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_empty_override_rejected(self):
+        self.override.write_text("")
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_release_commit_mismatch_rejected(self):
+        self.current["candidate_commit"] = "a" * 40
+        self.write_release()
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_release_image_mismatch_rejected(self):
+        self.current["new_api_image_id"] = DIGEST
+        self.write_release()
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_release_digest_mismatch_rejected(self):
+        self.current["image_digest"] = IMAGE_ID
+        self.write_release()
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_override_does_not_pin_effective_image_rejected(self):
+        self.state["override_reference"] = None
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_compose_image_mismatch_rejected(self):
+        self.state["effective_image"]["Id"] = DIGEST
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_unverified_repo_digest_rejected(self):
+        self.state["image"]["RepoDigests"] = []
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_floating_compose_reference_rejected(self):
+        self.state["reference"] = "ghcr.io/a3225865526-wq/clearapi:latest"
+        self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_container_change_during_backup_rejected(self):
+        snapshot = self.root / "snapshot.json"
+        snapshot.write_text(self.tool().stdout)
+        self.state["container"]["Id"] = "replacement"
+        result = self.tool("check", "--snapshot", str(snapshot))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("changed during backup", result.stderr)
+
+    def full_backup(self, drift=False):
+        base = self.root / "opt/clearapi/backups"
+        (base / "bin").mkdir(parents=True)
+        (base / "manifests").mkdir()
+        for part in ("legal", "secrets", "edge", "bin", "config"):
+            directory = self.root / "opt/clearapi" / part
+            directory.mkdir(exist_ok=True)
+            (directory / "fixture").write_text("isolated fixture")
+        old_id = "20261008T000000Z"
+        old_manifest = base / "manifests" / (old_id + ".json")
+        old_manifest.write_text('{"candidate_commit":"603b217"}\n')
+        old_bundle = base / "encrypted" / old_id / "historical.gpg"
+        old_bundle.parent.mkdir(parents=True)
+        old_bundle.write_bytes(b"historical encrypted fixture")
+        old_bytes = old_manifest.read_bytes(), old_bundle.read_bytes()
+        (self.root / "log").mkdir()
+        helper = base / "bin/backup-identity.py"
+        helper.write_text((SCRIPTS / "backup-identity.py").read_text().replace(
+            "/opt/clearapi/app", str(self.app)))
+        gnupg = self.root / "gnupg"
+        gnupg.mkdir(mode=0o700)
+        env = dict(self.env, GNUPGHOME=str(gnupg))
+        def gpg(*args):
+            return subprocess.run(["gpg", "--batch", "--pinentry-mode", "loopback",
+                                   "--passphrase", "", *args], env=env,
+                                  capture_output=True, check=True, timeout=30)
+        gpg("--quick-generate-key", "Isolated Backup Test", "ed25519", "cert", "0")
+        fingerprint = next(line.split(":")[9] for line in gpg("--with-colons", "--list-keys").stdout.decode().splitlines() if line.startswith("fpr:"))
+        gpg("--quick-add-key", fingerprint, "cv25519", "encr", "0")
+        source = Path(os.environ.get("BACKUP_SOURCE", SCRIPTS / "production-backup.sh")).read_text()
+        source = source.replace("/opt/clearapi", str(self.root / "opt/clearapi"))
+        source = source.replace("/var/log/clearapi", str(self.root / "log"))
+        source = source.replace("/run/lock/clearapi-backup.lock", str(self.root / "backup.lock"))
+        source = source.replace(" -C / ", " -C " + str(self.root) + " ")
+        source = source.replace("D675187C7097EF9D8C3BFF966B1439F896043FFD", fingerprint)
+        script = self.root / "backup.sh"
+        script.write_text(source)
+        self.state["drift_on_dump"] = drift
+        self.state_path.write_text(json.dumps(self.state))
+        result = subprocess.run(["bash", str(script)], env=env, capture_output=True,
+                                text=True, timeout=45)
+        self.assertEqual(old_bytes, (old_manifest.read_bytes(), old_bundle.read_bytes()))
+        manifests = [p for p in (base / "manifests").glob("*.json") if p != old_manifest]
+        if drift:
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(manifests, [])
+            return
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(manifests), 1)
+        manifest = json.loads(manifests[0].read_text())
+        self.assertEqual(manifest["candidate_commit"], self.current["candidate_commit"])
+        self.assertEqual(manifest["new_api_image_id"], self.current["new_api_image_id"])
+        self.assertEqual(manifest["ghcr_repo_digest"], self.current["image_ref"])
+        artifact = manifest["encryption"]["encrypted_artifact"]
+        encrypted = base / "encrypted" / manifest["backup_id"] / artifact["name"]
+        offsite = self.root / "offsite.gpg"
+        offsite.write_bytes(encrypted.read_bytes())
+        self.assertEqual(hashlib.sha256(offsite.read_bytes()).hexdigest(), artifact["sha256"])
+        self.assertEqual(offsite.stat().st_size, artifact["bytes"])
+        # Existing restore reader: encryption path/name, decrypt, tar, artifact hashes.
+        bundle = gpg("--decrypt", str(offsite)).stdout
+        self.assertEqual(hashlib.sha256(bundle).hexdigest(), manifest["bundle"]["sha256"])
+        with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
+            for item in manifest["artifacts"].values():
+                self.assertEqual(hashlib.sha256(archive.extractfile(item["name"]).read()).hexdigest(), item["sha256"])
+            config = archive.extractfile(manifest["artifacts"]["config_archive"]["name"]).read()
+        with tarfile.open(fileobj=io.BytesIO(config), mode="r:gz") as archive:
+            self.assertIn("opt/clearapi/app/compose-candidate.yaml", archive.getnames())
+        point = manifest["database_recovery_point"]
+        self.assertEqual(point["dump_sha256"], manifest["artifacts"]["database_dump"]["sha256"])
+        self.assertLessEqual(point["dump_started_at_utc"], point["dump_completed_at_utc"])
+
+    def test_full_encrypted_backup_offsite_and_legacy_restore_reader(self):
+        self.full_backup()
+
+    def test_backup_drift_fails_without_publishing_manifest(self):
+        self.full_backup(drift=True)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

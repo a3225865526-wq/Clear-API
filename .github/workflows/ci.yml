@@ -127,3 +127,6 @@ jobs:
           bash -n scripts/production-deploy.sh
           shellcheck --severity=warning scripts/production-deploy.sh
           python3 scripts/ci/test-production-deploy.py
+          bash -n scripts/production-backup.sh
+          shellcheck --severity=warning scripts/production-backup.sh
+          python3 scripts/ci/test-backup-identity.py
