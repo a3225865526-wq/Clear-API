@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -33,7 +34,7 @@ func TestVerificationAttemptLimitExpiryAndReplay(t *testing.T) {
 	assert.True(t, VerifyCodeWithKey(key, "654321", EmailVerificationPurpose))
 	assert.False(t, VerifyCodeWithKey(key, "654321", EmailVerificationPurpose))
 	verificationMutex.Lock()
-	verificationMap[EmailVerificationPurpose+key] = verificationValue{code: "expired", time: time.Now().Add(-time.Hour)}
+	verificationMap[EmailVerificationPurpose+key] = verificationValue{time: time.Now().Add(-time.Hour)}
 	verificationMutex.Unlock()
 	assert.False(t, VerifyCodeWithKey(key, "expired", EmailVerificationPurpose))
 }
@@ -578,4 +579,60 @@ func TestSendEmailExplicitStartTLSRejectsUntrustedCertificateByDefault(t *testin
 	err := SendEmail("Verification", "receiver@example.com", "<p>123456</p>")
 	require.Error(t, err)
 	require.Contains(t, fmt.Sprint(err), "certificate")
+}
+
+func TestVerificationCodesAreNumericHashedAndPurposeBound(t *testing.T) {
+	code, err := GenerateEmailVerificationCode()
+	require.NoError(t, err)
+	require.Regexp(t, `^[0-9]{6}$`, code)
+	key := "numeric-verification@example.invalid"
+	RegisterVerificationCodeWithKey(key, code, EmailVerificationPurpose)
+	verificationMutex.Lock()
+	value := verificationMap[EmailVerificationPurpose+key]
+	verificationMutex.Unlock()
+	assert.NotEqual(t, code, fmt.Sprintf("%x", value.digest))
+	assert.False(t, VerifyCodeWithKey(key, code, PasswordResetPurpose))
+	assert.True(t, VerifyCodeWithKey(key, code, EmailVerificationPurpose))
+	assert.False(t, VerifyCodeWithKey(key, code, EmailVerificationPurpose))
+}
+
+func TestVerificationSendCooldownNormalizesMailboxAndExpires(t *testing.T) {
+	email := "cooldown-unit@example.invalid"
+	require.True(t, ReserveVerificationEmailSend(email))
+	assert.False(t, ReserveVerificationEmailSend(" COOLDOWN-UNIT@EXAMPLE.INVALID "))
+	verificationMutex.Lock()
+	verificationSendTimes[email] = time.Now().Add(-time.Minute)
+	verificationMutex.Unlock()
+	assert.True(t, ReserveVerificationEmailSend(email))
+}
+
+func TestVerificationProofIsConsumedOnlyAfterOperationSucceeds(t *testing.T) {
+	key := "transaction-verification@example.invalid"
+	RegisterVerificationCodeWithKey(key, "123456", EmailVerificationPurpose)
+	failure := errors.New("synthetic database failure")
+	verified, err := VerifyCodeAndRunWithKey(key, "123456", EmailVerificationPurpose, func() error { return failure })
+	assert.True(t, verified)
+	assert.ErrorIs(t, err, failure)
+	called := false
+	verified, err = VerifyCodeAndRunWithKey(key, "123456", EmailVerificationPurpose, func() error { called = true; return nil })
+	assert.True(t, verified)
+	assert.NoError(t, err)
+	assert.True(t, called)
+	assert.False(t, VerifyCodeWithKey(key, "123456", EmailVerificationPurpose))
+}
+
+func TestVerificationStoreCapacityFailsClosed(t *testing.T) {
+	verificationMutex.Lock()
+	previousMap, previousLimit := verificationMap, verificationMapMaxSize
+	verificationMap, verificationMapMaxSize = make(map[string]verificationValue), 1
+	verificationMutex.Unlock()
+	t.Cleanup(func() {
+		verificationMutex.Lock()
+		defer verificationMutex.Unlock()
+		verificationMap, verificationMapMaxSize = previousMap, previousLimit
+	})
+	assert.True(t, RegisterVerificationCodeWithKey("one", "123456", EmailVerificationPurpose))
+	assert.False(t, RegisterVerificationCodeWithKey("two", "654321", EmailVerificationPurpose))
+	assert.False(t, VerifyCodeWithKey("two", "654321", EmailVerificationPurpose))
+	assert.True(t, VerifyCodeWithKey("one", "123456", EmailVerificationPurpose))
 }

@@ -1063,8 +1063,20 @@ func (user *User) ValidateAndFill() (err error) {
 	if username == "" || password == "" {
 		return ErrUserEmptyCredentials
 	}
-	// find by username or email
-	err = DB.Where("username = ? OR email = ?", username, username).First(user).Error
+	// Legacy username lookup retains its existing collation and priority.
+	// Email lookup is normalized and
+	// must identify exactly one account; never pick the first duplicate email.
+	err = DB.Where("username = ?", username).First(user).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		var emailUser *User
+		emailUser, err = GetUniqueUserByEmail(username)
+		if errors.Is(err, ErrEmailNotFound) || errors.Is(err, ErrEmailAmbiguous) {
+			return ErrInvalidCredentials
+		}
+		if err == nil {
+			*user = *emailUser
+		}
+	}
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrInvalidCredentials

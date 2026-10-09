@@ -1,3 +1,4 @@
+import { ReceiptText } from 'lucide-react'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -18,13 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ReceiptText } from 'lucide-react'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { useIsAdmin } from '@/hooks/use-admin'
 import { getSelf } from '@/lib/api'
 
+import { CreditPurchaseCard } from './components/credit-purchase-card'
 import { BalanceTransactionsDialog } from './components/dialogs/balance-transactions-dialog'
 import { BillingHistoryDialog } from './components/dialogs/billing-history-dialog'
 import { OtherRedeemMethodsCard } from './components/other-redeem-methods-card'
@@ -58,6 +59,7 @@ export function Wallet(props: WalletProps) {
   const [billingDialogOpen, setBillingDialogOpen] = useState(false)
   const [balanceDialogOpen, setBalanceDialogOpen] = useState(false)
 
+  const [legacyRedemptionOpen, setLegacyRedemptionOpen] = useState(0)
   const isAdmin = useIsAdmin()
   const {
     topupInfo,
@@ -128,7 +130,13 @@ export function Wallet(props: WalletProps) {
 
             <VipProgressCard vip={topupInfo?.vip} loading={topupLoading} />
 
-            <OtherRedeemMethodsCard onSuccess={fetchUser} />
+            <CreditPurchaseCard
+              onRedeem={() => setLegacyRedemptionOpen((request) => request + 1)}
+            />
+            <OtherRedeemMethodsCard
+              onSuccess={fetchUser}
+              openLegacy={legacyRedemptionOpen}
+            />
 
             {isAdmin ? (
               <Button

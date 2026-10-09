@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/smtp"
 	"slices"
 	"strings"
@@ -37,16 +38,19 @@ func shouldAuthenticateSMTP() bool {
 func smtpTLSConfig() *tls.Config {
 	return &tls.Config{
 		ServerName:         SMTPServer,
+		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: SMTPInsecureSkipVerify, // #nosec G402 -- admin-controlled SMTP compatibility option.
 	}
 }
 
 func newSMTPClient(addr string) (*smtp.Client, error) {
+	dialer := &net.Dialer{Timeout: 15 * time.Second}
 	if SMTPSSLEnabled || (SMTPPort == 465 && !SMTPStartTLSEnabled) {
-		conn, err := tls.Dial("tcp", addr, smtpTLSConfig())
+		conn, err := tls.DialWithDialer(dialer, "tcp", addr, smtpTLSConfig())
 		if err != nil {
 			return nil, err
 		}
+		_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
 		client, err := smtp.NewClient(conn, SMTPServer)
 		if err != nil {
 			_ = conn.Close()
@@ -55,8 +59,14 @@ func newSMTPClient(addr string) (*smtp.Client, error) {
 		return client, nil
 	}
 
-	client, err := smtp.Dial(addr)
+	conn, err := dialer.Dial("tcp", addr)
 	if err != nil {
+		return nil, err
+	}
+	_ = conn.SetDeadline(time.Now().Add(30 * time.Second))
+	client, err := smtp.NewClient(conn, SMTPServer)
+	if err != nil {
+		_ = conn.Close()
 		return nil, err
 	}
 
@@ -130,7 +140,7 @@ func SendEmail(subject string, receiver string, content string) error {
 	}
 	err = client.Quit()
 	if err != nil {
-		SysError(fmt.Sprintf("failed to send email to %s: %v", receiver, err))
+		SysError("SMTP session completion failed")
 	}
 	return err
 }

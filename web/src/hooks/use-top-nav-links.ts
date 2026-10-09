@@ -80,6 +80,8 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Model Square'), href: '/pricing', requiresAuth })
   }
 
+  links.push({ title: t('Buy credits'), href: '/shop' })
+
   // Docs (supports external links)
   if (modules?.docs !== false && docsLink) {
     links.push({

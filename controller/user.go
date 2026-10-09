@@ -231,6 +231,11 @@ func Register(c *gin.Context) {
 	}
 	user.Username = strings.TrimSpace(user.Username)
 	user.Email = model.NormalizeEmail(user.Email)
+	if common.EmailVerificationEnabled {
+		// The unique username index is the final collision guard. Never expose
+		// the email address or accept a client-selected identity in this mode.
+		user.Username = "u_" + common.GenerateVerificationCode(18)
+	}
 	if user.Username == "" {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
@@ -244,23 +249,12 @@ func Register(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailVerificationRequired)
 			return
 		}
-		if !common.VerifyCodeWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose) {
-			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
-			return
-		}
-		if err := model.EnsureEmailAvailable(user.Email, 0); err != nil {
-			if errors.Is(err, model.ErrEmailAlreadyTaken) {
-				common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
-				return
-			}
-			common.ApiErrorI18n(c, i18n.MsgDatabaseError)
+		if _, err := service.ValidateAccountEmail(user.Email); err != nil {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}
 	}
 	emailForExistCheck := ""
-	if common.EmailVerificationEnabled {
-		emailForExistCheck = user.Email
-	}
 	exist, err := model.CheckUserExistOrDeleted(user.Username, emailForExistCheck)
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
@@ -272,6 +266,15 @@ func Register(c *gin.Context) {
 		return
 	}
 	affCode := user.AffCode // this code is the inviter's code, not the user's own code
+	if common.EmailVerificationEnabled {
+		// ClearAPI verified registration must not grant signup or referral credit.
+		// Refuse a misconfigured rollout rather than changing billing settings.
+		if common.QuotaForNewUser != 0 {
+			common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
+			return
+		}
+		affCode = ""
+	}
 	inviterId, _ := model.GetUserIdByAffCode(affCode)
 	cleanUser := model.User{
 		Username:    user.Username,
@@ -279,16 +282,38 @@ func Register(c *gin.Context) {
 		DisplayName: user.Username,
 		InviterId:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
+		Group:       "default",
 	}
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
 	}
-	if err := cleanUser.Insert(inviterId); err != nil {
+	if common.EmailVerificationEnabled {
+		verified, insertErr := common.VerifyCodeAndRunWithKey(user.Email, user.VerificationCode, common.EmailVerificationPurpose, func() error {
+			// Reserve email-shaped legacy usernames too: otherwise the new user
+			// could register an address which resolves to a different login.
+			var count int64
+			if err := model.DB.Unscoped().Model(&model.User{}).Where("LOWER(username) = ?", user.Email).Count(&count).Error; err != nil {
+				return err
+			}
+			if count > 0 {
+				return model.ErrEmailAlreadyTaken
+			}
+			return cleanUser.Insert(inviterId)
+		})
+		if !verified {
+			common.ApiErrorI18n(c, i18n.MsgUserVerificationCodeError)
+			return
+		}
+		err = insertErr
+	} else {
+		err = cleanUser.Insert(inviterId)
+	}
+	if err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
 			return
 		}
-		common.ApiError(c, err)
+		common.ApiErrorI18n(c, i18n.MsgUserRegisterFailed)
 		return
 	}
 
@@ -299,7 +324,7 @@ func Register(c *gin.Context) {
 		return
 	}
 	// 生成默认令牌
-	if constant.GenerateDefaultToken {
+	if constant.GenerateDefaultToken && !common.EmailVerificationEnabled {
 		key, err := common.GenerateKey()
 		if err != nil {
 			common.ApiErrorI18n(c, i18n.MsgUserDefaultTokenFailed)

@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { ChevronDown, Gift } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
@@ -26,18 +26,16 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { Input } from '@/components/ui/input'
 import { IconBadge } from '@/components/ui/icon-badge'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from '@/components/ui/native-select'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 
 import { useRedemption } from '../hooks'
 
 interface OtherRedeemMethodsCardProps {
   /** Refresh user balance after a successful redemption. */
+  openLegacy?: number
   onSuccess?: () => void | Promise<void>
 }
 
@@ -52,6 +50,21 @@ export function OtherRedeemMethodsCard(props: OtherRedeemMethodsCardProps) {
   const [code, setCode] = useState('')
   const [kind, setKind] = useState<'offline' | 'legacy'>('offline')
   const { redeeming, redeemCode } = useRedemption()
+
+  useEffect(() => {
+    if (props.openLegacy) {
+      setOpen(true)
+      setKind('legacy')
+    }
+  }, [props.openLegacy])
+
+  useEffect(() => {
+    if (props.openLegacy && open && kind === 'legacy') {
+      document
+        .querySelector<HTMLInputElement>('#other-redemption-code')
+        ?.focus()
+    }
+  }, [open, kind, props.openLegacy])
 
   const handleRedeem = async () => {
     if (!code.trim()) return

@@ -92,7 +92,7 @@ func WeChatAuth(c *gin.Context) {
 			return
 		}
 	} else {
-		if common.RegisterEnabled {
+		if common.RegisterEnabled && !common.EmailVerificationEnabled {
 			user.Username = "wechat_" + strconv.Itoa(model.GetMaxUserId()+1)
 			user.DisplayName = "WeChat User"
 			user.Role = common.RoleCommonUser
