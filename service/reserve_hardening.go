@@ -182,6 +182,17 @@ func estimateTieredDomainQuota(info *relaycommon.RelayInfo, snap *billingexpr.Bi
 		Len:        float64(promptTokens) + float64(hiddenTotal),
 		ImageCount: imageCount,
 	}
+	if BillingProtectionEnabled() {
+		if err := ValidateProtectedTieredSnapshot(info); err != nil {
+			return 0, "", err
+		}
+		// The visible prompt can be read from or written to cache too. Do not
+		// assume that absent cache-write usage means free cache writes. Bound
+		// every input category by the whole approved context envelope; the
+		// interval evaluator deliberately over-reserves mutually exclusive
+		// splits, without changing the actual settlement tariff.
+		domain.P, domain.CR, domain.CC, domain.CC1h = domain.Len, domain.Len, domain.Len, domain.Len
+	}
 	upper, err := billingexpr.ReservationDomainUpperBound(snap.ExprString, domain)
 	if err != nil {
 		return 0, "", fmt.Errorf("%w: %w", ErrReserveDomainBroken, err)
