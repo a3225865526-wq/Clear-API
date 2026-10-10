@@ -240,7 +240,14 @@ psql_q() { # read-only single query against the production database
     || die "read-only database probe failed"
 }
 verify_launch_baseline() {
-  local actual approved other status ch
+  local actual approved other status ch expected_email_verification
+  if [ "$LAUNCH_BASELINE" = commercial ]; then
+    expected_email_verification=true
+  else
+    expected_email_verification=false
+  fi
+  # Email verification is determined by the selected operator-approved launch
+  # baseline; it is not an independent caller-controlled override.
   actual="$(compose exec -T "$SERVICE" printenv CLEARAPI_CLOSED_LAUNCH)" \
     || die "launch baseline: CLOSED_LAUNCH unavailable"
   [ "$actual" = "$CLOSED_LAUNCH" ] || die "launch baseline: CLOSED_LAUNCH expected ${CLOSED_LAUNCH}"
@@ -250,11 +257,19 @@ verify_launch_baseline() {
 import json, sys
 d = json.load(sys.stdin)
 expected = sys.argv[1] == "commercial"
+expected_email_verification = sys.argv[2] == "true"
 v = d.get("data", {})
-if d.get("success") is not True or any(v.get(k) is not expected for k in
-    ("register_enabled", "password_register_enabled")) or v.get("email_verification") is not False:
+if (d.get("success") is not True
+        or any(v.get(k) is not expected for k in
+               ("register_enabled", "password_register_enabled"))
+        or v.get("password_login_enabled") is not True
+        or v.get("email_verification") is not expected_email_verification):
     sys.exit(1)
-' "$LAUNCH_BASELINE" || die "launch baseline: effective registration/email verification mismatch"
+' "$LAUNCH_BASELINE" "$expected_email_verification" \
+    || die "launch baseline: effective registration/email verification mismatch"
+actual="$(psql_q "SELECT value FROM options WHERE key='EmailVerificationEnabled';")"
+[ "$actual" = "$expected_email_verification" ] \
+  || die "launch baseline: database EmailVerificationEnabled mismatch"
   if [ "$LAUNCH_BASELINE" = commercial ]; then
     approved="$(psql_q "SELECT count(*) FROM channels WHERE id=1 AND status=1 AND base_url='https://api.88token.net' AND models='gpt-6-luna' AND \"group\"='default';")"
     [ "$approved" = 1 ] || die "launch baseline: Channel 1 approved provider/model/group mismatch"
