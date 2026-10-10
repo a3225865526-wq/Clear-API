@@ -31,6 +31,10 @@ interface MarkdownProps {
   breaks?: boolean
   children: string
   className?: string
+  /** Opt out of source HTML; existing rich-content consumers retain their behavior. */
+  allowHtml?: boolean
+  /** Transform documentation links after sanitization. Undefined disables a link. */
+  resolveLink?: (href: string) => string | undefined
 }
 
 const markdownOptions = {
@@ -720,7 +724,11 @@ const markdownParser = new Marked({
 
 markdownParser.use(...markdownExtensions)
 
-function addExternalLinkAttributes(html: string, baseUrl?: string): string {
+function addExternalLinkAttributes(
+  html: string,
+  baseUrl?: string,
+  resolveLink?: MarkdownProps['resolveLink']
+): string {
   if (typeof window === 'undefined') {
     return html
   }
@@ -729,6 +737,15 @@ function addExternalLinkAttributes(html: string, baseUrl?: string): string {
   template.innerHTML = html
 
   template.content.querySelectorAll('a[href]').forEach((link) => {
+    if (resolveLink) {
+      const href = resolveLink(link.getAttribute('href') ?? '')
+      if (!href || !/^(?:https?:\/\/|mailto:|\/(?!\/)|#)/i.test(href)) {
+        link.removeAttribute('href')
+        return
+      }
+      link.setAttribute('href', href)
+      if (href.startsWith('/') || href.startsWith('#')) return
+    }
     if (baseUrl) {
       try {
         const url = new URL(link.getAttribute('href') ?? '', baseUrl)
@@ -751,21 +768,42 @@ function addExternalLinkAttributes(html: string, baseUrl?: string): string {
 function renderMarkdown(
   markdown: string,
   breaks = false,
-  baseUrl?: string
+  baseUrl?: string,
+  allowHtml = true,
+  resolveLink?: MarkdownProps['resolveLink']
 ): string {
-  const parsedHtml = markdownParser.parse(markdown, {
+  const parser = allowHtml
+    ? markdownParser
+    : new Marked({ ...markdownOptions, renderer: markdownRenderer }).use(
+        ...markdownExtensions,
+        { renderer: { html: () => '' } }
+      )
+  const parsedHtml = parser.parse(markdown, {
     ...markdownOptions,
     breaks,
   })
   const html = DOMPurify.sanitize(parsedHtml, sanitizeOptions)
 
-  return addExternalLinkAttributes(html, baseUrl)
+  return addExternalLinkAttributes(html, baseUrl, resolveLink)
 }
 
 export function Markdown(props: MarkdownProps) {
   const html = useMemo(
-    () => renderMarkdown(props.children, props.breaks, props.baseUrl),
-    [props.breaks, props.children, props.baseUrl]
+    () =>
+      renderMarkdown(
+        props.children,
+        props.breaks,
+        props.baseUrl,
+        props.allowHtml,
+        props.resolveLink
+      ),
+    [
+      props.breaks,
+      props.children,
+      props.baseUrl,
+      props.allowHtml,
+      props.resolveLink,
+    ]
   )
 
   return (

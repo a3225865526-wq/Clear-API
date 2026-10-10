@@ -132,6 +132,14 @@ export function QuickstartSection(props: QuickstartSectionProps) {
           {t('clearapi.landing.quickstart.console_link')}
           <ArrowRight aria-hidden='true' className='size-4' />
         </Link>
+        <Link
+          to='/docs/clearapi'
+          search={{ lang: 'zh' }}
+          className='text-primary mt-4 flex w-fit items-center gap-2 text-sm font-medium underline-offset-4 hover:underline'
+        >
+          {t('Docs')}
+          <ArrowRight aria-hidden='true' className='size-4' />
+        </Link>
       </div>
 
       <div
