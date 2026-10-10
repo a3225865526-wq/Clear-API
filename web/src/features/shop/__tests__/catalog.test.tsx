@@ -36,6 +36,7 @@ import { api } from '@/lib/api'
 import { CreditCatalog } from '..'
 import {
   creditProducts,
+  legacyPurchaseUrl,
   trustedPurchaseUrl,
   type CreditProduct,
 } from '../catalog'
@@ -77,8 +78,10 @@ it('shows the official product and safe external link with no payment or redempt
   expect(buy).toHaveAttribute('href', 'https://catfk.com/item/qmcse2')
   expect(buy).toHaveAttribute('target', '_blank')
   expect(buy).toHaveAttribute('rel', 'noopener noreferrer')
-  expect(screen.getByText(/cannot be withdrawn as dollars/)).toBeVisible()
-  expect(screen.getByText(/does not automatically credit/)).toBeVisible()
+  expect(screen.getAllByText(/Cannot be withdrawn as cash/)).toHaveLength(8)
+  expect(screen.getAllByText(/does not automatically credit/)).toHaveLength(8)
+  expect(screen.queryByText(/Quota/)).not.toBeInTheDocument()
+  expect(screen.getAllByRole('button', { name: 'Coming soon' })).toHaveLength(8)
   expect(post).not.toHaveBeenCalled()
 })
 
@@ -94,16 +97,20 @@ it('routes users to the existing wallet instead of redeeming or creating an orde
 
 it('fails closed on invalid configured product links', async () => {
   renderCatalog([
-    { id: 'invalid', purchaseUrl: 'https://evil.example/item/qmcse2' },
+    {
+      ...creditProducts[0],
+      id: 'invalid',
+      published: true,
+      delivery_verified: true,
+      purchase_url: 'https://evil.example/item/qmcse2',
+    },
   ])
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Invalid store product link'
   )
+  expect(screen.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
   expect(
-    screen.getByRole('button', { name: 'View price and buy' })
-  ).toBeDisabled()
-  expect(
-    screen.queryByRole('link', { name: 'View price and buy' })
+    screen.queryByRole('link', { name: 'Buy API credits' })
   ).not.toBeInTheDocument()
 })
 
@@ -124,7 +131,7 @@ it('keeps a single column on mobile and switches the purchase content to Chinese
   i18next.addResourceBundle('en', 'translation', en.translation, true, true)
   i18next.addResourceBundle('zhCN', 'translation', zh.translation, true, true)
   renderCatalog()
-  const product = await screen.findByRole('article')
+  const product = (await screen.findAllByRole('article'))[0]
   expect(product.parentElement).toHaveClass('grid-cols-1', 'sm:grid-cols-2')
   await act(async () => {
     await i18next.changeLanguage('zhCN')
@@ -132,6 +139,38 @@ it('keeps a single column on mobile and switches the purchase content to Chinese
   expect(screen.getByRole('heading', { name: '购买额度' })).toBeVisible()
   expect(screen.getByRole('link', { name: '查看价格并购买' })).toHaveAttribute(
     'href',
-    creditProducts[0].purchaseUrl
+    legacyPurchaseUrl
   )
+})
+
+it('only enables verified published products with their own purchase links', async () => {
+  renderCatalog([
+    {
+      ...creditProducts[0],
+      published: true,
+      delivery_verified: true,
+      purchase_url: 'https://catfk.com/item/first',
+    },
+    {
+      ...creditProducts[1],
+      published: true,
+      delivery_verified: true,
+      purchase_url: 'https://catfk.com/item/second',
+    },
+    {
+      ...creditProducts[2],
+      published: true,
+      delivery_verified: false,
+      purchase_url: 'https://catfk.com/item/unverified',
+    },
+  ])
+  const links = await screen.findAllByRole('link', { name: 'Buy API credits' })
+  expect(links.map((l) => l.getAttribute('href'))).toEqual([
+    'https://catfk.com/item/first',
+    'https://catfk.com/item/second',
+  ])
+  expect(screen.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
+  expect(
+    screen.getByText(/Confirm the delivered API credit amount/)
+  ).toBeVisible()
 })

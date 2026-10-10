@@ -1,3 +1,6 @@
+import { RewardSettings } from '@/features/referrals/components/reward-settings'
+import { CatalogEditor } from '@/features/shop/components/catalog-editor'
+
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -30,6 +33,16 @@ import type { SiteSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
 
 const SITE_SECTIONS = [
+  {
+    id: 'credit-products',
+    titleKey: 'API credit products',
+    build: () => <CatalogEditor />,
+  },
+  {
+    id: 'referral-rewards',
+    titleKey: 'Referral reward settings',
+    build: () => <RewardSettings />,
+  },
   {
     id: 'system-info',
     titleKey: 'System Information',

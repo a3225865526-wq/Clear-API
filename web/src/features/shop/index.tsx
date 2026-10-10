@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -19,17 +20,24 @@ For commercial licensing, please contact support@quantumnous.com
 import { Link } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
+import { CopyButton } from '@/components/copy-button'
+import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatNumber } from '@/lib/format'
 
+import { getCatalog } from './api'
 import {
   creditProducts,
+  legacyPurchaseUrl,
   trustedPurchaseUrl,
   type CreditProduct,
 } from './catalog'
 
 export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   return (
     <div className='mx-auto w-full max-w-4xl space-y-6'>
       <div className='space-y-2'>
@@ -40,33 +48,65 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
           )}
         </p>
       </div>
+      <section className='bg-card text-card-foreground space-y-3 rounded-xl border p-5'>
+        <h2 className='font-semibold'>
+          {t('Contact support for large recharges with no handling fee!')}
+        </h2>
+        <div className='flex flex-wrap items-center gap-2'>
+          <span>QQ: 3225865526</span>
+          <CopyButton value='3225865526' tooltip={t('Copy support QQ')} />
+        </div>
+        <p className='text-muted-foreground text-sm'>
+          {t('Confirm purchase and fee arrangements with support first.')}
+        </p>
+      </section>
+      <section className='space-y-3 rounded-xl border p-5'>
+        <h2 className='font-semibold'>
+          {t('ClearAPI API credit recharge code')}
+        </h2>
+        <p className='text-muted-foreground text-sm'>
+          {t(
+            'Existing purchase entry. Confirm the delivered API credit amount with the seller before purchasing.'
+          )}
+        </p>
+        <Button
+          role='link'
+          className='min-h-11'
+          render={
+            <a
+              href={legacyPurchaseUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+            />
+          }
+        >
+          {t('View price and buy')}
+        </Button>
+      </section>
       <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
         {(props.products ?? creditProducts).map((product) => {
-          const url = trustedPurchaseUrl(product.purchaseUrl)
+          const url = trustedPurchaseUrl(product.purchase_url)
+          const canBuy = product.published && product.delivery_verified && url
           return (
             <article
               key={product.id}
               className='bg-card text-card-foreground min-w-0 space-y-5 rounded-xl border p-5 sm:p-6'
             >
-              <h2 className='text-xl font-semibold'>
-                {t('ClearAPI API credit recharge code')}
-              </h2>
+              <h2 className='text-xl font-semibold'>{product.name}</h2>
               <p>
-                {t(
-                  '500,000 Quota = $1 nominal platform credit. This credit cannot be withdrawn as dollars.'
-                )}
+                ¥{formatNumber(product.price_cents / 100, locale)} · $
+                {formatNumber(product.credit_cents / 100, locale)}{' '}
+                {t('platform API usage credit')}
               </p>
               <p className='text-muted-foreground text-sm'>
-                {t(
-                  'Use credits for approved API models in your account group.'
-                )}
+                {t(product.description)}
               </p>
               <p className='text-muted-foreground text-sm'>
                 {t(
                   'Price and availability are shown on Catfk. Payment does not automatically credit your wallet.'
                 )}
               </p>
-              {url ? (
+              {canBuy ? (
                 <Button
                   role='link'
                   className='min-h-11 w-full'
@@ -74,13 +114,15 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
                     <a href={url} target='_blank' rel='noopener noreferrer' />
                   }
                 >
-                  {t('View price and buy')}
+                  {t('Buy API credits')}
                 </Button>
               ) : (
                 <>
-                  <p role='alert'>{t('Invalid store product link')}</p>
+                  {product.purchase_url && !url ? (
+                    <p role='alert'>{t('Invalid store product link')}</p>
+                  ) : null}
                   <Button disabled className='min-h-11 w-full'>
-                    {t('View price and buy')}
+                    {t('Coming soon')}
                   </Button>
                 </>
               )}
@@ -113,9 +155,16 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
 }
 
 export function Shop() {
+  const catalog = useQuery({
+    queryKey: ['credit-catalog'],
+    queryFn: getCatalog,
+  })
   return (
     <PublicLayout>
-      <CreditCatalog />
+      {catalog.isError ? (
+        <ErrorState onRetry={() => catalog.refetch()} />
+      ) : null}
+      <CreditCatalog products={catalog.data?.products ?? []} />
     </PublicLayout>
   )
 }

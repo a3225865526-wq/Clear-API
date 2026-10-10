@@ -171,6 +171,21 @@ func TestAccessTokenAuditsResultsAndExcludesBrowserSessions(t *testing.T) {
 	}
 }
 
+func TestReferralManagementRequiresRootPermission(t *testing.T) {
+	_, pat := setupAccessTokenAudit(t)
+	router := gin.New()
+	router.GET("/catalog", middleware.RootAuth(), GetAdminCreditCatalog)
+	router.PUT("/catalog", middleware.RootAuth(), SaveCreditCatalog)
+	router.GET("/settings", middleware.RootAuth(), GetReferralSettings)
+	router.PUT("/settings", middleware.RootAuth(), SaveReferralSettings)
+	router.PUT("/qualification", middleware.RootAuth(), SetRedemptionReferralKind)
+	router.POST("/rewards/1/resume", middleware.RootAuth(), ResumeReferralReward)
+	for _, tc := range []struct{ method, path string }{{"GET", "/catalog"}, {"PUT", "/catalog"}, {"GET", "/settings"}, {"PUT", "/settings"}, {"PUT", "/qualification"}, {"POST", "/rewards/1/resume"}} {
+		response := auditRequest(router, tc.method, tc.path, pat)
+		assert.Equal(t, http.StatusForbidden, response.Code, tc.path)
+	}
+}
+
 func TestAuditIsolationVisibilityAndFailureContracts(t *testing.T) {
 	user, pat := setupAccessTokenAudit(t)
 	metadata := model.AuditOther{

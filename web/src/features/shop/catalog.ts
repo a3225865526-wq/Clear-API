@@ -18,13 +18,32 @@ For commercial licensing, please contact support@quantumnous.com
 */
 export interface CreditProduct {
   id: string
-  purchaseUrl: string
+  name: string
+  description: string
+  price_cents: number
+  credit_cents: number
+  purchase_url: string
+  published: boolean
+  delivery_verified: boolean
+  sort: number
 }
 
 // Reviewed public product links only. No order or payment integration.
 export const creditProducts: readonly CreditProduct[] = [
-  { id: 'clearapi-credit', purchaseUrl: 'https://catfk.com/item/qmcse2' },
-]
+  1, 5, 10, 20, 50, 100, 500, 1000,
+].map((face, sort) => ({
+  id: `credit-${face}`,
+  name: `ClearAPI $${face} API credit`,
+  description: 'Platform API usage credit. Cannot be withdrawn as cash.',
+  price_cents: face * 100,
+  credit_cents: face * 100,
+  purchase_url: '',
+  published: false,
+  delivery_verified: false,
+  sort,
+}))
+
+export const legacyPurchaseUrl = 'https://catfk.com/item/qmcse2'
 
 export function trustedPurchaseUrl(raw: string): string | null {
   try {

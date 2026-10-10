@@ -346,6 +346,9 @@ func migrateDB() error {
 		&LoginEncryptionKey{},
 		&Redemption{},
 		&RedemptionBatch{},
+		&ReferralReward{},
+		&ReferralLedger{},
+		&ReferralAudit{},
 		&VIPLevel{},
 		&BalanceTransaction{},
 		&StoreProduct{},
@@ -389,6 +392,12 @@ func migrateDB() error {
 		common.SysError("failed to backfill offline order redemption sources: " + err.Error())
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
+		return err
+	}
+	if err := InitReferralConfig(); err != nil {
+		return err
+	}
+	if err := InitCreditCatalog(); err != nil {
 		return err
 	}
 	if err := InitializeExternalIdentityClaims(); err != nil {

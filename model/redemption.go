@@ -40,6 +40,7 @@ type Redemption struct {
 	FaceValueCents int64          `json:"face_value_cents" gorm:"type:bigint;default:0"` // 人民币面额（分），旧码为 0
 	Type           string         `json:"type" gorm:"type:varchar(16);default:'BALANCE';index"`
 	Source         string         `json:"source" gorm:"type:varchar(16);default:'LEGACY';index"`
+	ReferralKind   string         `json:"referral_kind" gorm:"type:varchar(16)"` // Empty historical codes are ineligible.
 }
 
 func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total int64, err error) {
@@ -173,7 +174,11 @@ func redeem(key string, userId int, offlineOnly bool) (quota int, err error) {
 	}
 	common.RandomSleep()
 	err = DB.Transaction(func(tx *gorm.DB) error {
-		err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
+		cfg, err := readReferralConfig(tx, true)
+		if err != nil {
+			return err
+		}
+		err = lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error
 		if err != nil {
 			return errors.New("无效的兑换码")
 		}
@@ -230,7 +235,7 @@ func redeem(key string, userId int, offlineOnly bool) (quota int, err error) {
 			// redeem so quota is never credited without its source fact.
 			return EmitFinanceRedemptionEvent(tx, redemption, userId, common.GetTimestamp())
 		}
-		return nil
+		return queueReferralReward(tx, redemption, userId, cfg)
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())

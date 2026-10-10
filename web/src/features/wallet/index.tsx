@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
+import { ReferralPanel } from '@/features/referrals'
 import { useIsAdmin } from '@/hooks/use-admin'
 import { getSelf } from '@/lib/api'
 
@@ -116,6 +117,8 @@ export function Wallet(props: WalletProps) {
               vip={checkoutDisabledTopupInfo?.vip ?? null}
               onOpenBalanceDetails={() => setBalanceDialogOpen(true)}
             />
+
+            <ReferralPanel />
 
             {topupInfo?.store_recharge_enabled ? (
               <StoreProductsCard

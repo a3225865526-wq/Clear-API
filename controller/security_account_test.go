@@ -1055,6 +1055,56 @@ func TestVerifiedRegistrationConcurrentProofHasOneWinner(t *testing.T) {
 	assert.EqualValues(t, 1, count)
 }
 
+func TestVerifiedRegistrationReferralBindingRequiresProofAndCannotBeReplaced(t *testing.T) {
+	engine := setupVerifiedRegistrationTest(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.Option{}, &model.ReferralReward{}, &model.ReferralLedger{}, &model.ReferralAudit{}))
+	require.NoError(t, model.InitReferralConfig())
+	inviter := model.User{Username: "referral-owner", AffCode: "stable-referral-code", Status: common.UserStatusEnabled}
+	require.NoError(t, model.DB.Create(&inviter).Error)
+	email := "referral-signup@example.com"
+	common.RegisterVerificationCodeWithKey(email, "123456", common.EmailVerificationPurpose)
+	request := func(code string) *httptest.ResponseRecorder {
+		body, err := common.Marshal(map[string]any{"email": email, "verification_code": code, "password": "referral-test-password", "aff_code": inviter.AffCode, "inviter_id": 99999})
+		require.NoError(t, err)
+		w := httptest.NewRecorder()
+		engine.ServeHTTP(w, httptest.NewRequest("POST", "/api/user/register", strings.NewReader(string(body))))
+		return w
+	}
+	assert.False(t, registrationSucceeded(t, request("bad")))
+	var count int64
+	require.NoError(t, model.DB.Unscoped().Model(&model.User{}).Where("inviter_id = ?", inviter.Id).Count(&count).Error)
+	assert.Zero(t, count)
+	require.True(t, registrationSucceeded(t, request("123456")))
+	user, err := model.GetUniqueUserByEmail(email)
+	require.NoError(t, err)
+	assert.Equal(t, inviter.Id, user.InviterId)
+	assert.Zero(t, user.Quota)
+	assert.NotEmpty(t, user.AffCode)
+	assert.NotEqual(t, inviter.AffCode, user.AffCode)
+	assert.False(t, registrationSucceeded(t, request("123456")))
+	require.NoError(t, model.DB.Unscoped().Model(&model.User{}).Where("inviter_id = ?", inviter.Id).Count(&count).Error)
+	assert.EqualValues(t, 1, count)
+	// Caller-supplied identity parameters never select another user's statistics.
+	engine.GET("/referral-self", func(c *gin.Context) { c.Set("id", inviter.Id) }, GetReferralSelf)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest("GET", "/referral-self?user_id=99999", nil))
+	var result struct {
+		Success bool
+		Data    struct {
+			Code  string
+			Count int64
+			Link  string
+		}
+	}
+	require.NoError(t, common.Unmarshal(w.Body.Bytes(), &result))
+	assert.True(t, result.Success)
+	assert.Equal(t, inviter.AffCode, result.Data.Code)
+	assert.EqualValues(t, 1, result.Data.Count)
+	assert.Equal(t, "https://www.clear999.com/sign-up?aff="+inviter.AffCode, result.Data.Link)
+	assert.NotContains(t, w.Body.String(), email)
+	assert.NotContains(t, w.Body.String(), "password")
+}
+
 func TestVerifiedRegistrationDoesNotClaimLegacyEmailAndRejectsGiftMisconfiguration(t *testing.T) {
 	engine := setupVerifiedRegistrationTest(t)
 	existing := &model.User{Username: "reserved-legacy", Email: "reserved-registration@example.com", Quota: 456}

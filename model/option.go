@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"maps"
 	"os"
 	"strconv"
@@ -241,6 +242,9 @@ func SyncOptions(frequency int) {
 }
 
 func validateOptionValue(key string, value string) error {
+	if key == ReferralOptionKey || key == CreditCatalogOptionKey {
+		return errors.New("use dedicated validated shop and referral settings endpoints")
+	}
 	if err := operation_setting.ValidateQuotaOption(key, value); err != nil {
 		return err
 	}
