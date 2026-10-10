@@ -6,8 +6,9 @@ umask 077
 
 TARGET=/opt/clearapi/bin/production-deploy.sh
 LOCK=/run/lock/clearapi-production-deploy.lock
-EXPECTED_SHA=7a231b96c9c478f8a4ace04f385e5507acc4569b877f20e1458de6609221b4b2
-EXPECTED_COMMIT=8791435010e0b1ebb983c64d3a6c0a297f137615
+EXPECTED_SHA=e2e816397c43aa0b823ea1442543ec251f3e6b07541edfffd44d23e9c050e724
+# Release identity is supplied by the operator after the final commit is known.
+EXPECTED_COMMIT=${2:-}
 SOURCE=${1:-}
 STAGE=
 BACKUP=
@@ -36,12 +37,13 @@ restore() {
   [ "$RESTORING" = 0 ] || return 1
   RESTORING=1
   if [ -f "$BACKUP" ] && [ ! -L "$BACKUP" ]; then
-    cp --preserve=all -- "$BACKUP" "$TARGET.restore"
-    chown root:root "$TARGET.restore"; chmod 0750 "$TARGET.restore"
-    mv -fT -- "$TARGET.restore" "$TARGET"
-    test "$(sha256sum "$TARGET" | cut -d' ' -f1)" = "$OLD_SHA"
-    test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:0:750
-    audit RESTORED "old wrapper restored after post-replace verification failure"
+    cp --preserve=all -- "$BACKUP" "$STAGE/restore.sh" || return 1
+    chown root:root "$STAGE/restore.sh" || return 1
+    chmod 0750 "$STAGE/restore.sh" || return 1
+    mv -fT -- "$STAGE/restore.sh" "$TARGET" || return 1
+    test "$(sha256sum "$TARGET" | cut -d' ' -f1)" = "$OLD_SHA" || return 1
+    test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:0:750 || return 1
+    audit RESTORED "old wrapper restored after post-replace verification failure" || return 1
     return 0
   fi
   return 1
@@ -60,6 +62,7 @@ trap on_error ERR
 
 [ "$(id -u)" = 0 ] || fail 'root is required'
 [ -n "$SOURCE" ] || fail 'usage: clearapi-install-approved-script.sh /root/input/approved-wrapper.sh'
+[[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail 'supply the approved full release commit as the second argument'
 [ -f "$SOURCE" ] && [ ! -L "$SOURCE" ] || fail 'source must be a regular non-symlink file'
 for directory in /opt /opt/clearapi /opt/clearapi/bin /run /run/lock; do
   [ -d "$directory" ] && [ ! -L "$directory" ] || fail "unsafe directory: $directory"
@@ -87,7 +90,7 @@ flock -n 9 || fail 'production deployment lock is held'
 STAGE=$(mktemp -d /opt/clearapi/bin/.script-install.XXXXXXXX)
 chmod 0700 "$STAGE"; chown root:root "$STAGE"
 OLD_SHA=$(sha256sum "$TARGET" | cut -d' ' -f1)
-test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:750 || fail 'existing wrapper must be root:root 0750'
+test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:0:750 || fail 'existing wrapper must be root:root 0750'
 BACKUP="$STAGE/production-deploy.old.sh"
 cp --preserve=all -- "$TARGET" "$BACKUP"
 test "$(sha256sum "$BACKUP" | cut -d' ' -f1)" = "$OLD_SHA"
@@ -96,7 +99,7 @@ audit PREPARED "source commit ${EXPECTED_COMMIT}; old_sha ${OLD_SHA}; backup ${B
 install -o root -g root -m 0750 -- "$SOURCE" "$STAGE/production-deploy.new.sh"
 test "$(sha256sum "$STAGE/production-deploy.new.sh" | cut -d' ' -f1)" = "$EXPECTED_SHA"
 bash -n "$STAGE/production-deploy.new.sh"
-test "$(stat -c '%u:%g:%a' "$STAGE/production-deploy.new.sh")" = 0:750
+test "$(stat -c '%u:%g:%a' "$STAGE/production-deploy.new.sh")" = 0:0:750
 test "$(stat -c %d "$STAGE")" = "$(stat -c %d /opt/clearapi/bin)"
 
 test -s /etc/machine-id
@@ -107,7 +110,7 @@ audit VERIFIED "vps=$(hostname -f 2>/dev/null || hostname); deploy_account=clear
 mv -fT -- "$STAGE/production-deploy.new.sh" "$TARGET"
 REPLACED=1
 test "$(sha256sum "$TARGET" | cut -d' ' -f1)" = "$EXPECTED_SHA"
-test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:750
+test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:0:750
 bash -n "$TARGET"
 sudo -n /usr/bin/sha256sum "$TARGET" | grep -q "$EXPECTED_SHA"
 audit INSTALLED "new_sha ${EXPECTED_SHA}; no container replacement performed"
