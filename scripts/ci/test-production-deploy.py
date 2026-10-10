@@ -138,10 +138,13 @@ elif a[-3:] == ["ps", "-q", "new-api"]:
     print("running-container")
 elif a == ["docker", "inspect", "--format", "{{.Image}}", "running-container"]:
     print("sha256:running-local-id")
+elif a[:4] == ["docker", "image", "inspect", "--format"] and a[4] == "{{.Id}}":
+    print("sha256:running-local-id")
 elif a[-2:] == ["printenv", "CLEARAPI_CLOSED_LAUNCH"]:
     print(f.get("closed", "false"))
 elif a[-3:] == ["config", "--format", "json"]:
     print(json.dumps({"services":{"new-api":{
+        "image":"registry/example@sha256:" + "a" * 64,
         "stop_signal":f.get("signal", "SIGTERM"),
         "stop_grace_period":f.get("grace", "2m30s"),
         "environment":{"SHUTDOWN_TIMEOUT_SECONDS":f.get("timeout", "120")}}}}))
@@ -258,14 +261,45 @@ print(json.dumps({"success":True,"data":{
         self.assertEqual(r.returncode, 0, r.stderr)
         rollback_manifest = self.root / "release-manifest.previous.json"
         rollback_manifest.write_text(self.manifest.read_text())
+        previous = json.loads(rollback_manifest.read_text())
+        self.manifest.write_text(json.dumps({"releases": {"current": {
+            "new_api_image_id": "sha256:failed-candidate", "candidate_commit": COMMIT
+        }}}))
         r = self.run_gate('PRE_DEPLOY_MANIFEST="' + str(rollback_manifest) + '"; '
                           'ROLLBACK_REF=registry/previous; PREV_IMAGE_ID=sha256:running-local-id; '
                           'health_retry() { return 0; }; rollback')
         self.assertEqual(r.returncode, 0, r.stderr)
+        restored = json.loads(self.manifest.read_text())
+        self.assertEqual(restored["releases"], previous["releases"])
+        self.assertEqual(restored["failed_deployments"][0]["candidate"]["candidate_commit"], COMMIT)
         commands = [json.loads(line) for line in self.trace.read_text().splitlines()]
         self.assertEqual(len(commands), 2)
         for command in commands:
             self.assertEqual(command[-5:], ["up", "-d", "--timeout", "150", "new-api"])
+
+    def test_config_permissions_and_symlink_rejected_under_python_optimize(self):
+        self.env["PYTHONOPTIMIZE"] = "2"
+        self.config.chmod(0o666)
+        result = self.run_wrapper("--verify")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.trace.exists())
+        self.config.chmod(0o600)
+        original = self.config.with_suffix(".original")
+        self.config.rename(original)
+        self.config.symlink_to(original)
+        result = self.run_wrapper("--verify")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(self.trace.exists())
+
+    def test_audit_json_escaping_and_write_failure(self):
+        detail = 'quoted "reason"\\path\nsecond line'
+        result = self.run_gate("audit regression failed " + shlex.quote(detail))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(self.audit.read_text())["detail"], detail)
+        self.audit.unlink()
+        self.audit.mkdir()
+        result = self.run_gate("audit regression failed reason")
+        self.assertNotEqual(result.returncode, 0)
 
 
 class WorkflowStdinTest(unittest.TestCase):
@@ -369,14 +403,14 @@ elif a[0]=='inspect':
     else: print('sha256:candidate-local-id' if (root/'replaced').exists() else 'sha256:running-local-id')
 elif a[0]=='port':
     if '3000/tcp' in a: print('127.0.0.1:3000')
- elif a[:2]==['ps','-a']: pass
- elif a[0]=='compose':
+elif a[:2]==['ps','-a']: pass
+elif a[0]=='compose':
     if 'ps' in a: print('postgres-container' if a[-1]=='postgres' else 'running-container')
     elif 'config' in a:
-         candidate = any('compose-jobs.yaml' in x for x in a)
-         image = 'ghcr.io/a3225865526-wq/clearapi@sha256:'+'a'*64 if candidate else 'registry/example@sha256:'+'a'*64
-         service = {'image': image, 'stop_signal':'SIGTERM','stop_grace_period':'2m30s','environment':{'SHUTDOWN_TIMEOUT_SECONDS':'120'}}
-         print(json.dumps({'services':{'new-api':service, 'production-bootstrap':{'image':image}}}))
+        candidate = any('compose-jobs.yaml' in x for x in a)
+        image = 'ghcr.io/a3225865526-wq/clearapi@sha256:'+'a'*64 if candidate else 'registry/example@sha256:'+'a'*64
+        service = {'image': image, 'stop_signal':'SIGTERM','stop_grace_period':'2m30s','environment':{'SHUTDOWN_TIMEOUT_SECONDS':'120'}}
+        print(json.dumps({'services':{'new-api':service, 'production-bootstrap':{'image':image}}}))
     elif 'printenv' in a: print('false')
     elif 'psql' in a:
         q=a[-1]
@@ -404,6 +438,8 @@ else: sys.exit('Forbidden docker operation')
                    TMPDIR=str(self.root))
         result = subprocess.run(["bash", "-c", block], env=env, capture_output=True,
                                 text=True, timeout=20)
+        self.assertTrue(self.trace.exists(),
+                        f"mock trace absent: exit={result.returncode}\n{result.stderr}")
         trace = [json.loads(line) for line in self.trace.read_text().splitlines()]
         output = result.stdout + result.stderr
         if self.audit.exists():
