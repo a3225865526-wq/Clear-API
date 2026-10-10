@@ -43,6 +43,9 @@ class WrapperModesTest(unittest.TestCase):
         # Redirect only the fixed operator config path in the test copy.
         self.wrapper = self.root / "wrapper.sh"
         self.wrapper.write_text(SOURCE.read_text().replace(
+            "production_path = str(p) == '/opt/clearapi/config/deploy.env'",
+            "production_path = False # isolated non-production fixture"
+        ).replace(
             "/opt/clearapi/config/deploy.env", str(self.config)
         ))
         fake_sudo = self.root / "sudo"
