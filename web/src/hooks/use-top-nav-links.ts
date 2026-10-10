@@ -20,7 +20,6 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useStatus } from '@/hooks/use-status'
-import { getClearApiDocsLink } from '@/lib/clearapi-branding'
 import { parseHeaderNavModulesFromStatus } from '@/lib/nav-modules'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -56,9 +55,6 @@ export function useTopNavLinks(): TopNavLink[] {
     )
   }, [status])
 
-  // Documentation link (may be external)
-  const docsLink = getClearApiDocsLink(status?.docs_link as string | undefined)
-
   const isAuthed = !!auth?.user
 
   const links: TopNavLink[] = []
@@ -82,12 +78,11 @@ export function useTopNavLinks(): TopNavLink[] {
 
   links.push({ title: t('Buy credits'), href: '/shop' })
 
-  // Docs (supports external links)
-  if (modules?.docs !== false && docsLink) {
+  // The bundled public guide is available without login or an external docs host.
+  if (modules?.docs !== false) {
     links.push({
       title: t('Docs'),
-      href: docsLink,
-      external: docsLink.startsWith('http'),
+      href: '/docs/clearapi',
     })
   }
 

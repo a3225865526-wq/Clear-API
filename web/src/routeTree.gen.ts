@@ -31,6 +31,7 @@ import { Route as AuthenticatedChat2linkRouteImport } from './routes/_authentica
 import { Route as AuthenticatedSystemSettingsRouteRouteImport } from './routes/_authenticated/system-settings/route'
 import { Route as AuthenticatedUsageGuideRouteImport } from './routes/_authenticated/usage-guide'
 import { Route as AboutIndexRouteImport } from './routes/about/index'
+import { Route as DocsClearapiRouteRouteImport } from './routes/docs/clearapi/route'
 import { Route as OauthProviderRouteImport } from './routes/oauth/$provider'
 import { Route as PricingIndexRouteImport } from './routes/pricing/index'
 import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
@@ -62,6 +63,8 @@ import { Route as AuthenticatedUsageLogsSectionRouteImport } from './routes/_aut
 import { Route as AuthenticatedUsageLogsAuditRouteImport } from './routes/_authenticated/usage-logs/audit'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
+import { Route as DocsClearapiIndexRouteImport } from './routes/docs/clearapi/index'
+import { Route as DocsClearapiChapterRouteImport } from './routes/docs/clearapi/$chapter'
 import { Route as PricingModelIdIndexRouteImport } from './routes/pricing/$modelId/index'
 import { Route as AuthenticatedSystemSettingsAuthIndexRouteImport } from './routes/_authenticated/system-settings/auth/index'
 import { Route as AuthenticatedSystemSettingsAuthSectionRouteImport } from './routes/_authenticated/system-settings/auth/$section'
@@ -188,6 +191,11 @@ const AuthenticatedUsageGuideRoute = AuthenticatedUsageGuideRouteImport.update({
 const AboutIndexRoute = AboutIndexRouteImport.update({
   id: '/about/',
   path: '/about/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsClearapiRouteRoute = DocsClearapiRouteRouteImport.update({
+  id: '/docs/clearapi',
+  path: '/docs/clearapi',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OauthProviderRoute = OauthProviderRouteImport.update({
@@ -366,6 +374,16 @@ const AuthenticatedWalletIndexRoute =
     path: '/wallet/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const DocsClearapiIndexRoute = DocsClearapiIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => DocsClearapiRouteRoute,
+} as any)
+const DocsClearapiChapterRoute = DocsClearapiChapterRouteImport.update({
+  id: '/$chapter',
+  path: '/$chapter',
+  getParentRoute: () => DocsClearapiRouteRoute,
+} as any)
 const PricingModelIdIndexRoute = PricingModelIdIndexRouteImport.update({
   id: '/pricing/$modelId/',
   path: '/pricing/$modelId/',
@@ -473,6 +491,7 @@ export interface FileRoutesByFullPath {
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/user-agreement': typeof UserAgreementRoute
   '/system-settings': typeof AuthenticatedSystemSettingsRouteRouteWithChildren
+  '/docs/clearapi': typeof DocsClearapiRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
   '/oauth': typeof authOauthRoute
   '/otp': typeof authOtpRoute
@@ -503,6 +522,7 @@ export interface FileRoutesByFullPath {
   '/pool/capabilities': typeof AuthenticatedPoolCapabilitiesRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
+  '/docs/clearapi/$chapter': typeof DocsClearapiChapterRoute
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/finance/': typeof AuthenticatedFinanceIndexRoute
@@ -520,6 +540,7 @@ export interface FileRoutesByFullPath {
   '/usage-logs/': typeof AuthenticatedUsageLogsIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/wallet/': typeof AuthenticatedWalletIndexRoute
+  '/docs/clearapi/': typeof DocsClearapiIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -572,6 +593,7 @@ export interface FileRoutesByTo {
   '/pool/capabilities': typeof AuthenticatedPoolCapabilitiesRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
+  '/docs/clearapi/$chapter': typeof DocsClearapiChapterRoute
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/finance': typeof AuthenticatedFinanceIndexRoute
@@ -589,6 +611,7 @@ export interface FileRoutesByTo {
   '/usage-logs': typeof AuthenticatedUsageLogsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
+  '/docs/clearapi': typeof DocsClearapiIndexRoute
   '/pricing/$modelId': typeof PricingModelIdIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -615,6 +638,7 @@ export interface FileRoutesById {
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/user-agreement': typeof UserAgreementRoute
   '/_authenticated/system-settings': typeof AuthenticatedSystemSettingsRouteRouteWithChildren
+  '/docs/clearapi': typeof DocsClearapiRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
   '/(auth)/oauth': typeof authOauthRoute
   '/(auth)/otp': typeof authOtpRoute
@@ -645,6 +669,7 @@ export interface FileRoutesById {
   '/_authenticated/pool/capabilities': typeof AuthenticatedPoolCapabilitiesRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/_authenticated/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
+  '/docs/clearapi/$chapter': typeof DocsClearapiChapterRoute
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/finance/': typeof AuthenticatedFinanceIndexRoute
@@ -662,6 +687,7 @@ export interface FileRoutesById {
   '/_authenticated/usage-logs/': typeof AuthenticatedUsageLogsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
+  '/docs/clearapi/': typeof DocsClearapiIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
   '/_authenticated/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/_authenticated/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -687,6 +713,7 @@ export interface FileRouteTypes {
     | '/privacy-policy'
     | '/user-agreement'
     | '/system-settings'
+    | '/docs/clearapi'
     | '/forgot-password'
     | '/oauth'
     | '/otp'
@@ -717,6 +744,7 @@ export interface FileRouteTypes {
     | '/pool/capabilities'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
+    | '/docs/clearapi/$chapter'
     | '/channels/'
     | '/dashboard/'
     | '/finance/'
@@ -734,6 +762,7 @@ export interface FileRouteTypes {
     | '/usage-logs/'
     | '/users/'
     | '/wallet/'
+    | '/docs/clearapi/'
     | '/pricing/$modelId/'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
@@ -786,6 +815,7 @@ export interface FileRouteTypes {
     | '/pool/capabilities'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
+    | '/docs/clearapi/$chapter'
     | '/channels'
     | '/dashboard'
     | '/finance'
@@ -803,6 +833,7 @@ export interface FileRouteTypes {
     | '/usage-logs'
     | '/users'
     | '/wallet'
+    | '/docs/clearapi'
     | '/pricing/$modelId'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
@@ -828,6 +859,7 @@ export interface FileRouteTypes {
     | '/privacy-policy'
     | '/user-agreement'
     | '/_authenticated/system-settings'
+    | '/docs/clearapi'
     | '/(auth)/forgot-password'
     | '/(auth)/oauth'
     | '/(auth)/otp'
@@ -858,6 +890,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pool/capabilities'
     | '/_authenticated/usage-logs/$section'
     | '/_authenticated/usage-logs/audit'
+    | '/docs/clearapi/$chapter'
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
     | '/_authenticated/finance/'
@@ -875,6 +908,7 @@ export interface FileRouteTypes {
     | '/_authenticated/usage-logs/'
     | '/_authenticated/users/'
     | '/_authenticated/wallet/'
+    | '/docs/clearapi/'
     | '/pricing/$modelId/'
     | '/_authenticated/system-settings/auth/$section'
     | '/_authenticated/system-settings/billing/$section'
@@ -900,6 +934,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   UserAgreementRoute: typeof UserAgreementRoute
+  DocsClearapiRouteRoute: typeof DocsClearapiRouteRouteWithChildren
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
   errors404Route: typeof errors404Route
@@ -1068,6 +1103,13 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about/'
       preLoaderRoute: typeof AboutIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/clearapi': {
+      id: '/docs/clearapi'
+      path: '/docs/clearapi'
+      fullPath: '/docs/clearapi'
+      preLoaderRoute: typeof DocsClearapiRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oauth/$provider': {
@@ -1286,6 +1328,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/wallet/'
       preLoaderRoute: typeof AuthenticatedWalletIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/docs/clearapi/': {
+      id: '/docs/clearapi/'
+      path: '/'
+      fullPath: '/docs/clearapi/'
+      preLoaderRoute: typeof DocsClearapiIndexRouteImport
+      parentRoute: typeof DocsClearapiRouteRoute
+    }
+    '/docs/clearapi/$chapter': {
+      id: '/docs/clearapi/$chapter'
+      path: '/$chapter'
+      fullPath: '/docs/clearapi/$chapter'
+      preLoaderRoute: typeof DocsClearapiChapterRouteImport
+      parentRoute: typeof DocsClearapiRouteRoute
     }
     '/pricing/$modelId/': {
       id: '/pricing/$modelId/'
@@ -1565,12 +1621,26 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface DocsClearapiRouteRouteChildren {
+  DocsClearapiChapterRoute: typeof DocsClearapiChapterRoute
+  DocsClearapiIndexRoute: typeof DocsClearapiIndexRoute
+}
+
+const DocsClearapiRouteRouteChildren: DocsClearapiRouteRouteChildren = {
+  DocsClearapiChapterRoute: DocsClearapiChapterRoute,
+  DocsClearapiIndexRoute: DocsClearapiIndexRoute,
+}
+
+const DocsClearapiRouteRouteWithChildren =
+  DocsClearapiRouteRoute._addFileChildren(DocsClearapiRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   authRouteRoute: authRouteRouteWithChildren,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   UserAgreementRoute: UserAgreementRoute,
+  DocsClearapiRouteRoute: DocsClearapiRouteRouteWithChildren,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
   errors404Route: errors404Route,

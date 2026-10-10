@@ -29,11 +29,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    fs: { allow: [path.resolve(__dirname, '../docs')] },
+  },
   test: {
     environment: 'jsdom',
-    server: {
-      deps: { inline: [/@lobehub\//, /antd-style/] },
-    },
+    server: { deps: { inline: [/@lobehub\//, /antd-style/] } },
     setupFiles: ['./src/test-setup.ts'],
     // Several heavy jsdom suites (channel-configuration, visual-billing-editor)
     // legitimately take >5s per test on contended CI runners; the vitest
