@@ -16,6 +16,7 @@ import unittest
 SOURCE = Path(__file__).resolve().parents[1] / "production-deploy.sh"
 DIGEST = "sha256:" + "a" * 64
 COMMIT = "b" * 40
+INSTALLER_COMMIT = "43b94178bd574a4c2ac0d95d8382cf27377e1dad"
 
 
 class WrapperModesTest(unittest.TestCase):
@@ -376,7 +377,7 @@ sys.exit('unexpected mock command')
 
     def run_install(self, failure=""):
         env = dict(self.env, INSTALL_FAILURE=failure)
-        return subprocess.run(["bash", str(self.installer), str(self.source), COMMIT],
+        return subprocess.run(["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
                               env=env, capture_output=True, text=True, timeout=10)
 
     def test_normal_install_hash_owner_and_permissions(self):

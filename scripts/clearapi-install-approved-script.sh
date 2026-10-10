@@ -7,8 +7,8 @@ umask 077
 TARGET=/opt/clearapi/bin/production-deploy.sh
 LOCK=/run/lock/clearapi-production-deploy.lock
 EXPECTED_SHA=e2e816397c43aa0b823ea1442543ec251f3e6b07541edfffd44d23e9c050e724
-# Release identity is supplied by the operator after the final commit is known.
-EXPECTED_COMMIT=${2:-}
+EXPECTED_COMMIT=43b94178bd574a4c2ac0d95d8382cf27377e1dad
+RELEASE_COMMIT=${2:-}
 SOURCE=${1:-}
 STAGE=
 BACKUP=
@@ -62,7 +62,7 @@ trap on_error ERR
 
 [ "$(id -u)" = 0 ] || fail 'root is required'
 [ -n "$SOURCE" ] || fail 'usage: clearapi-install-approved-script.sh /root/input/approved-wrapper.sh'
-[[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail 'supply the approved full release commit as the second argument'
+[[ "$RELEASE_COMMIT" == "$EXPECTED_COMMIT" ]] || fail 'release commit does not match the approved installer identity'
 [ -f "$SOURCE" ] && [ ! -L "$SOURCE" ] || fail 'source must be a regular non-symlink file'
 for directory in /opt /opt/clearapi /opt/clearapi/bin /run /run/lock; do
   [ -d "$directory" ] && [ ! -L "$directory" ] || fail "unsafe directory: $directory"
