@@ -34,7 +34,7 @@ import { api } from '@/lib/api'
 import { SignUpForm } from '../components/sign-up-form'
 
 let client: QueryClient | undefined
-function renderRegistration(emailVerification: boolean) {
+function renderRegistration(emailVerification: boolean, entry = '/sign-up') {
   client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity } },
   })
@@ -57,7 +57,7 @@ function renderRegistration(emailVerification: boolean) {
   })
   const router = createRouter({
     routeTree: root.addChildren([register, login]),
-    history: createMemoryHistory({ initialEntries: ['/sign-up'] }),
+    history: createMemoryHistory({ initialEntries: [entry] }),
   })
   render(
     <QueryClientProvider client={client}>
@@ -96,6 +96,34 @@ it('registers with only email, password and code when verification is enabled', 
       username: '',
       email: 'new@example.com',
       password: 'registration-password',
+      verification_code: '123456',
+    }),
+    expect.any(Object)
+  )
+})
+
+it('keeps the invitation parameter while requiring the email verification code', async () => {
+  const post = vi
+    .spyOn(api, 'post')
+    .mockResolvedValue({ data: { success: true } })
+  renderRegistration(true, '/sign-up?aff=stable-referral-code')
+  await userEvent.type(
+    await screen.findByLabelText('Email (required for verification)'),
+    'referral-new@example.com'
+  )
+  await userEvent.type(
+    screen.getByLabelText('Password'),
+    'registration-password'
+  )
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(post).not.toHaveBeenCalled()
+  await userEvent.type(screen.getByLabelText('Verification code'), '123456')
+  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  expect(await screen.findByText('Sign-in destination')).toBeVisible()
+  expect(post).toHaveBeenCalledWith(
+    '/api/user/register',
+    expect.objectContaining({
+      aff_code: 'stable-referral-code',
       verification_code: '123456',
     }),
     expect.any(Object)

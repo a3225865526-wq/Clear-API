@@ -273,9 +273,16 @@ func Register(c *gin.Context) {
 			common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
 			return
 		}
-		affCode = ""
 	}
 	inviterId, _ := model.GetUserIdByAffCode(affCode)
+	cfg, cfgErr := model.GetReferralConfig()
+	if cfgErr != nil {
+		common.ApiError(c, cfgErr)
+		return
+	}
+	if !cfg.InvitesEnabled {
+		inviterId = 0
+	}
 	cleanUser := model.User{
 		Username:    user.Username,
 		Password:    user.Password,
@@ -469,14 +476,15 @@ func GetAffCode(c *gin.Context) {
 		return
 	}
 	if user.AffCode == "" {
-		user.AffCode = common.GetRandomString(4)
-		if err := user.Update(false); err != nil {
+		code, err := model.EnsureReferralCode(id)
+		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": err.Error(),
 			})
 			return
 		}
+		user.AffCode = code
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
