@@ -186,7 +186,6 @@ PY
 }
 log() { printf '[deploy %s] %s\n' "$(TS_NOW)" "$*" >&2; }
 
-REPLACE_DONE=0
 REPLACE_STARTED=0
 WORK_DIR=""
 EPHEMERAL_DOCKER_CONFIG=""
@@ -699,7 +698,6 @@ write_override "$IMAGE_REF"
 # its persisted stop timeout may predate the new Compose grace policy.
 REPLACE_STARTED=1
 compose up -d --timeout 150 "$SERVICE" || die "step 14: compose replace failed (runtime state may have changed)"
-REPLACE_DONE=1
 # Hard identity gate: prove the running container actually IS the candidate
 # image before any health check can call this deploy a success. compose may
 # legitimately no-op when it believes nothing changed; without this check a
