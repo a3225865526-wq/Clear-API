@@ -16,7 +16,7 @@ import unittest
 SOURCE = Path(__file__).resolve().parents[1] / "production-deploy.sh"
 DIGEST = "sha256:" + "a" * 64
 COMMIT = "b" * 40
-INSTALLER_COMMIT = "43b94178bd574a4c2ac0d95d8382cf27377e1dad"
+INSTALLER_COMMIT = "f1797fbb3752100c665ddf85d9dfae89b7765ad7"
 
 
 class WrapperModesTest(unittest.TestCase):
