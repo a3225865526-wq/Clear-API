@@ -37,6 +37,7 @@ class WrapperModesTest(unittest.TestCase):
                 "DEPLOY_MANIFEST": self.manifest, "DEPLOY_AUDIT_LOG": self.audit,
             }.items()
         ))
+        self.config.chmod(0o600)
         # Redirect only the fixed operator config path in the test copy.
         self.wrapper = self.root / "wrapper.sh"
         self.wrapper.write_text(SOURCE.read_text().replace(
@@ -50,7 +51,7 @@ with open(os.environ["TEST_TRACE"], "a") as f:
     f.write(json.dumps(args) + "\\n")
 if args[0:2] == ["docker", "compose"] and args[-3:] == ["ps", "-q", "new-api"]:
     print("running-container")
-elif args[0:2] == ["docker", "compose"] and args[-3:] == ["config", "--format", "json"]:
+elif args[0:2] == ["docker", "compose"] and "config" in args and args[-2:] == ["--format", "json"]:
     print(json.dumps({"services": {"new-api": {"image": "registry/example@sha256:" + "a" * 64}}}))
 elif args == ["docker", "inspect", "--format", "{{.Image}}", "running-container"]:
     print("sha256:running-local-id")
@@ -255,7 +256,10 @@ print(json.dumps({"success":True,"data":{
         setup = 'IMAGE_REF=registry/example; CANDIDATE_IMAGE_ID=sha256:running-local-id; '
         r = self.run_gate(setup + step)
         self.assertEqual(r.returncode, 0, r.stderr)
-        r = self.run_gate('ROLLBACK_REF=registry/previous; PREV_IMAGE_ID=sha256:running-local-id; '
+        rollback_manifest = self.root / "release-manifest.previous.json"
+        rollback_manifest.write_text(self.manifest.read_text())
+        r = self.run_gate('PRE_DEPLOY_MANIFEST="' + str(rollback_manifest) + '"; '
+                          'ROLLBACK_REF=registry/previous; PREV_IMAGE_ID=sha256:running-local-id; '
                           'health_retry() { return 0; }; rollback')
         self.assertEqual(r.returncode, 0, r.stderr)
         commands = [json.loads(line) for line in self.trace.read_text().splitlines()]
@@ -365,12 +369,14 @@ elif a[0]=='inspect':
     else: print('sha256:candidate-local-id' if (root/'replaced').exists() else 'sha256:running-local-id')
 elif a[0]=='port':
     if '3000/tcp' in a: print('127.0.0.1:3000')
-elif a[:2]==['ps','-a']: pass
-elif a[0]=='compose':
+ elif a[:2]==['ps','-a']: pass
+ elif a[0]=='compose':
     if 'ps' in a: print('postgres-container' if a[-1]=='postgres' else 'running-container')
     elif 'config' in a:
-        print(json.dumps({'services':{'new-api':{'image':'registry/example@sha256:'+'a'*64,
-              'stop_signal':'SIGTERM','stop_grace_period':'2m30s','environment':{'SHUTDOWN_TIMEOUT_SECONDS':'120'}}}}))
+         candidate = any('compose-jobs.yaml' in x for x in a)
+         image = 'ghcr.io/a3225865526-wq/clearapi@sha256:'+'a'*64 if candidate else 'registry/example@sha256:'+'a'*64
+         service = {'image': image, 'stop_signal':'SIGTERM','stop_grace_period':'2m30s','environment':{'SHUTDOWN_TIMEOUT_SECONDS':'120'}}
+         print(json.dumps({'services':{'new-api':service, 'production-bootstrap':{'image':image}}}))
     elif 'printenv' in a: print('false')
     elif 'psql' in a:
         q=a[-1]

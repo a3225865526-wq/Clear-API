@@ -42,6 +42,24 @@ unset GHCR_PULL_TOKEN
 # Operator configuration is authoritative over inherited DEPLOY_* variables.
 # Derive aliases only after sourcing; absent keys retain the caller/default value.
 if [ -f /opt/clearapi/config/deploy.env ]; then
+  python3 - /opt/clearapi/config/deploy.env <<'PY'
+import os, pathlib, stat, sys
+p = pathlib.Path(sys.argv[1])
+production_path = str(p) == '/opt/clearapi/config/deploy.env'
+for d in reversed(p.parent.parents):
+    s = os.lstat(d)
+    if (not stat.S_ISDIR(s.st_mode) or (production_path and s.st_uid != 0)
+            or (s.st_mode & 0o022 and not s.st_mode & stat.S_ISVTX)):
+        sys.exit(f'REFUSING: unsafe configuration directory {d}')
+s = os.lstat(p.parent)
+if (not stat.S_ISDIR(s.st_mode) or (production_path and s.st_uid != 0)
+        or (s.st_mode & 0o022 and not s.st_mode & stat.S_ISVTX)):
+    sys.exit('REFUSING: unsafe configuration directory')
+s = os.lstat(p)
+if (not stat.S_ISREG(s.st_mode) or (production_path and (s.st_uid != 0 or s.st_gid != 0))
+        or stat.S_IMODE(s.st_mode) != 0o600 or s.st_nlink != 1):
+    sys.exit('REFUSING: deploy.env must be root:root 0600, regular and unlinked')
+PY
   # shellcheck disable=SC1090
   . /opt/clearapi/config/deploy.env
 else
@@ -151,25 +169,45 @@ exec 3<&-
 TS_NOW() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 audit() { # audit <event> <result> <detail>
   mkdir -p "$(dirname "$AUDIT_LOG")"
-  printf '{"ts":"%s","event":"%s","result":"%s","digest":"%s","previous_image":"%s","commit":"%s","workflow_run":"%s","detail":"%s"}\n' \
-    "$(TS_NOW)" "$1" "$2" "${DIGEST:-}" "${PREV_IMAGE_ID:-}" "${COMMIT:-}" "${WORKFLOW_RUN:-}" "$3" >> "$AUDIT_LOG"
+  python3 - "$AUDIT_LOG" "$(TS_NOW)" "$1" "$2" "${DIGEST:-}" "${PREV_IMAGE_ID:-}" "${COMMIT:-}" "${WORKFLOW_RUN:-}" "$3" <<'PY'
+import json, os, stat, sys
+path, *values = sys.argv[1:]
+fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+with os.fdopen(fd, 'a') as f:
+    s = os.fstat(f.fileno())
+    production_path = path.startswith('/opt/clearapi/')
+    if (not stat.S_ISREG(s.st_mode) or (production_path and s.st_uid != 0)
+            or s.st_mode & 0o077 or s.st_nlink != 1):
+        sys.exit('unsafe deployment audit file')
+    f.write(json.dumps(dict(zip(('ts','event','result','digest','previous_image','commit','workflow_run','detail'), values))) + '\n')
+    f.flush()
+    os.fsync(f.fileno())
+PY
 }
 log() { printf '[deploy %s] %s\n' "$(TS_NOW)" "$*" >&2; }
 
 REPLACE_DONE=0
+REPLACE_STARTED=0
+WORK_DIR=""
+EPHEMERAL_DOCKER_CONFIG=""
+cleanup() {
+  [ -z "$EPHEMERAL_DOCKER_CONFIG" ] || rm -rf -- "$EPHEMERAL_DOCKER_CONFIG"
+  [ -z "$WORK_DIR" ] || rm -rf -- "$WORK_DIR"
+}
+trap cleanup EXIT
 die() {
+  trap - ERR
   log "FAIL: $*"
-  audit "deploy_failed" "failed" "$*"
-  if [ "$REPLACE_DONE" = "1" ] && [ "$MIGRATION_COMPATIBLE" = "true" ]; then
-    rollback "$*"
+  audit "deploy_failed" "failed" "$*" || log "AUDIT_FAILED: deployment failure could not be persisted"
+  if [ "$REPLACE_STARTED" = "1" ] && [ "$MIGRATION_COMPATIBLE" = "true" ]; then
+    rollback "$*" || log "ROLLBACK_FAILED: MANUAL REVIEW REQUIRED"
     exit 1
   fi
-  if [ "$REPLACE_DONE" = "1" ]; then
+  if [ "$REPLACE_STARTED" = "1" ]; then
     log "no automatic rollback (migration_compatible=${MIGRATION_COMPATIBLE}) — MANUAL REVIEW REQUIRED"
   fi
   exit 1
 }
-
 compose() {
   # The override file (exact-digest pin, written by write_override) MUST be
   # part of every compose invocation; without it `compose up -d` sees an
@@ -179,6 +217,12 @@ compose() {
   local args=(--project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}")
   [ -f "$OVERRIDE_FILE" ] && args+=(-f "$OVERRIDE_FILE")
   sudo docker compose "${args[@]}" "$@"
+}
+candidate_compose() {
+  # Only temporary jobs see this override; the live digest pin is unchanged.
+  local args=(--project-directory "$APP_DIR" -f "${APP_DIR}/${COMPOSE_FILE}")
+  [ -f "$OVERRIDE_FILE" ] && args+=(-f "$OVERRIDE_FILE")
+  sudo docker compose "${args[@]}" -f "$CANDIDATE_OVERRIDE" "$@"
 }
 service_id() { compose ps -q "$SERVICE" | head -1; }
 
@@ -308,14 +352,15 @@ if timeout != 120 or seconds < timeout + 30 or s.get("stop_signal") != "SIGTERM"
 }
 health_retry() { # health_retry <url> <retries> <sleep_s> [<require_header>]
   local url="$1" retries="$2" sleep_s="$3" header="${4:-}" i=0
+  if [ -z "$WORK_DIR" ]; then WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/clearapi-deploy.XXXXXXXX")"; fi
   while [ "$i" -lt "$retries" ]; do
     if [ -n "$header" ]; then
-      if curl -fsS -D /tmp/deploy-health-headers -o /tmp/deploy-health-body --max-time 15 "$url" \
-         && grep -qi "^${header}:" /tmp/deploy-health-headers; then
+      if curl -fsS -D "$WORK_DIR/health-headers" -o "$WORK_DIR/health-body" --max-time 15 "$url" \
+          && grep -qi "^${header}:" "$WORK_DIR/health-headers"; then
         return 0
       fi
     else
-      if curl -fsS -o /tmp/deploy-health-body --max-time 15 "$url"; then
+      if curl -fsS -o "$WORK_DIR/health-body" --max-time 15 "$url"; then
         return 0
       fi
     fi
@@ -345,26 +390,41 @@ PYEOF
 }
 rollback() {
   log "rollback: switching back to previous exact image (${ROLLBACK_REF})"
-  write_override "$ROLLBACK_REF"
+  write_override "$ROLLBACK_REF" || return 1
   if ! compose up -d --timeout 150 "$SERVICE"; then
     audit "rollback" "failed" "compose up failed for previous image ${ROLLBACK_REF}"
     log "ROLLBACK FAILED — MANUAL INTERVENTION REQUIRED"
     return 1
   fi
-  RID="$(service_id)"
-  RUN_IMG="$(sudo docker inspect --format '{{.Image}}' "$RID")"
+  RID="$(service_id)" || return 1
+  RUN_IMG="$(sudo docker inspect --format '{{.Image}}' "$RID")" || return 1
   if [ "$RUN_IMG" != "$PREV_IMAGE_ID" ]; then
     audit "rollback" "failed" "running image ${RUN_IMG} does not match recorded previous ${PREV_IMAGE_ID}"
     log "ROLLBACK IMAGE MISMATCH — MANUAL INTERVENTION REQUIRED"
     return 1
   fi
   if health_retry "$LOCAL_HEALTH_URL" 30 2 && health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray"; then
-    set_manifest_status "rolled_back"
-    audit "rollback" "rolled_back" "previous image ${PREV_IMAGE_ID} healthy again"
+    # Restore the complete pre-deploy manifest, not the failed candidate current.
+    # Retain failed candidate provenance and reason in the manifest and audit.
+    python3 - "$MANIFEST" "$PRE_DEPLOY_MANIFEST" "$*" <<'PY' || return 1
+import json, os, sys, tempfile
+path, backup, reason = sys.argv[1:]
+with open(path) as f: failed = json.load(f)['releases']['current']
+with open(backup) as f: restored = json.load(f)
+restored.setdefault('failed_deployments', []).append({'candidate': failed, 'reason': reason})
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix='.manifest-rollback-')
+with os.fdopen(fd, 'w') as f:
+    json.dump(restored, f, indent=2)
+    f.write('\n'); f.flush(); os.fsync(f.fileno())
+os.replace(tmp, path)
+PY
+    verify_running_identity || return 1
+    audit "rollback" "rolled_back" "previous image ${PREV_IMAGE_ID} healthy again" || return 1
     log "rollback complete; deployment remains FAILED but production is healthy on the previous image"
   else
     audit "rollback" "failed" "previous image deployed but health checks fail; MANUAL INTERVENTION REQUIRED"
     log "ROLLBACK DEPLOYED BUT UNHEALTHY — MANUAL INTERVENTION REQUIRED"
+    return 1
   fi
 }
 
@@ -396,6 +456,7 @@ mkdir -p /run/lock
 exec 9>"/run/lock/clearapi-production-deploy.lock"
 flock -n 9 || die "deploy lock held: another production deploy is in progress"
 log "step 1: deploy lock acquired"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/clearapi-deploy.XXXXXXXX")"
 
 # ===========================================================================
 # 2. validate candidate metadata
@@ -459,13 +520,11 @@ printf '    %s\n' $NEW_ARTIFACTS >&2
 IMAGE_REF="${IMAGE_BASE}@${DIGEST}"
 # Ephemeral, isolated pull credential: a throwaway DOCKER_CONFIG keeps the
 # token out of /root/.docker/config.json so nothing long-lived is left behind.
-EPHEMERAL_DOCKER_CONFIG=""
 cleanup_ephemeral() {
   if [ -n "$EPHEMERAL_DOCKER_CONFIG" ] && [ -d "$EPHEMERAL_DOCKER_CONFIG" ]; then
     rm -rf "$EPHEMERAL_DOCKER_CONFIG"
   fi
 }
-trap cleanup_ephemeral EXIT
 
 if [ "$GHCR_TOKEN_STDIN" = "1" ]; then
   EPHEMERAL_DOCKER_CONFIG="$(mktemp -d)"
@@ -503,6 +562,15 @@ IMAGE_REVISION="$(docker image inspect --format '{{index .Config.Labels "org.ope
 [ "$IMAGE_REVISION" = "$COMMIT" ] \
   || die "step 7: image revision label '${IMAGE_REVISION}' does not match expected commit ${COMMIT}"
 log "step 7: digest and revision label verified"
+CANDIDATE_OVERRIDE="$WORK_DIR/compose-jobs.yaml"
+printf 'services:\n  %s:\n    image: %s\n  %s:\n    image: %s\n' \
+  "$SERVICE" "$IMAGE_REF" "$BOOTSTRAP_SERVICE" "$IMAGE_REF" > "$CANDIDATE_OVERRIDE"
+candidate_compose --profile bootstrap config --format json | python3 -c '
+import json, sys
+services=json.load(sys.stdin)["services"]
+if any(services[s].get("image") != sys.argv[3] for s in sys.argv[1:3]):
+    sys.exit("candidate job image mismatch")
+' "$SERVICE" "$BOOTSTRAP_SERVICE" "$IMAGE_REF" || die "candidate job image mismatch"
 
 # ===========================================================================
 # 8. inspect required binaries
@@ -525,7 +593,7 @@ if [ -z "$MIGRATION_FLAGS" ]; then
   log "step 10: DEPLOY_MIGRATION_FLAGS empty in deploy.env — no schema change expected for a zero-change candidate; skipping migration run"
   audit "migration_gate" "preflight_only" "no flags configured; no schema change performed"
 else
-  compose run --rm --entrypoint /bin/sh -e MIGRATION_FLAGS="$MIGRATION_FLAGS" "$SERVICE" -c '
+  candidate_compose run --rm --no-deps --pull never --entrypoint /bin/sh -e MIGRATION_FLAGS="$MIGRATION_FLAGS" "$SERVICE" -c '
     test -f /run/secrets/sql_dsn || { echo "sql_dsn secret is not mounted; refusing migration" >&2; exit 1; }
     export CLEARAPI_BILLING_MIGRATION_DSN="$(cat /run/secrets/sql_dsn)"
     # shellcheck disable=SC2086
@@ -539,7 +607,7 @@ fi
 # 11. bootstrap verify (readiness gate, zero-write)
 # ===========================================================================
 if [ "$VERIFY_BOOTSTRAP" = "true" ]; then
-  compose --profile bootstrap run --rm "$BOOTSTRAP_SERVICE" --verify-only \
+  candidate_compose --profile bootstrap run --rm --no-deps --pull never "$BOOTSTRAP_SERVICE" --verify-only \
     || die "step 11: production-bootstrap --verify-only failed; deployment BLOCKED"
   log "step 11: bootstrap verify-only PASS"
 else
@@ -550,7 +618,8 @@ fi
 # 12/13. record old image + update release manifest (merge into live schema)
 # ===========================================================================
 STAMP="$(TS_NOW)"
-[ -f "$MANIFEST" ] && cp "$MANIFEST" "${MANIFEST}.bak.$(date -u +%Y%m%dT%H%M%SZ)"
+PRE_DEPLOY_MANIFEST="${MANIFEST}.bak.$(date -u +%Y%m%dT%H%M%SZ).$$"
+cp -p "$MANIFEST" "$PRE_DEPLOY_MANIFEST"
 PREV_TAG="$(python3 - "$MANIFEST" <<'PYEOF'
 import json, sys
 try:
@@ -596,7 +665,7 @@ except Exception:
 rel = m.setdefault("releases", {})
 old_current = rel.get("current") or {}
 new_current = {
-    "tag": image_ref + "@" + digest,
+    "tag": image_ref,
     "candidate_commit": commit,
     "new_api_image_id": image_id,
     "image_digest": digest,
@@ -628,7 +697,8 @@ log "step 12/13: release manifest updated (previous image ${PREV_IMAGE_ID}, roll
 write_override "$IMAGE_REF"
 # Explicit timeout also protects the OLD container on the first rollout;
 # its persisted stop timeout may predate the new Compose grace policy.
-compose up -d --timeout 150 "$SERVICE" || die "step 14: compose replace failed"
+REPLACE_STARTED=1
+compose up -d --timeout 150 "$SERVICE" || die "step 14: compose replace failed (runtime state may have changed)"
 REPLACE_DONE=1
 # Hard identity gate: prove the running container actually IS the candidate
 # image before any health check can call this deploy a success. compose may
@@ -668,7 +738,7 @@ verify_launch_baseline
 verify_stop_policy
 
 PORTS_3000="$(sudo docker port "$NEW_ID" 3000/tcp 2>/dev/null || true)"
-printf '%s' "$PORTS_3000" | grep -q "127.0.0.1:3000" || die "step 17: new-api must bind 127.0.0.1:3000 only (got: ${PORTS_3000:-<unpublished>})"
+[ "$PORTS_3000" = "127.0.0.1:3000" ] || die "step 17: new-api must bind 127.0.0.1:3000 only (got: ${PORTS_3000:-<unpublished>})"
 
 PG_ID="$(compose ps -q "$PG_SERVICE")"
 [ -n "$PG_ID" ] || die "step 17: postgres container missing"
