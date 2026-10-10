@@ -147,7 +147,9 @@ elif a[-3:] == ["config", "--format", "json"]:
 elif "psql" in a:
     if f.get("sql_error"): sys.exit(1)
     q = a[-1]
-    if "id=1 AND status=1" in q: print(f.get("provider", "1"))
+    if "EmailVerificationEnabled" in q:
+        print(f.get("db_email", "true" if f.get("closed", "false") == "false" else "false"))
+    elif "id=1 AND status=1" in q: print(f.get("provider", "1"))
     elif "FROM abilities" in q and "NOT" not in q: print(f.get("ability", "1"))
     elif "FROM abilities" in q: print(f.get("extra_ability", "0"))
     elif "count(*) FROM channels" in q: print(f.get("extra_channel", "0"))
@@ -161,10 +163,13 @@ else: sys.exit("Forbidden operation")
         curl.write_text("#!/usr/bin/env python3\n" + '''
 import json, os
 f=json.loads(os.environ["GATE_FIXTURES"])
+if f.get("health_error"): raise SystemExit(1)
+if f.get("health_malformed"): print("not-json"); raise SystemExit(0)
 print(json.dumps({"success":True,"data":{
     "register_enabled":f.get("register", True),
+    "password_login_enabled":f.get("password_login", True),
     "password_register_enabled":f.get("password", True),
-    "email_verification":f.get("email", False)}}))
+    "email_verification":f.get("email", f.get("closed", "false") == "false")}}))
 ''')
         curl.chmod(0o755)
         env = dict(self.env, GATE_FIXTURES=json.dumps(fixtures))
@@ -185,9 +190,45 @@ print(json.dumps({"success":True,"data":{
                           closed="true", register=False, password=False)
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_email_verification_matches_trusted_launch_baseline(self):
+        cases = [
+            ("commercial", True, True),
+            ("commercial", False, False),
+            ("closed", False, True),
+            ("closed", True, False),
+        ]
+        for baseline, email, accepted in cases:
+            with self.subTest(baseline=baseline, email=email):
+                fixtures = {
+                    "closed": "true" if baseline == "closed" else "false",
+                    "register": baseline == "commercial",
+                    "password": baseline == "commercial",
+                    "email": email,
+                }
+                r = self.run_gate("verify_launch_baseline", f"DEPLOY_LAUNCH_BASELINE={baseline}", **fixtures)
+                self.assertEqual(r.returncode == 0, accepted, r.stderr)
+
+    def test_email_verification_database_and_status_must_match(self):
+        r = self.run_gate("verify_launch_baseline", "DEPLOY_LAUNCH_BASELINE=commercial",
+                          email=True, db_email="false")
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertIn("database EmailVerificationEnabled", r.stderr)
+
+        r = self.run_gate("verify_launch_baseline", "DEPLOY_LAUNCH_BASELINE=commercial",
+                          email=True, db_email="")
+        self.assertEqual(r.returncode, 1, r.stderr)
+
+        r = self.run_gate("verify_launch_baseline", "DEPLOY_LAUNCH_BASELINE=commercial",
+                          email=True, health_error=True)
+        self.assertEqual(r.returncode, 1, r.stderr)
+
+        r = self.run_gate("verify_launch_baseline", "DEPLOY_LAUNCH_BASELINE=commercial",
+                          email=True, health_malformed=True)
+        self.assertEqual(r.returncode, 1, r.stderr)
+
     def test_commercial_rejects_drift_and_unsafe_stop(self):
         for fixture in ({"closed":"true"}, {"register":False}, {"password":False},
-                        {"email":True}, {"provider":"0"}, {"ability":"0"},
+                        {"email":False}, {"password_login":False}, {"provider":"0"}, {"ability":"0"},
                         {"extra_ability":"1"}, {"extra_channel":"1"},
                         {"disabled":"1"}, {"off":"1"}, {"grace":"10s"},
                         {"signal":"SIGKILL"}, {"timeout":"180"}, {"sql_error":True}):
@@ -303,7 +344,7 @@ if name=='systemctl':
     elif a[0]=='show': print('0')
     sys.exit(0)
 if name=='curl':
-    body=json.dumps({'success':True,'data':{'register_enabled':True,'password_register_enabled':True,'email_verification':False}})
+    body=json.dumps({'success':True,'data':{'register_enabled':True,'password_login_enabled':True,'password_register_enabled':True,'email_verification':True}})
     if '-D' in a: pathlib.Path(a[a.index('-D')+1]).write_text('CF-Ray: fixture\n')
     if '-o' in a: pathlib.Path(a[a.index('-o')+1]).write_text(body)
     else: print(body)
@@ -333,7 +374,8 @@ elif a[0]=='compose':
     elif 'printenv' in a: print('false')
     elif 'psql' in a:
         q=a[-1]
-        if 'id=1 AND status=1' in q: print('0' if fail=='provider' else '1')
+        if 'EmailVerificationEnabled' in q: print('true')
+        elif 'id=1 AND status=1' in q: print('0' if fail=='provider' else '1')
         elif 'FROM abilities' in q: print('0' if 'NOT' in q else '1')
         elif 'DisableOnlinePayments' in q: print('2')
         elif 'count(*)' in q: print('0')
