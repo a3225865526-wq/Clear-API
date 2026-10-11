@@ -5,6 +5,9 @@
 .gitignore
 Makefile
 docs
+!docs/
+!docs/clearapi/
+!docs/clearapi/**
 .eslintcache
 .gocache
 /web/node_modules
