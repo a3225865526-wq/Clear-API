@@ -350,6 +350,8 @@ if name=='stat':
     value=subprocess.check_output(['/usr/bin/stat',*a],text=True).strip()
     if a[1]=='%u:%g:%a': value='0:0:'+value.split(':')[-1]
     elif a[1]=='%u:%a': value='0:'+value.split(':')[-1]
+    elif a[1]=='%u' and str(root/'run/lock') == a[2] and os.environ.get('LOCK_OWNER'):
+        value=os.environ['LOCK_OWNER']
     elif a[1]=='%u': value='0'
     print(value); sys.exit(0)
 if name=='install': os.execv('/usr/bin/install',['install','-m','0750',a[-2],a[-1]])
@@ -366,6 +368,8 @@ if name=='mv':
     os.execv('/usr/bin/mv',['mv',*a])
 if name=='python3':
     data=sys.stdin.read()
+    if os.environ.get('LOCK_FILE_OWNER') and a[1] == str(root/'run/lock/clearapi-production-deploy.lock'):
+        data='import os\n_original_lstat=os.lstat\ndef wrong_owner(path):\n s=list(_original_lstat(path)); s[4]=int(os.environ["LOCK_FILE_OWNER"]); return os.stat_result(s)\nos.lstat=wrong_owner\n'+data
     if failure=='audit' and len(a)>3 and a[2]=='INSTALLED':
         data='import os\ndef broken_fsync(fd): raise OSError("injected persistence failure")\nos.fsync=broken_fsync\n'+data
     sys.argv=['-',*a[1:]]
@@ -376,12 +380,78 @@ sys.exit('unexpected mock command')
         for name in ("id", "chown", "stat", "install", "sudo", "mv", "python3"):
             (self.mockbin / name).symlink_to(host)
         self.env = dict(os.environ, PATH=str(self.mockbin)+os.pathsep+os.environ["PATH"],
-                        INSTALL_ROOT=str(self.root), INSTALL_FAILURE="", PYTHONOPTIMIZE="2")
+                        INSTALL_ROOT=str(self.root), INSTALL_FAILURE="", PYTHONOPTIMIZE="2",
+                        LOCK_OWNER="0")
 
     def run_install(self, failure=""):
         env = dict(self.env, INSTALL_FAILURE=failure)
         return subprocess.run(["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
                               env=env, capture_output=True, text=True, timeout=10)
+
+    def test_lock_directory_accepts_root_0755_and_sticky_1777(self):
+        for mode in ("755", "1777"):
+            with self.subTest(mode=mode):
+                self.target.write_bytes(self.old)
+                self.lockdir.chmod(int(mode, 8))
+                result = subprocess.run(
+                    ["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
+                    env=dict(self.env, LOCK_MODE=mode), capture_output=True, text=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("INSTALL_PASS", result.stdout)
+
+    def test_lock_directory_rejects_insecure_modes_and_ownership(self):
+        for env in (
+            {"LOCK_MODE": "777"},
+            {"LOCK_MODE": "1775"},
+            {"LOCK_OWNER": "1000"},
+            {"LOCK_SYMLINK": "1"},
+            {"LOCK_TYPE": "file"},
+        ):
+            with self.subTest(env=env):
+                self.target.write_bytes(self.old)
+                if "LOCK_MODE" in env:
+                    self.lockdir.chmod(int(env["LOCK_MODE"], 8))
+                else:
+                    self.lockdir.chmod(0o755)
+                if "LOCK_SYMLINK" in env:
+                    self.lockdir.rename(self.root / "real-lock")
+                    self.lockdir.symlink_to(self.root / "real-lock", target_is_directory=True)
+                if "LOCK_TYPE" in env:
+                    self.lockdir.unlink()
+                    self.lockdir.touch()
+                result = subprocess.run(
+                    ["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
+                    env=dict(self.env, **env), capture_output=True, text=True, timeout=10,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.target.read_bytes(), self.old)
+
+    def test_lock_file_must_be_root_owned_regular_single_link_and_private(self):
+        for env in (
+            {"LOCK_FILE_MODE": "644"},
+            {"LOCK_FILE_TYPE": "symlink"},
+            {"LOCK_LINKS": "2"},
+            {"LOCK_FILE_OWNER": str(os.getuid() + 1)},
+        ):
+            with self.subTest(env=env):
+                lock = self.lockdir / "clearapi-production-deploy.lock"
+                if lock.exists() or lock.is_symlink():
+                    lock.unlink()
+                lock.touch(mode=0o600)
+                if "LOCK_FILE_MODE" in env:
+                    lock.chmod(0o644)
+                if "LOCK_FILE_TYPE" in env:
+                    lock.unlink()
+                    lock.symlink_to(self.source)
+                if "LOCK_LINKS" in env:
+                    os.link(lock, self.lockdir / "second-link")
+                result = subprocess.run(
+                    ["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
+                    env=dict(self.env, **env), capture_output=True, text=True, timeout=10,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.target.read_bytes(), self.old)
 
     def test_normal_install_hash_owner_and_permissions(self):
         result = self.run_install()
