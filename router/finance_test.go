@@ -59,6 +59,8 @@ func TestFinanceStageOne(t *testing.T) {
 	db := financeTestDB(t)
 	previousDB, previousLogDB := model.DB, model.LOG_DB
 	previousType := common.MainDatabaseType()
+	previousLogType := common.LogDatabaseType()
+	previousMaster := common.IsMasterNode
 	previousRedis, previousMemory := common.RedisEnabled, common.MemoryCacheEnabled
 	model.DB, model.LOG_DB = db, db
 	common.RedisEnabled, common.MemoryCacheEnabled = false, false
@@ -70,6 +72,12 @@ func TestFinanceStageOne(t *testing.T) {
 	default:
 		common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	}
+	// Finance tests configure the database type directly instead of going
+	// through model bootstrap, so refresh dialect-specific quoted columns.
+	t.Setenv("LOG_SQL_DSN", "")
+	common.IsMasterNode = false
+	require.NoError(t, model.InitLogDB())
+	common.IsMasterNode = previousMaster
 	t.Setenv("CLEARAPI_FINANCE_ENABLED", "true")
 	t.Setenv("CLEARAPI_FINANCE_OWNER_USER_ID", "5")
 	common.InitFinanceConfig()
@@ -77,6 +85,11 @@ func TestFinanceStageOne(t *testing.T) {
 		model.DB, model.LOG_DB = previousDB, previousLogDB
 		common.RedisEnabled, common.MemoryCacheEnabled = previousRedis, previousMemory
 		common.SetMainDatabaseType(previousType)
+		common.IsMasterNode = false
+		require.NoError(t, model.InitLogDB())
+		model.LOG_DB = previousLogDB
+		common.SetLogDatabaseType(previousLogType)
+		common.IsMasterNode = previousMaster
 	})
 	gin.SetMode(gin.TestMode)
 	// Existing-table fixture exercises additive upgrades and unchanged balances.
