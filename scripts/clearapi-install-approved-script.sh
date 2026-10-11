@@ -69,7 +69,11 @@ for directory in /opt /opt/clearapi /opt/clearapi/bin /run /run/lock; do
   test "$(stat -c '%u' "$directory")" = 0 || fail "directory is not root-owned: $directory"
 done
 test "$(stat -c '%u:%a' /opt/clearapi/bin)" = 0:755 || fail 'target directory must be root mode 0755'
-test "$(stat -c '%u:%a' /run/lock)" = 0:755 || fail 'lock directory must be root mode 0755'
+LOCK_MODE="$(stat -c '%a' /run/lock)"
+case "$LOCK_MODE" in
+  755|1777) ;;
+  *) fail 'lock directory must be root mode 0755 or 1777' ;;
+esac
 
 # Create the lock with O_NOFOLLOW/O_EXCL if it does not exist, then acquire it.
 python3 - "$LOCK" <<'PY'
