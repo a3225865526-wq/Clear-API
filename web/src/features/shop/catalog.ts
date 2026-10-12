@@ -44,6 +44,7 @@ export const creditProducts: readonly CreditProduct[] = [
 }))
 
 export const legacyPurchaseUrl = 'https://catfk.com/item/qmcse2'
+export const storePurchaseUrl = 'https://catfk.com/shop/YPMYXR7N'
 
 export function trustedPurchaseUrl(raw: string): string | null {
   try {
