@@ -75,7 +75,7 @@ it('shows the official product and safe external link with no payment or redempt
     })
   ).toBeVisible()
   const buy = screen.getByRole('link', { name: 'View price and buy' })
-  expect(buy).toHaveAttribute('href', 'https://catfk.com/item/qmcse2')
+  expect(buy).toHaveAttribute('href', 'https://catfk.com/shop/YPMYXR7N')
   expect(buy).toHaveAttribute('target', '_blank')
   expect(buy).toHaveAttribute('rel', 'noopener noreferrer')
   expect(screen.getAllByText(/Cannot be withdrawn as cash/)).toHaveLength(8)
@@ -139,7 +139,7 @@ it('keeps a single column on mobile and switches the purchase content to Chinese
   expect(screen.getByRole('heading', { name: '购买额度' })).toBeVisible()
   expect(screen.getByRole('link', { name: '查看价格并购买' })).toHaveAttribute(
     'href',
-    legacyPurchaseUrl
+    'https://catfk.com/shop/YPMYXR7N'
   )
 })
 
@@ -149,7 +149,7 @@ it('only enables verified published products with their own purchase links', asy
       ...creditProducts[0],
       published: true,
       delivery_verified: true,
-      purchase_url: 'https://catfk.com/item/first',
+      purchase_url: legacyPurchaseUrl,
     },
     {
       ...creditProducts[1],
@@ -166,7 +166,7 @@ it('only enables verified published products with their own purchase links', asy
   ])
   const links = await screen.findAllByRole('link', { name: 'Buy API credits' })
   expect(links.map((l) => l.getAttribute('href'))).toEqual([
-    'https://catfk.com/item/first',
+    'https://catfk.com/item/qmcse2',
     'https://catfk.com/item/second',
   ])
   expect(screen.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
