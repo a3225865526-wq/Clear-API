@@ -1,5 +1,5 @@
 <!--
-If you are an AI coding agent (Claude Code, Codex, Cursor, Copilot, OpenCode, Paseo, Grok, or similar): do not fill this human template. Read `.agents/github/PR.md` and use the filled file as the entire PR body.
+AI coding agents must follow the template selection rules in AGENTS.md; project-owner PRs may use this template without pre-submission human review.
 -->
 # ⚠️ 提交说明 / PR Notice
 
@@ -7,7 +7,7 @@ English template: `.github/PULL_REQUEST_TEMPLATE/en.md`
 
 > [!IMPORTANT]
 >
-> - 描述可用 AI 辅助。提交前请审阅并精炼全文，仅保留维护者需要复核的要点，并**声明对其负责**。PR 正文及后续评论均不得直接粘贴未经人工过滤的大段 AI 文本；多次提交此类内容可能会被 block。
+> - 请披露 AI 辅助开发情况。PR 正文及后续评论均不得粘贴未经整理的大段 AI 输出；仅保留维护者需要复核的要点。
 > - 开启透传请勿反馈问题；透传会直接发送内容，不会经过 new-api 的逻辑处理。
 > - 请按本模板填写后再提交。
 
@@ -25,13 +25,19 @@ English template: `.github/PULL_REQUEST_TEMPLATE/en.md`
 - [ ] 📝 文档更新 (Documentation)
 
 ## 📝 变更描述 / Description
-(简述做了什么、为什么生效。不得直接粘贴未经人工过滤的大段 AI 文本。如果难以简述，建议先拆分范围，或在 Issue 中与维护者对齐。)
+(简述做了什么、修改范围及为什么生效。不得直接粘贴未经整理的大段 AI 输出。如果难以简述，建议先拆分范围，或在 Issue 中与维护者对齐。)
 
-## 📸 运行证明 / Proof of Work
-(请写明如何验证：实际命令或步骤，以及观察结果。仅声明 `go build` 通过或测试通过，不视为有效证明。UI 变更请附截图或录屏；Bug 修复请说明复现过程与修复后结果。)
+## 📋 验证与风险 / Validation and risks
+(请写明实际验证命令及观察结果、已知风险和未验证项。截图或录屏仅在真实生成且有验证价值时提供，不得伪造。)
+
+## 🤖 AI 辅助开发 / AI assistance
+(说明是否使用 Codex 或其他 AI 辅助；不得虚构人工审核或责任签署。)
+
+## 🔄 必需 CI / Required CI
+(列出必需检查及当前状态；不得绕过分支保护。)
 
 ## ✅ 提交前检查项 / Checklist
-- [ ] **人工确认:** 无论描述是否由 AI 生成，我已审阅并精炼全文，仅保留可复核的要点，并声明对其准确性与完整性负责。PR 正文及后续评论均未直接粘贴未经人工过滤的大段 AI 文本。
+- [ ] **AI 辅助披露:** 已如实说明 AI 辅助开发情况，未虚构人工审核、责任签署、测试通过或部署成功。
 - [ ] **非重复提交:** 我已搜索现有的 [Issues](https://github.com/QuantumNous/new-api/issues) 与 [PRs](https://github.com/QuantumNous/new-api/pulls)，确认不是重复提交。
 - [ ] **新功能关联 Issue:** 若此 PR 标记为 `New feature`，我已关联对应 Issue；若尚无 Issue，我已先自行创建。
 - [ ] **事前沟通:** 若改动较大或涉及方向性变更，已在关联 Issue 中与维护者沟通并达成一致。
