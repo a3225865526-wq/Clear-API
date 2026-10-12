@@ -21,7 +21,9 @@ frequency, evidence that the problem is in new-api, or the applicable
 relay / billing / frontend / deployment items, ask the user those questions
 and wait. Ask for the facts. Do not tell the user to confirm a template.
 
-Do not open a PR unless every required condition is met. If the change is out
+Do not open a PR unless every required condition is met. Ordinary PRs do not
+require pre-submission line-by-line human review, responsibility sign-off, or
+screenshots. If the change is out
 of scope (including pass-through-only forwarding), is a usage/configuration/
 integration question, is missing required issue facts, has only `go build` /
 tests-passed as verification, or the body would be unfiltered AI-generated
@@ -79,7 +81,7 @@ If any item fails, tell the user and **stop**. Do not open the PR.
 - Usage / configuration / integration (answered instead of opening): no
 - Required issue facts present without invention: yes
 - Verification is actual commands or steps and observed results, not only `go build` or tests passed: yes
-- Body is short and factual; no unfiltered AI-generated text: yes
+- Body is short and factual; AI assistance is disclosed; no unfiltered AI-generated text: yes
 - Open: yes/no
 - If no, what was told to the user (stop here):
 
