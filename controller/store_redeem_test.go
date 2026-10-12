@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
@@ -81,6 +84,121 @@ func setupStoreControllerTest(t *testing.T) (*gin.Engine, *model.User, string) {
 	}
 	require.NoError(t, db.Create(&code).Error)
 	return router, &user, code.Key
+}
+
+func TestCreditApprovalHTTPPermissionsAndUnifiedWallet(t *testing.T) {
+	admin, adminPAT := setupAccessTokenAudit(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.Option{}, &model.StoreProduct{}, &model.CreditApprovalEvent{}, &model.RedemptionBatch{}, &model.Redemption{}, &model.AuthFlow{}, &model.TwoFA{}, &model.PasskeyCredential{}))
+	require.NoError(t, model.InitCreditCatalog())
+	require.NoError(t, model.DB.Create(&model.StoreProduct{Id: 1, Name: "legacy", FaceValueCents: 100, StoreUrl: model.LegacyCreditPurchaseURL, Enabled: true}).Error)
+	require.NoError(t, model.PrepareCreditCatalog())
+	priorFlag := operation_setting.StoreRechargeEnabled
+	operation_setting.StoreRechargeEnabled = true
+	t.Cleanup(func() { operation_setting.StoreRechargeEnabled = priorFlag })
+	root := model.User{Username: "store-root", Role: common.RoleRootUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, Password: "fixture-password"}
+	require.NoError(t, model.DB.Create(&root).Error)
+	now := time.Now().Unix()
+	session := &model.UserSession{SID: "store-approval-session", UserID: root.Id, Version: 1, UserAuthVersion: 1, Status: model.UserSessionStatusActive, RefreshHash: "fixture-refresh-hash", LoginMethod: "password", LastActiveAt: now, ExpiresAt: now + 3600}
+	require.NoError(t, model.CreateUserSession(session))
+	identity := service.AuthIdentity{UserID: root.Id, SessionID: session.SID, UserAuthVersion: 1, SessionVersion: 1}
+	jwt, _, err := service.IssueAccessToken(identity)
+	require.NoError(t, err)
+	batch := model.RedemptionBatch{Name: "verified evidence", FaceValueCents: 100, Quota: 500000, Source: model.RedemptionSourceStore, Type: model.RedemptionTypeBalance, Status: model.RedemptionBatchStatusEnabled, Count: 1}
+	require.NoError(t, model.DB.Create(&batch).Error)
+	require.NoError(t, model.DB.Create(&model.Redemption{Key: "evidence-fixture-only", Name: "evidence", BatchId: batch.Id, Quota: 500000, FaceValueCents: 100, Source: model.RedemptionSourceStore, Type: model.RedemptionTypeBalance, Status: common.RedemptionCodeStatusEnabled}).Error)
+	catalog, err := model.GetCreditCatalog()
+	require.NoError(t, err)
+	catalog.Products = append(catalog.Products, model.CreditProduct{ID: "explicit", Name: "explicit", PriceCents: 100, CreditCents: 100, BaseQuota: 500000, PurchaseURL: model.LegacyCreditPurchaseURL, EvidenceBatchID: batch.Id, DeliveryEvidence: "delivery/reference", DeliveryBinding: "catfk/item/qmcse2"})
+	require.NoError(t, model.SaveCreditCatalog(catalog, root.Id))
+	g := gin.New()
+	g.POST("/products/:id/:action", middleware.RootAuth(), ChangeCreditProductState)
+	g.POST("/legacy", middleware.AdminAuth(), AddStoreProduct)
+	g.PUT("/edit", middleware.RootAuth(), SaveCreditCatalog)
+	g.GET("/purchase/:kind/:id", middleware.DisableCache(), ResolveCreditPurchase)
+	request := func(path, token string, body any, proof string) *httptest.ResponseRecorder {
+		t.Helper()
+		raw, err := common.Marshal(body)
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		if proof != "" {
+			req.Header.Set("X-Security-Proof", proof)
+		}
+		response := httptest.NewRecorder()
+		g.ServeHTTP(response, req)
+		return response
+	}
+	for _, action := range []string{"submit", "approve", "publish", "revoke", "map"} {
+		assert.Equal(t, http.StatusForbidden, request("/products/explicit/"+action, adminPAT, map[string]any{}, "").Code)
+		assert.Equal(t, http.StatusUnauthorized, request("/products/explicit/"+action, "", map[string]any{}, "").Code)
+	}
+	assert.Equal(t, common.RoleAdminUser, admin.Role)
+	legacyResponse := request("/legacy", adminPAT, map[string]any{"name": "bypass", "enabled": true}, "")
+	assert.Contains(t, legacyResponse.Body.String(), "Legacy products are frozen")
+	catalog, err = model.GetCreditCatalog()
+	require.NoError(t, err)
+	review, err := model.GetCreditProductReview("explicit")
+	require.NoError(t, err)
+	input := map[string]any{"version": catalog.Version, "revision": review.Product.Revision}
+	response := request("/products/explicit/submit", jwt, input, "")
+	assert.Contains(t, response.Body.String(), `"success":true`)
+	catalog, err = model.GetCreditCatalog()
+	require.NoError(t, err)
+	review, err = model.GetCreditProductReview("explicit")
+	require.NoError(t, err)
+	input = map[string]any{"version": catalog.Version, "revision": review.Product.Revision, "digest": review.Digest, "confirmation": "APPROVE " + review.Confirmation}
+	assert.Contains(t, request("/products/explicit/approve", jwt, input, "").Body.String(), "SECURITY_PROOF_REQUIRED")
+	raw, err := common.Marshal(service.StoreProductOperationContext{ProductID: "explicit", Version: catalog.Version, Revision: review.Product.Revision, Action: "approve", Digest: review.Digest})
+	require.NoError(t, err)
+	binding, err := service.BindVerificationOperation(service.VerificationOperation{Scope: service.VerificationScopeStoreProductOperation, Context: raw})
+	require.NoError(t, err)
+	proof, _, err := service.IssueSecurityProof(identity, "password", binding)
+	require.NoError(t, err)
+	response = request("/products/explicit/approve", jwt, input, proof)
+	assert.Contains(t, response.Body.String(), `"success":true`)
+	assert.NotContains(t, request("/products/explicit/approve", jwt, input, proof).Body.String(), `"success":true`)
+	// Explicit mapping and cutover remain local service operations in this test.
+	catalog, err = model.GetCreditCatalog()
+	require.NoError(t, err)
+	require.NoError(t, model.MapLegacyCreditProduct("explicit", catalog.Version, review.Product.Revision, 1, root.Id))
+	for _, action := range []string{"submit", "approve", "publish"} {
+		catalog, err = model.GetCreditCatalog()
+		require.NoError(t, err)
+		review, err = model.GetCreditProductReview("explicit")
+		require.NoError(t, err)
+		confirmation := strings.ToUpper(action) + " " + review.Confirmation
+		require.NoError(t, model.ChangeCreditProductState("explicit", catalog.Version, review.Product.Revision, action, confirmation, root.Id))
+	}
+	catalog, err = model.GetCreditCatalog()
+	require.NoError(t, err)
+	require.NoError(t, model.ActivateUnifiedCreditView(catalog.Version, root.Id))
+	public, err := model.GetPublicCreditCatalog()
+	require.NoError(t, err)
+	wallet, err := getStoreProductsForUser()
+	require.NoError(t, err)
+	require.Len(t, wallet, 1)
+	require.Len(t, public.Products, 1)
+	assert.Equal(t, public.Products[0].ID, wallet[0]["id"])
+	assert.Equal(t, public.Products[0].PurchaseURL, wallet[0]["store_url"])
+	getPurchase := func(path string) *httptest.ResponseRecorder {
+		t.Helper()
+		response := httptest.NewRecorder()
+		g.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+		return response
+	}
+	response = getPurchase("/purchase/product/explicit?revision=2")
+	assert.Equal(t, http.StatusFound, response.Code)
+	assert.Equal(t, model.LegacyCreditPurchaseURL, response.Header().Get("Location"))
+	assert.Contains(t, response.Header().Get("Cache-Control"), "no-store")
+	assert.Equal(t, http.StatusConflict, getPurchase("/purchase/product/explicit?revision=1").Code)
+	assert.Equal(t, http.StatusNotFound, getPurchase("/purchase/legacy/1").Code)
+	catalog, err = model.GetCreditCatalog()
+	require.NoError(t, err)
+	review, err = model.GetCreditProductReview("explicit")
+	require.NoError(t, err)
+	require.NoError(t, model.ChangeCreditProductState("explicit", catalog.Version, review.Product.Revision, "revoke", "REVOKE "+review.Confirmation, root.Id))
+	assert.Equal(t, http.StatusNotFound, getPurchase("/purchase/product/explicit?revision=2").Code)
 }
 
 func postStoreRedeem(router *gin.Engine, token string, body string) *httptest.ResponseRecorder {

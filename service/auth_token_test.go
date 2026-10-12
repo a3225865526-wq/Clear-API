@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +17,37 @@ func useTestSessionSecret(t *testing.T) {
 	previous := common.SessionSecret
 	common.SessionSecret = "test-session-secret-with-sufficient-entropy"
 	t.Cleanup(func() { common.SessionSecret = previous })
+}
+
+func TestStoreProductProofBindsReviewAndRejectsOtherActions(t *testing.T) {
+	setupAuthSessionTestDB(t)
+	useTestSessionSecret(t)
+	identity := AuthIdentity{UserID: 42, SessionID: "store-review-session", UserAuthVersion: 1, SessionVersion: 1}
+	context := StoreProductOperationContext{ProductID: "one", Revision: 2, Version: 4, Action: "approve", Digest: strings.Repeat("a", 64)}
+	raw, err := common.Marshal(context)
+	require.NoError(t, err)
+	binding, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeStoreProductOperation, Context: raw})
+	require.NoError(t, err)
+	proof, _, err := IssueSecurityProof(identity, "password", binding)
+	require.NoError(t, err)
+	_, err = verifySecurityProof(proof, identity, binding)
+	require.NoError(t, err)
+	for _, changed := range []StoreProductOperationContext{
+		{ProductID: "two", Revision: 2, Version: 4, Action: "approve", Digest: context.Digest},
+		{ProductID: "one", Revision: 3, Version: 4, Action: "approve", Digest: context.Digest},
+		{ProductID: "one", Revision: 2, Version: 5, Action: "approve", Digest: context.Digest},
+		{ProductID: "one", Revision: 2, Version: 4, Action: "revoke", Digest: context.Digest},
+		{ProductID: "one", Revision: 2, Version: 4, Action: "approve", Digest: strings.Repeat("b", 64)},
+	} {
+		raw, err := common.Marshal(changed)
+		require.NoError(t, err)
+		other, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeStoreProductOperation, Context: raw})
+		require.NoError(t, err)
+		_, err = verifySecurityProof(proof, identity, other)
+		assert.ErrorIs(t, err, ErrProofContext)
+	}
+	_, err = BindVerificationOperation(VerificationOperation{Scope: VerificationScopeStoreProductOperation, Context: []byte(`{"product_id":"one"}`)})
+	assert.ErrorIs(t, err, ErrVerificationContextInvalid)
 }
 
 func TestAccessTokenRoundTripAndPurposeIsolation(t *testing.T) {

@@ -21,7 +21,53 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 
 import type { CreditProduct } from './catalog'
 
-export type Catalog = { version: number; products: CreditProduct[] }
+export type Catalog = {
+  version: number
+  products: CreditProduct[]
+  unified?: boolean
+  approval_schema?: number
+  legacy_products?: { id: number; name: string; enabled: boolean }[]
+}
+
+export type ProductReview = {
+  product: CreditProduct
+  digest: string
+  confirmation: string
+  events: {
+    id: number
+    actor_id: number
+    decision: string
+    created_time: number
+    solo_operator: boolean
+  }[]
+}
+
+export async function getProductReview(id: string): Promise<ProductReview> {
+  const response = await api.get(
+    `/api/clearapi/credit-catalog/products/${encodeURIComponent(id)}/review`
+  )
+  return requireServerSuccess(response.data).data
+}
+
+export async function changeProductState(
+  id: string,
+  action: string,
+  input: {
+    version: number
+    revision: number
+    confirmation?: string
+    legacy_store_id?: number
+    digest?: string
+  },
+  proof?: string
+): Promise<void> {
+  const response = await api.post(
+    `/api/clearapi/credit-catalog/products/${encodeURIComponent(id)}/${action}`,
+    input,
+    proof ? { headers: { 'X-Security-Proof': proof } } : undefined
+  )
+  requireServerSuccess(response.data)
+}
 
 export async function getCatalog(): Promise<Catalog> {
   const response = await api.get('/api/clearapi/credit-catalog')

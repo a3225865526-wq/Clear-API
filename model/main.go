@@ -352,6 +352,7 @@ func migrateDB() error {
 		&VIPLevel{},
 		&BalanceTransaction{},
 		&StoreProduct{},
+		&CreditApprovalEvent{},
 		&OfflineOrder{},
 		&OfflineOrderCode{},
 		&Ability{},
@@ -398,6 +399,9 @@ func migrateDB() error {
 		return err
 	}
 	if err := InitCreditCatalog(); err != nil {
+		return err
+	}
+	if err := PrepareCreditCatalog(); err != nil {
 		return err
 	}
 	if err := InitializeExternalIdentityClaims(); err != nil {

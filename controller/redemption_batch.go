@@ -5,6 +5,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
@@ -26,15 +27,28 @@ func GetAllRedemptionBatches(c *gin.Context) {
 // 数量与面额，绝不记录兑换码原文。
 func AddRedemptionBatch(c *gin.Context) {
 	var req struct {
-		Name           string `json:"name"`
-		FaceValueCents int64  `json:"face_value_cents"`
-		Count          int    `json:"count"`
-		ExpiredTime    int64  `json:"expired_time"`
-		Note           string `json:"note"`
+		Name            string `json:"name"`
+		FaceValueCents  int64  `json:"face_value_cents"`
+		Count           int    `json:"count"`
+		ExpiredTime     int64  `json:"expired_time"`
+		Note            string `json:"note"`
+		ProductID       string `json:"product_id"`
+		ProductRevision int64  `json:"product_revision"`
+		EvidenceOnly    bool   `json:"evidence_only"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiError(c, err)
 		return
+	}
+	if req.EvidenceOnly && c.GetInt("role") != common.RoleRootUser {
+		common.ApiErrorMsg(c, "Only root may create a delivery evidence sample")
+		return
+	}
+	if req.EvidenceOnly {
+		if _, ok := middleware.GetSessionAuthIdentity(c); !ok {
+			common.ApiErrorMsg(c, "Evidence samples require a live root session")
+			return
+		}
 	}
 	batch, keys, err := model.CreateRedemptionBatch(model.CreateRedemptionBatchInput{
 		Name:           req.Name,
@@ -43,6 +57,7 @@ func AddRedemptionBatch(c *gin.Context) {
 		ExpiredTime:    req.ExpiredTime,
 		Note:           req.Note,
 		AdminUserID:    c.GetInt("id"),
+		ProductID:      req.ProductID, ProductRevision: req.ProductRevision, EvidenceOnly: req.EvidenceOnly,
 	})
 	if err != nil {
 		common.SysError("failed to create redemption batch: " + err.Error())

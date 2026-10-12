@@ -17,10 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { ShoppingBag } from 'lucide-react'
-import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatLocalCurrencyAmount } from '@/lib/currency'
 import { openStoreUrl } from '@/lib/store-url'
 
 import { formatCnyCents } from '../lib/money'
@@ -37,7 +39,8 @@ interface StoreProductsCardProps {
  * Hidden entirely while the store recharge feature flag is off.
  */
 export function StoreProductsCard(props: StoreProductsCardProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
 
   if (!props.enabled) {
     return null
@@ -56,6 +59,11 @@ export function StoreProductsCard(props: StoreProductsCardProps) {
           {t('Pay at the third-party store, then redeem the code below')}
         </span>
       </div>
+      {products.some((product) => product.base_credit) ? (
+        <p className='text-muted-foreground mt-2 text-xs'>
+          {t('Base credit; conditional bonuses are separate')}
+        </p>
+      ) : null}
 
       {products.length === 0 ? (
         <p className='text-muted-foreground mt-3 text-sm'>
@@ -65,11 +73,11 @@ export function StoreProductsCard(props: StoreProductsCardProps) {
         <div className='mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6'>
           {products.map((product) => (
             <Button
-              key={product.id}
+              key={`${typeof product.id}:${product.id}`}
               variant='outline'
               className='h-auto flex-col items-start gap-0.5 px-3 py-2.5'
               onClick={() => {
-                if (!openStoreUrl(product.store_url)) {
+                if (!openStoreUrl(product.purchase_path ?? product.store_url)) {
                   toast.error(t('Invalid store product link'))
                 }
               }}
@@ -80,6 +88,18 @@ export function StoreProductsCard(props: StoreProductsCardProps) {
               <span className='text-muted-foreground w-full truncate text-left text-xs'>
                 {product.name}
               </span>
+              {product.base_credit ? (
+                <span className='text-muted-foreground text-xs'>
+                  $
+                  {formatLocalCurrencyAmount(Number(product.base_credit), {
+                    showSymbol: false,
+                    digitsLarge: 6,
+                    digitsSmall: 6,
+                    locale,
+                  })}{' '}
+                  {t('platform API usage credit')}
+                </span>
+              ) : null}
             </Button>
           ))}
         </div>
