@@ -198,7 +198,7 @@ func TestAuditIsolationVisibilityAndFailureContracts(t *testing.T) {
 	}
 	router := gin.New()
 	router.Use(middleware.RequestId(), middleware.AccessTokenAudit())
-	router.GET("/api/audit/self", middleware.UserAuth(), GetAuditLogs)
+	router.GET("/api/audit/self", middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), GetAuditLogs)
 	router.GET("/api/audit", middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), GetAuditLogs)
 	response := auditRequest(router, "GET", "/api/audit/self?username=other&user_id=2&category=security&success=false&page_size=1", pat)
 	var result struct {

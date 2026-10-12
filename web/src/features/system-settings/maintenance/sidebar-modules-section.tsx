@@ -138,6 +138,10 @@ export function SidebarModulesSection({
       },
     },
     admin: {
+      audit: {
+        title: t('Audit Logs'),
+        description: t('Login, security and access records'),
+      },
       channel: {
         title: t('Channels'),
         description: t('Configure upstream providers and routing.'),
