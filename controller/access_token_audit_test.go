@@ -198,9 +198,15 @@ func TestAuditIsolationVisibilityAndFailureContracts(t *testing.T) {
 	}
 	router := gin.New()
 	router.Use(middleware.RequestId(), middleware.AccessTokenAudit())
-	router.GET("/api/audit/self", middleware.UserAuth(), GetAuditLogs)
+	router.GET("/api/audit/self", middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), GetAuditLogs)
 	router.GET("/api/audit", middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), GetAuditLogs)
 	response := auditRequest(router, "GET", "/api/audit/self?username=other&user_id=2&category=security&success=false&page_size=1", pat)
+	require.Equal(t, http.StatusForbidden, response.Code)
+	assert.NotContains(t, response.Body.String(), "root-only")
+	assert.NotContains(t, response.Body.String(), "admin_info")
+	require.NoError(t, authz.SetUserPermissions(user.Id, authz.PermissionsMap{authz.ResourceAudit: {authz.ActionRead: true}}))
+	response = auditRequest(router, "GET", "/api/audit/self?username=other&user_id=2&category=security&success=false&page_size=1", pat)
+	require.Equal(t, http.StatusOK, response.Code)
 	var result struct {
 		Success bool
 		Data    struct {
@@ -266,14 +272,18 @@ func TestAuditRoleVisibilityAndPermissions(t *testing.T) {
 	router := gin.New()
 	router.Use(middleware.RequestId(), middleware.AccessTokenAudit())
 	router.GET("/api/audit", middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), GetAuditLogs)
-	router.GET("/api/audit/self", middleware.UserAuth(), GetAuditLogs)
+	router.GET("/api/audit/self", middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), GetAuditLogs)
 	now := time.Now().Unix()
 	session := &model.UserSession{SID: "audit-permissions-session", UserID: admin.Id, Version: 1, UserAuthVersion: 1, Status: model.UserSessionStatusActive, RefreshHash: "placeholder", LoginMethod: "password", LastActiveAt: now, ExpiresAt: now + 3600}
 	require.NoError(t, model.CreateUserSession(session))
 	jwt, _, err := service.IssueAccessToken(service.AuthIdentity{UserID: admin.Id, SessionID: session.SID, UserAuthVersion: 1, SessionVersion: 1})
 	require.NoError(t, err)
 	for _, credential := range []string{pat, jwt} {
-		assert.Equal(t, http.StatusForbidden, auditRequest(router, "GET", "/api/audit", credential).Code)
+		for _, endpoint := range []string{"/api/audit", "/api/audit/self"} {
+			response := auditRequest(router, "GET", endpoint, credential)
+			assert.Equal(t, http.StatusForbidden, response.Code)
+			assert.NotContains(t, response.Body.String(), `"items"`)
+		}
 	}
 	require.NoError(t, model.DB.Transaction(func(tx *gorm.DB) error {
 		return authz.SetUserPermissionsInTx(tx, admin.Id, authz.PermissionsMap{authz.ResourceAudit: {authz.ActionRead: true}})
@@ -313,7 +323,14 @@ func TestAuditRoleVisibilityAndPermissions(t *testing.T) {
 	require.NoError(t, authz.SetUserPermissions(admin.Id, authz.PermissionsMap{authz.ResourceAudit: {authz.ActionRead: false}}))
 	for _, credential := range []string{pat, jwt} {
 		assert.Equal(t, http.StatusForbidden, auditRequest(router, "GET", "/api/audit", credential).Code)
-		assert.Equal(t, http.StatusOK, auditRequest(router, "GET", "/api/audit/self", credential).Code)
+		assert.Equal(t, http.StatusForbidden, auditRequest(router, "GET", "/api/audit/self", credential).Code)
+	}
+	require.NoError(t, model.DB.Model(admin).Update("role", common.RoleCommonUser).Error)
+	require.NoError(t, authz.SetUserPermissions(admin.Id, authz.PermissionsMap{authz.ResourceAudit: {authz.ActionRead: true}}))
+	for _, endpoint := range []string{"/api/audit", "/api/audit/self"} {
+		response := auditRequest(router, "GET", endpoint, pat)
+		assert.Equal(t, http.StatusForbidden, response.Code)
+		assert.NotContains(t, response.Body.String(), `"items"`)
 	}
 }
 

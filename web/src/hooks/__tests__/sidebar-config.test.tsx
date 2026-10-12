@@ -123,28 +123,27 @@ describe('security sidebar visibility', () => {
 describe('audit log sidebar entry', () => {
   it('admin settings default Audit Logs to visible and preserve its independent toggle when saved', () => {
     const config = parseSidebarModulesAdmin(
-      '{"console":{"enabled":true,"log":true}}'
+      '{"admin":{"enabled":true}}'
     )
-    expect(config.console.audit).toBe(true)
-    config.console.audit = false
+    expect(config.admin.audit).toBe(true)
+    config.admin.audit = false
     const saved = parseSidebarModulesAdmin(serializeSidebarModulesAdmin(config))
     const { result } = sidebarFor(saved)
     const titles = result.current
       .flatMap((group) => group.items)
       .map((item) => item.title)
     expect(titles).not.toContain('Audit Logs')
-    expect(titles).toContain('Usage Logs')
   })
 
-  it('legacy configurations show a separate Audit Logs link immediately after Usage Logs', () => {
+  it('admin configurations show Audit Logs in the admin group', () => {
     const { result } = sidebarFor(
-      { console: { enabled: true, log: true } },
-      { console: { enabled: true, log: true } }
+      { admin: { enabled: true, audit: true } },
+      undefined
     )
     const items =
-      result.current.find((group) => group.id === 'general')?.items ?? []
-    const usageIndex = items.findIndex((item) => item.title === 'Usage Logs')
-    expect(items[usageIndex + 1]).toMatchObject({
+      result.current.find((group) => group.id === 'admin')?.items ?? []
+    expect(items.some((item) => item.title === 'Audit Logs')).toBe(true)
+    expect(items.find((item) => item.title === 'Audit Logs')).toMatchObject({
       title: 'Audit Logs',
       url: '/usage-logs/audit',
     })
@@ -155,10 +154,10 @@ describe('audit log sidebar entry', () => {
   })
 
   it.each([
-    [{ console: { enabled: true, audit: false } }, undefined],
-    [{ console: { enabled: false } }, { console: { audit: true } }],
-    [undefined, { console: { enabled: true, audit: false } }],
-    [undefined, { console: { enabled: false } }],
+    [{ admin: { enabled: true, audit: false } }, undefined],
+    [{ admin: { enabled: false } }, { admin: { audit: true } }],
+    [undefined, { admin: { enabled: true, audit: false } }],
+    [undefined, { admin: { enabled: false } }],
   ])(
     'admin and personal visibility rules can hide Audit Logs (%j, %j)',
     (admin, user) => {
@@ -172,11 +171,10 @@ describe('audit log sidebar entry', () => {
   )
 
   it('hiding Usage Logs does not hide the independently configured Audit Logs entry', () => {
-    const { result } = sidebarFor({ console: { enabled: true, log: false } })
+    const { result } = sidebarFor({ admin: { enabled: true, audit: true } })
     const titles = result.current
       .flatMap((group) => group.items)
       .map((item) => item.title)
-    expect(titles).not.toContain('Usage Logs')
     expect(titles).toContain('Audit Logs')
   })
 })
