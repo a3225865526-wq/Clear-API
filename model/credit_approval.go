@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -165,6 +166,9 @@ func PrepareCreditCatalog() error {
 			p.ApprovalID, p.EditedBy, p.LegacyStoreID, p.LegacyWithdrawn = 0, 0, 0, false
 		}
 		c.ApprovalSchema = 1
+		if err := tx.Model(&RedemptionBatch{}).Order("id").Pluck("id", &c.LegacyEvidenceBatchIDs).Error; err != nil {
+			return err
+		}
 		if err := tx.Create(&CreditApprovalEvent{Decision: "prepare", Policy: CreditApprovalPolicy, CreatedTime: common.GetTimestamp(), SoloOperator: true}).Error; err != nil {
 			return err
 		}
@@ -265,12 +269,46 @@ func validateCreditDelivery(tx *gorm.DB, p CreditProduct) error {
 		return errors.New("verified batch and delivery references are required")
 	}
 	var batch RedemptionBatch
-	if err := tx.Select("id", "quota", "source", "type", "face_value_cents", "status", "expired_time", "count").First(&batch, p.EvidenceBatchID).Error; err != nil {
+	if err := tx.First(&batch, p.EvidenceBatchID).Error; err != nil {
 		return errors.New("evidence batch unavailable")
 	}
+	var withdrawn int64
+	if err := tx.Model(&CreditApprovalEvent{}).Where("decision = ? AND product_id = ? AND revision = ? AND evidence_batch_id = ?", "revoke", p.ID, p.Revision, batch.Id).Count(&withdrawn).Error; err != nil || withdrawn != 0 {
+		return errors.New("evidence approval withdrawn for this revision")
+	}
 	quota, err := CreditProductQuota(p)
-	if batch.ProductID != "" && (batch.ProductID != p.ID || batch.DeliveryBinding != p.DeliveryBinding) {
-		return errors.New("evidence batch belongs to another delivery binding")
+	if batch.ProductID == "" {
+		_, catalog, err := lockedCreditCatalog(tx)
+		if err != nil || !slices.Contains(catalog.LegacyEvidenceBatchIDs, batch.Id) || batch.ProductRevision != 0 || batch.DeliveryBinding != "" || batch.ApprovalID != 0 || batch.EvidenceOnly {
+			return errors.New("unbound batch is not frozen legacy evidence")
+		}
+		var conflicting int64
+		if err := tx.Model(&CreditApprovalEvent{}).Where("decision = ? AND evidence_batch_id = ? AND (product_id <> ? OR revision <> ?)", "legacy_delivery", batch.Id, p.ID, p.Revision).Count(&conflicting).Error; err != nil || conflicting != 0 {
+			return errors.New("legacy evidence belongs to another product revision")
+		}
+	} else {
+		var missing int64
+		if err := tx.Model(&RedemptionBatch{}).Where("id = ?", batch.Id).Where("product_id IS NULL OR product_revision IS NULL OR delivery_binding IS NULL OR approval_id IS NULL OR evidence_only IS NULL").Count(&missing).Error; err != nil || missing != 0 {
+			return errors.New("incomplete evidence batch binding")
+		}
+		if batch.ProductID != p.ID || batch.ProductRevision != p.Revision || batch.DeliveryBinding != p.DeliveryBinding {
+			return errors.New("evidence batch belongs to another product revision or delivery binding")
+		}
+		if batch.EvidenceOnly {
+			var sample CreditApprovalEvent
+			if batch.Count != 1 || batch.ApprovalID != 0 || tx.Where("decision = ? AND product_id = ? AND revision = ? AND evidence_batch_id = ?", "sample", p.ID, p.Revision, batch.Id).First(&sample).Error != nil || sample.Policy != CreditApprovalPolicy {
+				return errors.New("evidence sample lacks its issuance record")
+			}
+		} else {
+			var approval CreditApprovalEvent
+			if err := tx.First(&approval, batch.ApprovalID).Error; err != nil || approval.Decision != "approve" || approval.ProductID != p.ID || approval.Revision != p.Revision || approval.Policy != CreditApprovalPolicy {
+				return errors.New("evidence inventory lacks a matching approval")
+			}
+			var revoked int64
+			if err := tx.Model(&CreditApprovalEvent{}).Where("decision = ? AND reference_approval_id = ?", "revoke", batch.ApprovalID).Count(&revoked).Error; err != nil || revoked != 0 {
+				return errors.New("evidence inventory approval revoked")
+			}
+		}
 	}
 	if err != nil || quota <= 0 || batch.Quota != quota || batch.FaceValueCents != p.PriceCents || batch.Source != RedemptionSourceStore || batch.Type != RedemptionTypeBalance || batch.Status != RedemptionBatchStatusEnabled || (batch.ExpiredTime != 0 && batch.ExpiredTime < common.GetTimestamp()) {
 		return errors.New("evidence batch does not match product promise")
@@ -379,6 +417,15 @@ func ChangeCreditProductState(id string, version, revision int64, action, confir
 				}
 				if err := validateCreditDelivery(tx, *p); err != nil {
 					return err
+				}
+				var batch RedemptionBatch
+				if err := tx.First(&batch, p.EvidenceBatchID).Error; err != nil {
+					return err
+				}
+				if batch.ProductID == "" {
+					if _, err := appendCreditEvent(tx, *p, actor, "legacy_delivery"); err != nil {
+						return err
+					}
 				}
 				p.State = "pending"
 			case "approve", "reject":
@@ -651,6 +698,7 @@ func GetPublicCreditCatalog() (CreditCatalog, error) {
 		}
 	}
 	effective.LegacyProducts, effective.LegacyCatalog, effective.ApprovalProducts = nil, nil, nil
+	effective.LegacyEvidenceBatchIDs = nil
 	// Public projections cannot disclose internal approval actors or evidence.
 	for i := range effective.Products {
 		p := &effective.Products[i]

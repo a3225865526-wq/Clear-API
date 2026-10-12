@@ -95,7 +95,8 @@ func TestCreditApprovalHTTPPermissionsAndUnifiedWallet(t *testing.T) {
 	priorFlag := operation_setting.StoreRechargeEnabled
 	operation_setting.StoreRechargeEnabled = true
 	t.Cleanup(func() { operation_setting.StoreRechargeEnabled = priorFlag })
-	root := model.User{Username: "store-root", Role: common.RoleRootUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, Password: "fixture-password"}
+	rootPAT := "sample-root-pat-fixture"
+	root := model.User{Username: "store-root", Role: common.RoleRootUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, Password: "fixture-password", AccessToken: &rootPAT}
 	require.NoError(t, model.DB.Create(&root).Error)
 	now := time.Now().Unix()
 	session := &model.UserSession{SID: "store-approval-session", UserID: root.Id, Version: 1, UserAuthVersion: 1, Status: model.UserSessionStatusActive, RefreshHash: "fixture-refresh-hash", LoginMethod: "password", LastActiveAt: now, ExpiresAt: now + 3600}
@@ -103,18 +104,16 @@ func TestCreditApprovalHTTPPermissionsAndUnifiedWallet(t *testing.T) {
 	identity := service.AuthIdentity{UserID: root.Id, SessionID: session.SID, UserAuthVersion: 1, SessionVersion: 1}
 	jwt, _, err := service.IssueAccessToken(identity)
 	require.NoError(t, err)
-	batch := model.RedemptionBatch{Name: "verified evidence", FaceValueCents: 100, Quota: 500000, Source: model.RedemptionSourceStore, Type: model.RedemptionTypeBalance, Status: model.RedemptionBatchStatusEnabled, Count: 1}
-	require.NoError(t, model.DB.Create(&batch).Error)
-	require.NoError(t, model.DB.Create(&model.Redemption{Key: "evidence-fixture-only", Name: "evidence", BatchId: batch.Id, Quota: 500000, FaceValueCents: 100, Source: model.RedemptionSourceStore, Type: model.RedemptionTypeBalance, Status: common.RedemptionCodeStatusEnabled}).Error)
 	catalog, err := model.GetCreditCatalog()
 	require.NoError(t, err)
-	catalog.Products = append(catalog.Products, model.CreditProduct{ID: "explicit", Name: "explicit", PriceCents: 100, CreditCents: 100, BaseQuota: 500000, PurchaseURL: model.LegacyCreditPurchaseURL, EvidenceBatchID: batch.Id, DeliveryEvidence: "delivery/reference", DeliveryBinding: "catfk/item/qmcse2"})
+	catalog.Products = append(catalog.Products, model.CreditProduct{ID: "explicit", Name: "explicit", PriceCents: 100, CreditCents: 100, BaseQuota: 500000, PurchaseURL: model.LegacyCreditPurchaseURL, DeliveryEvidence: "delivery/reference", DeliveryBinding: "catfk/item/qmcse2"})
 	require.NoError(t, model.SaveCreditCatalog(catalog, root.Id))
 	g := gin.New()
 	g.POST("/products/:id/:action", middleware.RootAuth(), ChangeCreditProductState)
 	g.POST("/legacy", middleware.AdminAuth(), AddStoreProduct)
 	g.PUT("/edit", middleware.RootAuth(), SaveCreditCatalog)
 	g.GET("/purchase/:kind/:id", middleware.DisableCache(), ResolveCreditPurchase)
+	g.POST("/samples", middleware.AdminAuth(), AddRedemptionBatch)
 	request := func(path, token string, body any, proof string) *httptest.ResponseRecorder {
 		t.Helper()
 		raw, err := common.Marshal(body)
@@ -129,6 +128,14 @@ func TestCreditApprovalHTTPPermissionsAndUnifiedWallet(t *testing.T) {
 		g.ServeHTTP(response, req)
 		return response
 	}
+	sampleInput := map[string]any{"name": "verified sample", "face_value_cents": 100, "count": 1, "product_id": "explicit", "product_revision": 1, "evidence_only": true}
+	assert.Contains(t, request("/samples", adminPAT, sampleInput, "").Body.String(), "Only root")
+	assert.Equal(t, http.StatusUnauthorized, request("/samples", "", sampleInput, "").Code)
+	assert.Contains(t, request("/samples", rootPAT, sampleInput, "").Body.String(), "live root session")
+	assert.Contains(t, request("/samples", jwt, sampleInput, "").Body.String(), `"success":true`)
+	duplicate := request("/samples", jwt, sampleInput, "").Body.String()
+	assert.Contains(t, duplicate, `"success":false`)
+	assert.NotContains(t, duplicate, `"keys"`)
 	for _, action := range []string{"submit", "approve", "publish", "revoke", "map"} {
 		assert.Equal(t, http.StatusForbidden, request("/products/explicit/"+action, adminPAT, map[string]any{}, "").Code)
 		assert.Equal(t, http.StatusUnauthorized, request("/products/explicit/"+action, "", map[string]any{}, "").Code)
@@ -162,6 +169,8 @@ func TestCreditApprovalHTTPPermissionsAndUnifiedWallet(t *testing.T) {
 	catalog, err = model.GetCreditCatalog()
 	require.NoError(t, err)
 	require.NoError(t, model.MapLegacyCreditProduct("explicit", catalog.Version, review.Product.Revision, 1, root.Id))
+	_, _, err = model.CreateRedemptionBatch(model.CreateRedemptionBatchInput{Name: "mapped sample", FaceValueCents: 100, Count: 1, AdminUserID: root.Id, ProductID: "explicit", ProductRevision: review.Product.Revision + 1, EvidenceOnly: true})
+	require.NoError(t, err)
 	for _, action := range []string{"submit", "approve", "publish"} {
 		catalog, err = model.GetCreditCatalog()
 		require.NoError(t, err)

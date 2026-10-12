@@ -7,6 +7,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -113,6 +114,8 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 	}
 	keys := make([]string, 0, input.Count)
 	err = DB.Transaction(func(tx *gorm.DB) error {
+		var sampleCatalog CreditCatalog
+		var sampleRow Option
 		var optionCount int64
 		if tx.Migrator().HasTable(&Option{}) {
 			if err := tx.Model(&Option{}).Where(&Option{Key: CreditCatalogOptionKey}).Count(&optionCount).Error; err != nil {
@@ -120,7 +123,7 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 			}
 		}
 		if optionCount > 0 {
-			_, catalog, err := lockedCreditCatalog(tx)
+			row, catalog, err := lockedCreditCatalog(tx)
 			if err != nil {
 				return err
 			}
@@ -141,6 +144,20 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 							return errors.New("delivery evidence sample requires a draft in preparation mode")
 						}
 						batch.EvidenceOnly = true
+						// A locking read is required here: MySQL REPEATABLE READ
+						// may have an older snapshot from the initial option query.
+						var issued []CreditApprovalEvent
+						if err := lockForUpdate(tx).Where("product_id = ? AND revision = ? AND decision = ?", product.ID, product.Revision, "sample").Find(&issued).Error; err != nil {
+							return err
+						}
+						if len(issued) != 0 {
+							return errors.New("sample already issued for this product revision")
+						}
+						var existing []RedemptionBatch
+						if err := lockForUpdate(tx).Where("product_id = ? AND product_revision = ? AND evidence_only = ?", product.ID, product.Revision, true).Find(&existing).Error; err != nil || len(existing) != 0 {
+							return errors.New("sample batch already exists for this product revision")
+						}
+						sampleCatalog, sampleRow = catalog, row
 					} else {
 						if err := validateCreditApproval(tx, product); err != nil {
 							return err
@@ -175,6 +192,24 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 		if err := tx.Create(batch).Error; err != nil {
 			return err
 		}
+		if input.EvidenceOnly {
+			for i := range sampleCatalog.Products {
+				p := &sampleCatalog.Products[i]
+				if p.ID != input.ProductID {
+					continue
+				}
+				p.EvidenceBatchID = batch.Id
+				if _, err := appendCreditEvent(tx, *p, input.AdminUserID, "sample"); err != nil {
+					return err
+				}
+			}
+			// CAS claims the revision in the same transaction as batch and code
+			// creation. SQLite competing readers fail rather than issue twice;
+			// MySQL/PostgreSQL serialize on the existing catalog row lock.
+			if err := persistCreditCatalog(tx, sampleRow, sampleCatalog); err != nil {
+				return err
+			}
+		}
 		for range input.Count {
 			code := &Redemption{
 				UserId:         input.AdminUserID,
@@ -189,8 +224,9 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 				Type:           RedemptionTypeBalance,
 				Source:         RedemptionSourceStore,
 			}
-			if err := tx.Create(code).Error; err != nil {
-				return err
+			// SQL traces and driver errors can contain the newly issued key.
+			if err := tx.Session(&gorm.Session{Logger: tx.Logger.LogMode(logger.Silent)}).Create(code).Error; err != nil {
+				return errors.New("redemption code insertion failed")
 			}
 			keys = append(keys, code.Key)
 		}

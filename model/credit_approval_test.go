@@ -1,7 +1,9 @@
 package model
 
 import (
+	"bytes"
 	"errors"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -15,6 +17,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 // This fixture accepts no external DSN and cannot target a production database.
@@ -68,6 +71,8 @@ func creditApprovalFixture(t *testing.T) {
 	}
 	legacy := StoreProduct{Id: 1, Name: "existing", FaceValueCents: 100, StoreUrl: LegacyCreditPurchaseURL, Enabled: true, CreatedTime: 1, UpdatedTime: 1}
 	require.NoError(t, db.Create(&legacy).Error)
+	require.NoError(t, db.Create(&RedemptionBatch{Id: 77, Name: "preparation legacy", FaceValueCents: 100, Quota: 500000, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Status: RedemptionBatchStatusEnabled, Count: 1}).Error)
+	require.NoError(t, db.Create(&Redemption{Key: "legacy-fixture-only", BatchId: 77, Quota: 500000, FaceValueCents: 100, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Status: common.RedemptionCodeStatusEnabled}).Error)
 	require.NoError(t, InitCreditCatalog())
 	require.NoError(t, PrepareCreditCatalog())
 	require.NoError(t, PrepareCreditCatalog())
@@ -144,14 +149,20 @@ func TestCreditApprovalReleasedSchemaUpgradeAndConcurrentReview(t *testing.T) {
 
 func creditApprovalProduct(t *testing.T, id string, price int64) CreditProduct {
 	t.Helper()
-	batch := RedemptionBatch{Name: "delivery evidence", FaceValueCents: price, Quota: 500000, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Status: RedemptionBatchStatusEnabled, Count: 1}
-	require.NoError(t, DB.Create(&batch).Error)
-	require.NoError(t, DB.Create(&Redemption{Key: id + "-evidence-fixture", Name: "evidence", BatchId: batch.Id, Quota: batch.Quota, FaceValueCents: price, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Status: common.RedemptionCodeStatusEnabled}).Error)
 	catalog, err := GetCreditCatalog()
 	require.NoError(t, err)
-	p := CreditProduct{ID: id, Name: id, Currency: "CNY", PriceCents: price, CreditCents: 100, BaseQuota: batch.Quota, PurchaseURL: LegacyCreditPurchaseURL, EvidenceBatchID: batch.Id, DeliveryEvidence: "delivery-check/2026-10", DeliveryBinding: "catfk/item/qmcse2"}
+	p := CreditProduct{ID: id, Name: id, Currency: "CNY", PriceCents: price, CreditCents: 100, BaseQuota: 500000, PurchaseURL: LegacyCreditPurchaseURL, DeliveryEvidence: "delivery-check/2026-10", DeliveryBinding: "catfk/item/qmcse2"}
 	catalog.Products = append(catalog.Products, p)
 	require.NoError(t, SaveCreditCatalog(catalog, 7))
+	return creditApprovalSample(t, id)
+}
+
+func creditApprovalSample(t *testing.T, id string) CreditProduct {
+	t.Helper()
+	review, err := GetCreditProductReview(id)
+	require.NoError(t, err)
+	_, _, err = CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "delivery evidence", FaceValueCents: review.Product.PriceCents, Count: 1, AdminUserID: 7, ProductID: id, ProductRevision: review.Product.Revision, EvidenceOnly: true})
+	require.NoError(t, err)
 	c, err := GetCreditCatalog()
 	require.NoError(t, err)
 	for _, product := range c.Products {
@@ -316,6 +327,7 @@ func TestCreditApprovalLegacyCutoverAndFrozenCompatibility(t *testing.T) {
 	require.NoError(t, err)
 	require.Error(t, ActivateUnifiedCreditView(c.Version, 7))
 	require.NoError(t, MapLegacyCreditProduct(p.ID, c.Version, p.Revision, 1, 7))
+	p = creditApprovalSample(t, p.ID)
 	c, err = GetCreditCatalog()
 	require.NoError(t, err)
 	require.Error(t, ActivateUnifiedCreditView(c.Version, 7))
@@ -366,6 +378,17 @@ func TestCreditApprovalURLsAndMissingEvidence(t *testing.T) {
 func TestCreditApprovalPreparationSampleAndDowngradeProtection(t *testing.T) {
 	creditApprovalFixture(t)
 	p := creditApprovalProduct(t, "sample", 100)
+	c, err := GetCreditCatalog()
+	require.NoError(t, err)
+	for i := range c.Products {
+		if c.Products[i].ID == p.ID {
+			c.Products[i].Description = "new sample revision"
+		}
+	}
+	require.NoError(t, SaveCreditCatalog(c, 7))
+	review, err := GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	p = review.Product
 	sample, keys, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "delivery trial", FaceValueCents: 100, Count: 1, AdminUserID: 7, ProductID: p.ID, ProductRevision: p.Revision, EvidenceOnly: true})
 	require.NoError(t, err)
 	assert.True(t, sample.EvidenceOnly)
@@ -378,12 +401,183 @@ func TestCreditApprovalPreparationSampleAndDowngradeProtection(t *testing.T) {
 	_, _, err = CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "unreviewed inventory", FaceValueCents: 100, Count: 1, AdminUserID: 7, ProductID: p.ID, ProductRevision: p.Revision})
 	require.Error(t, err)
 	// Only metadata is inspected; missing code quota must never pass approval.
-	require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", p.EvidenceBatchID).Update("quota", nil).Error)
-	c, err := GetCreditCatalog()
+	require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", sample.Id).Update("quota", nil).Error)
+	c, err = GetCreditCatalog()
 	require.NoError(t, err)
 	require.Error(t, ChangeCreditProductState(p.ID, c.Version, p.Revision, "submit", "", 7))
 	raw, err := common.Marshal(DefaultCreditCatalog())
 	require.NoError(t, err)
 	require.NoError(t, DB.Model(&Option{}).Where(&Option{Key: CreditCatalogOptionKey}).Update("value", string(raw)).Error)
 	require.Error(t, PrepareCreditCatalog(), "old-image writes cannot recapture new legacy products")
+}
+
+func TestCreditApprovalEvidenceIsolation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		changes map[string]any
+	}{
+		{"other product", map[string]any{"product_id": "another"}},
+		{"other revision", map[string]any{"product_revision": 99}},
+		{"other delivery", map[string]any{"delivery_binding": "another"}},
+		{"unbound new batch", map[string]any{"product_id": ""}},
+		{"null product", map[string]any{"product_id": nil}},
+		{"null revision", map[string]any{"product_revision": nil}},
+		{"null binding", map[string]any{"delivery_binding": nil}},
+		{"missing binding", map[string]any{"delivery_binding": ""}},
+		{"null sample flag", map[string]any{"evidence_only": nil}},
+		{"null approval", map[string]any{"approval_id": nil}},
+		{"disabled batch", map[string]any{"status": RedemptionBatchStatusDisabled}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			creditApprovalFixture(t)
+			p := creditApprovalProduct(t, "isolation", 100)
+			require.NoError(t, validateCreditDelivery(DB, p))
+			require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Updates(tc.changes).Error)
+			require.Error(t, validateCreditDelivery(DB, p))
+		})
+	}
+	t.Run("revoked sales approval", func(t *testing.T) {
+		creditApprovalFixture(t)
+		p := creditApprovalProduct(t, "inventory", 100)
+		creditApprovalAction(t, p.ID, "submit")
+		creditApprovalAction(t, p.ID, "approve")
+		batch, _, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "approved", FaceValueCents: 100, Count: 1, AdminUserID: 7, ProductID: p.ID, ProductRevision: p.Revision})
+		require.NoError(t, err)
+		p.EvidenceBatchID = batch.Id
+		require.NoError(t, validateCreditDelivery(DB, p))
+		creditApprovalAction(t, p.ID, "revoke")
+		require.Error(t, validateCreditDelivery(DB, p))
+	})
+	t.Run("frozen legacy adoption", func(t *testing.T) {
+		creditApprovalFixture(t)
+		p := creditApprovalProduct(t, "legacy", 100)
+		c, err := GetCreditCatalog()
+		require.NoError(t, err)
+		for i := range c.Products {
+			if c.Products[i].ID == p.ID {
+				c.Products[i].EvidenceBatchID = 77
+			}
+		}
+		require.NoError(t, SaveCreditCatalog(c, 7))
+		review, err := GetCreditProductReview(p.ID)
+		require.NoError(t, err)
+		p = review.Product
+		var before RedemptionBatch
+		require.NoError(t, DB.First(&before, 77).Error)
+		creditApprovalAction(t, p.ID, "submit")
+		creditApprovalAction(t, p.ID, "approve")
+		var after RedemptionBatch
+		require.NoError(t, DB.First(&after, 77).Error)
+		assert.Equal(t, before, after, "legacy financial data must remain unchanged")
+		p.Revision++
+		require.Error(t, validateCreditDelivery(DB, p))
+		p.Revision--
+		p.ID = "another"
+		require.Error(t, validateCreditDelivery(DB, p))
+	})
+}
+
+func TestCreditApprovalSampleLifetimeAndConcurrency(t *testing.T) {
+	creditApprovalFixture(t)
+	p := creditApprovalProduct(t, "repeat", 100)
+	input := CreateRedemptionBatchInput{Name: "sample", FaceValueCents: 100, Count: 1, AdminUserID: 7, ProductID: p.ID, ProductRevision: p.Revision, EvidenceOnly: true}
+	_, _, err := CreateRedemptionBatch(input)
+	require.Error(t, err)
+	// Consumption or batch withdrawal cannot clear the permanent issuance event.
+	require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", p.EvidenceBatchID).Update("status", common.RedemptionCodeStatusUsed).Error)
+	_, _, err = CreateRedemptionBatch(input)
+	require.Error(t, err)
+	_, err = DisableRedemptionBatchById(p.EvidenceBatchID)
+	require.NoError(t, err)
+	_, _, err = CreateRedemptionBatch(input)
+	require.Error(t, err)
+	other := creditApprovalProduct(t, "other", 100)
+	assert.Equal(t, p.Revision, other.Revision)
+	c, err := GetCreditCatalog()
+	require.NoError(t, err)
+	for i := range c.Products {
+		if c.Products[i].ID == p.ID {
+			c.Products[i].Description = "next revision"
+		}
+	}
+	require.NoError(t, SaveCreditCatalog(c, 7))
+	review, err := GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	input.ProductRevision = review.Product.Revision
+	sqlDB, err := DB.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(4)
+	start := make(chan struct{})
+	results := make(chan error, 3)
+	var workers sync.WaitGroup
+	for range 3 {
+		workers.Go(func() {
+			<-start
+			_, _, err := CreateRedemptionBatch(input)
+			results <- err
+		})
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+	successes := 0
+	for err := range results {
+		if err == nil {
+			successes++
+		}
+	}
+	assert.Equal(t, 1, successes)
+	var batches, events, codes int64
+	require.NoError(t, DB.Model(&RedemptionBatch{}).Where("product_id = ? AND product_revision = ?", p.ID, input.ProductRevision).Count(&batches).Error)
+	require.NoError(t, DB.Model(&CreditApprovalEvent{}).Where("product_id = ? AND revision = ? AND decision = ?", p.ID, input.ProductRevision, "sample").Count(&events).Error)
+	require.NoError(t, DB.Model(&Redemption{}).Where("batch_id IN (?)", DB.Model(&RedemptionBatch{}).Select("id").Where("product_id = ? AND product_revision = ?", p.ID, input.ProductRevision)).Count(&codes).Error)
+	assert.EqualValues(t, 1, batches)
+	assert.EqualValues(t, 1, events)
+	assert.EqualValues(t, 1, codes)
+}
+
+func TestCreditApprovalSampleRollback(t *testing.T) {
+	creditApprovalFixture(t)
+	p := creditApprovalProduct(t, "rollback", 100)
+	c, err := GetCreditCatalog()
+	require.NoError(t, err)
+	for i := range c.Products {
+		if c.Products[i].ID == p.ID {
+			c.Products[i].Description = "next revision"
+		}
+	}
+	require.NoError(t, SaveCreditCatalog(c, 7))
+	c, err = GetCreditCatalog()
+	require.NoError(t, err)
+	review, err := GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	input := CreateRedemptionBatchInput{Name: "sample", FaceValueCents: 100, Count: 1, AdminUserID: 7, ProductID: p.ID, ProductRevision: review.Product.Revision, EvidenceOnly: true}
+	const privateFixtureKey = "duplicate-key-fixture-only"
+	require.NoError(t, DB.Create(&Redemption{Key: privateFixtureKey, Name: "failure fixture"}).Error)
+	var captured bytes.Buffer
+	priorLogger := DB.Logger
+	DB.Logger = gormlogger.New(log.New(&captured, "", 0), gormlogger.Config{LogLevel: gormlogger.Info})
+	require.NoError(t, DB.Callback().Create().Before("gorm:create").Register("sample-code-failure", func(tx *gorm.DB) {
+		if code, ok := tx.Statement.Dest.(*Redemption); ok {
+			code.Key = privateFixtureKey
+		}
+	}))
+	batch, keys, err := CreateRedemptionBatch(input)
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), privateFixtureKey)
+	assert.NotContains(t, captured.String(), privateFixtureKey)
+	DB.Logger = priorLogger
+	assert.Nil(t, batch)
+	assert.Nil(t, keys)
+	require.NoError(t, DB.Callback().Create().Remove("sample-code-failure"))
+	after, err := GetCreditCatalog()
+	require.NoError(t, err)
+	assert.Equal(t, c, after)
+	var count int64
+	require.NoError(t, DB.Model(&RedemptionBatch{}).Where("product_id = ? AND product_revision = ?", p.ID, input.ProductRevision).Count(&count).Error)
+	assert.Zero(t, count)
+	require.NoError(t, DB.Model(&CreditApprovalEvent{}).Where("product_id = ? AND revision = ? AND decision = ?", p.ID, input.ProductRevision, "sample").Count(&count).Error)
+	assert.Zero(t, count)
+	_, _, err = CreateRedemptionBatch(input)
+	require.NoError(t, err)
 }

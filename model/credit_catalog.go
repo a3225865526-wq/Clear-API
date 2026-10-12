@@ -47,8 +47,9 @@ type CreditCatalog struct {
 	ApprovalSchema int             `json:"approval_schema"`
 	Unified        bool            `json:"unified"`
 	// Frozen at the first local schema upgrade, never populated by an editor.
-	LegacyProducts []*StoreProduct `json:"legacy_products,omitempty"`
-	LegacyCatalog  []CreditProduct `json:"legacy_catalog,omitempty"`
+	LegacyProducts         []*StoreProduct `json:"legacy_products,omitempty"`
+	LegacyCatalog          []CreditProduct `json:"legacy_catalog,omitempty"`
+	LegacyEvidenceBatchIDs []int           `json:"legacy_evidence_batch_ids,omitempty"`
 	// The original products key remains readable by the previous image during
 	// schema preparation. New readers use this versioned authoritative list.
 	ApprovalProducts []CreditProduct `json:"approval_products,omitempty"`
