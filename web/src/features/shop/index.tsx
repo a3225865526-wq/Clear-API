@@ -30,7 +30,7 @@ import { formatNumber } from '@/lib/format'
 import { getCatalog } from './api'
 import {
   creditProducts,
-  legacyPurchaseUrl,
+  storePurchaseUrl,
   trustedPurchaseUrl,
   type CreditProduct,
 } from './catalog'
@@ -74,7 +74,7 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
           className='min-h-11'
           render={
             <a
-              href={legacyPurchaseUrl}
+              href={storePurchaseUrl}
               target='_blank'
               rel='noopener noreferrer'
             />
