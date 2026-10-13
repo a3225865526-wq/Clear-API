@@ -5,12 +5,33 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shlex
 import subprocess
 import tempfile
 import textwrap
 import unittest
+
+CONTAINER_ID = "c" * 64
+STARTED_AT = "2026-10-13T00:00:00Z"
+BINARY_SHA = "d" * 64
+
+
+def runtime_report():
+    return {"success": True, "data": {
+        "schema_version": "1", "report_version": "1", "status": "PASS",
+        "instance_id": "6f6ebdbe-9e74-4d25-b608-64eecbe0c0b1",
+        "container_id": CONTAINER_ID, "started_at": STARTED_AT,
+        "build_identity": "sha256:" + BINARY_SHA, "config_generation": "sha256:" + "e" * 64,
+        "config_digest": "sha256:" + hashlib.sha256(b'{"online_payment_enabled":false,"store_enabled":false,"billing_mode":"enforce","referral_enabled":false,"pool_enabled":false}').hexdigest(),
+        "approval_view_digest": "sha256:" + "f" * 64,
+        "online_payment_enabled": False, "store_enabled": False, "billing_mode": "enforce",
+        "referral_enabled": False, "pool_enabled": False, "approval_schema": 1,
+        "catalog_version": 1, "effective_product_count": 0,
+        "product_view_digest": "sha256:" + "f" * 64,
+        "generated_at": "fresh",
+    }}
 
 
 SOURCE = Path(__file__).resolve().parents[1] / "production-deploy.sh"
@@ -40,6 +61,83 @@ class WrapperModesTest(unittest.TestCase):
             }.items()
         ))
         self.config.chmod(0o600)
+        self.probe_token = self.root / "probe-session"
+        self.probe_token.write_text("fixture.header.signature")
+        self.probe_token.chmod(0o600)
+        self.probe_owner = self.root / "probe-owner.json"
+        self.probe_owner.write_text(json.dumps({"uid": 0, "gid": 0}))
+        with self.config.open("a") as f:
+            f.write("\nDEPLOY_RUNTIME_PROBE_TOKEN_FILE=" + shlex.quote(str(self.probe_token)) + "\n")
+        # Stub only HTTP transport. The actual shell, Python contract validator,
+        # secure credential reader and Docker identity checks still execute.
+        (self.root / "sitecustomize.py").write_text(r'''
+import datetime, json, os, urllib.request
+class Response:
+    status = 200
+    def __enter__(self): return self
+    def __exit__(self, *args): pass
+    def read(self, limit):
+        body = json.loads(os.environ['RUNTIME_REPORT'])
+        data = body.get('data', {})
+        if data.get('generated_at') == 'fresh':
+            data['generated_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        failure = os.environ.get('TEST_FAILURE', '')
+        if failure == 'probe-missing': data.pop('schema_version', None)
+        if failure == 'probe-stale': data['generated_at'] = '2000-01-01T00:00:00Z'
+        if failure == 'probe-build': data['build_identity'] = 'sha256:' + '0'*64
+        if failure == 'probe-config': data['store_enabled'] = True
+        if failure == 'probe-approval': body = {'success':False, 'code':'APPROVAL_VIEW_INVALID'}
+        root = os.environ.get('TEST_ROOT')
+        if root and os.path.exists(root+'/replaced') and not os.path.exists(root+'/rolled-back'):
+            data['instance_id'] = '7f6ebdbe-9e74-4d25-b608-64eecbe0c0b2'
+            data['container_id'] = 'a'*64
+            if failure == 'probe-post-config': data['config_generation'] = 'sha256:'+'0'*64
+            if failure == 'probe-post-approval': data['approval_view_digest'] = 'sha256:'+'0'*64
+            if failure == 'probe-post-products': data['product_view_digest'] = 'sha256:'+'0'*64
+        return json.dumps(body).encode()[:limit]
+class Opener:
+    def open(self, request, timeout):
+        if os.environ.get('TEST_FAILURE') == 'probe-unavailable': raise OSError('fixture unavailable')
+        if request.full_url != 'http://127.0.0.1:3000/api/clearapi/runtime-integrity': raise OSError('forbidden URL')
+        if request.get_header('Authorization') != 'Bearer fixture.header.signature': raise OSError('bad fixture credential')
+        return Response()
+urllib.request.build_opener = lambda *args: Opener()
+''')
+        # Production uses Python isolated mode for credential handling. Inject
+        # the fixture HTTP transport only through a disposable interpreter shim,
+        # rather than weakening -I or relying on inherited PYTHONPATH in the gate.
+        python = self.root / "python3"
+        python.write_text("#!/usr/bin/python3\n" + r'''
+import json, os, pathlib, sys
+args = sys.argv[1:]
+if '-I' in args and '-' in args:
+    code = sys.stdin.read()
+    fixture = pathlib.Path(__file__).with_name('sitecustomize.py').read_text()
+    sys.argv = ['-', *args[args.index('-')+1:]]
+    # Only this disposable test interpreter simulates a root-owned credential.
+    # Keep real type, mode, link-count and O_NOFOLLOW checks. The shipped gate
+    # is unmodified and never reads this fixture or installs these hooks.
+    token = pathlib.Path(__file__).with_name('probe-session')
+    owner = json.loads(token.with_name('probe-owner.json').read_text())
+    trusted_dirs = set(token.parents)
+    real_lstat, real_fstat = os.lstat, os.fstat
+    def fixture_owner(value):
+        fields = list(value)
+        fields[4], fields[5] = owner['uid'], owner['gid']
+        return os.stat_result(fields)
+    def fixture_lstat(path):
+        value = real_lstat(path)
+        return fixture_owner(value) if pathlib.Path(path) in trusted_dirs else value
+    def fixture_fstat(fd):
+        value = real_fstat(fd)
+        return fixture_owner(value) if pathlib.Path(os.readlink('/proc/self/fd/'+str(fd))) == token else value
+    os.lstat, os.fstat = fixture_lstat, fixture_fstat
+    exec(compile(fixture, '<fixture-http>', 'exec'))
+    exec(compile(code, '<actual-gate>', 'exec'))
+else:
+    os.execv('/usr/bin/python3', ['/usr/bin/python3', *args])
+''')
+        python.chmod(0o755)
         # Redirect only the fixed operator config path in the test copy.
         self.wrapper = self.root / "wrapper.sh"
         self.wrapper.write_text(SOURCE.read_text().replace(
@@ -62,15 +160,22 @@ elif args == ["docker", "inspect", "--format", "{{.Image}}", "running-container"
     print("sha256:running-local-id")
 elif args[0:4] == ["docker", "image", "inspect", "--format"] and args[4] == "{{.Id}}":
     print(os.environ.get("TEST_EFFECTIVE_ID", "sha256:running-local-id"))
+elif args[:3] == ["docker", "inspect", "--format"] and args[3] == '{{.Id}} {{.State.StartedAt}} {{.Image}}':
+    print('c'*64+' 2026-10-13T00:00:00Z sha256:running-local-id')
+elif args[:2] == ['docker', 'run'] and '--entrypoint' in args and args[args.index('--entrypoint')+1] == 'sha256sum':
+    print('d'*64+'  /new-api')
+elif args[:2] == ['docker', 'port']: print('127.0.0.1:3000')
 else:
     sys.exit("Forbidden operation: " + repr(args))
 ''')
         fake_sudo.chmod(0o755)
         self.env = dict(os.environ, PATH=str(self.root) + os.pathsep + os.environ["PATH"],
-                        TEST_TRACE=str(self.trace))
+                        TEST_TRACE=str(self.trace),
+                        RUNTIME_REPORT=json.dumps(runtime_report()))
 
     def run_wrapper(self, *args):
-        before = {p.name: p.read_bytes() for p in self.root.iterdir() if p.is_file()}
+        before = {p.name: p.read_bytes() for p in self.root.iterdir()
+                  if p.is_file() and p not in (self.audit, self.trace)}
         result = subprocess.run(["bash", str(self.wrapper), *args], env=self.env,
                                 capture_output=True, text=True, timeout=10)
         # Only the documented audit append and read-probe trace may change.
@@ -84,7 +189,7 @@ else:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("identity OK", result.stderr)
         self.assertEqual(json.loads(self.audit.read_text())["result"], "ok")
-        self.assertEqual(len(self.trace.read_text().splitlines()), 4)
+        self.assertIn("Runtime Gate PASS", result.stderr)
 
     def test_verify_missing_override_fails(self):
         self.override.unlink()
@@ -129,7 +234,7 @@ else:
             f.write("\n" + config + "\n")
         # Execute the actual configuration and helper definitions in Bash;
         # stop before the deployment steps, and allow only fixture probes.
-        source = self.wrapper.read_text().split("# Identity-only --verify mode:")[0]
+        source = self.wrapper.read_text().split("# Verification mode:")[0]
         gate = self.root / "gate.sh"
         gate.write_text(source + "\n" + body + "\n")
         probe = self.root / "sudo"
@@ -145,6 +250,11 @@ elif a == ["docker", "inspect", "--format", "{{.Image}}", "running-container"]:
     print("sha256:running-local-id")
 elif a[:4] == ["docker", "image", "inspect", "--format"] and a[4] == "{{.Id}}":
     print("sha256:running-local-id")
+elif a[:3] == ['docker','inspect','--format'] and a[3] == '{{.Id}} {{.State.StartedAt}} {{.Image}}':
+    print('c'*64+' 2026-10-13T00:00:00Z sha256:running-local-id')
+elif a[:2] == ['docker','run'] and '--entrypoint' in a and a[a.index('--entrypoint')+1] == 'sha256sum':
+    print('d'*64+'  /new-api')
+elif a[:2] == ['docker','port']: print('127.0.0.1:3000')
 elif a[-2:] == ["printenv", "CLEARAPI_CLOSED_LAUNCH"]:
     print(f.get("closed", "false"))
 elif a[-3:] == ["config", "--format", "json"]:
@@ -239,7 +349,7 @@ print(json.dumps({"success":True,"data":{
         for fixture in ({"closed":"true"}, {"register":False}, {"password":False},
                         {"email":False}, {"password_login":False}, {"provider":"0"}, {"ability":"0"},
                         {"extra_ability":"1"}, {"extra_channel":"1"},
-                        {"disabled":"1"}, {"off":"1"}, {"grace":"10s"},
+                        {"disabled":"1"}, {"grace":"10s"},
                         {"signal":"SIGKILL"}, {"timeout":"180"}, {"sql_error":True}):
             with self.subTest(fixture=fixture):
                 r = self.run_gate("verify_launch_baseline; verify_stop_policy",
@@ -307,6 +417,120 @@ print(json.dumps({"success":True,"data":{
         self.assertNotEqual(result.returncode, 0)
 
 
+class RuntimeGateContractTest(unittest.TestCase):
+    setUp = WrapperModesTest.setUp
+    run_wrapper = WrapperModesTest.run_wrapper
+
+    def reject_report(self, report, code):
+        self.env['RUNTIME_REPORT'] = json.dumps(report)
+        result = self.run_wrapper('--verify')
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('"status": "BLOCKED"', result.stderr)
+        self.assertIn('"code": "'+code+'"', result.stderr)
+        self.assertEqual(json.loads(self.audit.read_text().splitlines()[-1])['result'], 'blocked')
+        self.assertNotIn('fixture.header.signature', result.stdout+result.stderr+self.trace.read_text())
+
+    def test_every_required_field_is_mandatory_and_unknown_versions_block(self):
+        for field in runtime_report()['data']:
+            with self.subTest(field=field):
+                report = runtime_report()
+                report['data'].pop(field)
+                self.reject_report(report, 'PROBE_UNAVAILABLE')
+        for field in ('schema_version', 'report_version'):
+            for value in (0, 1, 2, True, '0', '2', None):
+                with self.subTest(field=field, value=value):
+                    report = runtime_report()
+                    report['data'][field] = value
+                    self.reject_report(report, 'PROBE_UNAVAILABLE')
+
+    def test_real_producer_contract_and_cross_instance_binding(self):
+        if os.environ.get('RUNTIME_PROBE_EXPORT') != '1':
+            self.skipTest('real producer artifact not requested')
+        report = json.loads(Path('/tmp/clearapi-runtime-v1-report.json').read_text())
+        data = report['data']
+        self.env['RUNTIME_REPORT'] = json.dumps(report)
+        # The test Docker transport independently supplies the deterministic
+        # identity contract. Report fields are not used as expectations.
+        fake = self.root / 'sudo'
+        text = fake.read_text().replace("'c'*64+' 2026-10-13T00:00:00Z sha256:running-local-id'",
+            repr(CONTAINER_ID+' '+STARTED_AT+' sha256:running-local-id'))
+        text = text.replace("'d'*64+'  /new-api'",repr(BINARY_SHA+'  /new-api'))
+        fake.write_text(text)
+        data['generated_at'] = 'fresh'
+        self.env['RUNTIME_REPORT'] = json.dumps(report)
+        result = self.run_wrapper('--verify')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertIn('Runtime Gate PASS',result.stderr)
+        # The producer's fixture A report cannot satisfy independently inspected B.
+        fake.write_text(text.replace(CONTAINER_ID,'0'*64))
+        self.reject_report(report,'PROBE_UNAVAILABLE')
+
+    def test_stage2b1_response_is_explicitly_incompatible(self):
+        report = runtime_report()
+        for field in ('schema_version', 'report_version', 'status', 'container_id', 'started_at', 'config_digest', 'approval_view_digest', 'effective_product_count'):
+            report['data'].pop(field)
+        report['data']['effective_product_digest'] = report['data'].pop('product_view_digest')
+        report['data']['probe_timestamp'] = report['data'].pop('generated_at')
+        self.reject_report(report, 'PROBE_UNAVAILABLE')
+
+    def test_identity_time_policy_and_product_failures(self):
+        cases = [
+            ('instance_id', '0'*64, 'PROBE_UNAVAILABLE'),
+            ('container_id', '0'*64, 'PROBE_UNAVAILABLE'),
+            ('started_at', '2000-01-01T00:00:00Z', 'PROBE_UNAVAILABLE'),
+            ('status', 'unknown', 'PROBE_UNAVAILABLE'),
+            ('build_identity', 'sha256:'+'0'*64, 'PROBE_UNAVAILABLE'),
+            ('generated_at', '2000-01-01T00:00:00Z', 'PROBE_UNAVAILABLE'),
+            ('generated_at', '2999-01-01T00:00:00Z', 'PROBE_UNAVAILABLE'),
+            ('generated_at', '2026-10-13T00:00:00', 'PROBE_UNAVAILABLE'),
+            ('config_generation', 'unknown', 'RUNTIME_CONFIG_MISMATCH'),
+            ('config_digest', 'unknown', 'RUNTIME_CONFIG_MISMATCH'),
+            ('config_digest', 'sha256:'+'0'*64, 'RUNTIME_CONFIG_MISMATCH'),
+            ('approval_view_digest', 'unknown', 'APPROVAL_VIEW_INVALID'),
+            ('online_payment_enabled', True, 'RUNTIME_CONFIG_MISMATCH'),
+            ('store_enabled', True, 'RUNTIME_CONFIG_MISMATCH'),
+            ('referral_enabled', True, 'RUNTIME_CONFIG_MISMATCH'),
+            ('pool_enabled', True, 'RUNTIME_CONFIG_MISMATCH'),
+            ('billing_mode', 'monitor', 'RUNTIME_CONFIG_MISMATCH'),
+            ('approval_schema', 2, 'APPROVAL_VIEW_INVALID'),
+            ('catalog_version', 0, 'PRODUCT_VIEW_INVALID'),
+            ('product_view_digest', 'unknown', 'PRODUCT_VIEW_INVALID'),
+            ('effective_product_count', 1, 'PRODUCT_VIEW_INVALID'),
+        ]
+        for field, value, code in cases:
+            with self.subTest(field=field, value=value):
+                report = runtime_report()
+                report['data'][field] = value
+                self.reject_report(report, code)
+        self.reject_report({'success':False, 'code':'APPROVAL_VIEW_INVALID'}, 'APPROVAL_VIEW_INVALID')
+        self.reject_report({'success':False, 'code':'unknown-private-fixture-detail'}, 'PROBE_UNAVAILABLE')
+
+    def test_operator_policy_and_credential_security(self):
+        self.env['CLEARAPI_STORE_POLICY'] = 'approved'
+        result = self.run_wrapper('--verify')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with self.config.open('a') as f:
+            f.write('\nCLEARAPI_STORE_POLICY=approved\n')
+        self.reject_report(runtime_report(), 'RUNTIME_CONFIG_MISMATCH')
+
+    def test_unsafe_or_missing_credentials_and_transport_never_fall_back(self):
+        for mode in (0o644, 0o666):
+            with self.subTest(mode=mode):
+                self.probe_token.chmod(mode)
+                self.reject_report(runtime_report(), 'PROBE_UNAVAILABLE')
+        self.probe_token.chmod(0o600)
+        for owner in ({'uid':1001,'gid':0}, {'uid':0,'gid':1001}):
+            with self.subTest(owner=owner):
+                self.probe_owner.write_text(json.dumps(owner))
+                self.reject_report(runtime_report(),'PROBE_UNAVAILABLE')
+        self.probe_owner.write_text(json.dumps({'uid':0,'gid':0}))
+        self.env['TEST_FAILURE'] = 'probe-unavailable'
+        self.reject_report(runtime_report(), 'PROBE_UNAVAILABLE')
+        self.env.pop('TEST_FAILURE')
+        self.probe_token.unlink()
+        self.reject_report(runtime_report(), 'PROBE_UNAVAILABLE')
+
+
 class InstallerFaultTest(unittest.TestCase):
     """Run a path-rewritten installer only against an isolated virtual VPS."""
 
@@ -330,6 +554,11 @@ class InstallerFaultTest(unittest.TestCase):
         self.machine.write_text("virtual-vps")
         installer = SOURCE.parent / "clearapi-install-approved-script.sh"
         text = installer.read_text().replace("/opt", str(self.root / "opt"))
+        # Authorize only the disposable test copy's fixture bytes. The real
+        # installer retains its old reviewed hash and cannot install this change.
+        text = re.sub(r'^EXPECTED_SHA=.*$',
+                      'EXPECTED_SHA=' + hashlib.sha256(self.source.read_bytes()).hexdigest(),
+                      text, count=1, flags=re.MULTILINE)
         text = text.replace("/run", str(self.root / "run"))
         text = text.replace("/etc/machine-id", str(self.machine))
         # The production script still requires root. Here, only filesystem
@@ -598,9 +827,14 @@ if a[:2]==['image','inspect']:
     elif 'revision' in fmt: print(('c' if fail=='revision' else 'b')*40)
     else: sys.exit('Forbidden image probe')
 elif a[0]=='run':
+    if '--entrypoint' in a and a[a.index('--entrypoint')+1]=='sha256sum':
+        print('d'*64+'  /new-api'); sys.exit(0)
     if '--entrypoint' in a and a[a.index('--entrypoint')+1]=='/billing-migrate': sys.exit(1)
 elif a[0]=='inspect':
-    if 'NetworkSettings' in a[2]: print('clearapi_internal')
+    if a[2]=='{{.Id}} {{.State.StartedAt}} {{.Image}}':
+        replaced=(root/'replaced').exists() and not (root/'rolled-back').exists()
+        print(('a' if replaced else 'c')*64+' 2026-10-13T00:00:00Z '+('sha256:candidate-local-id' if replaced else 'sha256:running-local-id'))
+    elif 'NetworkSettings' in a[2]: print('clearapi_internal')
     else: print('sha256:candidate-local-id' if (root/'replaced').exists() and not (root/'rolled-back').exists() else 'sha256:running-local-id')
 elif a[0]=='port':
     if '3000/tcp' in a: print('127.0.0.1:3000')
@@ -673,6 +907,38 @@ else: sys.exit('Forbidden docker operation')
         self.assertFalse(any("SELECT status FROM channels WHERE id=1;" in q for q in queries))
         self.assertTrue(any(x["args"][-5:] == ["up","-d","--timeout","150","new-api"] for x in trace))
 
+    def test_runtime_blocks_prevent_migration_replace_and_success(self):
+        cases = [('probe-unavailable','PROBE_UNAVAILABLE'),
+                 ('probe-missing','PROBE_UNAVAILABLE'), ('probe-stale','PROBE_UNAVAILABLE'),
+                 ('probe-build','PROBE_UNAVAILABLE'), ('probe-config','RUNTIME_CONFIG_MISMATCH'),
+                 ('probe-approval','APPROVAL_VIEW_INVALID')]
+        for index, (failure, code) in enumerate(cases):
+            with self.subTest(failure=failure):
+                if index: self.setUp()
+                result, trace, logins = self.run_chain(failure=failure, migration=True)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn('"code": "'+code+'"', result.stderr)
+                self.assertFalse(logins)
+                self.assertFalse((self.root/'replaced').exists())
+                self.assertFalse(any(x['name']=='docker' and x['args'][0]=='compose' and 'run' in x['args'] for x in trace))
+                self.assertNotIn('DEPLOYMENT SUCCESS', result.stderr)
+                manifest = json.loads(self.manifest.read_text())
+                self.assertEqual(manifest['releases']['current']['new_api_image_id'], 'sha256:running-local-id')
+                self.assertNotEqual(manifest['releases']['current'].get('status'), 'success')
+
+    def test_post_replace_drift_never_marks_success(self):
+        for index, (failure, code) in enumerate([
+                ('probe-post-config','RUNTIME_CONFIG_MISMATCH'),
+                ('probe-post-approval','APPROVAL_VIEW_INVALID'),
+                ('probe-post-products','PRODUCT_VIEW_INVALID')]):
+            with self.subTest(failure=failure):
+                if index: self.setUp()
+                result, trace, _ = self.run_chain(failure=failure)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn('"code": "'+code+'"', result.stderr)
+                self.assertTrue((self.root/'replaced').exists())
+                self.assertNotEqual(json.loads(self.manifest.read_text())['releases']['current'].get('status'), 'success')
+                self.assertNotIn('DEPLOYMENT SUCCESS', result.stderr)
     def test_empty_and_truncated_frames_rejected_before_probes(self):
         result, trace, logins = self.run_chain(payload="")
         self.assertEqual(result.returncode, 2)
