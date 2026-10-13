@@ -3,10 +3,12 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"gorm.io/gorm"
 )
@@ -136,11 +138,20 @@ func (e *ConsoleProbeExecutor) Run(ctx context.Context, id int) error {
 	// Transport cancellation must not discard accounting for an admitted call.
 	finishCtx, finishCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer finishCancel()
-	if errors.Is(err, ErrMonitorLeaseUnresolved) {
+	if errors.Is(err, ErrMonitorLeaseUnresolved) || errors.Is(err, ErrMonitorProbePanic) {
 		// Persist a visible, unresolved attempt and an unknown result, while
 		// retaining the active-concurrency reservation for reconciliation.
+		updates := map[string]any{"failure": true, "cleanup_state": "cleanup_pending", "cleanup_started_at": outcome.CleanupStartedAt}
+		var panicErr error
+		if errors.Is(err, ErrMonitorProbePanic) {
+			// A recovered panic is not proof that transport stopped. Preserve a
+			// durable safe reason and never log the recovered value or credentials.
+			updates["recovery_reason"] = "probe_panic"
+			panicErr = ErrMonitorProbePanic
+			logger.LogError(finishCtx, fmt.Sprintf("monitor probe panic: monitor_id=%d attempt_id=%d; cleanup unconfirmed", id, attempt.ID))
+		}
 		persistErr := e.DB.WithContext(finishCtx).Transaction(func(tx *gorm.DB) error {
-			result := tx.Model(&model.ConsoleMonitorAttempt{}).Where("id = ? AND finished_at = 0", attempt.ID).Updates(map[string]any{"failure": true, "cleanup_state": "cleanup_pending", "cleanup_started_at": outcome.CleanupStartedAt})
+			result := tx.Model(&model.ConsoleMonitorAttempt{}).Where("id = ? AND finished_at = 0", attempt.ID).Updates(updates)
 			if result.Error != nil {
 				return result.Error
 			}
@@ -149,7 +160,7 @@ func (e *ConsoleProbeExecutor) Run(ctx context.Context, id int) error {
 			}
 			return tx.Create(&model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: "unknown", ErrorCode: "probe_failed", LatencyMS: &latency, SourceKind: m.TargetKind}).Error
 		})
-		return errors.Join(ErrMonitorLeaseUnresolved, persistErr)
+		return errors.Join(ErrMonitorLeaseUnresolved, panicErr, persistErr)
 	}
 	return e.DB.WithContext(finishCtx).Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&model.ConsoleMonitorAttempt{}).Where("id = ? AND finished_at = 0", attempt.ID).Updates(map[string]any{"finished_at": now, "failure": outcome.Status != "normal" && outcome.Status != "degraded", "cleanup_state": "released", "cleanup_started_at": outcome.CleanupStartedAt})

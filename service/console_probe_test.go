@@ -379,10 +379,12 @@ func TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled(t *testin
 	require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "enabled", true))
 	require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 10, DailyCostMicros: 100, RetentionDays: 90}))
 	adapter := &monitorMockAdapter{probe: func(context.Context, model.ConsoleMonitor) (service.ConsoleProbeOutcome, error) {
-		return service.ConsoleProbeOutcome{}, service.ErrMonitorLeaseUnresolved
+		return service.ConsoleProbeOutcome{}, errors.Join(service.ErrMonitorLeaseUnresolved, errors.New("fixture-cleanup-secret"))
 	}}
 	e := service.ConsoleProbeExecutor{DB: db, Adapters: map[string]service.ConsoleProbeAdapter{"channel": adapter}}
-	require.ErrorIs(t, e.Run(ctx, m.ID), service.ErrMonitorLeaseUnresolved)
+	err := e.Run(ctx, m.ID)
+	require.ErrorIs(t, err, service.ErrMonitorLeaseUnresolved)
+	assert.NotContains(t, err.Error(), "fixture-cleanup-secret")
 	var attempt model.ConsoleMonitorAttempt
 	require.NoError(t, db.Where("monitor_id = ?", m.ID).First(&attempt).Error)
 	assert.Zero(t, attempt.FinishedAt)
@@ -390,6 +392,69 @@ func TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled(t *testin
 	var active int64
 	require.NoError(t, db.Model(&model.ConsoleMonitorAttempt{}).Where("finished_at = 0").Count(&active).Error)
 	assert.EqualValues(t, 1, active)
+}
+
+func TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+	}{
+		{"stop unconfirmed", nil},
+		{"confirmation failed", errors.New("fixture reconciliation failure")},
+		{"confirmation canceled", context.Canceled},
+		{"confirmation timed out", context.DeadlineExceeded},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			db, m := consoleMonitorFixture(t)
+			ctx := context.Background()
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "enabled", true))
+			require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 10, DailyCostMicros: 100, RetentionDays: 90}))
+			adapter := &monitorMockAdapter{probe: func(context.Context, model.ConsoleMonitor) (service.ConsoleProbeOutcome, error) {
+				panic("fixture-panic-secret")
+			}}
+			e := service.ConsoleProbeExecutor{DB: db, Adapters: map[string]service.ConsoleProbeAdapter{"channel": adapter}}
+			err := e.Run(ctx, m.ID)
+			require.ErrorIs(t, err, service.ErrMonitorLeaseUnresolved)
+			require.ErrorIs(t, err, service.ErrMonitorProbePanic)
+			var attempt model.ConsoleMonitorAttempt
+			require.NoError(t, db.Where("monitor_id = ?", m.ID).First(&attempt).Error)
+			assert.Zero(t, attempt.FinishedAt)
+			assert.Equal(t, "cleanup_pending", attempt.CleanupState)
+			assert.True(t, attempt.Failure)
+			assert.Equal(t, "probe_panic", attempt.RecoveryReason)
+			var probe model.ConsoleProbe
+			require.NoError(t, db.Where("monitor_id = ?", m.ID).First(&probe).Error)
+			assert.Equal(t, "unknown", probe.Status)
+			assert.Equal(t, "probe_failed", probe.ErrorCode)
+			encoded, marshalErr := common.Marshal([]any{attempt, probe})
+			require.NoError(t, marshalErr)
+			assert.NotContains(t, string(encoded), "fixture-panic-secret")
+
+			second := m
+			second.ID, second.Model = 0, "model-b"
+			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &second))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, second.ID, "enabled", true))
+			require.ErrorIs(t, e.Run(ctx, second.ID), model.ErrMonitorBudget)
+			assert.Equal(t, 1, adapter.calls, "another monitor cannot start a probe while the panic holds capacity")
+
+			reconciler := &monitorReconcileAdapter{err: tc.err}
+			e.Adapters["channel"] = reconciler
+			require.ErrorIs(t, e.ReconcileConsoleMonitorAttempt(ctx, attempt.ID), service.ErrMonitorLeaseUnresolved)
+			require.NoError(t, db.First(&attempt, attempt.ID).Error)
+			assert.Zero(t, attempt.FinishedAt)
+			assert.Equal(t, "cleanup_pending", attempt.CleanupState)
+			require.ErrorIs(t, e.Run(ctx, second.ID), model.ErrMonitorBudget)
+
+			reconciler.confirmed, reconciler.err = true, nil
+			require.NoError(t, e.ReconcileConsoleMonitorAttempt(ctx, attempt.ID))
+			require.NoError(t, db.First(&attempt, attempt.ID).Error)
+			assert.NotZero(t, attempt.FinishedAt)
+			assert.Equal(t, "reconciled", attempt.CleanupState)
+			assert.Equal(t, "probe_panic", attempt.RecoveryReason)
+			e.Adapters["channel"] = &monitorMockAdapter{}
+			require.NoError(t, e.Run(ctx, second.ID))
+		})
+	}
 }
 
 func TestConsoleMonitorReconciliationIsSingleClaimAndRecoveryKeepsLease(t *testing.T) {
