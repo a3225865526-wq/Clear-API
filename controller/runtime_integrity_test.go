@@ -44,6 +44,17 @@ func runtimeFixtureIdentity() runtimeFixtureIdentityProvider {
 	}}
 }
 
+type runtimeSequenceIdentityProvider struct {
+	identities []model.RuntimeIdentity
+	index     int
+}
+
+func (p *runtimeSequenceIdentityProvider) RuntimeIdentity(context.Context) (model.RuntimeIdentity, error) {
+	identity := p.identities[p.index]
+	p.index++
+	return identity, nil
+}
+
 // All server fixtures are fixed, isolated test containers with fixture-only
 // credentials. No caller-supplied DSN can select an external database.
 func runtimeProbeFixture(t *testing.T, emptyCatalog ...bool) (*gin.Engine, string, *gorm.DB) {
@@ -462,4 +473,17 @@ func TestRuntimeIntegrityCollectionFence(t *testing.T) {
 			assert.ErrorIs(t, err, test.expected)
 		})
 	}
+}
+
+func TestRuntimeIntegrityCollectionRejectsIdentityDrift(t *testing.T) {
+	_, _, _ = runtimeProbeFixture(t)
+	first := runtimeFixtureIdentity().identity
+	second := first
+	second.ContainerID = strings.Repeat("e", 64)
+	provider := &runtimeSequenceIdentityProvider{identities: []model.RuntimeIdentity{first, second}}
+
+	_, err := service.CollectRuntimeIntegrityReportWithProvider(context.Background(), func() ([]byte, error) {
+		return []byte("[]"), nil
+	}, provider)
+	require.ErrorIs(t, err, model.ErrProbeUnavailable)
 }
