@@ -3,17 +3,28 @@ package router_test
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay"
+	relaychannel "github.com/QuantumNous/new-api/relay/channel"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service/accountpool"
 	"github.com/gin-gonic/gin"
@@ -26,6 +37,137 @@ import (
 )
 
 const poolRawIdentity = "secret-identity@example-upstream.com"
+
+type pg03WireAdaptor struct {
+	relaychannel.Adaptor
+	url string
+}
+
+func (a pg03WireAdaptor) GetRequestURL(*relaycommon.RelayInfo) (string, error) { return a.url, nil }
+func (a pg03WireAdaptor) SetupRequestHeader(c *gin.Context, header *http.Header, _ *relaycommon.RelayInfo) error {
+	*header = c.Request.Header.Clone()
+	return nil
+}
+
+func TestPG03PolicySnapshotWiring(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, setup.db.AutoMigrate(&model.Channel{}))
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	t.Setenv("CLEARAPI_PG03_POLICY_KEY", "synthetic-pg03-policy-key-012345678901234567890123456789")
+	t.Setenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY", "synthetic-pg03-proof-key-for-unit-tests-only")
+	endpoint := "http://synthetic.invalid"
+	channel := model.Channel{Type: 1, Name: "pg03", BaseURL: &endpoint, OtherSettings: `{"upstream_pool":"codex-pool","pool_routing_enabled":true}`}
+	require.NoError(t, setup.db.Create(&channel).Error)
+	input := accountpool.FallbackPolicyInput{PoolId: "codex-pool", ModelName: "synthetic-native", MaxFallbackCount: 3, Enabled: true}
+	for id := 1; id <= 4; id++ {
+		ref := fmt.Sprintf("pg03-%c", 'A'+id-1)
+		require.NoError(t, setup.db.Create(&model.UpstreamPoolAccount{Id: id, Platform: "codex", ExecutorId: accountpool.ExecutorCliproxyAPI, CredentialRef: ref}).Error)
+		input.Members = append(input.Members, accountpool.FallbackMemberInput{AccountId: id, Priority: 110 - 10*id, Enabled: true})
+	}
+	path := "/api/owner/pool/fallback-policy"
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	body := `{"model":"synthetic-native","stream":true}`
+	newContext := func() *gin.Context {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+		c.Request.Header.Set(accountpool.PG03PolicyHeader, "client-forged")
+		common.SetContextKey(c, constant.ContextKeyChannelId, channel.Id)
+		common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+		common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, endpoint)
+		common.SetContextKey(c, constant.ContextKeyOriginalModel, input.ModelName)
+		return c
+	}
+	prepare := func(c *gin.Context) {
+		stream := true
+		request := &dto.OpenAIResponsesRequest{Model: input.ModelName, Stream: &stream, Input: []byte(`"synthetic"`)}
+		info := relaycommon.GenRelayInfoResponses(c, request)
+		_, _, closer, apiErr := relay.PrepareResponsesRequest(c, info, request)
+		require.Nil(t, apiErr)
+		if closer != nil {
+			require.NoError(t, closer.Close())
+		}
+	}
+	sign := func(c *gin.Context, name string) []string {
+		var req *http.Request
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			req = r.Clone(r.Context())
+			data, err := io.ReadAll(r.Body)
+			if err != nil || string(data) != body {
+				t.Errorf("outbound body=%s err=%v", data, err)
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, "data: synthetic\n\n")
+		}))
+		defer server.Close()
+		info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{HeadersOverride: map[string]any{accountpool.PG03SignatureHeader: "override-forged", accountpool.PG03PolicyHeader: "override-forged"}}}
+		response, err := relaychannel.DoApiRequest(pg03WireAdaptor{url: server.URL + "/v1/responses"}, c, info, strings.NewReader(body))
+		require.NoError(t, err)
+		require.NoError(t, response.Body.Close())
+		require.NotNil(t, req)
+		payload, err := base64.RawURLEncoding.DecodeString(req.Header.Get(accountpool.PG03PolicyHeader))
+		require.NoError(t, err)
+		var snapshot struct {
+			AccountOrder []string `json:"account_order"`
+			RequestID    string   `json:"request_id"`
+			BodyDigest   string   `json:"body_digest"`
+		}
+		require.NoError(t, common.Unmarshal(payload, &snapshot))
+		assert.Equal(t, snapshot.RequestID, req.Header.Get(accountpool.PG03RequestHeader))
+		assert.Equal(t, snapshot.RequestID, req.Header.Get("X-ClearAPI-PG02-Request"))
+		digest := sha256.Sum256([]byte(body))
+		assert.Equal(t, hex.EncodeToString(digest[:]), snapshot.BodyDigest)
+		mac := hmac.New(sha256.New, []byte(os.Getenv("CLEARAPI_PG03_POLICY_KEY")))
+		mac.Write([]byte("clearapi-pg03-policy-v1\n"))
+		mac.Write(payload)
+		assert.Equal(t, hex.EncodeToString(mac.Sum(nil)), req.Header.Get(accountpool.PG03SignatureHeader))
+		if directory := os.Getenv("PG03_WIRE_EVIDENCE_DIR"); directory != "" {
+			wire, err := common.Marshal(struct {
+				Headers http.Header `json:"headers"`
+				Body    string      `json:"body"`
+			}{req.Header, body})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(directory, name+".json"), wire, 0600))
+		}
+		return snapshot.AccountOrder
+	}
+	old := newContext()
+	prepare(old)
+	assert.Equal(t, []string{"pg03-A", "pg03-B", "pg03-C", "pg03-D"}, sign(old, "gateway-ABCD"))
+	for i := range input.Members {
+		input.Members[i].Priority = 70 + 10*i
+	}
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	prepare(old)
+	assert.Equal(t, []string{"pg03-A", "pg03-B", "pg03-C", "pg03-D"}, sign(old, "gateway-old-ABCD"))
+	fresh := newContext()
+	prepare(fresh)
+	assert.Equal(t, []string{"pg03-D", "pg03-C", "pg03-B", "pg03-A"}, sign(fresh, "gateway-DCBA"))
+	changed, err := http.NewRequest(http.MethodPost, endpoint+"/v1/responses", strings.NewReader(body+" "))
+	require.NoError(t, err)
+	require.Error(t, accountpool.ApplyPG03Policy(old, changed))
+	for _, ref := range []string{"", "pg03-A"} {
+		require.NoError(t, setup.db.Model(&model.UpstreamPoolAccount{}).Where("id = ?", 2).Update("credential_ref", ref).Error)
+		require.Error(t, accountpool.FreezePG03Policy(newContext(), channel.Id, input.ModelName))
+	}
+	require.NoError(t, setup.db.Model(&model.UpstreamPoolAccount{}).Where("id = ?", 2).Update("credential_ref", "pg03-B").Error)
+	// Absence is a frozen decision too: enabling a policy cannot affect an old request.
+	input.Enabled = false
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	absent := newContext()
+	require.NoError(t, accountpool.FreezePG03Policy(absent, channel.Id, input.ModelName))
+	input.Enabled = true
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	require.NoError(t, accountpool.FreezePG03Policy(absent, channel.Id, input.ModelName))
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/responses", strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header = absent.Request.Header.Clone()
+	require.NoError(t, accountpool.ApplyPG03Policy(absent, req))
+	assert.Empty(t, req.Header.Get(accountpool.PG03PolicyHeader))
+	data, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	assert.Equal(t, body, string(data))
+}
 
 // mockPoolExecutor implements accountpool.ExecutorClient with configurable
 // outcomes; counters let tests assert the executor really was consulted.
