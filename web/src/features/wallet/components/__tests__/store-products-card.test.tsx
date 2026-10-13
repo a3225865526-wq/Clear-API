@@ -1,3 +1,5 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -17,11 +19,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 
-import { StoreProductsCard } from '../store-products-card'
 import type { StoreProductDto } from '../../types'
+import { StoreProductsCard } from '../store-products-card'
 
 const PRODUCTS: StoreProductDto[] = [
   {
@@ -35,18 +35,45 @@ const PRODUCTS: StoreProductDto[] = [
 ]
 
 describe('StoreProductsCard', () => {
+  test('uses the server admission route and displays the exact approved base credit', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    render(
+      <StoreProductsCard
+        enabled
+        products={[
+          {
+            ...PRODUCTS[0],
+            id: 'one',
+            base_credit: '1.000002',
+            purchase_path: '/api/clearapi/purchase/product/one?revision=2',
+          },
+        ]}
+      />
+    )
+    expect(screen.getByText(/1.000002/)).toBeVisible()
+    await userEvent.click(screen.getByRole('button'))
+    expect(open).toHaveBeenCalledWith(
+      '/api/clearapi/purchase/product/one?revision=2',
+      '_blank',
+      'noopener,noreferrer'
+    )
+  })
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
   test('renders nothing while the feature flag is off', () => {
-    const { container } = render(<StoreProductsCard enabled={false} products={PRODUCTS} />)
+    const { container } = render(
+      <StoreProductsCard enabled={false} products={PRODUCTS} />
+    )
     expect(container).toBeEmptyDOMElement()
   })
 
   test('shows the empty hint when no products are configured', () => {
     render(<StoreProductsCard enabled products={[]} />)
-    expect(screen.getByText('No store products configured yet')).toBeInTheDocument()
+    expect(
+      screen.getByText('No store products configured yet')
+    ).toBeInTheDocument()
   })
 
   test('renders product face values without parsing the name', () => {

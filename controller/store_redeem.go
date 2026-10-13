@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -50,17 +51,28 @@ func RedeemStoreCode(c *gin.Context) {
 }
 
 // getStoreProductsForUser 下发启用中的商城档位；开关关闭时返回空列表。
-func getStoreProductsForUser() []map[string]any {
+func getStoreProductsForUser() ([]map[string]any, error) {
 	products := []map[string]any{}
 	if !operation_setting.StoreRechargeEnabled {
-		return products
+		return products, nil
 	}
-	list, err := model.GetEnabledStoreProducts()
+	effective, err := model.GetEffectiveCreditProducts()
 	if err != nil {
-		common.SysError("failed to load store products: " + err.Error())
-		return products
+		return nil, err
 	}
-	for _, product := range list {
+	for _, product := range effective.LegacyProducts {
+		if effective.Unified || !product.Enabled {
+			continue
+		}
+		withdrawn := false
+		for _, p := range effective.ApprovalProducts {
+			if p.LegacyStoreID == product.Id && p.LegacyWithdrawn {
+				withdrawn = true
+			}
+		}
+		if withdrawn {
+			continue
+		}
 		products = append(products, map[string]any{
 			"id":               product.Id,
 			"name":             product.Name,
@@ -68,9 +80,19 @@ func getStoreProductsForUser() []map[string]any {
 			"store_url":        product.StoreUrl,
 			"description":      product.Description,
 			"sort":             product.Sort,
+			"purchase_path":    fmt.Sprintf("/api/clearapi/purchase/legacy/%d", product.Id),
 		})
 	}
-	return products
+	for _, p := range effective.Products {
+		if !effective.Unified && p.LegacyStoreID != 0 && !p.LegacyWithdrawn {
+			continue
+		}
+		products = append(products, map[string]any{"id": p.ID, "name": p.Name,
+			"face_value_cents": p.PriceCents, "credit_cents": p.CreditCents, "base_credit": p.BaseCredit,
+			"store_url": p.PurchaseURL, "description": p.Description, "sort": p.Sort,
+			"purchase_path": fmt.Sprintf("/api/clearapi/purchase/product/%s?revision=%d", p.ID, p.Revision)})
+	}
+	return products, nil
 }
 
 // getUserVipInfo 返回用户当前等级与累计充值；next_level 为 nil 表示已最高。

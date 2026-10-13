@@ -25,6 +25,7 @@ export type VerificationMethod =
   | 'oauth'
   | 'session'
 export type SecurityProofScope =
+  | 'store.product.operation'
   | 'channel.key.read'
   | 'passkey.register'
   | 'passkey.delete'
@@ -40,6 +41,17 @@ export type SecurityProofScope =
   | 'account.delete'
 
 export type VerificationOperation =
+  | {
+      scope: 'store.product.operation'
+      context: {
+        product_id: string
+        revision: number
+        version: number
+        action: string
+        digest: string
+        legacy_store_id: number
+      }
+    }
   | { scope: 'channel.key.read'; context: { channel_id: number } }
   | {
       scope: 'account.binding.bind'
@@ -49,7 +61,10 @@ export type VerificationOperation =
   | {
       scope: Exclude<
         SecurityProofScope,
-        'channel.key.read' | 'account.binding.bind' | 'account.binding.unbind'
+        | 'channel.key.read'
+        | 'account.binding.bind'
+        | 'account.binding.unbind'
+        | 'store.product.operation'
       >
       context?: Record<string, never>
     }

@@ -78,10 +78,11 @@ it('shows the official product and safe external link with no payment or redempt
   expect(buy).toHaveAttribute('href', 'https://catfk.com/shop/YPMYXR7N')
   expect(buy).toHaveAttribute('target', '_blank')
   expect(buy).toHaveAttribute('rel', 'noopener noreferrer')
-  expect(screen.getAllByText(/Cannot be withdrawn as cash/)).toHaveLength(8)
-  expect(screen.getAllByText(/does not automatically credit/)).toHaveLength(8)
+  expect(screen.queryByRole('article')).not.toBeInTheDocument()
   expect(screen.queryByText(/Quota/)).not.toBeInTheDocument()
-  expect(screen.getAllByRole('button', { name: 'Coming soon' })).toHaveLength(8)
+  expect(
+    screen.queryByRole('button', { name: 'Coming soon' })
+  ).not.toBeInTheDocument()
   expect(post).not.toHaveBeenCalled()
 })
 
@@ -105,10 +106,8 @@ it('fails closed on invalid configured product links', async () => {
       purchase_url: 'https://evil.example/item/qmcse2',
     },
   ])
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Invalid store product link'
-  )
-  expect(screen.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
+  await screen.findByRole('heading', { name: 'Buy credits' })
+  expect(screen.queryByRole('article')).not.toBeInTheDocument()
   expect(
     screen.queryByRole('link', { name: 'Buy API credits' })
   ).not.toBeInTheDocument()
@@ -130,7 +129,14 @@ it.each([
 it('keeps a single column on mobile and switches the purchase content to Chinese', async () => {
   i18next.addResourceBundle('en', 'translation', en.translation, true, true)
   i18next.addResourceBundle('zhCN', 'translation', zh.translation, true, true)
-  renderCatalog()
+  renderCatalog([
+    {
+      ...creditProducts[0],
+      published: true,
+      delivery_verified: true,
+      purchase_url: legacyPurchaseUrl,
+    },
+  ])
   const product = (await screen.findAllByRole('article'))[0]
   expect(product.parentElement).toHaveClass('grid-cols-1', 'sm:grid-cols-2')
   await act(async () => {
@@ -169,7 +175,7 @@ it('only enables verified published products with their own purchase links', asy
     'https://catfk.com/item/qmcse2',
     'https://catfk.com/item/second',
   ])
-  expect(screen.getByRole('button', { name: 'Coming soon' })).toBeDisabled()
+  expect(screen.queryByText(creditProducts[2].name)).not.toBeInTheDocument()
   expect(
     screen.getByText(/Confirm the delivered API credit amount/)
   ).toBeVisible()

@@ -25,6 +25,7 @@ import { ErrorState } from '@/components/error-state'
 import { PublicLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { toIntlLocale } from '@/i18n/languages'
+import { formatLocalCurrencyAmount } from '@/lib/currency'
 import { formatNumber } from '@/lib/format'
 
 import { getCatalog } from './api'
@@ -86,7 +87,9 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
       <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
         {(props.products ?? creditProducts).map((product) => {
           const url = trustedPurchaseUrl(product.purchase_url)
-          const canBuy = product.published && product.delivery_verified && url
+          if (!product.published || !product.delivery_verified || !url) {
+            return null
+          }
           return (
             <article
               key={product.id}
@@ -95,8 +98,12 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
               <h2 className='text-xl font-semibold'>{product.name}</h2>
               <p>
                 ¥{formatNumber(product.price_cents / 100, locale)} · $
-                {formatNumber(product.credit_cents / 100, locale)}{' '}
-                {t('platform API usage credit')}
+                {formatLocalCurrencyAmount(
+                  Number(product.base_credit ?? product.credit_cents / 100),
+                  { showSymbol: false, digitsLarge: 6, digitsSmall: 6, locale }
+                )}{' '}
+                {t('platform API usage credit')} ·{' '}
+                {t('Base credit; conditional bonuses are separate')}
               </p>
               <p className='text-muted-foreground text-sm'>
                 {t(product.description)}
@@ -106,26 +113,19 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
                   'Price and availability are shown on Catfk. Payment does not automatically credit your wallet.'
                 )}
               </p>
-              {canBuy ? (
-                <Button
-                  role='link'
-                  className='min-h-11 w-full'
-                  render={
-                    <a href={url} target='_blank' rel='noopener noreferrer' />
-                  }
-                >
-                  {t('Buy API credits')}
-                </Button>
-              ) : (
-                <>
-                  {product.purchase_url && !url ? (
-                    <p role='alert'>{t('Invalid store product link')}</p>
-                  ) : null}
-                  <Button disabled className='min-h-11 w-full'>
-                    {t('Coming soon')}
-                  </Button>
-                </>
-              )}
+              <Button
+                role='link'
+                className='min-h-11 w-full'
+                render={
+                  <a
+                    href={product.purchase_path ?? url}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  />
+                }
+              >
+                {t('Buy API credits')}
+              </Button>
             </article>
           )
         })}
