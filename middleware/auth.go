@@ -115,6 +115,40 @@ func RootAuth() func(c *gin.Context) {
 	}
 }
 
+// RuntimeIntegrityAuth accepts only a live root dashboard session. Rejecting
+// opaque credentials before session validation avoids PAT usage/audit writes on this
+// strictly read-only diagnostic route. JWT/session validation stays shared.
+func RuntimeIntegrityAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		raw, present := authorizationToken(c.GetHeader("Authorization"))
+		identity, internal, err := service.ParseDashboardAccessToken(raw)
+		if !present || !internal || err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"success": false, "code": "AUTH_REQUIRED"})
+			return
+		}
+		// Existing session validation may populate Redis on cache misses.
+		// Production already disallows Redis; do not introduce cache writes
+		// through diagnostics in other configurations either.
+		if common.RedisEnabled {
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"success": false, "code": "PROBE_UNAVAILABLE"})
+			return
+		}
+		// Keep the shared live-session validation, but expose no account,
+		// revocation, expiry or database-error detail on this diagnostic route.
+		_, user, err := service.ValidateLoginSession(identity)
+		if err != nil || user == nil || user.Status != common.UserStatusEnabled || !validUserInfo(user.Username, user.Role) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"success": false, "code": "AUTH_REQUIRED"})
+			return
+		}
+		if user.Role < common.RoleRootUser {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"success": false, "code": "AUTH_REQUIRED"})
+			return
+		}
+		setDashboardAuthContext(c, user, identity, false)
+		c.Next()
+	}
+}
+
 // GetAuthIdentity returns a dashboard session identity. PAT-authenticated
 // requests intentionally have no SessionID and cannot manage browser sessions.
 func GetAuthIdentity(c *gin.Context) (service.AuthIdentity, bool) {

@@ -559,25 +559,32 @@ func effectiveCreditProducts(tx *gorm.DB, c CreditCatalog) ([]CreditProduct, err
 func GetEffectiveCreditProducts() (CreditCatalog, error) {
 	var result CreditCatalog
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		_, c, err := lockedCreditCatalog(tx)
-		if err != nil {
-			return err
-		}
-		if err := c.Validate(); err != nil {
-			return err
-		}
-		if err := validateLegacyCreditSnapshot(tx, c); err != nil {
-			return err
-		}
-		products, err := effectiveCreditProducts(tx, c)
-		if err != nil {
-			return err
-		}
-		result = c
-		result.Products = products
-		return nil
+		var err error
+		result, err = getEffectiveCreditProducts(tx)
+		return err
 	})
 	return result, err
+}
+
+// getEffectiveCreditProducts shares the existing approval validation with
+// diagnostics that already own a transaction. It performs no persistent writes.
+func getEffectiveCreditProducts(tx *gorm.DB) (CreditCatalog, error) {
+	_, c, err := lockedCreditCatalog(tx)
+	if err != nil {
+		return CreditCatalog{}, err
+	}
+	if err := c.Validate(); err != nil {
+		return CreditCatalog{}, err
+	}
+	if err := validateLegacyCreditSnapshot(tx, c); err != nil {
+		return CreditCatalog{}, err
+	}
+	products, err := effectiveCreditProducts(tx, c)
+	if err != nil {
+		return CreditCatalog{}, err
+	}
+	c.Products = products
+	return c, nil
 }
 
 func validateLegacyCreditSnapshot(tx *gorm.DB, c CreditCatalog) error {

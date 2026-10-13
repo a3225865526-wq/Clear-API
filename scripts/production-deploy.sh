@@ -38,6 +38,7 @@ umask 077
 exec 3<&0
 exec </dev/null
 unset GHCR_PULL_TOKEN
+unset CLEARAPI_STORE_POLICY DEPLOY_EXPECT_REFERRAL_ENABLED DEPLOY_RUNTIME_PROBE_TOKEN_FILE
 
 # Operator configuration is authoritative over inherited DEPLOY_* variables.
 # Derive aliases only after sourcing; absent keys retain the caller/default value.
@@ -123,6 +124,14 @@ EXPECT_EMPTY_TABLES="${DEPLOY_EXPECT_EMPTY_TABLES:-store_products,top_ups,offlin
 POOL_OPTION_PATTERN="${DEPLOY_POOL_OPTION_PATTERN:-%pool%}"
 POLICY_MODE_KEY="${DEPLOY_POLICY_MODE_KEY:-billing_reserve_policy.mode}"
 
+# Stage 2B-2 consumes only Runtime Integrity Report v1. The Stage 2B-1
+# diagnostic response is deliberately incompatible; never synthesize missing
+# version, product counts or identity evidence to make it pass.
+STORE_POLICY="${CLEARAPI_STORE_POLICY:-disabled}"
+EXPECT_REFERRAL_ENABLED="${DEPLOY_EXPECT_REFERRAL_ENABLED:-false}"
+RUNTIME_PROBE_TOKEN_FILE="${DEPLOY_RUNTIME_PROBE_TOKEN_FILE:-/opt/clearapi/secrets/runtime-probe-session}"
+RUNTIME_BASELINE=""
+
 AUDIT_LOG="${DEPLOY_AUDIT_LOG:-/opt/clearapi/logs/deployments.log}"
 MANIFEST="${DEPLOY_MANIFEST:-${APP_DIR}/release-manifest.json}"
 OVERRIDE_FILE="${DEPLOY_OVERRIDE_FILE:-${APP_DIR}/compose-candidate.yaml}"
@@ -143,8 +152,9 @@ while [ $# -gt 0 ]; do
     # policy is not acceptable. The flag is explicit, auditable and changes
     # nothing about which principal may run this wrapper.
     --ghcr-token-stdin) GHCR_TOKEN_STDIN="1"; shift 1 ;;
-    # Identity drift probe: running image == compose effective image ==
-    # manifest current. Appends an audit record; safe to run from a systemd timer
+    # Identity plus Runtime Report v1 verification. Appends an audit record;
+    # requires a separately supplied valid root session credential, including
+    # when invoked from a systemd timer
     # (monitoring minimal set) or before any manual container operation.
     --verify) VERIFY_ONLY="1"; shift 1 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -282,6 +292,172 @@ psql_q() { # read-only single query against the production database
   compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1" \
     || die "read-only database probe failed"
 }
+verify_runtime_gate() { # phase expected-image-id; failure never falls back to SQL
+  local phase="$1" expected_image="$2" cid identity binary receipt
+  cid="$(service_id)" || return 1
+  [ -n "$cid" ] || { log 'Runtime Gate BLOCKED: PROBE_UNAVAILABLE'; return 1; }
+  identity="$(sudo docker inspect --format '{{.Id}} {{.State.StartedAt}} {{.Image}}' "$cid")" \
+    || { log 'Runtime Gate BLOCKED: PROBE_UNAVAILABLE'; return 1; }
+  # A separate read-only, networkless image invocation supplies the expected
+  # binary digest. Report build_identity is NOT an OCI image digest or revision.
+  binary="$(sudo docker run --rm --network none --read-only --entrypoint sha256sum "$expected_image" /new-api)" \
+    || { log 'Runtime Gate BLOCKED: PROBE_UNAVAILABLE'; return 1; }
+  # Bind the fixed local endpoint to the inspected service before sending a
+  # credential. No configurable remote URL, proxies or redirects are allowed.
+  [ "$(sudo docker port "$cid" 3000/tcp)" = '127.0.0.1:3000' ] \
+    || { log 'Runtime Gate BLOCKED: PROBE_UNAVAILABLE'; return 1; }
+  if ! receipt="$(python3 -I - "$RUNTIME_PROBE_TOKEN_FILE" "$identity" "$expected_image" "$binary" \
+      "$STORE_POLICY" "$EXPECT_REFERRAL_ENABLED" "$RUNTIME_BASELINE" <<'PY'
+import datetime, hashlib, json, os, pathlib, re, stat, sys, urllib.error, urllib.request, uuid
+
+def blocked(code):
+    print(json.dumps({'status': 'BLOCKED', 'code': code}))
+    raise SystemExit(1)
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            blocked('PROBE_UNAVAILABLE')
+        result[key] = value
+    return result
+
+try:
+    token_path, identity, expected_image, binary, policy, referral, baseline = sys.argv[1:]
+    if policy != 'disabled' or referral not in ('true', 'false'):
+        blocked('RUNTIME_CONFIG_MISMATCH')
+    parts = identity.split()
+    if len(parts) != 3 or not re.fullmatch(r'[a-f0-9]{64}', parts[0]) or parts[2] != expected_image:
+        blocked('PROBE_UNAVAILABLE')
+    container_id, started_at, _ = parts
+    if not re.fullmatch(r'[a-f0-9]{64}  /new-api', binary):
+        blocked('PROBE_UNAVAILABLE')
+    expected_build = 'sha256:' + binary.split()[0]
+    path = pathlib.Path(token_path)
+    if not path.is_absolute():
+        blocked('PROBE_UNAVAILABLE')
+    for directory in path.parents:
+        s = os.lstat(directory)
+        if (not stat.S_ISDIR(s.st_mode) or s.st_uid != 0
+                or (s.st_mode & 0o022 and not s.st_mode & stat.S_ISVTX)):
+            blocked('PROBE_UNAVAILABLE')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as f:
+        s = os.fstat(f.fileno())
+        if (not stat.S_ISREG(s.st_mode) or s.st_uid != 0 or s.st_gid != 0
+                or stat.S_IMODE(s.st_mode) != 0o600 or s.st_nlink != 1):
+            blocked('PROBE_UNAVAILABLE')
+        token = f.read(16385).decode('ascii').strip()
+    if len(token) > 16384 or not re.fullmatch(r'[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+', token):
+        blocked('PROBE_UNAVAILABLE')
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *args, **kwargs):
+            return None
+
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    request = urllib.request.Request('http://127.0.0.1:3000/api/clearapi/runtime-integrity',
+        headers={'Authorization': 'Bearer ' + token, 'Cache-Control': 'no-store'})
+    requested_at = datetime.datetime.now(datetime.timezone.utc)
+    try:
+        response = opener.open(request, timeout=10)
+    except urllib.error.HTTPError as error:
+        response = error
+    with response:
+        status = response.status
+        payload = response.read(65537)
+    if len(payload) > 65536:
+        blocked('PROBE_UNAVAILABLE')
+    body = json.loads(payload, object_pairs_hook=unique_object)
+    if type(body) is not dict:
+        blocked('PROBE_UNAVAILABLE')
+    if body.get('success') is False:
+        code = body.get('code')
+        blocked(code if code in ('RUNTIME_CONFIG_MISMATCH', 'APPROVAL_VIEW_INVALID',
+            'PRODUCT_VIEW_INVALID', 'PROBE_UNAVAILABLE') else 'PROBE_UNAVAILABLE')
+    if status != 200 or body.get('success') is not True or type(body.get('data')) is not dict:
+        blocked('PROBE_UNAVAILABLE')
+    report = body['data']
+    fields = {
+        'schema_version': str, 'report_version': str, 'status': str, 'instance_id': str,
+        'container_id': str, 'started_at': str, 'build_identity': str,
+        'config_generation': str, 'config_digest': str,
+        'online_payment_enabled': bool, 'store_enabled': bool, 'billing_mode': str,
+        'referral_enabled': bool, 'pool_enabled': bool, 'approval_schema': int,
+        'catalog_version': int, 'approval_view_digest': str, 'product_view_digest': str,
+        'effective_product_count': int, 'generated_at': str,
+    }
+    if set(report) != set(fields) or any(type(report.get(key)) is not kind for key, kind in fields.items()):
+        blocked('PROBE_UNAVAILABLE')
+    if report['schema_version'] != '1' or report['report_version'] != '1' or report['status'] != 'PASS':
+        blocked('PROBE_UNAVAILABLE')
+    # Container lifecycle metadata is independently inspected, while the UUID
+    # identifies the current process. Neither request/env values nor UUID alone
+    # establish container identity. Old flat/nested contracts are not accepted.
+    instance = uuid.UUID(report['instance_id'])
+    if (instance.version != 4 or str(instance) != report['instance_id']
+            or report['container_id'] != container_id or report['started_at'] != started_at):
+        blocked('PROBE_UNAVAILABLE')
+    if report['build_identity'] != expected_build:
+        blocked('PROBE_UNAVAILABLE')
+    digest = r'sha256:[a-f0-9]{64}'
+    if not re.fullmatch(digest, report['config_generation']) or not re.fullmatch(digest, report['config_digest']):
+        blocked('RUNTIME_CONFIG_MISMATCH')
+    config = {key: report[key] for key in ('online_payment_enabled', 'store_enabled',
+        'billing_mode', 'referral_enabled', 'pool_enabled')}
+    expected_config = 'sha256:' + hashlib.sha256(json.dumps(config, separators=(',', ':')).encode()).hexdigest()
+    if report['config_digest'] != expected_config:
+        blocked('RUNTIME_CONFIG_MISMATCH')
+    if (report['online_payment_enabled'] or report['store_enabled'] or report['pool_enabled']
+            or report['billing_mode'] != 'enforce'
+            or report['referral_enabled'] != (referral == 'true')):
+        blocked('RUNTIME_CONFIG_MISMATCH')
+    if report['approval_schema'] != 1:
+        blocked('APPROVAL_VIEW_INVALID')
+    if (report['catalog_version'] <= 0 or report['effective_product_count'] != 0
+            or not re.fullmatch(digest, report['product_view_digest'])):
+        blocked('PRODUCT_VIEW_INVALID')
+    if not re.fullmatch(digest, report['approval_view_digest']):
+        blocked('APPROVAL_VIEW_INVALID')
+    timestamp = datetime.datetime.fromisoformat(report['generated_at'].replace('Z', '+00:00'))
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if timestamp.tzinfo is None or not (-2 <= (now-timestamp).total_seconds() <= 15):
+        blocked('PROBE_UNAVAILABLE')
+    if timestamp < requested_at - datetime.timedelta(seconds=2):
+        blocked('PROBE_UNAVAILABLE')
+    receipt = {key: report[key] for key in ('instance_id', 'container_id', 'started_at',
+        'config_generation', 'config_digest', 'catalog_version',
+        'approval_view_digest', 'product_view_digest', 'effective_product_count')}
+    if baseline:
+        previous = json.loads(baseline)
+        if (previous['container_id'] == receipt['container_id'] and
+                (previous['instance_id'] != receipt['instance_id'] or previous['started_at'] != receipt['started_at'])):
+            blocked('PROBE_UNAVAILABLE')
+        if previous['container_id'] != receipt['container_id'] and previous['instance_id'] == receipt['instance_id']:
+            blocked('PROBE_UNAVAILABLE')
+        if any(previous[key] != receipt[key] for key in ('config_generation', 'config_digest')):
+            blocked('RUNTIME_CONFIG_MISMATCH')
+        if previous['approval_view_digest'] != receipt['approval_view_digest']:
+            blocked('APPROVAL_VIEW_INVALID')
+        if any(previous[key] != receipt[key] for key in (
+                'catalog_version', 'product_view_digest', 'effective_product_count')):
+            blocked('PRODUCT_VIEW_INVALID')
+    print(json.dumps(receipt, sort_keys=True))
+except Exception:
+    # Never emit HTTP bodies, file contents, credentials or exception details.
+    blocked('PROBE_UNAVAILABLE')
+PY
+)"; then
+    [ -n "$receipt" ] || receipt='{"status":"BLOCKED","code":"PROBE_UNAVAILABLE"}'
+    log "Runtime Gate $receipt"
+    return 1
+  fi
+  # Reject a replacement/race while the HTTP report was being collected.
+  [ "$(sudo docker inspect --format '{{.Id}} {{.State.StartedAt}} {{.Image}}' "$(service_id)")" = "$identity" ] \
+    || { log 'Runtime Gate BLOCKED: PROBE_UNAVAILABLE'; return 1; }
+  if [ "$phase" = before ]; then RUNTIME_BASELINE="$receipt"; fi
+  log "Runtime Gate PASS (${phase})"
+}
 verify_launch_baseline() {
   local actual approved other status ch expected_email_verification
   if [ "$LAUNCH_BASELINE" = commercial ]; then
@@ -329,8 +505,6 @@ actual="$(psql_q "SELECT value FROM options WHERE key='EmailVerificationEnabled'
     status="$(psql_q "SELECT status FROM channels WHERE id=${ch};")"
     [ "$status" = 2 ] || die "launch baseline: channel ${ch} expected disabled"
   done
-  actual="$(psql_q "SELECT count(*) FROM options WHERE (key='DisableOnlinePayments' AND value='true') OR (key='StoreRechargeEnabled' AND value='false');")"
-  [ "$actual" = 2 ] || die "launch baseline: Payment/Store must stay OFF"
 }
 
 verify_stop_policy() {
@@ -418,6 +592,7 @@ with os.fdopen(fd, 'w') as f:
 os.replace(tmp, path)
 PY
     verify_running_identity || return 1
+    verify_runtime_gate after "$PREV_IMAGE_ID" || return 1
     audit "rollback" "rolled_back" "previous image ${PREV_IMAGE_ID} healthy again" || return 1
     log "rollback complete; deployment remains FAILED but production is healthy on the previous image"
   else
@@ -427,12 +602,17 @@ PY
   fi
 }
 
-# Identity-only --verify mode: run the check, append its audit record, and exit.
+# Verification mode: check identity and Runtime Report v1, audit, and exit.
 # Kept after helper definitions and before step 1 so it never touches the deploy lock, the
-# backup subsystem, or any container.
+# backup subsystem, or replace any container. The binary digest check uses a
+# temporary networkless, read-only container and does not start the application.
 if [ "$VERIFY_ONLY" = "1" ]; then
   if verify_running_identity; then
-    audit "verify" "ok" "running == compose effective == manifest current"
+    if ! verify_runtime_gate before "$PREV_IMAGE_ID"; then
+      audit "verify" "blocked" 'Runtime Integrity Gate BLOCKED'
+      exit 1
+    fi
+    audit "verify" "ok" "running == compose effective == manifest current; Runtime Gate PASS"
     exit 0
   fi
   audit "verify" "drift" "identity check failed; no changes were made"
@@ -494,6 +674,7 @@ verify_running_identity \
   || die "step 3: production identity drift (running image vs compose effective vs manifest current); refusing to deploy on an inconsistent baseline"
 verify_launch_baseline
 verify_stop_policy
+verify_runtime_gate before "$PREV_IMAGE_ID" || die 'Runtime Integrity Gate BLOCKED before deployment'
 
 # ===========================================================================
 # 4. encrypted pre-deploy backup (hard gate)
@@ -734,6 +915,7 @@ for pair in $EXPECT_ENV_KEYS; do
 done
 verify_launch_baseline
 verify_stop_policy
+verify_runtime_gate after "$CANDIDATE_IMAGE_ID" || die 'Runtime Integrity Gate BLOCKED after replacement'
 
 PORTS_3000="$(sudo docker port "$NEW_ID" 3000/tcp 2>/dev/null || true)"
 [ "$PORTS_3000" = "127.0.0.1:3000" ] || die "step 17: new-api must bind 127.0.0.1:3000 only (got: ${PORTS_3000:-<unpublished>})"
@@ -781,13 +963,16 @@ for tok in $(printf '%s' "$EXPECT_TOKEN_IDS" | tr ',' ' '); do
 done
 
 for tbl in $(printf '%s' "$EXPECT_EMPTY_TABLES" | tr ',' ' '); do
+  # Product emptiness is proven by the versioned runtime view, never by a
+  # raw table count or a self-approved static product fingerprint.
+  [ "$tbl" != store_products ] || continue
   cnt="$(psql_q "SELECT count(*) FROM ${tbl};")"
   [ "$cnt" = "0" ] || die "step 18: table ${tbl} row count=${cnt} expected 0"
 done
 
 POOL_ROWS="$(psql_q "SELECT count(*) FROM options WHERE key ILIKE '${POOL_OPTION_PATTERN}';")"
 [ "$POOL_ROWS" = "0" ] || die "step 18: ${POOL_ROWS} pool option row(s) present; Pool must stay OFF"
-log "step 18: billing invariants PASS (mode=enforce, needs_review set frozen, channels/user/token disabled, store tables empty, no pool rows)"
+log "step 18: billing invariants PASS (mode=enforce, needs_review set frozen, channels/user/token disabled, order tables empty, runtime product gate, no pool rows)"
 
 # ===========================================================================
 # 19. mark deployment success

@@ -13,6 +13,9 @@ import (
 )
 
 func SetApiRouter(router *gin.Engine) {
+	// Register before the PAT audit group: every probe path, including rejected
+	// credentials, must remain free of persistent writes.
+	router.GET("/api/clearapi/runtime-integrity", middleware.DisableCache(), middleware.RuntimeIntegrityAuth(), controller.GetRuntimeIntegrity)
 	apiRouter := router.Group("/api")
 	apiRouter.Use(middleware.RouteTag("api"))
 	apiRouter.Use(gzip.Gzip(gzip.DefaultCompression))
