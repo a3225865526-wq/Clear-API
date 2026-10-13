@@ -344,3 +344,74 @@ func TestProtectedTextBudget(t *testing.T) {
 		})
 	}
 }
+
+func TestProtectedResponsesTextBudget(t *testing.T) {
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	oldCount := constant.CountToken
+	constant.CountToken = true
+	t.Cleanup(func() { constant.CountToken = oldCount })
+	oldRatio, oldCompletion := ratio_setting.ModelRatio2JSONString(), ratio_setting.CompletionRatio2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatio))
+		require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(oldCompletion))
+	})
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"protected-responses-test":1}`))
+	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"protected-responses-test":2}`))
+	for _, tc := range []struct {
+		name, input, extra string
+		limit              uint
+		ok                 bool
+	}{
+		{name: "text", input: `"hello"`, limit: 100, ok: true},
+		{name: "instructions", input: `"hello"`, extra: `,"instructions":"be concise"`, limit: 100, ok: true},
+		{name: "text messages", input: `[{"role":"user","content":[{"type":"input_text","text":"hello"}]}]`, limit: 100, ok: true},
+		{name: "string messages", input: `[{"type":"message","role":"user","content":"hello"}]`, limit: 100, ok: true},
+		{name: "null text type", input: `[{"role":"user","content":[{"type":"input_text","text":"hello"},{"type":null,"text":"unknown"}]}]`, limit: 100},
+		{name: "tools", input: `"hello"`, extra: `,"tools":[{"type":"web_search"}]`, limit: 100},
+		{name: "tool call", input: `[{"type":"function_call","call_id":"call","name":"lookup","arguments":"{}"}]`, limit: 100},
+		{name: "image", input: `[{"role":"user","content":[{"type":"input_image","image_url":"synthetic"}]}]`, limit: 100},
+		{name: "file", input: `[{"role":"user","content":[{"type":"input_file","file_id":"synthetic"}]}]`, limit: 100},
+		{name: "item reference", input: `[{"type":"item_reference","id":"synthetic"}]`, limit: 100},
+		{name: "message reference", input: `[{"role":"user","content":"hello","id":"synthetic"}]`, limit: 100},
+		{name: "previous response", input: `"hello"`, extra: `,"previous_response_id":"synthetic"`, limit: 100},
+		{name: "conversation", input: `"hello"`, extra: `,"conversation":"synthetic"`, limit: 100},
+		{name: "prompt reference", input: `"hello"`, extra: `,"prompt":{"id":"synthetic"}`, limit: 100},
+		{name: "filtered optional field", input: `"hello"`, extra: `,"thinking_budget":1`, limit: 100},
+		{name: "instructions reference", input: `"hello"`, extra: `,"instructions":{"id":"synthetic"}`, limit: 100},
+		{name: "null instructions", input: `"hello"`, extra: `,"instructions":null`, limit: 100},
+		{name: "missing budget", input: `"hello"`},
+		{name: "over budget", input: `"hello"`, limit: 1 << 31},
+		{name: "wrapped budget", input: `"hello"`, limit: ^uint(0)},
+		{name: "empty input", input: `[]`, limit: 100},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(fmt.Sprintf(`{"model":"protected-responses-test","stream":true,"input":%s,"max_output_tokens":%d%s}`, tc.input, tc.limit, tc.extra))
+			var request dto.OpenAIResponsesRequest
+			require.NoError(t, common.Unmarshal(body, &request))
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			info := &relaycommon.RelayInfo{Request: &request, RelayFormat: types.RelayFormatOpenAIResponses, OriginModelName: request.Model, UserGroup: "default", UsingGroup: "default"}
+			price, err := helper.ModelPriceHelper(ctx, info, 10, request.GetTokenCountMeta())
+			if !tc.ok {
+				require.Error(t, err)
+				assert.False(t, info.ProtectedTextBudget)
+				return
+			}
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, price.QuotaToPreConsume, 210)
+			assert.True(t, info.ProtectedTextBudget)
+			require.NoError(t, helper.ValidateProtectedTextBody(info, body))
+			for _, outbound := range []string{
+				`{"model":"protected-responses-test","stream":true,"input":"changed","max_output_tokens":100}`,
+				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":101}`,
+				`{"model":"protected-responses-test","stream":true,"input":"hello","instructions":"changed","max_output_tokens":100}`,
+				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":100,"unknown_budget":1}`,
+			} {
+				require.Error(t, helper.ValidateProtectedTextBody(info, []byte(outbound)))
+			}
+			stream := false
+			request.Stream = &stream
+			_, err = helper.ModelPriceHelper(ctx, info, 10, request.GetTokenCountMeta())
+			require.Error(t, err, "non-streaming Responses admission remains closed")
+		})
+	}
+}

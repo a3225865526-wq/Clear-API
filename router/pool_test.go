@@ -19,12 +19,14 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relay"
 	relaychannel "github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	relaytypes "github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/accountpool"
@@ -52,16 +54,19 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 	t.Setenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY", "synthetic-pg03-proof-key-for-unit-tests-only")
 	oldCount, oldBatch, oldLog := constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled
 	constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled = true, false, false
+	oldTimeout, oldRetries := constant.StreamingTimeout, common.RetryTimes
+	constant.StreamingTimeout, common.RetryTimes = 10, 0
 	oldRatio, oldCompletion := ratio_setting.ModelRatio2JSONString(), ratio_setting.CompletionRatio2JSONString()
 	t.Cleanup(func() {
 		constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled = oldCount, oldBatch, oldLog
+		constant.StreamingTimeout, common.RetryTimes = oldTimeout, oldRetries
 		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatio))
 		require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(oldCompletion))
 	})
 	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"synthetic-native":1}`))
 	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"synthetic-native":1}`))
 	service.InitTokenEncoders()
-	for _, scenario := range []string{"all-reject", "success", "started", "unknown"} {
+	for _, scenario := range []string{"all-reject", "success", "started", "unknown", "tools", "multimodal", "over-budget", "insufficient-quota"} {
 		t.Run(scenario, func(t *testing.T) {
 			setup := newPoolTestSetup(t, true)
 			require.NoError(t, setup.db.AutoMigrate(&model.Token{}, &model.UserSubscription{}, &model.Channel{}, &model.Log{}, &model.BillingReviewMarker{}))
@@ -83,6 +88,16 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 			require.NoError(t, setup.db.Create(&token).Error)
 			stream, limit := true, uint(99)
 			request := &dto.OpenAIResponsesRequest{Model: "synthetic-native", Stream: &stream, MaxOutputTokens: &limit, Input: []byte(`"synthetic"`)}
+			switch scenario {
+			case "tools":
+				request.Tools = []byte(`[{"type":"web_search"}]`)
+			case "multimodal":
+				request.Input = []byte(`[{"role":"user","content":[{"type":"input_image","image_url":"synthetic"}]}]`)
+			case "over-budget":
+				limit = 1 << 31
+			case "insufficient-quota":
+				limit = 2000
+			}
 			body, err := common.Marshal(request)
 			require.NoError(t, err)
 			c, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -92,50 +107,43 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 			common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
 			common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, endpoint)
 			common.SetContextKey(c, constant.ContextKeyOriginalModel, request.Model)
-			common.SetContextKey(c, constant.ContextKeyChannelHeaderOverride, map[string]any{"X-RC-Scenario": scenario})
 			info := relaycommon.GenRelayInfoResponses(c, request)
 			info.UserId, info.TokenId, info.RequestId = user.Id, token.Id, "pg03-billing-"+scenario
 			info.UserQuota, info.UserSetting.QuotaWarningThreshold = 1000, 1
 			info.UsingGroup, info.UserGroup = "default", "default"
 			info.UserSetting.BillingPreference = "wallet_only"
-			info.SetEstimatePromptTokens(1)
-			// The fixture starts at an existing durable reservation; native
-			// Responses admission under protected billing is outside this fix.
-			info.ProtectedTextBudget = true
-			info.PriceData.ModelRatio, info.PriceData.CompletionRatio = 1, 1
-			info.PriceData.GroupRatioInfo.GroupRatio = 1
-			billing, apiErr := service.NewBillingSession(c, info, 100)
+			apiErr := relay.PrepareRequestBilling(c, info)
+			if scenario == "tools" || scenario == "multimodal" || scenario == "over-budget" || scenario == "insufficient-quota" {
+				require.NotNil(t, apiErr)
+				require.Nil(t, info.Billing)
+				var count int64
+				require.NoError(t, setup.db.Model(&model.BillingReservation{}).Where("request_id = ?", info.RequestId).Count(&count).Error)
+				assert.Zero(t, count)
+				var after model.User
+				require.NoError(t, setup.db.First(&after, user.Id).Error)
+				assert.Equal(t, 1000, after.Quota)
+				t.Logf("scenario=%s rejected before reservation and Executor dispatch", scenario)
+				return
+			}
 			require.Nil(t, apiErr)
-			info.Billing = billing
+			require.True(t, info.ProtectedTextBudget)
+			require.NotNil(t, info.Billing)
+			require.Contains(t, c.GetStringSlice(model.BillingExecutionContextKey), info.RequestId)
+			billing := info.Billing
 			var before model.BillingReservation
 			require.NoError(t, setup.db.Where("request_id = ?", info.RequestId).First(&before).Error)
-			require.Equal(t, 100, before.Reserved)
-			_, _, closer, prepareErr := relay.PrepareResponsesRequest(c, info, request)
-			require.Nil(t, prepareErr)
-			if closer != nil {
-				require.NoError(t, closer.Close())
-			}
-			transportInfo := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{HeadersOverride: map[string]any{"X-RC-Scenario": scenario}}}
-			upstream, err := relaychannel.DoApiRequest(pg03WireAdaptor{url: endpoint + "/v1/responses"}, c, transportInfo, bytes.NewReader(body))
+			require.Equal(t, info.PriceData.QuotaToPreConsume, before.Reserved)
+			require.Greater(t, before.Reserved, 0)
+			// Configure only the isolated provider mock. The actual request keeps
+			// /v1/responses and does not need channel/header overrides.
+			control, err := http.Post(endpoint+"/rc/scenario/"+scenario, "application/json", nil)
 			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, control.StatusCode)
+			require.NoError(t, control.Body.Close())
+			apiErr = relay.ResponsesHelper(c, info)
 			if scenario == "success" {
-				require.Equal(t, http.StatusOK, upstream.StatusCode)
-				data, err := io.ReadAll(upstream.Body)
-				require.NoError(t, err)
-				require.NoError(t, upstream.Body.Close())
-				for line := range strings.SplitSeq(string(data), "\n") {
-					if payload, ok := strings.CutPrefix(line, "data: "); ok && strings.Contains(payload, "response.completed") {
-						service.ObserveCodexMetering(c, info, []byte(payload), true)
-					}
-				}
-				usage := service.CodexUsageForSettlement(c, info)
-				require.NotNil(t, usage)
-				require.NotNil(t, usage.CodexMetering)
-				require.Equal(t, "exact", usage.CodexMetering.Status)
-				relay.ConsumeResponsesQuota(c, info, usage)
-				apiErr = nil
+				require.Nil(t, apiErr)
 			} else {
-				apiErr = service.RelayErrorHandler(c.Request.Context(), upstream, false)
 				require.NotNil(t, apiErr)
 			}
 			relay.RefundFailedRequestBilling(c, info, apiErr)
@@ -151,7 +159,7 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 			var afterToken model.Token
 			require.NoError(t, setup.db.First(&after, user.Id).Error)
 			require.NoError(t, setup.db.First(&afterToken, token.Id).Error)
-			charge, state := 100, "settled"
+			charge, state := before.Reserved, "settled"
 			if scenario == "all-reject" {
 				charge, state = 0, "refunded"
 			}
@@ -183,7 +191,52 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 			}
 			assert.Equal(t, order, evidence.Order)
 			assert.Equal(t, dispatch, evidence.Dispatch)
-			t.Logf("scenario=%s reservation=%d quota=1000->%d applied=%d state=%s dispatch=%d order=%v", scenario, len(rows), after.Quota, rows[0].Applied, rows[0].State, evidence.Dispatch, evidence.Order)
+			t.Logf("scenario=%s reservation=%d reserved=%d quota=1000->%d applied=%d state=%s dispatch=%d order=%v", scenario, len(rows), before.Reserved, after.Quota, rows[0].Applied, rows[0].State, evidence.Dispatch, evidence.Order)
+			if scenario == "success" || scenario == "all-reject" {
+				// Exercise the actual client Relay entry as well, including parsing,
+				// protection admission, reservation, dispatch and its billing defer.
+				clientUser := model.User{Username: "client-relay-" + scenario, Quota: 1000, Status: common.UserStatusEnabled, AffCode: "client-" + scenario}
+				require.NoError(t, setup.db.Create(&clientUser).Error)
+				clientToken := model.Token{UserId: clientUser.Id, Key: "synthetic-client-" + scenario, RemainQuota: 1000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+				require.NoError(t, setup.db.Create(&clientToken).Error)
+				recorder := httptest.NewRecorder()
+				client, _ := gin.CreateTestContext(recorder)
+				client.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+				client.Request.Header.Set("Content-Type", "application/json")
+				requestID := "pg03-client-" + scenario
+				common.SetContextKey(client, common.RequestIdKey, requestID)
+				common.SetContextKey(client, constant.ContextKeyUserId, clientUser.Id)
+				common.SetContextKey(client, constant.ContextKeyTokenId, clientToken.Id)
+				common.SetContextKey(client, constant.ContextKeyUserQuota, 1000)
+				common.SetContextKey(client, constant.ContextKeyUserGroup, "default")
+				common.SetContextKey(client, constant.ContextKeyUsingGroup, "default")
+				common.SetContextKey(client, constant.ContextKeyUserSetting, dto.UserSetting{BillingPreference: "wallet_only", QuotaWarningThreshold: 1})
+				common.SetContextKey(client, constant.ContextKeyOriginalModel, request.Model)
+				common.SetContextKey(client, constant.ContextKeyChannelId, channel.Id)
+				common.SetContextKey(client, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+				common.SetContextKey(client, constant.ContextKeyChannelBaseUrl, endpoint)
+				controller.Relay(client, relaytypes.RelayFormatOpenAIResponses)
+				var clientRows []model.BillingReservation
+				require.NoError(t, setup.db.Where("request_id = ?", requestID).Find(&clientRows).Error)
+				require.Len(t, clientRows, 1)
+				assert.Equal(t, state, clientRows[0].State)
+				assert.Equal(t, charge, clientRows[0].Applied)
+				require.NoError(t, setup.db.First(&clientUser, clientUser.Id).Error)
+				assert.Equal(t, 1000-charge, clientUser.Quota)
+				if scenario == "success" {
+					assert.Equal(t, http.StatusOK, recorder.Code)
+					assert.Contains(t, recorder.Body.String(), "response.completed")
+				} else {
+					assert.GreaterOrEqual(t, recorder.Code, http.StatusBadRequest)
+				}
+				response, err := http.Get(endpoint + "/rc/result/" + scenario)
+				require.NoError(t, err)
+				require.NoError(t, common.DecodeJson(response.Body, &evidence))
+				require.NoError(t, response.Body.Close())
+				assert.Equal(t, order, evidence.Order)
+				assert.Equal(t, dispatch, evidence.Dispatch)
+				t.Logf("client Relay scenario=%s reservation=1 applied=%d state=%s dispatch=%d order=%v", scenario, clientRows[0].Applied, clientRows[0].State, evidence.Dispatch, evidence.Order)
+			}
 		})
 	}
 }

@@ -22,6 +22,9 @@ import (
 // Tool surcharges, multimodal quantities, provider-specific passthrough fields
 // and arbitrary expressions cannot be bounded by evaluating one sample.
 func protectedTextLimit(info *relaycommon.RelayInfo) (int, error) {
+	if info != nil && info.RelayFormat == types.RelayFormatOpenAIResponses {
+		return protectedResponsesTextLimit(info)
+	}
 	if !constant.CountToken || info == nil || info.RelayFormat != types.RelayFormatOpenAI {
 		return 0, errors.New("protected billing requires token counting and an OpenAI text request")
 	}
@@ -86,6 +89,107 @@ func protectedTextLimit(info *relaycommon.RelayInfo) (int, error) {
 	return int(limit), nil
 }
 
+// Native Responses admission is limited to bounded, self-contained text SSE.
+// Keep the Chat contract above and the reservation arithmetic below unchanged.
+func protectedResponsesTextLimit(info *relaycommon.RelayInfo) (int, error) {
+	if !constant.CountToken {
+		return 0, errors.New("protected billing requires token counting")
+	}
+	if info.TokenGroup == "auto" {
+		return 0, errors.New("protected billing requires a fixed group")
+	}
+	r, ok := info.Request.(*dto.OpenAIResponsesRequest)
+	if !ok || r == nil {
+		return 0, errors.New("protected billing requires a native Responses request")
+	}
+	if strings.Contains(r.Model, "search-preview") || strings.Contains(info.GetBillingModelName(), "search-preview") {
+		return 0, errors.New("protected billing does not admit models with implicit search fees")
+	}
+	// Bypass MarshalJSON field filtering so an unsupported supplied field cannot
+	// disappear before the protection allowlist checks it.
+	type responsesFields dto.OpenAIResponsesRequest
+	body, err := common.Marshal((*responsesFields)(r))
+	if err != nil {
+		return 0, err
+	}
+	if _, err := validateProtectedResponsesText(body); err != nil {
+		return 0, err
+	}
+	if info.ChannelMeta != nil && (len(info.ChannelMeta.ParamOverride) != 0 || len(info.ChannelMeta.HeadersOverride) != 0) {
+		return 0, errors.New("protected billing does not admit channel parameter or header overrides")
+	}
+	return int(*r.MaxOutputTokens), nil
+}
+
+func validateProtectedResponsesText(body []byte) (*dto.OpenAIResponsesRequest, error) {
+	var fields map[string]common.RawMessage
+	if err := common.Unmarshal(body, &fields); err != nil {
+		return nil, err
+	}
+	for key := range fields {
+		switch key {
+		case "model", "input", "instructions", "max_output_tokens", "stream":
+		default:
+			return nil, errors.New("protected billing does not admit optional provider, tool or reference fields")
+		}
+	}
+	var r dto.OpenAIResponsesRequest
+	if err := common.Unmarshal(body, &r); err != nil {
+		return nil, err
+	}
+	if r.Stream == nil || !*r.Stream {
+		return nil, errors.New("protected billing requires Responses SSE")
+	}
+	if r.MaxOutputTokens == nil || *r.MaxOutputTokens == 0 || *r.MaxOutputTokens > maxTokensLimit {
+		return nil, errors.New("protected billing requires an explicit bounded output token limit")
+	}
+	if instructions, present := fields["instructions"]; present && common.GetJsonType(instructions) != "string" {
+		return nil, errors.New("protected billing requires plain text instructions")
+	}
+	if common.GetJsonType(r.Input) == "string" {
+		var text string
+		if err := common.Unmarshal(r.Input, &text); err != nil || strings.TrimSpace(text) == "" {
+			return nil, errors.New("protected billing requires nonempty text input")
+		}
+		return &r, nil
+	}
+	var messages []map[string]common.RawMessage
+	if err := common.Unmarshal(r.Input, &messages); err != nil || len(messages) == 0 {
+		return nil, errors.New("protected billing requires self-contained text input")
+	}
+	for _, message := range messages {
+		for key := range message {
+			if key != "type" && key != "role" && key != "content" {
+				return nil, errors.New("protected billing does not admit input references or tool calls")
+			}
+		}
+		var role, kind string
+		if err := common.Unmarshal(message["role"], &role); err != nil || (role != "user" && role != "assistant" && role != "system" && role != "developer") {
+			return nil, errors.New("protected billing requires plain text messages")
+		}
+		if raw, present := message["type"]; present {
+			if err := common.Unmarshal(raw, &kind); err != nil || kind != "message" {
+				return nil, errors.New("protected billing does not admit input references or tool calls")
+			}
+		}
+		content := message["content"]
+		if common.GetJsonType(content) == "string" {
+			continue
+		}
+		var parts []map[string]common.RawMessage
+		if err := common.Unmarshal(content, &parts); err != nil || len(parts) == 0 {
+			return nil, errors.New("protected billing requires plain text message content")
+		}
+		for _, part := range parts {
+			var partType, text string
+			if len(part) != 2 || common.Unmarshal(part["type"], &partType) != nil || partType != "input_text" || common.GetJsonType(part["text"]) != "string" || common.Unmarshal(part["text"], &text) != nil {
+				return nil, errors.New("protected billing does not admit multimodal input or references")
+			}
+		}
+	}
+	return &r, nil
+}
+
 func protectTextReservation(info *relaycommon.RelayInfo, price *hosttypes.PriceData, promptTokens, outputTokens int) error {
 	if promptTokens <= 0 || outputTokens <= 0 || len(price.OtherRatios()) != 0 {
 		return errors.New("protected billing cannot establish a text budget")
@@ -133,6 +237,44 @@ func ValidateProtectedTextChannel(info *relaycommon.RelayInfo) error {
 
 func ValidateProtectedTextBody(info *relaycommon.RelayInfo, body []byte) error {
 	if !billingProtectionEnabled() {
+		return nil
+	}
+	if info != nil && info.RelayFormat == types.RelayFormatOpenAIResponses {
+		originalLimit, err := protectedTextLimit(info)
+		if err != nil {
+			return err
+		}
+		outbound, err := validateProtectedResponsesText(body)
+		if err != nil {
+			return err
+		}
+		original := info.Request.(*dto.OpenAIResponsesRequest)
+		effective := *info
+		effective.Request = outbound
+		limit, err := protectedTextLimit(&effective)
+		if err != nil {
+			return err
+		}
+		var originalInput, outboundInput, originalInstructions, outboundInstructions any
+		if err := common.Unmarshal(original.Input, &originalInput); err != nil {
+			return err
+		}
+		if err := common.Unmarshal(outbound.Input, &outboundInput); err != nil {
+			return err
+		}
+		if len(original.Instructions) > 0 {
+			if err := common.Unmarshal(original.Instructions, &originalInstructions); err != nil {
+				return err
+			}
+		}
+		if len(outbound.Instructions) > 0 {
+			if err := common.Unmarshal(outbound.Instructions, &outboundInstructions); err != nil {
+				return err
+			}
+		}
+		if limit != originalLimit || !reflect.DeepEqual(originalInput, outboundInput) || !reflect.DeepEqual(originalInstructions, outboundInstructions) {
+			return errors.New("outbound text or output budget changed after reservation")
+		}
 		return nil
 	}
 	var outbound dto.GeneralOpenAIRequest
