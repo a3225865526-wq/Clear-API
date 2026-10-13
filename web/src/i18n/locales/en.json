@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Archive monitor": "Archive monitor",
+    "Daily probe request limit": "Daily probe request limit",
+    "Monitor administration": "Monitor administration",
+    "Monitoring protocol": "Monitoring protocol",
+    "Probe interval (seconds)": "Probe interval (seconds)",
+    "Probe timeout (seconds)": "Probe timeout (seconds)",
+    "Probe transport integration is pending. Configuration and publication do not start detection.": "Probe transport integration is pending. Configuration and publication do not start detection.",
+    "Reserved cost per probe (micro USD)": "Reserved cost per probe (micro USD)",
+    "Result validity (seconds)": "Result validity (seconds)",
     "Contact support for large recharges with no handling fee!": "Contact support for large recharges with no handling fee!",
     "Copy support QQ": "Copy support QQ",
     "Confirm purchase and fee arrangements with support first.": "Confirm purchase and fee arrangements with support first.",

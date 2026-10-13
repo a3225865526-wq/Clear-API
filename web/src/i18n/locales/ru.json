@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Archive monitor": "Архивировать мониторинг",
+    "Daily probe request limit": "Суточный лимит проверок",
+    "Monitor administration": "Управление мониторингом",
+    "Monitoring protocol": "Протокол мониторинга",
+    "Probe interval (seconds)": "Интервал проверок (секунды)",
+    "Probe timeout (seconds)": "Тайм-аут проверок (секунды)",
+    "Probe transport integration is pending. Configuration and publication do not start detection.": "Транспорт проверок ещё не интегрирован. Настройка и публикация не запускают проверки.",
+    "Reserved cost per probe (micro USD)": "Резерв стоимости проверки (микро USD)",
+    "Result validity (seconds)": "Срок действия результата (секунды)",
     "360": "360",
     "1000": "1000",
     "10000": "10000",

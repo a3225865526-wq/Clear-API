@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Archive monitor": "Archiver la sonde",
+    "Daily probe request limit": "Limite quotidienne des sondes",
+    "Monitor administration": "Gestion des sondes",
+    "Monitoring protocol": "Protocole de surveillance",
+    "Probe interval (seconds)": "Intervalle des sondes (secondes)",
+    "Probe timeout (seconds)": "Délai des sondes (secondes)",
+    "Probe transport integration is pending. Configuration and publication do not start detection.": "Le transport des sondes reste à intégrer. Configurer et publier ne lance aucun test.",
+    "Reserved cost per probe (micro USD)": "Coût réservé par sonde (micro USD)",
+    "Result validity (seconds)": "Validité des résultats (secondes)",
     "360": "360",
     "1000": "1000",
     "10000": "10000",
