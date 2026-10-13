@@ -26,7 +26,9 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/router"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/accountpool"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -37,6 +39,154 @@ import (
 )
 
 const poolRawIdentity = "secret-identity@example-upstream.com"
+
+// Run against the isolated Executor production-handler bridge. Both sides use
+// their real policy, transport, receipt and billing paths; only providers mock.
+func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
+	endpoint := os.Getenv("PG03_REFUND_EXECUTOR_URL")
+	if endpoint == "" {
+		t.Skip("requires isolated Executor production-handler bridge")
+	}
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	t.Setenv("CLEARAPI_PG03_POLICY_KEY", "synthetic-pg03-policy-key-012345678901234567890123456789")
+	t.Setenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY", "synthetic-pg03-proof-key-for-unit-tests-only")
+	oldCount, oldBatch, oldLog := constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled
+	constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled = true, false, false
+	oldRatio, oldCompletion := ratio_setting.ModelRatio2JSONString(), ratio_setting.CompletionRatio2JSONString()
+	t.Cleanup(func() {
+		constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled = oldCount, oldBatch, oldLog
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatio))
+		require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(oldCompletion))
+	})
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"synthetic-native":1}`))
+	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"synthetic-native":1}`))
+	service.InitTokenEncoders()
+	for _, scenario := range []string{"all-reject", "success", "started", "unknown"} {
+		t.Run(scenario, func(t *testing.T) {
+			setup := newPoolTestSetup(t, true)
+			require.NoError(t, setup.db.AutoMigrate(&model.Token{}, &model.UserSubscription{}, &model.Channel{}, &model.Log{}, &model.BillingReviewMarker{}))
+			require.NoError(t, model.MigrateBillingReservations(setup.db))
+			require.NoError(t, model.MigrateUpstreamPool(setup.db))
+			require.NoError(t, model.MigratePoolFallback(setup.db))
+			channel := model.Channel{Type: constant.ChannelTypeOpenAI, Name: "pg03-refund", BaseURL: &endpoint, OtherSettings: `{"upstream_pool":"codex-pool","pool_routing_enabled":true}`}
+			require.NoError(t, setup.db.Create(&channel).Error)
+			input := accountpool.FallbackPolicyInput{PoolId: "codex-pool", ModelName: "synthetic-native", MaxFallbackCount: 3, Enabled: true}
+			for i := range 4 {
+				account := model.UpstreamPoolAccount{Platform: "codex", ExecutorId: accountpool.ExecutorCliproxyAPI, CredentialRef: fmt.Sprintf("pg03-%c", 'A'+i)}
+				require.NoError(t, setup.db.Create(&account).Error)
+				input.Members = append(input.Members, accountpool.FallbackMemberInput{AccountId: account.Id, Priority: 100 - 10*i, Enabled: true})
+			}
+			require.Equal(t, http.StatusOK, setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input).Code)
+			user := model.User{Id: 20, Username: "pg03-refund-" + scenario, Quota: 1000, Status: common.UserStatusEnabled, AffCode: "pg03-" + scenario}
+			require.NoError(t, setup.db.Create(&user).Error)
+			token := model.Token{UserId: user.Id, Key: "synthetic-refund-" + scenario, RemainQuota: 1000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+			require.NoError(t, setup.db.Create(&token).Error)
+			stream, limit := true, uint(99)
+			request := &dto.OpenAIResponsesRequest{Model: "synthetic-native", Stream: &stream, MaxOutputTokens: &limit, Input: []byte(`"synthetic"`)}
+			body, err := common.Marshal(request)
+			require.NoError(t, err)
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			common.SetContextKey(c, constant.ContextKeyChannelId, channel.Id)
+			common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+			common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, endpoint)
+			common.SetContextKey(c, constant.ContextKeyOriginalModel, request.Model)
+			common.SetContextKey(c, constant.ContextKeyChannelHeaderOverride, map[string]any{"X-RC-Scenario": scenario})
+			info := relaycommon.GenRelayInfoResponses(c, request)
+			info.UserId, info.TokenId, info.RequestId = user.Id, token.Id, "pg03-billing-"+scenario
+			info.UserQuota, info.UserSetting.QuotaWarningThreshold = 1000, 1
+			info.UsingGroup, info.UserGroup = "default", "default"
+			info.UserSetting.BillingPreference = "wallet_only"
+			info.SetEstimatePromptTokens(1)
+			// The fixture starts at an existing durable reservation; native
+			// Responses admission under protected billing is outside this fix.
+			info.ProtectedTextBudget = true
+			info.PriceData.ModelRatio, info.PriceData.CompletionRatio = 1, 1
+			info.PriceData.GroupRatioInfo.GroupRatio = 1
+			billing, apiErr := service.NewBillingSession(c, info, 100)
+			require.Nil(t, apiErr)
+			info.Billing = billing
+			var before model.BillingReservation
+			require.NoError(t, setup.db.Where("request_id = ?", info.RequestId).First(&before).Error)
+			require.Equal(t, 100, before.Reserved)
+			_, _, closer, prepareErr := relay.PrepareResponsesRequest(c, info, request)
+			require.Nil(t, prepareErr)
+			if closer != nil {
+				require.NoError(t, closer.Close())
+			}
+			transportInfo := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{HeadersOverride: map[string]any{"X-RC-Scenario": scenario}}}
+			upstream, err := relaychannel.DoApiRequest(pg03WireAdaptor{url: endpoint + "/v1/responses"}, c, transportInfo, bytes.NewReader(body))
+			require.NoError(t, err)
+			if scenario == "success" {
+				require.Equal(t, http.StatusOK, upstream.StatusCode)
+				data, err := io.ReadAll(upstream.Body)
+				require.NoError(t, err)
+				require.NoError(t, upstream.Body.Close())
+				for line := range strings.SplitSeq(string(data), "\n") {
+					if payload, ok := strings.CutPrefix(line, "data: "); ok && strings.Contains(payload, "response.completed") {
+						service.ObserveCodexMetering(c, info, []byte(payload), true)
+					}
+				}
+				usage := service.CodexUsageForSettlement(c, info)
+				require.NotNil(t, usage)
+				require.NotNil(t, usage.CodexMetering)
+				require.Equal(t, "exact", usage.CodexMetering.Status)
+				relay.ConsumeResponsesQuota(c, info, usage)
+				apiErr = nil
+			} else {
+				apiErr = service.RelayErrorHandler(c.Request.Context(), upstream, false)
+				require.NotNil(t, apiErr)
+			}
+			relay.RefundFailedRequestBilling(c, info, apiErr)
+			relay.RefundFailedRequestBilling(c, info, apiErr)
+			if scenario == "success" {
+				billing.Refund(c)
+				billing.Refund(c)
+			}
+			var rows []model.BillingReservation
+			require.NoError(t, setup.db.Where("request_id = ?", info.RequestId).Find(&rows).Error)
+			require.Len(t, rows, 1)
+			var after model.User
+			var afterToken model.Token
+			require.NoError(t, setup.db.First(&after, user.Id).Error)
+			require.NoError(t, setup.db.First(&afterToken, token.Id).Error)
+			charge, state := 100, "settled"
+			if scenario == "all-reject" {
+				charge, state = 0, "refunded"
+			}
+			if scenario == "success" {
+				charge = 2
+			}
+			assert.Equal(t, 1000-charge, after.Quota)
+			assert.Equal(t, after.Quota, afterToken.RemainQuota)
+			assert.Equal(t, charge, afterToken.UsedQuota)
+			assert.Equal(t, charge, rows[0].Applied)
+			assert.Equal(t, state, rows[0].State)
+			response, err := http.Get(endpoint + "/rc/result/" + scenario)
+			require.NoError(t, err)
+			defer response.Body.Close()
+			var evidence struct {
+				Order    []string `json:"order"`
+				Dispatch int      `json:"dispatch"`
+			}
+			require.NoError(t, common.DecodeJson(response.Body, &evidence))
+			order, dispatch := []string{"pg03-A"}, 0
+			if scenario == "all-reject" {
+				order = []string{"pg03-A", "pg03-B", "pg03-C", "pg03-D"}
+			}
+			if scenario == "success" {
+				order, dispatch = []string{"pg03-A", "pg03-B", "pg03-C"}, 1
+			}
+			if scenario == "started" {
+				dispatch = 1
+			}
+			assert.Equal(t, order, evidence.Order)
+			assert.Equal(t, dispatch, evidence.Dispatch)
+			t.Logf("scenario=%s reservation=%d quota=1000->%d applied=%d state=%s dispatch=%d order=%v", scenario, len(rows), after.Quota, rows[0].Applied, rows[0].State, evidence.Dispatch, evidence.Order)
+		})
+	}
+}
 
 type pg03WireAdaptor struct {
 	relaychannel.Adaptor
