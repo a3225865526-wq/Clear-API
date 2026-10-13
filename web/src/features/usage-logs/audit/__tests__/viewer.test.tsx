@@ -18,6 +18,12 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from '@tanstack/react-router'
+import {
   cleanup,
   fireEvent,
   render,
@@ -576,7 +582,7 @@ it.each([10, 100])(
 )
 
 it.each([1, 10])(
-  'role %i without an audit grant queries only its own records without scope tabs',
+  'role %i without an audit grant is forbidden without querying audit records',
   async (role) => {
     useAuthStore.getState().auth.setUser({ id: 2, username: 'alice', role })
     const get = vi.spyOn(api, 'get').mockResolvedValue({
@@ -585,15 +591,17 @@ it.each([1, 10])(
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     })
+    const router = createRouter({
+      routeTree: createRootRoute({ component: AuditLogs }),
+      history: createMemoryHistory({ initialEntries: ['/'] }),
+    })
     render(
       <QueryClientProvider client={client}>
-        <AuditLogs />
+        <RouterProvider router={router} />
       </QueryClientProvider>
     )
-    await waitFor(() =>
-      expect(get).toHaveBeenCalledWith('/api/audit/self', expect.anything())
-    )
-    expect(get).not.toHaveBeenCalledWith('/api/audit', expect.anything())
+    expect(await screen.findByText('Access Forbidden')).toBeVisible()
+    expect(get).not.toHaveBeenCalled()
     expect(
       screen.queryByRole('tablist', { name: 'View scope' })
     ).not.toBeInTheDocument()
@@ -601,7 +609,7 @@ it.each([1, 10])(
   }
 )
 
-it('clears global records and open details on revocation, falls back to self, and refreshes permissions', async () => {
+it('clears global records and open details on revocation, denies access, and refreshes permissions', async () => {
   const admin = {
     id: 1,
     username: 'admin',
@@ -667,9 +675,13 @@ it('clears global records and open details on revocation, falls back to self, an
     }
   })
   client.setQueryData(['audit', 99, 'all'], { items: ['separate-session'] })
+  const router = createRouter({
+    routeTree: createRootRoute({ component: AuditLogs }),
+    history: createMemoryHistory({ initialEntries: ['/'] }),
+  })
   render(
     <QueryClientProvider client={client}>
-      <AuditLogs />
+      <RouterProvider router={router} />
     </QueryClientProvider>
   )
   await screen.findByText('other-account')
@@ -682,9 +694,8 @@ it('clears global records and open details on revocation, falls back to self, an
   await waitFor(() =>
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   )
-  await waitFor(() =>
-    expect(get).toHaveBeenCalledWith('/api/audit/self', expect.anything())
-  )
+  expect(await screen.findByText('Access Forbidden')).toBeVisible()
+  expect(get).not.toHaveBeenCalledWith('/api/audit/self', expect.anything())
   await waitFor(() => expect(get).toHaveBeenCalledWith('/api/user/self'))
   expect(screen.queryByText('other-account')).not.toBeInTheDocument()
   expect(screen.queryByRole('tab', { name: 'All' })).not.toBeInTheDocument()
