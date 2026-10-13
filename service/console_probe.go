@@ -127,15 +127,7 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	}
 	if err != nil {
 		outcome.Status = "error"
-		outcome.ErrorCode = "probe_failed"
-		if errors.Is(err, ErrMonitorCostUnverified) {
-			outcome.ErrorCode = "MONITOR_COST_UNVERIFIED"
-		} else if errors.Is(err, ErrMonitorCostExceeded) {
-			outcome.ErrorCode = "MONITOR_COST_EXCEEDED"
-		}
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
-			outcome.ErrorCode = "probe_timeout"
-		}
+		outcome.ErrorCode = consoleProbeFailureCode(err, probeCtx.Err())
 	}
 	if outcome.Status != "normal" && outcome.Status != "degraded" && outcome.Status != "error" && outcome.Status != "unknown" {
 		outcome.Status = "unknown"
@@ -219,6 +211,19 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 		result = ConsoleProbeResult{AttemptID: attempt.ID}
 	}
 	return result, err
+}
+
+func consoleProbeFailureCode(err, contextErr error) string {
+	switch {
+	case errors.Is(err, ErrMonitorCostUnverified):
+		return "MONITOR_COST_UNVERIFIED"
+	case errors.Is(err, ErrMonitorCostExceeded):
+		return "MONITOR_COST_EXCEEDED"
+	case errors.Is(err, context.DeadlineExceeded), errors.Is(contextErr, context.DeadlineExceeded):
+		return "probe_timeout"
+	default:
+		return "probe_failed"
+	}
 }
 
 func isConsoleProbeCostScope(m model.ConsoleMonitor) bool {

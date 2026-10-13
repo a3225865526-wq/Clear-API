@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"io"
 	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -233,6 +236,69 @@ func (a *consoleCostTestAdapter) Probe(_ context.Context, m model.ConsoleMonitor
 	return ConsoleProbeOutcome{Status: "normal", SourceChannelID: m.ChannelID}, nil
 }
 
+func TestConsoleProbeCostDenialPrecedesDeadline(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		code string
+	}{
+		{"unverified", ErrMonitorCostUnverified, "MONITOR_COST_UNVERIFIED"},
+		{"exceeded", ErrMonitorCostExceeded, "MONITOR_COST_EXCEEDED"},
+		{"wrapped-unverified", errors.Join(ErrMonitorCostUnverified, context.DeadlineExceeded), "MONITOR_COST_UNVERIFIED"},
+		{"wrapped-exceeded", errors.Join(ErrMonitorCostExceeded, context.DeadlineExceeded), "MONITOR_COST_EXCEEDED"},
+		{"timeout", context.DeadlineExceeded, "probe_timeout"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.code, consoleProbeFailureCode(tc.err, context.DeadlineExceeded))
+		})
+	}
+}
+
+// Expire the caller only after the admission transaction has committed.
+// This models the deadline race without sleeps or changing the cost policy.
+type consoleCostDeadlineContext struct {
+	context.Context
+	done chan struct{}
+	once sync.Once
+}
+
+func (c *consoleCostDeadlineContext) Done() <-chan struct{} { return c.done }
+func (c *consoleCostDeadlineContext) Err() error {
+	select {
+	case <-c.done:
+		return context.DeadlineExceeded
+	default:
+		return nil
+	}
+}
+func (c *consoleCostDeadlineContext) expire() { c.once.Do(func() { close(c.done) }) }
+
+type consoleCostDeadlinePool struct {
+	*sql.DB
+	expire func()
+}
+
+func (p consoleCostDeadlinePool) BeginTx(ctx context.Context, opts *sql.TxOptions) (gorm.ConnPool, error) {
+	tx, err := p.DB.BeginTx(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+	return &consoleCostDeadlineTx{Tx: tx, expire: p.expire}, nil
+}
+
+type consoleCostDeadlineTx struct {
+	*sql.Tx
+	expire func()
+}
+
+func (tx consoleCostDeadlineTx) Commit() error {
+	if err := tx.Tx.Commit(); err != nil {
+		return err
+	}
+	tx.expire()
+	return nil
+}
+
 func TestConsoleProbeCostExecutorMatrix(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -249,6 +315,13 @@ func TestConsoleProbeCostExecutorMatrix(t *testing.T) {
 			}
 			db, err := gorm.Open(tc.dialect, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 			require.NoError(t, err)
+			versionQuery := "SELECT version()"
+			if tc.name == "sqlite" {
+				versionQuery = "SELECT sqlite_version()"
+			}
+			var version string
+			require.NoError(t, db.Raw(versionQuery).Scan(&version).Error)
+			t.Logf("database version: %s", version)
 			sqlDB, err := db.DB()
 			require.NoError(t, err)
 			sqlDB.SetMaxOpenConns(1)
@@ -276,13 +349,28 @@ func TestConsoleProbeCostExecutorMatrix(t *testing.T) {
 			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "enabled", true))
 			require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 10, DailyCostMicros: 1000, RetentionDays: 90}))
 			adapter := &consoleCostTestAdapter{}
-			for _, registered := range []bool{false, true} {
+			for _, run := range []struct {
+				registered bool
+				deadline   bool
+			}{{false, false}, {true, false}, {true, true}} {
 				e := ConsoleProbeExecutor{DB: db}
-				if registered {
+				if run.registered {
 					e.Adapters = map[string]ConsoleProbeAdapter{"channel": adapter}
 				}
-				result, err := e.RunWithResult(ctx, m.ID)
+				runCtx := ctx
+				if run.deadline {
+					deadline := &consoleCostDeadlineContext{Context: ctx, done: make(chan struct{})}
+					runCtx = deadline
+					pool := consoleCostDeadlinePool{DB: sqlDB, expire: deadline.expire}
+					e.DB = db.Session(&gorm.Session{NewDB: true})
+					e.DB.ConnPool = pool
+					e.DB.Statement = &gorm.Statement{DB: e.DB, ConnPool: pool, Context: ctx}
+				}
+				result, err := e.RunWithResult(runCtx, m.ID)
 				require.NoError(t, err)
+				if run.deadline {
+					require.ErrorIs(t, runCtx.Err(), context.DeadlineExceeded)
+				}
 				require.Positive(t, result.AttemptID)
 				require.Positive(t, result.ProbeID)
 				assert.Equal(t, "error", result.Status)
@@ -310,8 +398,8 @@ func TestConsoleProbeCostExecutorMatrix(t *testing.T) {
 			var attempts, probes int64
 			require.NoError(t, db.Model(&model.ConsoleMonitorAttempt{}).Count(&attempts).Error)
 			require.NoError(t, db.Model(&model.ConsoleProbe{}).Count(&probes).Error)
-			assert.EqualValues(t, 2, attempts)
-			assert.EqualValues(t, 2, probes)
+			assert.EqualValues(t, 3, attempts)
+			assert.EqualValues(t, 3, probes)
 		})
 	}
 }
