@@ -77,7 +77,7 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 		kind   common.DatabaseType
 	}{
 		{"sqlite", sqlite.Open(":memory:"), common.DatabaseTypeSQLite},
-		{"postgres", postgres.Open(os.Getenv("MONITOR_TEST_POSTGRES_DSN")), common.DatabaseTypePostgreSQL},
+		{"postgres", postgres.New(postgres.Config{DSN: os.Getenv("MONITOR_TEST_POSTGRES_DSN"), PreferSimpleProtocol: true}), common.DatabaseTypePostgreSQL},
 		{"mysql", mysql.Open(os.Getenv("MONITOR_TEST_MYSQL_DSN")), common.DatabaseTypeMySQL},
 	}
 	for _, tc := range cases {
@@ -103,6 +103,19 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			require.False(t, db.Migrator().HasTable(&model.ConsoleMonitor{}), "fixture database must be empty")
 			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
 			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			// Reconstruct the PR #29 schema before exercising its additive upgrade.
+			for _, column := range []string{"allowlisted", "created_by", "created_at"} {
+				require.NoError(t, db.Migrator().DropColumn(&model.ConsoleMonitor{}, column))
+			}
+			prior := model.ConsoleMonitor{ID: 49, ChannelID: 1, Model: "prior-model", TargetKind: "channel", TargetRef: "1", Protocol: "openai_chat", Published: true, IntervalSeconds: 600, TimeoutSeconds: 30, StaleSeconds: 900}
+			require.NoError(t, db.Omit("Allowlisted", "CreatedBy", "CreatedAt").Create(&prior).Error)
+			assert.False(t, model.ConsoleMonitorAllowlistReady(db))
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			var upgraded model.ConsoleMonitor
+			require.NoError(t, db.First(&upgraded, 49).Error)
+			assert.Equal(t, prior, upgraded)
+			assert.True(t, model.ConsoleMonitorAllowlistReady(db))
 			require.NoError(t, db.Migrator().DropTable(&model.ConsoleMonitorAttempt{}, &model.ConsoleMonitorPolicy{}, &model.ConsoleProbe{}, &model.ConsoleMonitor{}))
 			require.NoError(t, db.Table("console_monitors").AutoMigrate(&legacyMonitor{}))
 			require.NoError(t, db.Table("console_probes").AutoMigrate(&legacyProbe{}))
@@ -124,6 +137,25 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			require.NoError(t, db.Create(&model.Channel{Id: 9, Name: "Legacy", Key: "fixture-only", Status: common.ChannelStatusEnabled, Models: "legacy"}).Error)
 			m := model.ConsoleMonitor{ChannelID: 1, TargetKind: "channel", TargetRef: "1", Model: "model-a", Protocol: "openai_chat", DisplayName: "Public name", IntervalSeconds: 60, TimeoutSeconds: 1, StaleSeconds: 900, DailyRequests: 2, RequestCostMicros: 10}
 			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &m))
+			require.NoError(t, db.Model(&m).Updates(map[string]any{"created_by": 7, "created_at": int64(1720000000)}).Error)
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, m.ID, true))
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, m.ID, true))
+			var allowlisted model.ConsoleMonitor
+			require.NoError(t, db.First(&allowlisted, m.ID).Error)
+			assert.True(t, allowlisted.Allowlisted)
+			edit := allowlisted
+			edit.DisplayName, edit.DailyRequests, edit.RequestCostMicros = "Updated allowlist name", 999, 999
+			require.NoError(t, model.UpdateConsoleMonitorAllowlist(ctx, db, &edit))
+			require.NoError(t, db.First(&allowlisted, m.ID).Error)
+			assert.Equal(t, "Updated allowlist name", allowlisted.DisplayName)
+			assert.EqualValues(t, 2, allowlisted.DailyRequests)
+			assert.EqualValues(t, 10, allowlisted.RequestCostMicros)
+			assert.False(t, allowlisted.Enabled)
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			require.NoError(t, db.First(&allowlisted, m.ID).Error)
+			assert.Equal(t, 7, allowlisted.CreatedBy)
+			assert.EqualValues(t, 1720000000, allowlisted.CreatedAt)
+			assert.True(t, allowlisted.Allowlisted)
 			adopt := m
 			adopt.ID = 0
 			adopt.ChannelID = 9
@@ -166,6 +198,7 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			denied.TargetRef = "fixture-pool-group"
 			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &denied))
 			require.ErrorIs(t, model.SetConsoleMonitorSwitch(ctx, db, denied.ID, "published", true), model.ErrMonitorIntegration)
+			require.ErrorIs(t, model.SetConsoleMonitorAllowlisted(ctx, db, denied.ID, true), model.ErrMonitorIntegration)
 			require.ErrorIs(t, model.SetConsoleMonitorSwitch(ctx, db, denied.ID, "enabled", true), model.ErrMonitorIntegration)
 			require.NoError(t, db.Create(&model.Ability{Group: "stable-group", Model: "model-a", ChannelId: 1, Enabled: true}).Error)
 			group := m
@@ -174,6 +207,7 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			group.TargetKind = "group_route"
 			group.TargetRef = "stable-group"
 			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &group))
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, group.ID, true))
 			group.Model = "not-authorized"
 			require.ErrorIs(t, model.ValidateMonitorTarget(db, &group), model.ErrMonitorDenied)
 			mock := &monitorMockAdapter{}
@@ -690,6 +724,88 @@ func TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution(t *te
 	require.NoError(t, db.Where("action = ?", "monitor.attempt_recover").First(&audit).Error)
 	assert.Equal(t, "monitor.attempt_recover", audit.Action)
 	assert.NotContains(t, audit.Content, "fixture worker restart")
+
+	t.Run("allowlist management keeps execution and accounting isolated", func(t *testing.T) {
+		base := "/api/console/monitor-targets"
+		input := map[string]any{"target_type": "channel", "target_ref": "1", "channel_id": 1, "model": "model-b", "protocol": "openai_chat", "display_name": "Allowlist target", "interval_seconds": 600, "timeout_seconds": 30, "stale_seconds": 900, "enabled": true, "published": true, "created_by": 999, "created_at": 1, "daily_requests": 100, "request_cost_micros": 999, "max_concurrency": 32, "daily_budget_limit": 999}
+		for _, token := range []string{"", "fixture-admin-pat", "fixture-user-pat", "fixture-disabled-pat"} {
+			for _, route := range []struct{ method, path string }{{http.MethodGet, base}, {http.MethodPost, base}, {http.MethodPut, base}, {http.MethodPut, base + "/1/switch/enabled"}, {http.MethodPut, base + "/1/switch/published"}} {
+				response := request(route.method, route.path, token, "application/json", "1", input)
+				assert.Contains(t, []int{http.StatusUnauthorized, http.StatusForbidden}, response.Code)
+			}
+		}
+		for _, marker := range []string{"", "1"} {
+			contentType := "text/plain"
+			if marker == "" {
+				contentType = "application/json"
+			}
+			assert.Equal(t, http.StatusForbidden, request(http.MethodPost, base, "fixture-root-pat", contentType, marker, input).Code)
+		}
+		var policyBefore model.ConsoleMonitorPolicy
+		require.NoError(t, db.First(&policyBefore, 1).Error)
+		response := request(http.MethodPost, base, "fixture-root-pat", "application/json", "1", input)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		var target model.ConsoleMonitor
+		require.NoError(t, db.Where("model = ?", "model-b").First(&target).Error)
+		assert.False(t, target.Enabled)
+		assert.False(t, target.Allowlisted)
+		assert.False(t, target.Published)
+		assert.Equal(t, 1, target.CreatedBy)
+		assert.Greater(t, target.CreatedAt, int64(1))
+		assert.Zero(t, target.DailyRequests)
+		assert.Zero(t, target.RequestCostMicros)
+		original := target
+		response = request(http.MethodPost, base, "fixture-root-pat", "application/json", "1", input)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		var count int64
+		require.NoError(t, db.Model(&model.ConsoleMonitor{}).Where("model = ?", "model-b").Count(&count).Error)
+		assert.EqualValues(t, 1, count)
+		for _, change := range []struct {
+			action string
+			value  bool
+		}{{"enabled", true}, {"enabled", true}, {"published", true}, {"published", true}, {"published", false}, {"published", false}, {"enabled", false}, {"enabled", false}} {
+			response = request(http.MethodPut, fmt.Sprintf("%s/%d/switch/%s", base, target.ID, change.action), "fixture-root-pat", "application/json", "1", map[string]any{"value": change.value, "confirm": true})
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			require.NoError(t, db.First(&target, target.ID).Error)
+			assert.False(t, target.Enabled)
+			if change.action == "enabled" {
+				assert.Equal(t, change.value, target.Allowlisted)
+			} else {
+				assert.Equal(t, change.value, target.Published)
+			}
+		}
+		input["id"], input["display_name"], input["timeout_seconds"] = target.ID, "Updated target", 45
+		require.NoError(t, db.Model(&target).Updates(map[string]any{"daily_requests": 2, "request_cost_micros": 10}).Error)
+		response = request(http.MethodPut, base, "fixture-root-pat", "application/json", "1", input)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		require.NoError(t, db.First(&target, target.ID).Error)
+		assert.Equal(t, "Updated target", target.DisplayName)
+		assert.EqualValues(t, 45, target.TimeoutSeconds)
+		assert.Equal(t, original.CreatedAt, target.CreatedAt)
+		assert.Equal(t, original.CreatedBy, target.CreatedBy)
+		assert.EqualValues(t, 10, target.RequestCostMicros)
+		assert.EqualValues(t, 2, target.DailyRequests)
+		input["model"] = "gpt-6-luna"
+		assert.Equal(t, http.StatusForbidden, request(http.MethodPut, base, "fixture-root-pat", "application/json", "1", input).Code)
+		response = request(http.MethodGet, base, "fixture-root-pat", "application/json", "1", nil)
+		require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		assert.Contains(t, response.Body.String(), `"created_by":1`)
+		assert.Contains(t, response.Body.String(), `"max_concurrency":1`)
+		assert.Contains(t, response.Body.String(), `"real_probe_ready":false`)
+		var policyAfter model.ConsoleMonitorPolicy
+		require.NoError(t, db.First(&policyAfter, 1).Error)
+		assert.Equal(t, policyBefore, policyAfter)
+		var attemptsAfter int64
+		require.NoError(t, db.Model(&model.ConsoleMonitorAttempt{}).Count(&attemptsAfter).Error)
+		assert.Equal(t, attempts, attemptsAfter)
+		var channel model.Channel
+		require.NoError(t, db.First(&channel, 1).Error)
+		assert.Equal(t, common.ChannelStatusEnabled, channel.Status)
+		var user model.User
+		require.NoError(t, db.First(&user, 1).Error)
+		assert.Zero(t, user.Quota)
+		assert.Zero(t, user.UsedQuota)
+	})
 }
 
 func TestConsoleMonitorCLIDryRunAndSeparateApprovals(t *testing.T) {

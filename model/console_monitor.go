@@ -28,6 +28,11 @@ type ConsoleMonitor struct {
 	// Monitoring budget reservation only: this is NOT a provider-enforced spending
 	// ceiling or a retail billing price. Real transport must separately enforce one.
 	RequestCostMicros int64 `json:"request_cost_micros"`
+
+	// Allowlisted is administrative eligibility, never an execution switch.
+	Allowlisted bool  `json:"-"`
+	CreatedBy   int   `json:"-"`
+	CreatedAt   int64 `gorm:"autoCreateTime:false" json:"-"`
 }
 
 type ConsoleProbe struct {

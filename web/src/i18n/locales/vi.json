@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Channel monitoring": "Giám sát kênh",
+    "Monitoring targets": "Đối tượng giám sát",
+    "Global monitoring policy (read only)": "Chính sách giám sát toàn cục (chỉ đọc)",
+    "Maximum concurrent probes": "Số phép kiểm tra đồng thời tối đa",
+    "Daily monitoring budget": "Ngân sách giám sát hằng ngày",
+    "Allowlist membership does not enable probe execution.": "Thêm vào danh sách cho phép không bật thực thi kiểm tra.",
+    "Account Pool group (integration pending)": "Nhóm kho tài khoản (chưa tích hợp)",
+    "Created by": "Người tạo",
     "Archive monitor": "Lưu trữ giám sát",
     "Daily probe request limit": "Giới hạn yêu cầu kiểm tra mỗi ngày",
     "Monitor administration": "Quản lý giám sát",

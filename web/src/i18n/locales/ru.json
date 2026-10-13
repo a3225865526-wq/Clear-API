@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Channel monitoring": "Мониторинг каналов",
+    "Monitoring targets": "Объекты мониторинга",
+    "Global monitoring policy (read only)": "Общая политика мониторинга (только чтение)",
+    "Maximum concurrent probes": "Максимум одновременных проверок",
+    "Daily monitoring budget": "Суточный бюджет мониторинга",
+    "Allowlist membership does not enable probe execution.": "Включение в разрешённый список не запускает проверки.",
+    "Account Pool group (integration pending)": "Группа пула аккаунтов (интеграция ожидается)",
+    "Created by": "Создатель",
     "Archive monitor": "Архивировать мониторинг",
     "Daily probe request limit": "Суточный лимит проверок",
     "Monitor administration": "Управление мониторингом",

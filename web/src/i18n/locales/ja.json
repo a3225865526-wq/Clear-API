@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Channel monitoring": "チャネル監視",
+    "Monitoring targets": "監視対象",
+    "Global monitoring policy (read only)": "全体の監視ポリシー（読み取り専用）",
+    "Maximum concurrent probes": "最大同時プローブ数",
+    "Daily monitoring budget": "1日の監視予算",
+    "Allowlist membership does not enable probe execution.": "許可リストへの登録ではプローブ実行は有効になりません。",
+    "Account Pool group (integration pending)": "アカウントプールグループ（未統合）",
+    "Created by": "作成者",
     "Archive monitor": "監視をアーカイブ",
     "Daily probe request limit": "1日の検査リクエスト上限",
     "Monitor administration": "監視管理",

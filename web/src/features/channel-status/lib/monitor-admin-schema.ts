@@ -28,6 +28,11 @@ export interface Monitor extends MonitorValues {
   published: boolean
   enabled: boolean
   archived: boolean
+  created_by?: number
+  created_at?: number
+  target_type?: string
+  max_concurrency?: number
+  daily_budget_limit?: number
 }
 export interface MonitorTargets {
   channels: { id: number; name: string; status: number; models: string }[]
