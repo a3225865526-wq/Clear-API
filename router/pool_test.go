@@ -159,11 +159,23 @@ func TestPG03PolicySnapshotWiring(t *testing.T) {
 	input.Enabled = true
 	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
 	require.NoError(t, accountpool.FreezePG03Policy(absent, channel.Id, input.ModelName))
+	// A legacy channel retry must retain frozen absence even if its pool now has a policy.
+	retryChannel := channel
+	retryChannel.Id = 0
+	retryChannel.Name = "pg03-retry"
+	require.NoError(t, setup.db.Create(&retryChannel).Error)
+	common.SetContextKey(absent, constant.ContextKeyChannelId, retryChannel.Id)
+	prepare(absent)
+	require.Error(t, accountpool.FreezePG03Policy(old, retryChannel.Id, input.ModelName))
 	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/responses", strings.NewReader(body))
 	require.NoError(t, err)
 	req.Header = absent.Request.Header.Clone()
+	req.Header.Set(accountpool.PG03SignatureHeader, "client-forged")
+	req.Header.Set(accountpool.PG03RequestHeader, "client-forged")
 	require.NoError(t, accountpool.ApplyPG03Policy(absent, req))
 	assert.Empty(t, req.Header.Get(accountpool.PG03PolicyHeader))
+	assert.Empty(t, req.Header.Get(accountpool.PG03SignatureHeader))
+	assert.Empty(t, req.Header.Get(accountpool.PG03RequestHeader))
 	data, err := io.ReadAll(req.Body)
 	require.NoError(t, err)
 	assert.Equal(t, body, string(data))
