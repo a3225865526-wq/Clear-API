@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Archive monitor": "Lưu trữ giám sát",
+    "Daily probe request limit": "Giới hạn yêu cầu kiểm tra mỗi ngày",
+    "Monitor administration": "Quản lý giám sát",
+    "Monitoring protocol": "Giao thức giám sát",
+    "Probe interval (seconds)": "Khoảng kiểm tra (giây)",
+    "Probe timeout (seconds)": "Thời gian chờ kiểm tra (giây)",
+    "Probe transport integration is pending. Configuration and publication do not start detection.": "Cơ chế gửi kiểm tra chưa được tích hợp. Cấu hình và công bố không khởi chạy kiểm tra.",
+    "Reserved cost per probe (micro USD)": "Chi phí dự trữ mỗi lần kiểm tra (micro USD)",
+    "Result validity (seconds)": "Thời hạn kết quả (giây)",
     "360": "360",
     "1000": "1000",
     "10000": "10000",

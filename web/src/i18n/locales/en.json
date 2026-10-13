@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Archive monitor": "Archive monitor",
+    "Daily probe request limit": "Daily probe request limit",
+    "Monitor administration": "Monitor administration",
+    "Monitoring protocol": "Monitoring protocol",
+    "Probe interval (seconds)": "Probe interval (seconds)",
+    "Probe timeout (seconds)": "Probe timeout (seconds)",
+    "Probe transport integration is pending. Configuration and publication do not start detection.": "Probe transport integration is pending. Configuration and publication do not start detection.",
+    "Reserved cost per probe (micro USD)": "Reserved cost per probe (micro USD)",
+    "Result validity (seconds)": "Result validity (seconds)",
     "360": "360",
     "1000": "1000",
     "10000": "10000",

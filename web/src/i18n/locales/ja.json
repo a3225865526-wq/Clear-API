@@ -1,5 +1,14 @@
 {
   "translation": {
+    "Archive monitor": "監視をアーカイブ",
+    "Daily probe request limit": "1日の検査リクエスト上限",
+    "Monitor administration": "監視管理",
+    "Monitoring protocol": "監視プロトコル",
+    "Probe interval (seconds)": "検査間隔（秒）",
+    "Probe timeout (seconds)": "検査タイムアウト（秒）",
+    "Probe transport integration is pending. Configuration and publication do not start detection.": "プローブ転送の統合は保留中です。設定と公開では検査は開始されません。",
+    "Reserved cost per probe (micro USD)": "検査ごとの予約費用（マイクロ米ドル）",
+    "Result validity (seconds)": "結果の有効期間（秒）",
     "360": "360",
     "1000": "1000",
     "10000": "10000",

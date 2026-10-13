@@ -1,11 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -64,9 +58,7 @@ describe('pool release controls', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
     expect(setPoolMaster).not.toHaveBeenCalled()
     await user.click(screen.getByRole('switch', { name: 'Pool is closed' }))
-    await user.click(
-      await screen.findByRole('button', { name: 'Enable pool' })
-    )
+    await user.click(await screen.findByRole('button', { name: 'Enable pool' }))
     await waitFor(() => expect(setPoolMaster).toHaveBeenCalledWith(true))
   })
 
@@ -83,9 +75,15 @@ describe('pool release controls', () => {
     const user = userEvent.setup()
     mount()
     expect(await screen.findByText('synthetic-pool (#11)')).toBeInTheDocument()
-    expect(screen.getByText(/Channel models: synthetic-model-a, synthetic-model-b/)).toBeInTheDocument()
-    expect(screen.getByText(/Published pool models: synthetic-model-a/)).toBeInTheDocument()
-    expect(screen.queryByText(/Published pool models:.*synthetic-model-b/)).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Channel models: synthetic-model-a, synthetic-model-b/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/Published pool models: synthetic-model-a/)
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByText(/Published pool models:.*synthetic-model-b/)
+    ).not.toBeInTheDocument()
     const item = screen.getByText('synthetic-pool (#11)').closest('li')
     expect(item).not.toBeNull()
     const channelSwitch = within(item as HTMLElement).getByRole('switch')

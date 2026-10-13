@@ -8,12 +8,26 @@ import (
 // Publication is an explicit operator opt-in. None of the upstream configuration
 // is serialized. These tables are deliberately excluded from startup AutoMigrate.
 type ConsoleMonitor struct {
-	ID          int `gorm:"primaryKey"`
-	ChannelID   int `gorm:"index"`
-	DisplayName string
-	Platform    string
-	Model       string
-	Published   bool `gorm:"default:false"`
+	ID          int    `gorm:"primaryKey" json:"id"`
+	ChannelID   int    `gorm:"index" json:"channel_id"`
+	DisplayName string `json:"display_name"`
+	Platform    string `json:"platform"`
+	Model       string `json:"model"`
+	Published   bool   `gorm:"default:false" json:"published"`
+	// Nullable identity preserves legacy rows; new targets use a canonical hash.
+	Identity        *string `gorm:"size:64;uniqueIndex" json:"identity"`
+	TargetKind      string  `gorm:"size:32" json:"target_kind"`
+	TargetRef       string  `gorm:"size:255" json:"target_ref"`
+	Protocol        string  `gorm:"size:32" json:"protocol"`
+	Enabled         bool    `json:"enabled"`
+	Archived        bool    `json:"archived"`
+	IntervalSeconds int64   `json:"interval_seconds"`
+	TimeoutSeconds  int64   `json:"timeout_seconds"`
+	StaleSeconds    int64   `json:"stale_seconds"`
+	DailyRequests   int64   `json:"daily_requests"`
+	// Monitoring budget reservation only: this is NOT a provider-enforced spending
+	// ceiling or a retail billing price. Real transport must separately enforce one.
+	RequestCostMicros int64 `json:"request_cost_micros"`
 }
 
 type ConsoleProbe struct {
@@ -25,10 +39,27 @@ type ConsoleProbe struct {
 	EndpointMS *int64 `json:"endpoint_ms"`
 	// Only fixed safe codes, never raw upstream error text.
 	ErrorCode string `json:"error_code"`
+	// Administrative attribution only, never exposed on the public status page.
+	SourceChannelID int    `json:"-"`
+	SourceKind      string `gorm:"size:32" json:"-"`
+}
+
+// SafeResult also protects legacy records and future adapters at API boundaries.
+func (p *ConsoleProbe) SafeResult() {
+	switch p.Status {
+	case "normal", "degraded", "error", "unknown", "skipped":
+	default:
+		p.Status = "unknown"
+	}
+	switch p.ErrorCode {
+	case "", "probe_failed", "probe_timeout", "authorization_denied", "invalid_result":
+	default:
+		p.ErrorCode = "probe_failed"
+	}
 }
 
 // MigrateConsoleMonitoring is opt-in tooling, never called during application startup.
-func MigrateConsoleMonitoring() error { return DB.AutoMigrate(&ConsoleMonitor{}, &ConsoleProbe{}) }
+func MigrateConsoleMonitoring() error { return MigrateConsoleMonitoringDB(DB) }
 
 type ConsoleAvailability struct {
 	Percent     *float64 `json:"percent"`
@@ -47,10 +78,11 @@ type ConsoleMonitorView struct {
 }
 
 type ConsoleChannelView struct {
-	ID       int                  `json:"id"`
-	Name     string               `json:"name"`
-	Platform string               `json:"platform"`
-	Models   []ConsoleMonitorView `json:"models"`
+	ID         int                  `json:"id"`
+	Name       string               `json:"name"`
+	Platform   string               `json:"platform"`
+	Models     []ConsoleMonitorView `json:"models"`
+	TargetKind string               `json:"target_kind,omitempty"`
 }
 
 type ConsoleMonitorData struct {
@@ -103,9 +135,14 @@ func GetConsoleMonitoring(ctx context.Context, now time.Time) (*ConsoleMonitorDa
 	}
 	result.Ready = true
 	var monitors []ConsoleMonitor
-	if err := DB.WithContext(ctx).Where("published = ?", true).Order("channel_id, id").Find(&monitors).Error; err != nil {
+	query := DB.WithContext(ctx).Where("published = ?", true)
+	if DB.Migrator().HasColumn(&ConsoleMonitor{}, "archived") {
+		query = query.Where("archived = ?", false)
+	}
+	if err := query.Order("channel_id, id").Find(&monitors).Error; err != nil {
 		return nil, err
 	}
+	channelIndices := make(map[int]int)
 	for _, monitor := range monitors {
 		view := ConsoleMonitorView{ID: monitor.ID, Model: monitor.Model, Status: "unknown", History: []ConsoleProbe{}, Windows: map[int]ConsoleAvailability{}}
 		var records []ConsoleProbe
@@ -116,10 +153,17 @@ func GetConsoleMonitoring(ctx context.Context, now time.Time) (*ConsoleMonitorDa
 		if err := DB.WithContext(ctx).Where("monitor_id = ? AND checked_at <= ?", monitor.ID, now.Unix()).Order("checked_at DESC, id DESC").Limit(60).Find(&view.History).Error; err != nil {
 			return nil, err
 		}
+		for i := range view.History {
+			view.History[i].SafeResult()
+		}
 		if len(view.History) > 0 {
 			latest := view.History[0]
 			view.Latest = &latest
-			if now.Unix()-latest.CheckedAt <= result.StaleAfterSeconds {
+			staleSeconds := result.StaleAfterSeconds
+			if monitor.StaleSeconds > 0 {
+				staleSeconds = monitor.StaleSeconds
+			}
+			if now.Unix()-latest.CheckedAt <= staleSeconds {
 				view.Status = latest.Status
 			}
 		}
@@ -129,10 +173,17 @@ func GetConsoleMonitoring(ctx context.Context, now time.Time) (*ConsoleMonitorDa
 		for _, days := range []int{7, 15, 30} {
 			view.Windows[days] = ConsoleProbeWindow(records, days, now.In(ConsoleBusinessZone))
 		}
-		if len(result.Channels) == 0 || result.Channels[len(result.Channels)-1].ID != monitor.ChannelID {
-			result.Channels = append(result.Channels, ConsoleChannelView{ID: monitor.ChannelID, Name: monitor.DisplayName, Platform: monitor.Platform, Models: []ConsoleMonitorView{}})
+		publicID := monitor.ChannelID
+		if monitor.TargetKind != "" && monitor.TargetKind != "channel" {
+			publicID = -monitor.ID
 		}
-		result.Channels[len(result.Channels)-1].Models = append(result.Channels[len(result.Channels)-1].Models, view)
+		index, found := channelIndices[publicID]
+		if !found {
+			index = len(result.Channels)
+			channelIndices[publicID] = index
+			result.Channels = append(result.Channels, ConsoleChannelView{ID: publicID, Name: monitor.DisplayName, Platform: monitor.Platform, TargetKind: monitor.TargetKind, Models: []ConsoleMonitorView{}})
+		}
+		result.Channels[index].Models = append(result.Channels[index].Models, view)
 	}
 	return result, nil
 }
@@ -147,6 +198,11 @@ func RecordConsoleProbe(ctx context.Context, channelID int, testModel, status st
 		return err
 	}
 	for _, monitor := range monitors {
+		// New control-plane targets may only receive records from the independent
+		// executor; legacy channel_test cannot populate a group or managed target.
+		if monitor.Identity != nil {
+			continue
+		}
 		record := ConsoleProbe{MonitorID: monitor.ID, CheckedAt: time.Now().Unix(), Status: status, LatencyMS: &milliseconds}
 		if status == "error" {
 			record.ErrorCode = "probe_failed"
