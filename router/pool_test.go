@@ -427,10 +427,124 @@ func TestPoolModuleDisabledReturns404ForOwner(t *testing.T) {
 		{"GET", "/api/owner/pool/capability"},
 		{"GET", "/api/owner/pool/accounts"},
 		{"POST", "/api/owner/pool/accounts"},
+		{"GET", "/api/owner/pool/fallback-policy"},
+		{"PUT", "/api/owner/pool/fallback-policy"},
 	} {
 		result := setup.request(endpoint.method, endpoint.path, "synthetic-owner-pat", map[string]any{})
 		assert.Equal(t, http.StatusNotFound, result.Code, endpoint.path)
 	}
+}
+
+func TestPoolFallbackPolicyRoundTrip(t *testing.T) {
+	t.Run("fresh_migration", func(t *testing.T) {
+		db := poolFixtureDB(t)
+		for range 2 {
+			require.NoError(t, model.MigratePoolFallback(db))
+		}
+		assert.True(t, db.Migrator().HasTable(&model.PoolFallbackPolicy{}))
+		assert.True(t, db.Migrator().HasTable(&model.PoolFallbackMember{}))
+	})
+	setup := newPoolTestSetup(t, true)
+	var engineVersion string
+	versionQuery := "SELECT version()"
+	if setup.db.Dialector.Name() == "sqlite" {
+		versionQuery = "SELECT sqlite_version()"
+	}
+	require.NoError(t, setup.db.Raw(versionQuery).Scan(&engineVersion).Error)
+	t.Logf("database=%s version=%s", setup.db.Dialector.Name(), engineVersion)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	// Representative pre-PG03 account data must survive repeated migration.
+	for id := 1; id <= 4; id++ {
+		require.NoError(t, setup.db.Create(&model.UpstreamPoolAccount{Id: id, Platform: "codex", ExecutorId: accountpool.ExecutorCliproxyAPI, CredentialRef: fmt.Sprintf("synthetic-%d", id), Note: "preserve"}).Error)
+	}
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	var retained model.UpstreamPoolAccount
+	require.NoError(t, setup.db.First(&retained, 1).Error)
+	assert.Equal(t, "preserve", retained.Note)
+
+	readPath := "/api/owner/pool/fallback-policy?pool_id=codex-pool&model=codex"
+	missing := setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, missing.Code)
+	assert.Contains(t, missing.Body.String(), `"data":null`)
+
+	input := accountpool.FallbackPolicyInput{PoolId: "codex-pool", ModelName: "codex", MaxFallbackCount: 3, Enabled: true}
+	for id := 1; id <= 4; id++ {
+		input.Members = append(input.Members, accountpool.FallbackMemberInput{AccountId: id, Priority: 110 - 10*id, Enabled: true})
+	}
+	saved := setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	require.Equal(t, http.StatusOK, saved.Code, saved.Body.String())
+	read := setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, read.Code, read.Body.String())
+	var result struct {
+		Data model.PoolFallbackPolicy `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(read.Body.Bytes(), &result))
+	assert.Equal(t, 3, result.Data.MaxFallbackCount)
+	require.Len(t, result.Data.Members, 4)
+	for i, member := range result.Data.Members {
+		assert.Equal(t, i+1, member.AccountId)
+	}
+	policyID := result.Data.Id
+	// Same-policy replacement is atomic and new reads immediately see the order.
+	for i := range input.Members {
+		input.Members[i].Priority = 70 + 10*i
+	}
+	saved = setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	require.Equal(t, http.StatusOK, saved.Code, saved.Body.String())
+	read = setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.NoError(t, common.Unmarshal(read.Body.Bytes(), &result))
+	assert.Equal(t, policyID, result.Data.Id)
+	for i, member := range result.Data.Members {
+		assert.Equal(t, 4-i, member.AccountId)
+	}
+	// Uniqueness constraints survive migrations without discarding policy data.
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	require.Error(t, setup.db.Create(&model.PoolFallbackPolicy{PoolId: "codex-pool", ModelName: "codex"}).Error)
+	require.Error(t, setup.db.Create(&model.PoolFallbackMember{PolicyId: policyID, AccountId: 1}).Error)
+	for _, tc := range []struct {
+		name   string
+		mutate func(*accountpool.FallbackPolicyInput)
+	}{
+		{"over_limit", func(p *accountpool.FallbackPolicyInput) { p.MaxFallbackCount = 4 }},
+		{"negative_limit", func(p *accountpool.FallbackPolicyInput) { p.MaxFallbackCount = -1 }},
+		{"duplicate", func(p *accountpool.FallbackPolicyInput) { p.Members[1].AccountId = p.Members[0].AccountId }},
+		{"unknown_account", func(p *accountpool.FallbackPolicyInput) { p.Members[0].AccountId = 999 }},
+		{"wildcard", func(p *accountpool.FallbackPolicyInput) { p.ModelName = "*" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			invalid := input
+			invalid.Members = append([]accountpool.FallbackMemberInput(nil), input.Members...)
+			tc.mutate(&invalid)
+			rejected := setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", invalid)
+			assert.Equal(t, http.StatusBadRequest, rejected.Code, rejected.Body.String())
+		})
+	}
+	// A member insert failure must roll back the policy update and member deletion.
+	require.NoError(t, setup.db.Callback().Create().Before("gorm:create").Register("pg03_member_failure", func(tx *gorm.DB) {
+		if tx.Statement.Table == "pool_fallback_member" {
+			tx.AddError(fmt.Errorf("synthetic member failure"))
+		}
+	}))
+	input.Enabled = false
+	failed := setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	assert.Equal(t, http.StatusInternalServerError, failed.Code)
+	require.NoError(t, setup.db.Callback().Create().Remove("pg03_member_failure"))
+	read = setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.NoError(t, common.Unmarshal(read.Body.Bytes(), &result))
+	assert.True(t, result.Data.Enabled)
+	require.Len(t, result.Data.Members, 4)
+	assert.Equal(t, 4, result.Data.Members[0].AccountId)
+	input.MaxFallbackCount = 0
+	input.Members[0].Enabled = false
+	saved = setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	require.Equal(t, http.StatusOK, saved.Code, saved.Body.String())
+	require.NoError(t, common.Unmarshal(saved.Body.Bytes(), &result))
+	assert.False(t, result.Data.Enabled)
+	assert.Zero(t, result.Data.MaxFallbackCount)
+	var accounts int64
+	require.NoError(t, setup.db.Model(&model.UpstreamPoolAccount{}).Count(&accounts).Error)
+	assert.EqualValues(t, 4, accounts)
 }
 
 func TestPoolRequiresOwnerIdentityOnEveryEndpoint(t *testing.T) {
@@ -445,6 +559,7 @@ func TestPoolRequiresOwnerIdentityOnEveryEndpoint(t *testing.T) {
 		{"POST", "/accounts/1/resume"}, {"POST", "/accounts/1/reauth"},
 		{"POST", "/accounts/1/delete"}, {"POST", "/accounts/1/sync"},
 		{"GET", "/accounts/1/quota"},
+		{"GET", "/fallback-policy"}, {"PUT", "/fallback-policy"},
 	}
 	actors := []struct {
 		token  string
