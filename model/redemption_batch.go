@@ -7,6 +7,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 const (
@@ -21,19 +22,24 @@ const maxRedemptionBatchCount = 100
 const maxRedemptionBatchFaceValueCents int64 = 1_000_000_000
 
 type RedemptionBatch struct {
-	Id             int    `json:"id"`
-	Name           string `json:"name" gorm:"type:varchar(128);index"`
-	Source         string `json:"source" gorm:"type:varchar(16);default:'STORE'"`
-	Type           string `json:"type" gorm:"type:varchar(16);default:'BALANCE'"`
-	FaceValueCents int64  `json:"face_value_cents" gorm:"type:bigint"`
-	Quota          int    `json:"quota" gorm:"default:0"`
-	Count          int    `json:"count" gorm:"default:0"`
-	ExpiredTime    int64  `json:"expired_time" gorm:"bigint"`
-	Status         int    `json:"status" gorm:"default:1;index"`
-	Note           string `json:"note" gorm:"type:varchar(255);default:''"`
-	CreatedBy      int    `json:"created_by"`
-	CreatedTime    int64  `json:"created_time" gorm:"bigint;index"`
-	UpdatedTime    int64  `json:"updated_time" gorm:"bigint"`
+	Id              int    `json:"id"`
+	Name            string `json:"name" gorm:"type:varchar(128);index"`
+	Source          string `json:"source" gorm:"type:varchar(16);default:'STORE'"`
+	Type            string `json:"type" gorm:"type:varchar(16);default:'BALANCE'"`
+	FaceValueCents  int64  `json:"face_value_cents" gorm:"type:bigint"`
+	Quota           int    `json:"quota" gorm:"default:0"`
+	Count           int    `json:"count" gorm:"default:0"`
+	ExpiredTime     int64  `json:"expired_time" gorm:"bigint"`
+	Status          int    `json:"status" gorm:"default:1;index"`
+	Note            string `json:"note" gorm:"type:varchar(255);default:''"`
+	CreatedBy       int    `json:"created_by"`
+	CreatedTime     int64  `json:"created_time" gorm:"bigint;index"`
+	UpdatedTime     int64  `json:"updated_time" gorm:"bigint"`
+	ProductID       string `json:"product_id" gorm:"type:varchar(64)"`
+	ProductRevision int64  `json:"product_revision"`
+	ApprovalID      int    `json:"approval_id"`
+	DeliveryBinding string `json:"delivery_binding" gorm:"type:varchar(256)"`
+	EvidenceOnly    bool   `json:"evidence_only"`
 }
 
 // RedemptionBatchStats 实时聚合（GROUP BY batch_id, status），不存计数器，
@@ -51,17 +57,23 @@ type RedemptionBatchWithStats struct {
 }
 
 type CreateRedemptionBatchInput struct {
-	Name           string
-	FaceValueCents int64
-	Count          int
-	ExpiredTime    int64
-	Note           string
-	AdminUserID    int
+	Name            string
+	FaceValueCents  int64
+	Count           int
+	ExpiredTime     int64
+	Note            string
+	AdminUserID     int
+	ProductID       string
+	ProductRevision int64
+	EvidenceOnly    bool
 }
 
 // CreateRedemptionBatch 创建批次并一次性生成全部商城码（单事务，任一码插入
 // 失败整体回滚）。quota 按创建当时 Price 冻结。
 func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, []string, error) {
+	if input.EvidenceOnly && (input.ProductID == "" || input.Count != 1) {
+		return nil, nil, errors.New("evidence sample requires one code bound to a draft revision")
+	}
 	if input.AdminUserID <= 0 {
 		return nil, nil, errors.New("无效的管理员")
 	}
@@ -77,9 +89,13 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 	if input.ExpiredTime != 0 && input.ExpiredTime < common.GetTimestamp() {
 		return nil, nil, errors.New("过期时间无效")
 	}
-	quota, err := storeQuotaForFaceValueCents(input.FaceValueCents)
-	if err != nil {
-		return nil, nil, err
+	quota := 0
+	var err error
+	if input.ProductID == "" && !input.EvidenceOnly {
+		quota, err = storeQuotaForFaceValueCents(input.FaceValueCents)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	now := common.GetTimestamp()
 	batch := &RedemptionBatch{
@@ -98,8 +114,101 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 	}
 	keys := make([]string, 0, input.Count)
 	err = DB.Transaction(func(tx *gorm.DB) error {
+		var sampleCatalog CreditCatalog
+		var sampleRow Option
+		var optionCount int64
+		if tx.Migrator().HasTable(&Option{}) {
+			if err := tx.Model(&Option{}).Where(&Option{Key: CreditCatalogOptionKey}).Count(&optionCount).Error; err != nil {
+				return err
+			}
+		}
+		if optionCount > 0 {
+			row, catalog, err := lockedCreditCatalog(tx)
+			if err != nil {
+				return err
+			}
+			if input.ProductID == "" && catalog.ApprovalSchema == 1 {
+				return errors.New("new inventory requires a product revision")
+			}
+			if input.ProductID != "" {
+				found := false
+				for _, product := range catalog.Products {
+					if product.ID != input.ProductID {
+						continue
+					}
+					if product.Revision != input.ProductRevision || product.PriceCents != input.FaceValueCents {
+						return errors.New("product revision or price mismatch")
+					}
+					if input.EvidenceOnly {
+						if catalog.Unified || input.Count != 1 || product.State != "draft" || product.BaseQuota <= 0 || product.DeliveryBinding == "" {
+							return errors.New("delivery evidence sample requires a draft in preparation mode")
+						}
+						batch.EvidenceOnly = true
+						// A locking read is required here: MySQL REPEATABLE READ
+						// may have an older snapshot from the initial option query.
+						var issued []CreditApprovalEvent
+						if err := lockForUpdate(tx).Where("product_id = ? AND revision = ? AND decision = ?", product.ID, product.Revision, "sample").Find(&issued).Error; err != nil {
+							return err
+						}
+						if len(issued) != 0 {
+							return errors.New("sample already issued for this product revision")
+						}
+						var existing []RedemptionBatch
+						if err := lockForUpdate(tx).Where("product_id = ? AND product_revision = ? AND evidence_only = ?", product.ID, product.Revision, true).Find(&existing).Error; err != nil || len(existing) != 0 {
+							return errors.New("sample batch already exists for this product revision")
+						}
+						sampleCatalog, sampleRow = catalog, row
+					} else {
+						if err := validateCreditApproval(tx, product); err != nil {
+							return err
+						}
+					}
+					quota, err := CreditProductQuota(product)
+					if err != nil {
+						return err
+					}
+					batch.Quota, batch.ProductID, batch.ProductRevision = quota, product.ID, product.Revision
+					batch.ApprovalID, batch.DeliveryBinding = product.ApprovalID, product.DeliveryBinding
+					found = true
+				}
+				if !found {
+					return errors.New("approved product not found")
+				}
+			}
+		} else {
+			if input.ProductID != "" {
+				return errors.New("catalog unavailable")
+			}
+			if tx.Migrator().HasTable(&CreditApprovalEvent{}) {
+				var prepared int64
+				if err := tx.Model(&CreditApprovalEvent{}).Where("decision = ?", "prepare").Count(&prepared).Error; err != nil {
+					return err
+				}
+				if prepared != 0 {
+					return errors.New("prepared catalog missing; inventory issuance refused")
+				}
+			}
+		}
 		if err := tx.Create(batch).Error; err != nil {
 			return err
+		}
+		if input.EvidenceOnly {
+			for i := range sampleCatalog.Products {
+				p := &sampleCatalog.Products[i]
+				if p.ID != input.ProductID {
+					continue
+				}
+				p.EvidenceBatchID = batch.Id
+				if _, err := appendCreditEvent(tx, *p, input.AdminUserID, "sample"); err != nil {
+					return err
+				}
+			}
+			// CAS claims the revision in the same transaction as batch and code
+			// creation. SQLite competing readers fail rather than issue twice;
+			// MySQL/PostgreSQL serialize on the existing catalog row lock.
+			if err := persistCreditCatalog(tx, sampleRow, sampleCatalog); err != nil {
+				return err
+			}
 		}
 		for range input.Count {
 			code := &Redemption{
@@ -107,7 +216,7 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 				Name:           input.Name,
 				Key:            common.GetUUID(),
 				Status:         common.RedemptionCodeStatusEnabled,
-				Quota:          quota,
+				Quota:          batch.Quota,
 				CreatedTime:    common.GetTimestamp(),
 				ExpiredTime:    input.ExpiredTime,
 				BatchId:        batch.Id,
@@ -115,8 +224,9 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 				Type:           RedemptionTypeBalance,
 				Source:         RedemptionSourceStore,
 			}
-			if err := tx.Create(code).Error; err != nil {
-				return err
+			// SQL traces and driver errors can contain the newly issued key.
+			if err := tx.Session(&gorm.Session{Logger: tx.Logger.LogMode(logger.Silent)}).Create(code).Error; err != nil {
+				return errors.New("redemption code insertion failed")
 			}
 			keys = append(keys, code.Key)
 		}

@@ -100,6 +100,12 @@ func GetTopUpInfo(c *gin.Context) {
 		}
 	}
 
+	storeProducts, err := getStoreProductsForUser()
+	if err != nil {
+		common.SysError("invalid store publication: " + err.Error())
+		common.ApiError(c, err)
+		return
+	}
 	data := gin.H{
 		"enable_online_topup":              isEpayTopUpEnabled() && !onlineDisabled,
 		"enable_stripe_topup":              isStripeTopUpEnabled() && !onlineDisabled,
@@ -131,7 +137,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"discount":                operation_setting.GetPaymentSetting().AmountDiscount,
 		"topup_link":              common.TopUpLink,
 		"store_recharge_enabled":  operation_setting.StoreRechargeEnabled,
-		"store_products":          getStoreProductsForUser(),
+		"store_products":          storeProducts,
 		"vip":                     getUserVipInfo(c.GetInt("id")),
 	}
 	common.ApiSuccess(c, data)

@@ -26,6 +26,19 @@ export interface CreditProduct {
   published: boolean
   delivery_verified: boolean
   sort: number
+  currency?: 'CNY'
+  revision?: number
+  state?: string
+  edited_by?: number
+  approval_id?: number
+  evidence_batch_id?: number
+  delivery_evidence?: string
+  delivery_binding?: string
+  legacy_store_id?: number
+  base_quota?: number
+  base_credit?: string
+  legacy_withdrawn?: boolean
+  purchase_path?: string
 }
 
 // Reviewed public product links only. No order or payment integration.
@@ -55,7 +68,8 @@ export function trustedPurchaseUrl(raw: string): string | null {
       url.port !== '' ||
       url.username !== '' ||
       url.password !== '' ||
-      !/^\/item\/[a-zA-Z0-9]+$/.test(url.pathname) ||
+      !/^\/(?:item|shop)\/[a-zA-Z0-9]+$/.test(url.pathname) ||
+      raw !== `https://catfk.com${url.pathname}` ||
       url.search ||
       url.hash
     ) {

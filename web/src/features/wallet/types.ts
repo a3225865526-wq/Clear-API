@@ -299,7 +299,10 @@ export interface CompleteOrderRequest {
  * carrier: the real credited value always comes from the redeemed code.
  */
 export interface StoreProductDto {
-  id: number
+  id: number | string
+  credit_cents?: number
+  base_credit?: string
+  purchase_path?: string
   name: string
   face_value_cents: number
   store_url: string

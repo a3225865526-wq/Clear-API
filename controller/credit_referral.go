@@ -1,16 +1,20 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/authz"
 	"github.com/gin-gonic/gin"
 )
 
 func GetCreditCatalog(c *gin.Context) {
-	catalog, err := model.GetCreditCatalog()
+	catalog, err := model.GetPublicCreditCatalog()
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -20,7 +24,7 @@ func GetCreditCatalog(c *gin.Context) {
 			catalog.Products[i].PurchaseURL = ""
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": catalog, "legacy_purchase_url": model.LegacyCreditPurchaseURL})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": catalog})
 }
 
 func GetAdminCreditCatalog(c *gin.Context) {
@@ -43,6 +47,129 @@ func SaveCreditCatalog(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func GetCreditProductReview(c *gin.Context) {
+	review, err := model.GetCreditProductReview(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, review)
+}
+
+// ResolveCreditPurchase rechecks admission at click time; a cached card cannot
+// redirect after its approval was revoked or its financial revision changed.
+func ResolveCreditPurchase(c *gin.Context) {
+	if c.Param("kind") == "legacy" {
+		id, err := strconv.Atoi(c.Param("id"))
+		if err != nil || id <= 0 {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		products, err := getStoreProductsForUser()
+		if err != nil {
+			common.SysError("invalid purchase view: " + err.Error())
+			c.Status(http.StatusServiceUnavailable)
+			return
+		}
+		for _, p := range products {
+			if p["id"] == id {
+				c.Redirect(http.StatusFound, p["store_url"].(string))
+				return
+			}
+		}
+		c.Status(http.StatusNotFound)
+		return
+	}
+	if c.Param("kind") != "product" {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	revision, err := strconv.ParseInt(c.Query("revision"), 10, 64)
+	if err != nil || revision < 0 {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	catalog, err := model.GetPublicCreditCatalog()
+	if err != nil {
+		common.SysError("invalid purchase view: " + err.Error())
+		c.Status(http.StatusServiceUnavailable)
+		return
+	}
+	for _, p := range catalog.Products {
+		if p.ID != c.Param("id") {
+			continue
+		}
+		if p.Revision != revision {
+			c.Status(http.StatusConflict)
+			return
+		}
+		c.Redirect(http.StatusFound, p.PurchaseURL)
+		return
+	}
+	c.Status(http.StatusNotFound)
+}
+
+func ChangeCreditProductState(c *gin.Context) {
+	permission := authz.StoreReview
+	switch c.Param("action") {
+	case "map":
+		permission = authz.StoreEdit
+	case "publish", "unpublish":
+		permission = authz.StorePublish
+	case "revoke":
+		permission = authz.StoreRevoke
+	}
+	if !authz.Can(c.GetInt("id"), c.GetInt("role"), permission) {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+	if _, ok := middleware.GetSessionAuthIdentity(c); !ok {
+		c.JSON(http.StatusForbidden, gin.H{"success": false, "message": "Product review requires a live dashboard session"})
+		return
+	}
+	var req struct {
+		Version       int64  `json:"version"`
+		Revision      int64  `json:"revision"`
+		Confirmation  string `json:"confirmation"`
+		LegacyStoreID int    `json:"legacy_store_id"`
+		Digest        string `json:"digest"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if c.Param("action") != "submit" {
+		review, err := model.GetCreditProductReview(c.Param("id"))
+		if err != nil || review.Digest != req.Digest || review.Product.Revision != req.Revision {
+			common.ApiErrorMsg(c, "Product review changed; reload before confirming")
+			return
+		}
+		if c.Param("action") == "map" && req.Confirmation != "MAP "+review.Confirmation+fmt.Sprintf(":%d", req.LegacyStoreID) {
+			common.ApiErrorMsg(c, "Explicit mapping confirmation required")
+			return
+		}
+		context, err := common.Marshal(service.StoreProductOperationContext{ProductID: c.Param("id"), Revision: req.Revision, Version: req.Version, Action: c.Param("action"), Digest: req.Digest, LegacyStoreID: req.LegacyStoreID})
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		if middleware.RequireSecurityProof(c, service.VerificationOperation{Scope: service.VerificationScopeStoreProductOperation, Context: context}) == nil {
+			return
+		}
+	}
+	var err error
+	if c.Param("action") == "map" {
+		err = model.MapLegacyCreditProduct(c.Param("id"), req.Version, req.Revision, req.LegacyStoreID, c.GetInt("id"))
+	} else {
+		err = model.ChangeCreditProductState(c.Param("id"), req.Version, req.Revision, c.Param("action"), req.Confirmation, c.GetInt("id"))
+	}
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
 }
 
 func GetReferralSettings(c *gin.Context) {

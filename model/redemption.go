@@ -265,6 +265,9 @@ func (redemption *Redemption) SelectUpdate() error {
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (redemption *Redemption) Update() error {
+	if err := rejectStoreBatchCodeChanges([]int{redemption.Id}); err != nil {
+		return err
+	}
 	if err := rejectOfflineOrderCodeChanges([]int{redemption.Id}); err != nil {
 		return err
 	}
@@ -280,6 +283,9 @@ func (redemption *Redemption) Update() error {
 }
 
 func (redemption *Redemption) Delete() error {
+	if err := rejectStoreBatchCodeChanges([]int{redemption.Id}); err != nil {
+		return err
+	}
 	if err := rejectOfflineOrderCodeChanges([]int{redemption.Id}); err != nil {
 		return err
 	}
@@ -302,7 +308,11 @@ func DeleteRedemptionById(id int) (err error) {
 
 func DeleteInvalidRedemptions() (int64, error) {
 	now := common.GetTimestamp()
-	result := DB.Where("status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)", []int{common.RedemptionCodeStatusUsed, common.RedemptionCodeStatusDisabled}, common.RedemptionCodeStatusEnabled, now).
+	query := DB.Where("status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)", []int{common.RedemptionCodeStatusUsed, common.RedemptionCodeStatusDisabled}, common.RedemptionCodeStatusEnabled, now)
+	if DB.Migrator().HasTable(&RedemptionBatch{}) {
+		query = query.Where("batch_id IS NULL OR batch_id NOT IN (?)", DB.Model(&RedemptionBatch{}).Select("id").Where("product_id <> ?", ""))
+	}
+	result := query.
 		Where("id NOT IN (SELECT redemption_id FROM offline_order_codes)").Delete(&Redemption{})
 	return result.RowsAffected, result.Error
 }
@@ -317,11 +327,32 @@ func BatchDeleteRedemptions(ids []int) (int64, error) {
 			return 0, errors.New("redemption IDs must be positive")
 		}
 	}
+	if err := rejectStoreBatchCodeChanges(ids); err != nil {
+		return 0, err
+	}
 	if err := rejectOfflineOrderCodeChanges(ids); err != nil {
 		return 0, err
 	}
 	result := DB.Where("id IN ?", ids).Delete(&Redemption{})
 	return result.RowsAffected, result.Error
+}
+
+// Issued product-bound codes keep their financial facts and history immutable.
+// Inventory withdrawal uses the existing atomic batch-disable operation.
+func rejectStoreBatchCodeChanges(ids []int) error {
+	if !DB.Migrator().HasTable(&RedemptionBatch{}) {
+		return nil
+	}
+	var count int64
+	err := DB.Model(&Redemption{}).Where("id IN ?", ids).
+		Where("batch_id IN (?)", DB.Model(&RedemptionBatch{}).Select("id").Where("product_id <> ?", "")).Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return errors.New("issued product codes are immutable; manage inventory through batches")
+	}
+	return nil
 }
 
 func rejectOfflineOrderCodeChanges(ids []int) error {

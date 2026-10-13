@@ -55,7 +55,7 @@ func referralFixture(t *testing.T) (int, int) {
 		initCol()
 	})
 	// Dedicated, disposable database only, never a caller's production DSN.
-	for _, table := range []any{&ReferralLedger{}, &ReferralReward{}, &ReferralAudit{}, &Option{}, &Redemption{}, &User{}, &Log{}} {
+	for _, table := range []any{&CreditApprovalEvent{}, &RedemptionBatch{}, &StoreProduct{}, &ReferralLedger{}, &ReferralReward{}, &ReferralAudit{}, &Option{}, &Redemption{}, &User{}, &Log{}} {
 		require.NoError(t, db.Migrator().DropTable(table))
 	}
 	for range 2 {
@@ -347,6 +347,10 @@ func TestReferralConcurrentPayoutCapsAndDuplicateRedemption(t *testing.T) {
 
 func TestReferralCatalogValidationAndImmutableRelations(t *testing.T) {
 	a, b := referralFixture(t)
+	// Exercise the shared storefront startup schema, including batch evidence.
+	for range 2 {
+		require.NoError(t, migrateCreditCatalogSchema())
+	}
 	code, err := EnsureReferralCode(a)
 	require.NoError(t, err)
 	assert.Equal(t, "stable-old-code", code)
@@ -373,6 +377,8 @@ func TestReferralCatalogValidationAndImmutableRelations(t *testing.T) {
 	require.Error(t, SaveCreditCatalog(catalog, a))
 	catalog.Products[0].PurchaseURL = LegacyCreditPurchaseURL
 	catalog.Products[0].DeliveryVerified = true
+	require.Error(t, SaveCreditCatalog(catalog, a), "legacy flags cannot authorize publication")
+	catalog.Products[0].Published, catalog.Products[0].DeliveryVerified = false, false
 	require.NoError(t, SaveCreditCatalog(catalog, a))
 	require.Error(t, SaveCreditCatalog(catalog, a))
 	for _, url := range []string{"http://catfk.com/item/qmcse2", "https://user@catfk.com/item/qmcse2", "https://catfk.com.evil.com/item/qmcse2", "https://catfk.com/item/qmcse2?redirect=x", "https://catfk.com:8443/item/qmcse2", "javascript:alert(1)"} {

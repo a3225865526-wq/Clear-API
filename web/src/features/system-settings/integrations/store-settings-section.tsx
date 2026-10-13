@@ -41,10 +41,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { isValidStoreUrl } from '@/lib/store-url'
-import { handleServerError } from '@/lib/handle-server-error'
-
 import { formatCnyCents, parseCnyToCents } from '@/features/wallet/lib/money'
+import { handleServerError } from '@/lib/handle-server-error'
+import { isValidStoreUrl } from '@/lib/store-url'
+
 import { useUpdateOption } from '../hooks/use-update-option'
 import {
   createStoreProduct,
@@ -196,12 +196,15 @@ export function StoreSettingsSection(props: StoreSettingsSectionProps) {
 
   return (
     <div className='space-y-6'>
+      <p>
+        {t(
+          'Legacy products are frozen. Manage new products through API credit products.'
+        )}
+      </p>
       <div className='rounded-lg border p-4'>
         <div className='flex items-start justify-between gap-4'>
           <div className='space-y-1'>
-            <Label className='text-sm font-medium'>
-              {t('Store Recharge')}
-            </Label>
+            <Label className='text-sm font-medium'>{t('Store Recharge')}</Label>
             <p className='text-muted-foreground text-xs'>
               {t(
                 'When off, users cannot redeem store codes and the store products are hidden. Admin configuration stays available.'
@@ -219,7 +222,7 @@ export function StoreSettingsSection(props: StoreSettingsSectionProps) {
       <div className='space-y-3'>
         <div className='flex items-center justify-between'>
           <h4 className='text-sm font-medium'>{t('Store Products')}</h4>
-          <Button size='sm' variant='outline' onClick={openCreate}>
+          <Button disabled size='sm' variant='outline' onClick={openCreate}>
             {t('Add Product')}
           </Button>
         </div>
@@ -262,15 +265,14 @@ export function StoreSettingsSection(props: StoreSettingsSectionProps) {
                       {product.enabled ? t('Enabled') : t('Disabled')}
                     </Badge>
                   </TableCell>
-                  <TableCell className='tabular-nums'>
-                    {product.sort}
-                  </TableCell>
+                  <TableCell className='tabular-nums'>{product.sort}</TableCell>
                   <TableCell className='text-right'>
                     <div className='flex justify-end gap-1'>
                       <Button
                         variant='ghost'
                         size='sm'
                         className='h-8 px-2'
+                        disabled
                         onClick={() => openEdit(product)}
                       >
                         {t('Edit')}
@@ -279,6 +281,7 @@ export function StoreSettingsSection(props: StoreSettingsSectionProps) {
                         variant='ghost'
                         size='sm'
                         className='text-destructive h-8 px-2'
+                        disabled
                         onClick={() => setDeleteTarget(product)}
                       >
                         {t('Delete')}
@@ -304,7 +307,9 @@ export function StoreSettingsSection(props: StoreSettingsSectionProps) {
               {form.id ? t('Edit Product') : t('Add Product')}
             </DialogTitle>
             <DialogDescription>
-              {t('Configure a store product jump link shown on the wallet page.')}
+              {t(
+                'Configure a store product jump link shown on the wallet page.'
+              )}
             </DialogDescription>
           </DialogHeader>
           <div className='space-y-4'>

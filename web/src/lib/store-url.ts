@@ -47,7 +47,11 @@ export function isValidStoreUrl(raw: string): boolean {
  * noopener/noreferrer.
  */
 export function openStoreUrl(raw: string): boolean {
-  if (!isValidStoreUrl(raw)) return false
+  const admissionPath =
+    /^\/api\/clearapi\/purchase\/(?:legacy\/[1-9][0-9]*|product\/[a-zA-Z0-9_-]+\?revision=[0-9]+)$/.test(
+      raw
+    )
+  if (!admissionPath && !isValidStoreUrl(raw)) return false
   window.open(raw.trim(), '_blank', 'noopener,noreferrer')
   return true
 }

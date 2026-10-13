@@ -22,12 +22,15 @@ import { toast } from 'sonner'
 
 import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { formatCnyCents, parseCnyToCents } from '@/features/wallet/lib/money'
 import { handleServerError } from '@/lib/handle-server-error'
+import { ROLE } from '@/lib/roles'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { createRedemptionBatch } from '../api'
-import { formatCnyCents, parseCnyToCents } from '@/features/wallet/lib/money'
 
 interface RedemptionsBatchCreateDialogProps {
   open: boolean
@@ -50,6 +53,10 @@ export function RedemptionsBatchCreateDialog(
   const [count, setCount] = useState('100')
   const [expiredDate, setExpiredDate] = useState('')
   const [note, setNote] = useState('')
+  const [productID, setProductID] = useState('')
+  const [revision, setRevision] = useState('')
+  const [evidenceOnly, setEvidenceOnly] = useState(false)
+  const root = useAuthStore((s) => s.auth.user?.role === ROLE.SUPER_ADMIN)
   const [submitting, setSubmitting] = useState(false)
 
   const reset = () => {
@@ -58,6 +65,9 @@ export function RedemptionsBatchCreateDialog(
     setCount('100')
     setExpiredDate('')
     setNote('')
+    setProductID('')
+    setRevision('')
+    setEvidenceOnly(false)
   }
 
   const handleSubmit = async () => {
@@ -72,7 +82,9 @@ export function RedemptionsBatchCreateDialog(
       parsedCount < 1 ||
       parsedCount > props.maxCount
     ) {
-      toast.error(t('Count must be between 1 and {{max}}', { max: props.maxCount }))
+      toast.error(
+        t('Count must be between 1 and {{max}}', { max: props.maxCount })
+      )
       return
     }
     const expiredTime = expiredDate
@@ -87,6 +99,9 @@ export function RedemptionsBatchCreateDialog(
         count: parsedCount,
         expired_time: expiredTime,
         note: note.trim(),
+        product_id: productID.trim(),
+        product_revision: Number(revision),
+        evidence_only: evidenceOnly,
       })
       if (response.success && response.data) {
         toast.success(
@@ -129,6 +144,33 @@ export function RedemptionsBatchCreateDialog(
         </div>
       }
     >
+      <Label>
+        {t('Product ID')}
+        <Input
+          value={productID}
+          onChange={(e) => setProductID(e.target.value)}
+        />
+      </Label>
+      <Label>
+        {t('Approved product revision')}
+        <Input
+          inputMode='numeric'
+          value={revision}
+          onChange={(e) => setRevision(e.target.value)}
+        />
+      </Label>
+      {root ? (
+        <Label>
+          <Checkbox
+            checked={evidenceOnly}
+            onCheckedChange={(value) => {
+              setEvidenceOnly(value === true)
+              if (value) setCount('1')
+            }}
+          />
+          {t('Delivery evidence sample only (one code, preparation mode)')}
+        </Label>
+      ) : null}
       <div className='space-y-1.5'>
         <Label htmlFor='batch-name'>{t('Batch Name')}</Label>
         <Input

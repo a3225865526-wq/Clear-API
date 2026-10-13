@@ -125,6 +125,9 @@ export interface CreateRedemptionBatchRequest {
   count: number
   expired_time: number
   note?: string
+  product_id?: string
+  product_revision?: number
+  evidence_only?: boolean
 }
 
 export interface CreateRedemptionBatchResponse {

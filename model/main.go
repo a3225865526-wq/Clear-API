@@ -345,13 +345,11 @@ func migrateDB() error {
 		&Option{},
 		&LoginEncryptionKey{},
 		&Redemption{},
-		&RedemptionBatch{},
 		&ReferralReward{},
 		&ReferralLedger{},
 		&ReferralAudit{},
 		&VIPLevel{},
 		&BalanceTransaction{},
-		&StoreProduct{},
 		&OfflineOrder{},
 		&OfflineOrderCode{},
 		&Ability{},
@@ -397,7 +395,7 @@ func migrateDB() error {
 	if err := InitReferralConfig(); err != nil {
 		return err
 	}
-	if err := InitCreditCatalog(); err != nil {
+	if err := migrateCreditCatalogSchema(); err != nil {
 		return err
 	}
 	if err := InitializeExternalIdentityClaims(); err != nil {

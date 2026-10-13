@@ -43,6 +43,25 @@ describe('isValidStoreUrl', () => {
 })
 
 describe('openStoreUrl', () => {
+  test('opens only canonical same-origin purchase admission paths', () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null)
+    expect(openStoreUrl('/api/clearapi/purchase/product/one?revision=2')).toBe(
+      true
+    )
+    expect(open).toHaveBeenCalledWith(
+      '/api/clearapi/purchase/product/one?revision=2',
+      '_blank',
+      'noopener,noreferrer'
+    )
+    for (const path of [
+      '/api/clearapi/purchase/product/one?revision=2&next=https://evil.example',
+      '//evil.example/api/clearapi/purchase/legacy/1',
+      '/api/clearapi/purchase/product/%2e%2e?revision=2',
+    ]) {
+      expect(openStoreUrl(path)).toBe(false)
+    }
+    open.mockRestore()
+  })
   test('opens valid URLs with noopener/noreferrer', () => {
     const openSpy = vi
       .spyOn(window, 'open')

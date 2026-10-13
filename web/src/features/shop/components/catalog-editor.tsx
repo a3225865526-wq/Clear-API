@@ -24,12 +24,13 @@ import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { SettingsSection } from '@/features/system-settings/components/settings-section'
 
 import { getAdminCatalog, saveCatalog, type Catalog } from '../api'
 import { catalogSchema, decimalUnits } from '../lib/catalog-form'
+import { ProductOperations } from './product-operations'
 
 function CatalogForm(props: { catalog: Catalog }) {
   const { t } = useTranslation()
@@ -65,7 +66,10 @@ function CatalogForm(props: { catalog: Catalog }) {
           >
             <label className='space-y-1'>
               {t('Product ID')}
-              <Input {...form.register(`products.${i}.id`)} />
+              <Input
+                readOnly={(props.catalog.products[i]?.revision ?? 0) > 0}
+                {...form.register(`products.${i}.id`)}
+              />
             </label>
             <label className='space-y-1'>
               {t('Product name')}
@@ -82,25 +86,7 @@ function CatalogForm(props: { catalog: Catalog }) {
                   form.setValue(
                     `products.${i}.price_cents`,
                     decimalUnits(e.target.value, 100),
-                    { shouldValidate: true }
-                  )
-                }
-              />
-            </label>
-            <label className='space-y-1'>
-              {t('USD platform API credit')}
-              <Input
-                type='number'
-                step='0.01'
-                min='0.01'
-                defaultValue={
-                  form.getValues(`products.${i}.credit_cents`) / 100
-                }
-                onChange={(e) =>
-                  form.setValue(
-                    `products.${i}.credit_cents`,
-                    decimalUnits(e.target.value, 100),
-                    { shouldValidate: true }
+                    { shouldValidate: true, shouldDirty: true }
                   )
                 }
               />
@@ -122,28 +108,39 @@ function CatalogForm(props: { catalog: Catalog }) {
                 })}
               />
             </label>
-            <label className='flex items-center gap-2'>
-              <Switch
-                checked={form.watch(`products.${i}.delivery_verified`)}
-                onCheckedChange={(v) =>
-                  form.setValue(`products.${i}.delivery_verified`, v, {
-                    shouldValidate: true,
-                  })
-                }
+            <Label>
+              {t('Base API quota')}
+              <Input
+                type='number'
+                {...form.register(`products.${i}.base_quota`, {
+                  valueAsNumber: true,
+                })}
               />
-              {t('Exact delivery amount verified')}
-            </label>
-            <label className='flex items-center gap-2'>
-              <Switch
-                checked={form.watch(`products.${i}.published`)}
-                onCheckedChange={(v) =>
-                  form.setValue(`products.${i}.published`, v, {
-                    shouldValidate: true,
-                  })
-                }
+            </Label>
+            <Label>
+              {t('Evidence batch ID')}
+              <Input
+                type='number'
+                {...form.register(`products.${i}.evidence_batch_id`, {
+                  valueAsNumber: true,
+                })}
               />
-              {t('Published')}
-            </label>
+            </Label>
+            <Label>
+              {t('Delivery evidence reference')}
+              <Input {...form.register(`products.${i}.delivery_evidence`)} />
+            </Label>
+            <Label>
+              {t('Delivery binding')}
+              <Input {...form.register(`products.${i}.delivery_binding`)} />
+            </Label>
+            {props.catalog.products[i] ? (
+              <ProductOperations
+                product={props.catalog.products[i]}
+                version={props.catalog.version}
+                disabled={form.formState.isDirty}
+              />
+            ) : null}
             {Object.entries(form.formState.errors.products?.[i] ?? {}).map(
               ([key, error]) =>
                 typeof error === 'object' &&
@@ -164,7 +161,7 @@ function CatalogForm(props: { catalog: Catalog }) {
         <Button
           type='button'
           variant='outline'
-          disabled={fields.fields.length >= 100}
+          disabled={false}
           onClick={() =>
             fields.append({
               id: `credit-new-${fields.fields.length + 1}`,
@@ -176,6 +173,13 @@ function CatalogForm(props: { catalog: Catalog }) {
               published: false,
               delivery_verified: false,
               sort: fields.fields.length,
+              currency: 'CNY',
+              state: 'draft',
+              revision: 0,
+              base_quota: 0,
+              evidence_batch_id: 0,
+              delivery_evidence: '',
+              delivery_binding: '',
             })
           }
         >
@@ -202,6 +206,17 @@ export function CatalogEditor() {
   })
   return (
     <SettingsSection title={t('API credit products')}>
+      <p>
+        {t(
+          'Preparation mode preserves frozen legacy entries. Unified cutover requires separate release acceptance.'
+        )}
+      </p>
+      {query.data?.legacy_products?.map((p) => (
+        <p key={p.id}>
+          {t('Legacy store product ID')}: {p.id} · {p.name} ·{' '}
+          {t('Explicit mapping and review required')}
+        </p>
+      ))}
       {query.isPending ? <p>{t('Loading...')}</p> : null}
       {query.isError ? <ErrorState onRetry={() => query.refetch()} /> : null}
       {query.isSuccess ? (
