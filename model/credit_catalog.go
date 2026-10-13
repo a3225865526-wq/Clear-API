@@ -114,6 +114,18 @@ func (c CreditCatalog) Validate() error {
 	return nil
 }
 
+// migrateCreditCatalogSchema is shared by startup and isolated schema tests.
+// Option and Redemption are migrated by the host before this entry point.
+func migrateCreditCatalogSchema() error {
+	if err := DB.AutoMigrate(&StoreProduct{}, &RedemptionBatch{}, &CreditApprovalEvent{}); err != nil {
+		return err
+	}
+	if err := InitCreditCatalog(); err != nil {
+		return err
+	}
+	return PrepareCreditCatalog()
+}
+
 func InitCreditCatalog() error {
 	raw, err := common.Marshal(DefaultCreditCatalog())
 	if err != nil {

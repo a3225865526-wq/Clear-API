@@ -126,6 +126,21 @@ func TestLegacyScopedPoliciesDoNotExpandPermissions(t *testing.T) {
 	}
 }
 
+func TestStoreProductPermissionsDefaultDenyAndOverrides(t *testing.T) {
+	db := newAuthzTestDB(t)
+	require.NoError(t, Init(db))
+	for _, permission := range []Permission{StoreEdit, StoreReview, StorePublish, StoreRevoke} {
+		assert.True(t, Can(1, common.RoleRootUser, permission))
+		assert.False(t, Can(2, common.RoleAdminUser, permission))
+		assert.False(t, Can(3, common.RoleCommonUser, permission))
+	}
+	require.NoError(t, SetUserPermissions(2, PermissionsMap{ResourceStore: {"review": true}}))
+	assert.True(t, Can(2, common.RoleAdminUser, StoreReview))
+	assert.False(t, Can(2, common.RoleAdminUser, StorePublish))
+	require.NoError(t, SetUserPermissions(2, PermissionsMap{ResourceStore: {"review": false}}))
+	assert.False(t, Can(2, common.RoleAdminUser, StoreReview))
+}
+
 func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 	db := newAuthzTestDB(t)
 	require.NoError(t, Init(db))
@@ -158,6 +173,7 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 			ActionBind: false,
 		},
 		ResourceAudit: {ActionRead: false},
+		ResourceStore: {"edit": false, "review": false, "publish": false, "revoke": false},
 	}, ExplicitUserPermissions(42))
 	assert.Equal(t, PermissionsMap{
 		ResourceChannel: {
@@ -190,6 +206,7 @@ func TestSetUserPermissionsStoresOnlyOverrides(t *testing.T) {
 			ActionBind: false,
 		},
 		ResourceAudit: {ActionRead: false},
+		ResourceStore: {"edit": false, "review": false, "publish": false, "revoke": false},
 	}, ExplicitUserPermissions(42))
 	assert.Empty(t, ExplicitUserOverrides(42))
 }

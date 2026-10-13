@@ -159,7 +159,17 @@ it('requires operational confirmation before submitting an enable change', async
 })
 
 it('loads eight persisted products and saves sorting and descriptions through the root endpoint', async () => {
-  const catalog = { version: 1, products: [...creditProducts] }
+  const catalog = {
+    version: 1,
+    products: creditProducts.map((product) => ({
+      ...product,
+      currency: 'CNY',
+      revision: 1,
+      state: 'draft',
+      base_quota: 0,
+      evidence_batch_id: 0,
+    })),
+  }
   vi.spyOn(api, 'get').mockResolvedValue({
     data: { success: true, data: catalog },
   })
@@ -177,12 +187,55 @@ it('loads eight persisted products and saves sorting and descriptions through th
       '/api/clearapi/credit-catalog',
       expect.objectContaining({
         products: expect.arrayContaining([
-          expect.objectContaining({ description: 'Verified description' }),
+          expect.objectContaining({
+            description: 'Verified description',
+            revision: 1,
+            state: 'draft',
+            base_quota: 0,
+            evidence_batch_id: 0,
+            published: false,
+            delivery_verified: false,
+          }),
         ]),
       })
     )
   )
   expect(api.get).toHaveBeenCalledWith('/api/clearapi/credit-catalog/admin')
+})
+
+it('saves a new product as a draft with exact quota and no approval', async () => {
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { version: 4, products: [] } },
+  })
+  const put = vi
+    .spyOn(api, 'put')
+    .mockResolvedValue({ data: { success: true } })
+  renderQuery(<CatalogEditor />)
+  const user = userEvent.setup()
+  await user.click(await screen.findByRole('button', { name: 'Add product' }))
+  await user.type(screen.getByLabelText('Product name'), 'New quota product')
+  const quota = screen.getByLabelText('Base API quota')
+  await user.clear(quota)
+  await user.type(quota, '500001')
+  await user.click(screen.getByRole('button', { name: 'Save products' }))
+  await waitFor(() =>
+    expect(put).toHaveBeenCalledWith(
+      '/api/clearapi/credit-catalog',
+      expect.objectContaining({
+        version: 4,
+        products: [
+          expect.objectContaining({
+            revision: 0,
+            state: 'draft',
+            base_quota: 500001,
+            evidence_batch_id: 0,
+            published: false,
+            delivery_verified: false,
+          }),
+        ],
+      })
+    )
+  )
 })
 
 it('rejects missing delivery proof and parses fractional amounts without floating point drift', () => {

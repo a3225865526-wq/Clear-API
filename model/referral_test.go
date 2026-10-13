@@ -55,7 +55,7 @@ func referralFixture(t *testing.T) (int, int) {
 		initCol()
 	})
 	// Dedicated, disposable database only, never a caller's production DSN.
-	for _, table := range []any{&ReferralLedger{}, &ReferralReward{}, &ReferralAudit{}, &Option{}, &Redemption{}, &User{}, &Log{}} {
+	for _, table := range []any{&CreditApprovalEvent{}, &RedemptionBatch{}, &StoreProduct{}, &ReferralLedger{}, &ReferralReward{}, &ReferralAudit{}, &Option{}, &Redemption{}, &User{}, &Log{}} {
 		require.NoError(t, db.Migrator().DropTable(table))
 	}
 	for range 2 {
@@ -347,8 +347,10 @@ func TestReferralConcurrentPayoutCapsAndDuplicateRedemption(t *testing.T) {
 
 func TestReferralCatalogValidationAndImmutableRelations(t *testing.T) {
 	a, b := referralFixture(t)
-	require.NoError(t, DB.AutoMigrate(&StoreProduct{}, &CreditApprovalEvent{}))
-	require.NoError(t, PrepareCreditCatalog())
+	// Exercise the shared storefront startup schema, including batch evidence.
+	for range 2 {
+		require.NoError(t, migrateCreditCatalogSchema())
+	}
 	code, err := EnsureReferralCode(a)
 	require.NoError(t, err)
 	assert.Equal(t, "stable-old-code", code)

@@ -73,9 +73,9 @@ func creditApprovalFixture(t *testing.T) {
 	require.NoError(t, db.Create(&legacy).Error)
 	require.NoError(t, db.Create(&RedemptionBatch{Id: 77, Name: "preparation legacy", FaceValueCents: 100, Quota: 500000, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Status: RedemptionBatchStatusEnabled, Count: 1}).Error)
 	require.NoError(t, db.Create(&Redemption{Key: "legacy-fixture-only", BatchId: 77, Quota: 500000, FaceValueCents: 100, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Status: common.RedemptionCodeStatusEnabled}).Error)
-	require.NoError(t, InitCreditCatalog())
-	require.NoError(t, PrepareCreditCatalog())
-	require.NoError(t, PrepareCreditCatalog())
+	for range 2 {
+		require.NoError(t, migrateCreditCatalogSchema())
+	}
 }
 
 type creditApprovalLegacyBatch struct {
@@ -103,8 +103,7 @@ func TestCreditApprovalReleasedSchemaUpgradeAndConcurrentReview(t *testing.T) {
 	old := creditApprovalLegacyBatch{Id: 77, Name: "historical", Quota: 123456, FaceValueCents: 100, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Count: 3, Note: "frozen history"}
 	require.NoError(t, DB.Create(&old).Error)
 	for range 2 {
-		require.NoError(t, DB.AutoMigrate(&RedemptionBatch{}, &CreditApprovalEvent{}))
-		require.NoError(t, PrepareCreditCatalog())
+		require.NoError(t, migrateCreditCatalogSchema())
 	}
 	var upgraded RedemptionBatch
 	require.NoError(t, DB.First(&upgraded, 77).Error)

@@ -492,12 +492,8 @@ func TestManageUserQuotaConcurrentSnapshots(t *testing.T) {
 	var ready sync.WaitGroup
 	ready.Add(2)
 	release := make(chan struct{})
-	require.NoError(t, db.Callback().Query().Before("gorm:query").Register("test:concurrent_quota_start", func(tx *gorm.DB) {
-		if tx.Statement.Table == "users" {
-			ready.Done()
-			<-release
-		}
-	}))
+	// Synchronize before BEGIN: SQLite immediate transactions serialize writers
+	// before the query callback, so a barrier inside that callback deadlocks.
 	type result struct {
 		adjustment *model.UserQuotaAdjustment
 		err        error
@@ -506,6 +502,8 @@ func TestManageUserQuotaConcurrentSnapshots(t *testing.T) {
 	results := make(chan result, 2)
 	for _, value := range []int{10, 20} {
 		go func(value int) {
+			ready.Done()
+			<-release
 			adjustment, err := model.AdjustUserQuota(user.Id, common.RoleRootUser, "add", value)
 			results <- result{adjustment, err, value}
 		}(value)
@@ -525,7 +523,6 @@ func TestManageUserQuotaConcurrentSnapshots(t *testing.T) {
 		assert.Equal(t, result.value, result.adjustment.After-result.adjustment.Before)
 		committed = append(committed, *result.adjustment)
 	}
-	require.NoError(t, db.Callback().Query().Remove("test:concurrent_quota_start"))
 	require.NotEmpty(t, committed)
 	sort.Slice(committed, func(i, j int) bool { return committed[i].Before < committed[j].Before })
 	balance := 1000

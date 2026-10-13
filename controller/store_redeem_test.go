@@ -98,6 +98,9 @@ func TestCreditApprovalHTTPPermissionsAndUnifiedWallet(t *testing.T) {
 	rootPAT := "sample-root-pat-fixture"
 	root := model.User{Username: "store-root", Role: common.RoleRootUser, Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1, Password: "fixture-password", AccessToken: &rootPAT}
 	require.NoError(t, model.DB.Create(&root).Error)
+	userPAT := "store-user-pat-fixture"
+	user := model.User{Username: "store-common", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AffCode: "store-common-fixture", AuthVersion: 1, AccessToken: &userPAT}
+	require.NoError(t, model.DB.Create(&user).Error)
 	now := time.Now().Unix()
 	session := &model.UserSession{SID: "store-approval-session", UserID: root.Id, Version: 1, UserAuthVersion: 1, Status: model.UserSessionStatusActive, RefreshHash: "fixture-refresh-hash", LoginMethod: "password", LastActiveAt: now, ExpiresAt: now + 3600}
 	require.NoError(t, model.CreateUserSession(session))
@@ -138,6 +141,7 @@ func TestCreditApprovalHTTPPermissionsAndUnifiedWallet(t *testing.T) {
 	assert.NotContains(t, duplicate, `"keys"`)
 	for _, action := range []string{"submit", "approve", "publish", "revoke", "map"} {
 		assert.Equal(t, http.StatusForbidden, request("/products/explicit/"+action, adminPAT, map[string]any{}, "").Code)
+		assert.Equal(t, http.StatusForbidden, request("/products/explicit/"+action, userPAT, map[string]any{}, "").Code)
 		assert.Equal(t, http.StatusUnauthorized, request("/products/explicit/"+action, "", map[string]any{}, "").Code)
 	}
 	assert.Equal(t, common.RoleAdminUser, admin.Role)
