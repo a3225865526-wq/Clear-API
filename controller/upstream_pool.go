@@ -105,6 +105,35 @@ func PoolCapability(c *gin.Context) {
 	}})
 }
 
+func GetPoolFallbackPolicy(c *gin.Context) {
+	poolID := c.Query("pool_id")
+	modelName := c.Query("model")
+	if poolID == "" || modelName == "" {
+		poolError(c, model.ErrPoolInvalid)
+		return
+	}
+	policy, err := accountpool.GetFallbackPolicy(c.Request.Context(), poolID, modelName)
+	if err != nil {
+		poolError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": policy})
+}
+
+func SavePoolFallbackPolicy(c *gin.Context) {
+	var input accountpool.FallbackPolicyInput
+	if err := common.UnmarshalBodyReusable(c, &input); err != nil {
+		poolError(c, model.ErrPoolInvalid)
+		return
+	}
+	policy, err := accountpool.SaveFallbackPolicy(c.Request.Context(), input)
+	if err != nil {
+		poolError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": policy})
+}
+
 func ListPoolExecutors(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": accountpool.Executors()})
 }

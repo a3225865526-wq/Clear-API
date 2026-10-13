@@ -342,6 +342,9 @@ func migrateDB() error {
 	if err := MigrateRouteChain(DB); err != nil {
 		return err
 	}
+	if err := MigratePoolFallback(DB); err != nil {
+		return err
+	}
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},

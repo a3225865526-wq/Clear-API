@@ -23,6 +23,8 @@ func RegisterUpstreamPoolRoutes(api *gin.RouterGroup) {
 	pool.GET("/channels", controller.ListPoolChannels)
 	pool.PUT("/channels/:id/pool-routing", controller.SetChannelPoolRouting)
 	pool.GET("/model-availability", controller.GetPoolModelAvailability)
+	pool.GET("/fallback-policy", controller.GetPoolFallbackPolicy)
+	pool.PUT("/fallback-policy", controller.SavePoolFallbackPolicy)
 	pool.GET("/accounts", controller.ListPoolAccounts)
 	pool.POST("/accounts", controller.CreatePoolAccount)
 	pool.GET("/accounts/:id", controller.GetPoolAccount)
