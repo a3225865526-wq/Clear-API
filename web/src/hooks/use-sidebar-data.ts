@@ -150,6 +150,14 @@ export function useSidebarData(): SidebarData {
             icon: Box,
           },
           {
+            title: t('Channel monitoring'),
+            icon: RadioTower,
+            requiredRole: ROLE.SUPER_ADMIN,
+            items: [
+              { title: t('Monitoring targets'), url: '/monitor-targets' },
+            ],
+          },
+          {
             title: t('Users'),
             url: '/users',
             icon: Users,

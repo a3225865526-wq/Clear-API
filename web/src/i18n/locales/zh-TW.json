@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Channel monitoring": "渠道監測",
+    "Monitoring targets": "監測目標",
+    "Global monitoring policy (read only)": "全域監測策略（唯讀）",
+    "Maximum concurrent probes": "最大並行檢測數",
+    "Daily monitoring budget": "每日監測預算",
+    "Allowlist membership does not enable probe execution.": "加入白名單不會啟用檢測執行。",
+    "Account Pool group (integration pending)": "帳號池群組（尚未整合）",
+    "Created by": "建立者",
     "Archive monitor": "封存監測",
     "Daily probe request limit": "每日檢測請求上限",
     "Monitor administration": "監測管理",

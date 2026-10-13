@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Channel monitoring": "Surveillance des canaux",
+    "Monitoring targets": "Cibles de surveillance",
+    "Global monitoring policy (read only)": "Politique globale de surveillance (lecture seule)",
+    "Maximum concurrent probes": "Nombre maximal de sondes simultanées",
+    "Daily monitoring budget": "Budget quotidien de surveillance",
+    "Allowlist membership does not enable probe execution.": "L’inscription sur la liste autorisée n’active pas les sondes.",
+    "Account Pool group (integration pending)": "Groupe du pool de comptes (intégration en attente)",
+    "Created by": "Créé par",
     "Archive monitor": "Archiver la sonde",
     "Daily probe request limit": "Limite quotidienne des sondes",
     "Monitor administration": "Gestion des sondes",

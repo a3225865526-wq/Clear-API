@@ -1,5 +1,13 @@
 {
   "translation": {
+    "Channel monitoring": "Channel monitoring",
+    "Monitoring targets": "Monitoring targets",
+    "Global monitoring policy (read only)": "Global monitoring policy (read only)",
+    "Maximum concurrent probes": "Maximum concurrent probes",
+    "Daily monitoring budget": "Daily monitoring budget",
+    "Allowlist membership does not enable probe execution.": "Allowlist membership does not enable probe execution.",
+    "Account Pool group (integration pending)": "Account Pool group (integration pending)",
+    "Created by": "Created by",
     "Archive monitor": "Archive monitor",
     "Daily probe request limit": "Daily probe request limit",
     "Monitor administration": "Monitor administration",

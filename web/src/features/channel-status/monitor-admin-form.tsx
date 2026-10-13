@@ -30,6 +30,7 @@ export function MonitorAdminForm(props: {
   targets: MonitorTargets
   monitor?: Monitor
   onSaved?: () => void
+  allowlist?: boolean
 }) {
   const { t } = useTranslation()
   const client = useQueryClient()
@@ -59,10 +60,19 @@ export function MonitorAdminForm(props: {
       const separator = target.indexOf(':')
       const kind = target.slice(0, separator)
       const ref = target.slice(separator + 1)
+      const configuration = props.allowlist
+        ? {
+            display_name: values.display_name,
+            interval_seconds: values.interval_seconds,
+            timeout_seconds: values.timeout_seconds,
+            stale_seconds: values.stale_seconds,
+          }
+        : values
       const input = {
-        ...values,
+        ...configuration,
         id: props.monitor?.id ?? 0,
         target_kind: kind,
+        ...(props.allowlist ? { target_type: kind } : {}),
         target_ref: ref,
         channel_id: kind === 'channel' ? Number(ref) : 0,
         model,
@@ -73,13 +83,17 @@ export function MonitorAdminForm(props: {
         archived: false,
       }
       const options = { headers: { 'X-ClearAPI-Monitor': '1' } }
+      const base = props.allowlist
+        ? '/api/console/monitor-targets'
+        : '/api/console/monitor-admin'
       const response = props.monitor
-        ? await api.put('/api/console/monitor-admin', input, options)
-        : await api.post('/api/console/monitor-admin', input, options)
+        ? await api.put(base, input, options)
+        : await api.post(base, input, options)
       return requireServerSuccess(response.data)
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['monitor-admin-catalog'] })
+      void client.invalidateQueries({ queryKey: ['monitor-allowlist-catalog'] })
       void client.invalidateQueries({ queryKey: ['console-monitoring'] })
       props.onSaved?.()
     },
@@ -142,6 +156,11 @@ export function MonitorAdminForm(props: {
                       {name} · group_route
                     </SelectItem>
                   ))}
+                  {props.allowlist && (
+                    <SelectItem value='account_pool_group:reserved' disabled>
+                      {t('Account Pool group (integration pending)')}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -208,25 +227,33 @@ export function MonitorAdminForm(props: {
             </p>
           )}
         </div>
-        {numericFields.map(([key, label]) => (
-          <div key={key} className='space-y-2'>
-            <Label htmlFor={`monitor-${key}`}>{t(label)}</Label>
-            <Input
-              id={`monitor-${key}`}
-              type='number'
-              {...form.register(key)}
-              aria-invalid={Boolean(form.formState.errors[key])}
-              aria-describedby={
-                form.formState.errors[key] ? `monitor-${key}-error` : undefined
-              }
-            />
-            {form.formState.errors[key] && (
-              <p role='alert' id={`monitor-${key}-error`}>
-                {t('Invalid value')}
-              </p>
-            )}
-          </div>
-        ))}
+        {numericFields
+          .filter(
+            ([key]) =>
+              !props.allowlist ||
+              (key !== 'daily_requests' && key !== 'request_cost_micros')
+          )
+          .map(([key, label]) => (
+            <div key={key} className='space-y-2'>
+              <Label htmlFor={`monitor-${key}`}>{t(label)}</Label>
+              <Input
+                id={`monitor-${key}`}
+                type='number'
+                {...form.register(key)}
+                aria-invalid={Boolean(form.formState.errors[key])}
+                aria-describedby={
+                  form.formState.errors[key]
+                    ? `monitor-${key}-error`
+                    : undefined
+                }
+              />
+              {form.formState.errors[key] && (
+                <p role='alert' id={`monitor-${key}-error`}>
+                  {t('Invalid value')}
+                </p>
+              )}
+            </div>
+          ))}
         <Button type='submit' disabled={!model || !target || save.isPending}>
           {t(props.monitor ? 'Save' : 'Add')}
         </Button>

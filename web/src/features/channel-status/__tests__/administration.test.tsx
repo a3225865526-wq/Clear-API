@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import en from '@/i18n/locales/en.json'
 import { api } from '@/lib/api'
+import { useAuthStore } from '@/stores/auth-store'
 
 import { MonitorAdmin } from '../monitor-admin'
 import { MonitorAdminForm } from '../monitor-admin-form'
+import { MonitorTargetsPage } from '../monitor-targets-page'
 
 let client: QueryClient
 beforeEach(() => {
@@ -28,6 +30,7 @@ beforeEach(() => {
             groups: [],
           }
         : {
+            policy: { max_concurrent: 2, daily_cost_micros: 5000000 },
             monitors: [
               {
                 id: 1,
@@ -54,6 +57,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   client.clear()
+  useAuthStore.getState().auth.setUser(null)
   vi.restoreAllMocks()
 })
 function renderAdmin() {
@@ -63,10 +67,11 @@ function renderAdmin() {
     </QueryClientProvider>
   )
 }
-function renderEditForm() {
+function renderEditForm(allowlist = false) {
   return render(
     <QueryClientProvider client={client}>
       <MonitorAdminForm
+        allowlist={allowlist}
         targets={{
           channels: [{ id: 1, name: 'Allowed', status: 1, models: 'model-a' }],
           groups: [],
@@ -95,6 +100,74 @@ function renderEditForm() {
 }
 
 describe('monitor administration', () => {
+  it('saves target timing without sending per-target budget overrides', async () => {
+    const put = vi
+      .spyOn(api, 'put')
+      .mockResolvedValue({ data: { success: true } })
+    renderEditForm(true)
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(put).toHaveBeenCalled())
+    const [url, input] = put.mock.calls[0]
+    expect(url).toBe('/api/console/monitor-targets')
+    expect(input).toMatchObject({
+      target_type: 'channel',
+      target_ref: '1',
+      model: 'model-a',
+      enabled: false,
+      published: false,
+    })
+    expect(input).not.toHaveProperty('daily_requests')
+    expect(input).not.toHaveProperty('request_cost_micros')
+    expect(input).not.toHaveProperty('max_concurrency')
+    expect(input).not.toHaveProperty('daily_budget_limit')
+  })
+  it('hides target management from ordinary administrators without fetching data', () => {
+    useAuthStore.getState().auth.setUser({ id: 2, username: 'admin', role: 50 })
+    render(
+      <QueryClientProvider client={client}>
+        <MonitorTargetsPage />
+      </QueryClientProvider>
+    )
+    expect(
+      screen.queryByRole('button', { name: 'Add' })
+    ).not.toBeInTheDocument()
+    expect(api.get).not.toHaveBeenCalled()
+  })
+  it('shows global policy read only and enables only allowlist membership after confirmation', async () => {
+    useAuthStore.getState().auth.setUser({ id: 1, username: 'root', role: 100 })
+    const put = vi
+      .spyOn(api, 'put')
+      .mockResolvedValue({ data: { success: true } })
+    const post = vi.spyOn(api, 'post')
+    render(
+      <QueryClientProvider client={client}>
+        <MonitorTargetsPage />
+      </QueryClientProvider>
+    )
+    await screen.findByText('Configured target · model-a')
+    expect(
+      screen.getByText('Global monitoring policy (read only)')
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('spinbutton', { name: 'Daily probe request limit' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('spinbutton', {
+        name: 'Reserved cost per probe (micro USD)',
+      })
+    ).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Enable' }))
+    expect(put).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() =>
+      expect(put).toHaveBeenCalledWith(
+        '/api/console/monitor-targets/1/switch/enabled',
+        { value: true, confirm: true },
+        { headers: { 'X-ClearAPI-Monitor': '1' } }
+      )
+    )
+    expect(post).not.toHaveBeenCalled()
+  })
   it('requires explicit confirmation before publishing and never requests a probe', async () => {
     const put = vi
       .spyOn(api, 'put')
