@@ -34,6 +34,13 @@ type ConsoleProbeOutcome struct {
 	CleanupStartedAt int64
 }
 
+type ConsoleProbeResult struct {
+	AttemptID int64  `json:"attempt_id"`
+	ProbeID   int64  `json:"probe_id"`
+	Status    string `json:"status"`
+	ErrorCode string `json:"error_code"`
+}
+
 type ConsoleProbeExecutor struct {
 	DB       *gorm.DB
 	Adapters map[string]ConsoleProbeAdapter
@@ -70,31 +77,49 @@ func (e *ConsoleProbeExecutor) RunScheduled(ctx context.Context) error {
 }
 
 func (e *ConsoleProbeExecutor) Run(ctx context.Context, id int) error {
+	_, err := e.RunWithResult(ctx, id)
+	return err
+}
+
+func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (result ConsoleProbeResult, err error) {
 	if !model.ConsoleMonitoringReady(e.DB) {
-		return model.ErrMonitorNotReady
+		return result, model.ErrMonitorNotReady
 	}
 	var configured model.ConsoleMonitor
 	if err := e.DB.WithContext(ctx).First(&configured, id).Error; err != nil {
-		return err
+		return result, err
+	}
+	// Only the approved dedicated-channel Responses boundary is affected.
+	// No real adapter is required or registered to record a cost denial.
+	costGated := isConsoleProbeCostScope(configured)
+	if costGated && (!configured.Allowlisted || !configured.Published || !configured.Enabled || configured.Archived) {
+		return result, model.ErrMonitorPaused
 	}
 	adapter := e.Adapters[configured.TargetKind]
-	if adapter == nil {
-		return model.ErrMonitorIntegration
+	if adapter == nil && !costGated {
+		return result, model.ErrMonitorIntegration
 	}
-	if err := runConsoleAuthorizeSafely(ctx, adapter, configured); err != nil {
-		return err
+	if adapter != nil && !costGated {
+		if err := runConsoleAuthorizeSafely(ctx, adapter, configured); err != nil {
+			return result, err
+		}
 	}
 	m, attempt, err := model.ReserveConsoleMonitorAttempt(ctx, e.DB, id, time.Now())
 	if err != nil {
-		return err
+		return result, err
 	}
+	result.AttemptID = attempt.ID
 	// Re-authorize the actual admitted snapshot, not the earlier unlocked read.
 	probeCtx, cancel := context.WithTimeout(ctx, time.Duration(m.TimeoutSeconds)*time.Second)
 	defer cancel()
 	start := time.Now()
 	outcome := ConsoleProbeOutcome{Status: "unknown", ErrorCode: "authorization_denied"}
-	err = runConsoleAuthorizeSafely(probeCtx, adapter, m)
-	if err == nil {
+	if costGated || isConsoleProbeCostScope(m) {
+		_, err = consoleProbeProductionCostPolicy().WorstCaseCost(m, consoleProbePayload, time.Now())
+	} else if !costGated {
+		err = runConsoleAuthorizeSafely(probeCtx, adapter, m)
+	}
+	if err == nil && adapter != nil {
 		outcome, err = runConsoleProbeSafely(probeCtx, adapter, m, attempt.ID)
 	}
 	if err == nil && probeCtx.Err() != nil {
@@ -103,6 +128,11 @@ func (e *ConsoleProbeExecutor) Run(ctx context.Context, id int) error {
 	if err != nil {
 		outcome.Status = "error"
 		outcome.ErrorCode = "probe_failed"
+		if errors.Is(err, ErrMonitorCostUnverified) {
+			outcome.ErrorCode = "MONITOR_COST_UNVERIFIED"
+		} else if errors.Is(err, ErrMonitorCostExceeded) {
+			outcome.ErrorCode = "MONITOR_COST_EXCEEDED"
+		}
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(probeCtx.Err(), context.DeadlineExceeded) {
 			outcome.ErrorCode = "probe_timeout"
 		}
@@ -113,7 +143,7 @@ func (e *ConsoleProbeExecutor) Run(ctx context.Context, id int) error {
 	}
 	// Never persist arbitrary provider or adapter error strings.
 	switch outcome.ErrorCode {
-	case "", "probe_failed", "probe_timeout", "authorization_denied", "invalid_result":
+	case "", "probe_failed", "probe_timeout", "authorization_denied", "invalid_result", "MONITOR_COST_UNVERIFIED", "MONITOR_COST_EXCEEDED":
 	default:
 		outcome.ErrorCode = "probe_failed"
 	}
@@ -151,27 +181,48 @@ func (e *ConsoleProbeExecutor) Run(ctx context.Context, id int) error {
 			logger.LogError(finishCtx, fmt.Sprintf("monitor probe panic: monitor_id=%d attempt_id=%d; cleanup unconfirmed", id, attempt.ID))
 		}
 		persistErr := e.DB.WithContext(finishCtx).Transaction(func(tx *gorm.DB) error {
-			result := tx.Model(&model.ConsoleMonitorAttempt{}).Where("id = ? AND finished_at = 0", attempt.ID).Updates(updates)
-			if result.Error != nil {
-				return result.Error
+			updated := tx.Model(&model.ConsoleMonitorAttempt{}).Where("id = ? AND finished_at = 0", attempt.ID).Updates(updates)
+			if updated.Error != nil {
+				return updated.Error
 			}
-			if result.RowsAffected != 1 {
+			if updated.RowsAffected != 1 {
 				return model.ErrMonitorDenied
 			}
-			return tx.Create(&model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: "unknown", ErrorCode: "probe_failed", LatencyMS: &latency, SourceKind: m.TargetKind}).Error
+			probe := model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: "unknown", ErrorCode: "probe_failed", LatencyMS: &latency, SourceKind: m.TargetKind}
+			if err := tx.Create(&probe).Error; err != nil {
+				return err
+			}
+			result.ProbeID, result.Status, result.ErrorCode = probe.ID, probe.Status, probe.ErrorCode
+			return nil
 		})
-		return errors.Join(ErrMonitorLeaseUnresolved, panicErr, persistErr)
-	}
-	return e.DB.WithContext(finishCtx).Transaction(func(tx *gorm.DB) error {
-		result := tx.Model(&model.ConsoleMonitorAttempt{}).Where("id = ? AND finished_at = 0", attempt.ID).Updates(map[string]any{"finished_at": now, "failure": outcome.Status != "normal" && outcome.Status != "degraded", "cleanup_state": "released", "cleanup_started_at": outcome.CleanupStartedAt})
-		if result.Error != nil {
-			return result.Error
+		if persistErr != nil {
+			result = ConsoleProbeResult{AttemptID: attempt.ID}
 		}
-		if result.RowsAffected != 1 {
+		return result, errors.Join(ErrMonitorLeaseUnresolved, panicErr, persistErr)
+	}
+	err = e.DB.WithContext(finishCtx).Transaction(func(tx *gorm.DB) error {
+		updated := tx.Model(&model.ConsoleMonitorAttempt{}).Where("id = ? AND finished_at = 0", attempt.ID).Updates(map[string]any{"finished_at": now, "failure": outcome.Status != "normal" && outcome.Status != "degraded", "cleanup_state": "released", "cleanup_started_at": outcome.CleanupStartedAt})
+		if updated.Error != nil {
+			return updated.Error
+		}
+		if updated.RowsAffected != 1 {
 			return model.ErrMonitorDenied
 		}
-		return tx.Create(&model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: outcome.Status, ErrorCode: outcome.ErrorCode, LatencyMS: &latency, SourceChannelID: outcome.SourceChannelID, SourceKind: m.TargetKind}).Error
+		probe := model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: outcome.Status, ErrorCode: outcome.ErrorCode, LatencyMS: &latency, SourceChannelID: outcome.SourceChannelID, SourceKind: m.TargetKind}
+		if err := tx.Create(&probe).Error; err != nil {
+			return err
+		}
+		result.ProbeID, result.Status, result.ErrorCode = probe.ID, probe.Status, probe.ErrorCode
+		return nil
 	})
+	if err != nil {
+		result = ConsoleProbeResult{AttemptID: attempt.ID}
+	}
+	return result, err
+}
+
+func isConsoleProbeCostScope(m model.ConsoleMonitor) bool {
+	return m.TargetKind == "channel" && m.ChannelID == 1 && m.TargetRef == "1" && m.Model == "gpt-6-luna" && m.Protocol == "openai_responses"
 }
 
 func runConsoleProbeSafely(ctx context.Context, adapter ConsoleProbeAdapter, m model.ConsoleMonitor, attemptID int64) (outcome ConsoleProbeOutcome, err error) {

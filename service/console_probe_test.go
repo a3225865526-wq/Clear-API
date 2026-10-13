@@ -416,11 +416,16 @@ func TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled(t *testin
 		return service.ConsoleProbeOutcome{}, errors.Join(service.ErrMonitorLeaseUnresolved, errors.New("fixture-cleanup-secret"))
 	}}
 	e := service.ConsoleProbeExecutor{DB: db, Adapters: map[string]service.ConsoleProbeAdapter{"channel": adapter}}
-	err := e.Run(ctx, m.ID)
+	result, err := e.RunWithResult(ctx, m.ID)
 	require.ErrorIs(t, err, service.ErrMonitorLeaseUnresolved)
+	require.Positive(t, result.AttemptID)
+	require.Positive(t, result.ProbeID)
+	assert.Equal(t, "unknown", result.Status)
+	assert.Equal(t, "probe_failed", result.ErrorCode)
 	assert.NotContains(t, err.Error(), "fixture-cleanup-secret")
 	var attempt model.ConsoleMonitorAttempt
 	require.NoError(t, db.Where("monitor_id = ?", m.ID).First(&attempt).Error)
+	assert.Equal(t, result.AttemptID, attempt.ID)
 	assert.Zero(t, attempt.FinishedAt)
 	assert.Equal(t, "cleanup_pending", attempt.CleanupState)
 	var active int64

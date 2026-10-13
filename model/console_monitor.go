@@ -57,7 +57,7 @@ func (p *ConsoleProbe) SafeResult() {
 		p.Status = "unknown"
 	}
 	switch p.ErrorCode {
-	case "", "probe_failed", "probe_timeout", "authorization_denied", "invalid_result":
+	case "", "probe_failed", "probe_timeout", "authorization_denied", "invalid_result", "MONITOR_COST_UNVERIFIED", "MONITOR_COST_EXCEEDED":
 	default:
 		p.ErrorCode = "probe_failed"
 	}
