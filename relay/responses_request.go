@@ -25,6 +25,11 @@ import (
 func PrepareResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, req *dto.OpenAIResponsesRequest) (relaychannel.Adaptor, common.ReplayableBody, io.Closer, *types.NewAPIError) {
 	info.InitChannelMeta(c)
 	if c.Request.Method == http.MethodPost && c.Request.URL.Path == "/v1/responses" && req.Stream != nil && *req.Stream {
+		if err := helper.ValidateProtectedTextChannel(info); err != nil {
+			return nil, nil, nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		}
+	}
+	if c.Request.Method == http.MethodPost && c.Request.URL.Path == "/v1/responses" && req.Stream != nil && *req.Stream {
 		if err := accountpool.FreezePG03Policy(c, info.ChannelId, req.Model); err != nil {
 			return nil, nil, nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
@@ -84,6 +89,11 @@ func PrepareResponsesRequest(c *gin.Context, info *relaycommon.RelayInfo, req *d
 		}
 	}
 
+	if c.Request.Method == http.MethodPost && c.Request.URL.Path == "/v1/responses" && req.Stream != nil && *req.Stream {
+		if err := helper.ValidateProtectedTextBody(info, jsonData); err != nil {
+			return nil, nil, nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		}
+	}
 	logger.LogDebug(c, "requestBody: %s", jsonData)
 	body, closer, err := relaycommon.NewOutboundJSONBody(jsonData)
 	if err != nil {
