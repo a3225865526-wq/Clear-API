@@ -11,8 +11,9 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/controller"
+	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -22,6 +23,26 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
+
+// This implementation is compiled only by go test. No production source,
+// environment switch or global setter can select it in the shipped API router.
+type runtimeFixtureIdentityProvider struct {
+	identity model.RuntimeIdentity
+	err      error
+}
+
+func (p runtimeFixtureIdentityProvider) RuntimeIdentity(context.Context) (model.RuntimeIdentity, error) {
+	return p.identity, p.err
+}
+
+func runtimeFixtureIdentity() runtimeFixtureIdentityProvider {
+	return runtimeFixtureIdentityProvider{identity: model.RuntimeIdentity{
+		InstanceID:    "6f6ebdbe-9e74-4d25-b608-64eecbe0c0b1",
+		ContainerID:   strings.Repeat("c", 64),
+		StartedAt:     "2026-10-13T00:00:00Z",
+		BuildIdentity: "sha256:" + strings.Repeat("d", 64),
+	}}
+}
 
 // All server fixtures are fixed, isolated test containers with fixture-only
 // credentials. No caller-supplied DSN can select an external database.
@@ -91,7 +112,7 @@ func runtimeProbeFixture(t *testing.T, emptyCatalog ...bool) (*gin.Engine, strin
 	require.NoError(t, err)
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
-	router.SetApiRouter(engine)
+	engine.GET("/api/clearapi/runtime-integrity", middleware.DisableCache(), middleware.RuntimeIntegrityAuth(), controller.RuntimeIntegrityHandler(runtimeFixtureIdentity()))
 	return engine, token, db
 }
 
@@ -216,9 +237,9 @@ func TestRuntimeIntegrityStateAndFailures(t *testing.T) {
 			for _, key := range []string{"instance_id", "build_identity", "config_generation", "product_view_digest", "generated_at", "schema_version", "report_version", "status", "container_id", "started_at", "config_digest", "approval_view_digest", "effective_product_count"} {
 				assert.NotEmpty(t, body.Data[key])
 			}
-			first, err := model.ObserveRuntimeIntegrity(context.Background())
+			first, err := model.ObserveRuntimeIntegrityWithProvider(context.Background(), runtimeFixtureIdentity())
 			require.NoError(t, err)
-			second, err := model.ObserveRuntimeIntegrity(context.Background())
+			second, err := model.ObserveRuntimeIntegrityWithProvider(context.Background(), runtimeFixtureIdentity())
 			require.NoError(t, err)
 			assert.Equal(t, first.Report.ConfigGeneration, second.Report.ConfigGeneration)
 			assert.Equal(t, first.Report.InstanceID, second.Report.InstanceID)
@@ -303,7 +324,7 @@ func TestRuntimeIntegrityRevocationAndGeneration(t *testing.T) {
 	assert.NotEqual(t, changed.ConfigGeneration, reward.ConfigGeneration)
 	canceled, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = model.ObserveRuntimeIntegrity(canceled)
+	_, err = model.ObserveRuntimeIntegrityWithProvider(canceled, runtimeFixtureIdentity())
 	assert.ErrorIs(t, err, model.ErrProbeUnavailable)
 }
 
@@ -375,24 +396,25 @@ func TestRuntimeIntegrityContainerIdentity(t *testing.T) {
 	unchanged := runtimeReport(t, engine, token)
 	assert.Equal(t, real.InstanceID, unchanged.InstanceID)
 	assert.Equal(t, real.ContainerID, unchanged.ContainerID)
-	const path = "/run/clearapi/runtime-identity.json"
-	original, err := os.ReadFile(path)
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		require.NoError(t, os.WriteFile(path, original, 0o400))
-		require.NoError(t, os.Chmod(path, 0o400))
-	})
-	wrong, err := common.Marshal(map[string]string{"container_id": strings.Repeat("0", 64), "started_at": real.StartedAt})
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(path, wrong, 0o400))
-	response := runtimeProbeRequest(engine, token)
-	assert.Equal(t, http.StatusServiceUnavailable, response.Code)
-	assert.JSONEq(t, `{"success":false,"status":"BLOCKED","code":"PROBE_UNAVAILABLE"}`, response.Body.String())
-	require.NoError(t, os.WriteFile(path, original, 0o400))
-	require.NoError(t, os.Chmod(path, 0o644))
-	assert.Equal(t, http.StatusServiceUnavailable, runtimeProbeRequest(engine, token).Code)
-	require.NoError(t, os.Chmod(path, 0o400))
-	response = httptest.NewRecorder()
+	// Missing or malformed identities still pass through the shared v1 checks.
+	for _, test := range []struct {
+		name     string
+		provider runtimeFixtureIdentityProvider
+	}{
+		{"missing", runtimeFixtureIdentityProvider{err: model.ErrProbeUnavailable}},
+		{"empty", runtimeFixtureIdentityProvider{}},
+		{"wrong container", runtimeFixtureIdentityProvider{identity: model.RuntimeIdentity{InstanceID: real.InstanceID, ContainerID: "wrong", StartedAt: real.StartedAt, BuildIdentity: real.BuildIdentity}}},
+		{"future", runtimeFixtureIdentityProvider{identity: model.RuntimeIdentity{InstanceID: real.InstanceID, ContainerID: real.ContainerID, StartedAt: "2999-01-01T00:00:00Z", BuildIdentity: real.BuildIdentity}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			deniedEngine := gin.New()
+			deniedEngine.GET("/api/clearapi/runtime-integrity", middleware.DisableCache(), middleware.RuntimeIntegrityAuth(), controller.RuntimeIntegrityHandler(test.provider))
+			response := runtimeProbeRequest(deniedEngine, token)
+			assert.Equal(t, http.StatusServiceUnavailable, response.Code)
+			assert.JSONEq(t, `{"success":false,"status":"BLOCKED","code":"PROBE_UNAVAILABLE"}`, response.Body.String())
+		})
+	}
+	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/clearapi/runtime-integrity?instance_id="+real.InstanceID, nil)
 	request.Header.Set("Authorization", "Bearer "+token)
 	engine.ServeHTTP(response, request)
@@ -430,13 +452,13 @@ func TestRuntimeIntegrityCollectionFence(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			_, _, db := runtimeProbeFixture(t)
 			runtimePublishedProduct(t, db)
-			_, err := service.CollectRuntimeIntegrityReport(context.Background(), func() ([]byte, error) {
+			_, err := service.CollectRuntimeIntegrityReportWithProvider(context.Background(), func() ([]byte, error) {
 				if test.change == nil {
 					return nil, fmt.Errorf("private-sentinel")
 				}
 				test.change(t, db)
 				return []byte("[]"), nil
-			})
+			}, runtimeFixtureIdentity())
 			assert.ErrorIs(t, err, test.expected)
 		})
 	}

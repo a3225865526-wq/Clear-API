@@ -11,11 +11,21 @@ import (
 )
 
 func GetRuntimeIntegrity(c *gin.Context) {
+	getRuntimeIntegrity(c, nil)
+}
+
+// RuntimeIntegrityHandler supports explicit test dependency wiring. The actual
+// API router remains bound to GetRuntimeIntegrity and its production provider.
+func RuntimeIntegrityHandler(provider model.RuntimeIdentityProvider) gin.HandlerFunc {
+	return func(c *gin.Context) { getRuntimeIntegrity(c, provider) }
+}
+
+func getRuntimeIntegrity(c *gin.Context, provider model.RuntimeIdentityProvider) {
 	if c.Request.URL.RawQuery != "" {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "status": "BLOCKED", "code": "PROBE_UNAVAILABLE"})
 		return
 	}
-	report, err := service.CollectRuntimeIntegrityReport(c.Request.Context(), runtimePurchasableView)
+	report, err := service.CollectRuntimeIntegrityReportWithProvider(c.Request.Context(), runtimePurchasableView, provider)
 	if err != nil {
 		code := "PROBE_UNAVAILABLE"
 		switch {

@@ -68,6 +68,8 @@ type RuntimeIntegrityObservation struct {
 // the same container; unavailable or ambiguous identity always fails closed.
 const runtimeIdentityPath = "/run/clearapi/runtime-identity.json"
 
+var runtimeContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+var runtimeBuildDigestPattern = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 var runtimeContainerPattern = regexp.MustCompile(`(?:^|/)(?:docker-)?([a-f0-9]{64})(?:/|\.scope|$)`)
 
 func rootOwnedRuntimeMetadata(info os.FileInfo) bool {
@@ -171,29 +173,74 @@ var runtimeBuildIdentity = sync.OnceValues(func() (string, error) {
 	return fmt.Sprintf("sha256:%x", h.Sum(nil)), nil
 })
 
+// RuntimeIdentityProvider is an explicit dependency, never selected by a
+// request, environment variable or global override. Production API wiring uses
+// only dockerRuntimeIdentityProvider; deterministic implementations live in tests.
+type RuntimeIdentity struct {
+	InstanceID    string
+	ContainerID   string
+	StartedAt     string
+	BuildIdentity string
+}
+
+type RuntimeIdentityProvider interface {
+	RuntimeIdentity(context.Context) (RuntimeIdentity, error)
+}
+
+type dockerRuntimeIdentityProvider struct{}
+
+func (dockerRuntimeIdentityProvider) RuntimeIdentity(ctx context.Context) (RuntimeIdentity, error) {
+	if ctx.Err() != nil {
+		return RuntimeIdentity{}, ErrProbeUnavailable
+	}
+	containerID, startedAt, err := readRuntimeContainerIdentity()
+	if err != nil {
+		return RuntimeIdentity{}, err
+	}
+	build, err := runtimeBuildIdentity()
+	if err != nil {
+		return RuntimeIdentity{}, err
+	}
+	return RuntimeIdentity{InstanceID: runtimeInstanceID, ContainerID: containerID, StartedAt: startedAt, BuildIdentity: build}, nil
+}
+
 // ObserveRuntimeIntegrity never reloads options, initializes schemas, repairs data,
 // or starts workers. The option read lock holds the effective fields stable
 // against the existing updateOptionMap path throughout the observation.
 func ObserveRuntimeIntegrity(ctx context.Context) (RuntimeIntegrityObservation, error) {
+	return ObserveRuntimeIntegrityWithProvider(ctx, nil)
+}
+
+// ObserveRuntimeIntegrityWithProvider permits explicit dependency injection.
+// Nil always means the production provider. A provider error or invalid identity
+// is BLOCKED; it never falls back to another provider or database-only evidence.
+func ObserveRuntimeIntegrityWithProvider(ctx context.Context, provider RuntimeIdentityProvider) (RuntimeIntegrityObservation, error) {
 	var result RuntimeIntegrity
-	if DB == nil {
+	if DB == nil || ctx.Err() != nil {
 		return RuntimeIntegrityObservation{}, ErrProbeUnavailable
 	}
-	containerID, startedAt, err := readRuntimeContainerIdentity()
-	if err != nil {
-		return RuntimeIntegrityObservation{}, err
+	if provider == nil {
+		provider = dockerRuntimeIdentityProvider{}
 	}
-	build, err := runtimeBuildIdentity()
+	identity, err := provider.RuntimeIdentity(ctx)
 	if err != nil {
-		return RuntimeIntegrityObservation{}, err
+		return RuntimeIntegrityObservation{}, ErrProbeUnavailable
+	}
+	instance, err := uuid.Parse(identity.InstanceID)
+	started, timeErr := time.Parse(time.RFC3339Nano, identity.StartedAt)
+	if err != nil || instance.Version() != 4 || instance.String() != identity.InstanceID ||
+		!runtimeContainerIDPattern.MatchString(identity.ContainerID) ||
+		!runtimeBuildDigestPattern.MatchString(identity.BuildIdentity) ||
+		timeErr != nil || !started.After(time.Unix(0, 0)) || started.After(time.Now()) {
+		return RuntimeIntegrityObservation{}, ErrProbeUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	common.OptionMapRWMutex.RLock()
 	defer common.OptionMapRWMutex.RUnlock()
 	result = RuntimeIntegrity{
-		SchemaVersion: "1", ReportVersion: "1", ContainerID: containerID, StartedAt: startedAt,
-		InstanceID: runtimeInstanceID, BuildIdentity: build,
+		SchemaVersion: "1", ReportVersion: "1", ContainerID: identity.ContainerID, StartedAt: identity.StartedAt,
+		InstanceID: identity.InstanceID, BuildIdentity: identity.BuildIdentity,
 		OnlinePaymentEnabled: !operation_setting.DisableOnlinePayments,
 		StoreEnabled:         operation_setting.StoreRechargeEnabled,
 		BillingMode:          operation_setting.ReservationHardeningMode(),

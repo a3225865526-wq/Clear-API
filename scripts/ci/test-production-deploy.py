@@ -64,6 +64,8 @@ class WrapperModesTest(unittest.TestCase):
         self.probe_token = self.root / "probe-session"
         self.probe_token.write_text("fixture.header.signature")
         self.probe_token.chmod(0o600)
+        self.probe_owner = self.root / "probe-owner.json"
+        self.probe_owner.write_text(json.dumps({"uid": 0, "gid": 0}))
         with self.config.open("a") as f:
             f.write("\nDEPLOY_RUNTIME_PROBE_TOKEN_FILE=" + shlex.quote(str(self.probe_token)) + "\n")
         # Stub only HTTP transport. The actual shell, Python contract validator,
@@ -106,12 +108,30 @@ urllib.request.build_opener = lambda *args: Opener()
         # rather than weakening -I or relying on inherited PYTHONPATH in the gate.
         python = self.root / "python3"
         python.write_text("#!/usr/bin/python3\n" + r'''
-import os, pathlib, sys
+import json, os, pathlib, sys
 args = sys.argv[1:]
 if '-I' in args and '-' in args:
     code = sys.stdin.read()
     fixture = pathlib.Path(__file__).with_name('sitecustomize.py').read_text()
     sys.argv = ['-', *args[args.index('-')+1:]]
+    # Only this disposable test interpreter simulates a root-owned credential.
+    # Keep real type, mode, link-count and O_NOFOLLOW checks. The shipped gate
+    # is unmodified and never reads this fixture or installs these hooks.
+    token = pathlib.Path(__file__).with_name('probe-session')
+    owner = json.loads(token.with_name('probe-owner.json').read_text())
+    trusted_dirs = set(token.parents)
+    real_lstat, real_fstat = os.lstat, os.fstat
+    def fixture_owner(value):
+        fields = list(value)
+        fields[4], fields[5] = owner['uid'], owner['gid']
+        return os.stat_result(fields)
+    def fixture_lstat(path):
+        value = real_lstat(path)
+        return fixture_owner(value) if pathlib.Path(path) in trusted_dirs else value
+    def fixture_fstat(fd):
+        value = real_fstat(fd)
+        return fixture_owner(value) if pathlib.Path(os.readlink('/proc/self/fd/'+str(fd))) == token else value
+    os.lstat, os.fstat = fixture_lstat, fixture_fstat
     exec(compile(fixture, '<fixture-http>', 'exec'))
     exec(compile(code, '<actual-gate>', 'exec'))
 else:
@@ -429,20 +449,20 @@ class RuntimeGateContractTest(unittest.TestCase):
         report = json.loads(Path('/tmp/clearapi-runtime-v1-report.json').read_text())
         data = report['data']
         self.env['RUNTIME_REPORT'] = json.dumps(report)
-        # The host inspection and binary digest are independently supplied to
-        # the test Docker transport, never copied into the producer request.
+        # The test Docker transport independently supplies the deterministic
+        # identity contract. Report fields are not used as expectations.
         fake = self.root / 'sudo'
         text = fake.read_text().replace("'c'*64+' 2026-10-13T00:00:00Z sha256:running-local-id'",
-            repr(os.environ['RUNTIME_EXPECT_CONTAINER_ID']+' '+os.environ['RUNTIME_EXPECT_STARTED_AT']+' sha256:running-local-id'))
-        text = text.replace("'d'*64+'  /new-api'",repr(os.environ['RUNTIME_EXPECT_BUILD_SHA']+'  /new-api'))
+            repr(CONTAINER_ID+' '+STARTED_AT+' sha256:running-local-id'))
+        text = text.replace("'d'*64+'  /new-api'",repr(BINARY_SHA+'  /new-api'))
         fake.write_text(text)
         data['generated_at'] = 'fresh'
         self.env['RUNTIME_REPORT'] = json.dumps(report)
         result = self.run_wrapper('--verify')
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIn('Runtime Gate PASS',result.stderr)
-        # The same genuine A report cannot satisfy independently inspected B.
-        fake.write_text(text.replace(os.environ['RUNTIME_EXPECT_CONTAINER_ID'],os.environ['RUNTIME_OTHER_CONTAINER_ID']))
+        # The producer's fixture A report cannot satisfy independently inspected B.
+        fake.write_text(text.replace(CONTAINER_ID,'0'*64))
         self.reject_report(report,'PROBE_UNAVAILABLE')
 
     def test_stage2b1_response_is_explicitly_incompatible(self):
@@ -499,6 +519,11 @@ class RuntimeGateContractTest(unittest.TestCase):
                 self.probe_token.chmod(mode)
                 self.reject_report(runtime_report(), 'PROBE_UNAVAILABLE')
         self.probe_token.chmod(0o600)
+        for owner in ({'uid':1001,'gid':0}, {'uid':0,'gid':1001}):
+            with self.subTest(owner=owner):
+                self.probe_owner.write_text(json.dumps(owner))
+                self.reject_report(runtime_report(),'PROBE_UNAVAILABLE')
+        self.probe_owner.write_text(json.dumps({'uid':0,'gid':0}))
         self.env['TEST_FAILURE'] = 'probe-unavailable'
         self.reject_report(runtime_report(), 'PROBE_UNAVAILABLE')
         self.env.pop('TEST_FAILURE')

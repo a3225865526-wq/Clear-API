@@ -14,9 +14,15 @@ import (
 // observations succeed. The callback is the existing user-facing projection,
 // not a second implementation of product approval or compatibility rules.
 func CollectRuntimeIntegrityReport(ctx context.Context, productView func() ([]byte, error)) (model.RuntimeIntegrity, error) {
+	return CollectRuntimeIntegrityReportWithProvider(ctx, productView, nil)
+}
+
+// Production callers use CollectRuntimeIntegrityReport. Explicit test wiring
+// supplies a provider here without mutable globals or runtime configuration.
+func CollectRuntimeIntegrityReportWithProvider(ctx context.Context, productView func() ([]byte, error), provider model.RuntimeIdentityProvider) (model.RuntimeIntegrity, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	before, err := model.ObserveRuntimeIntegrity(ctx)
+	before, err := model.ObserveRuntimeIntegrityWithProvider(ctx, provider)
 	if err != nil {
 		return model.RuntimeIntegrity{}, err
 	}
@@ -24,7 +30,7 @@ func CollectRuntimeIntegrityReport(ctx context.Context, productView func() ([]by
 	if err != nil {
 		return model.RuntimeIntegrity{}, model.ErrProductViewInvalid
 	}
-	after, err := model.ObserveRuntimeIntegrity(ctx)
+	after, err := model.ObserveRuntimeIntegrityWithProvider(ctx, provider)
 	if err != nil {
 		return model.RuntimeIntegrity{}, err
 	}
