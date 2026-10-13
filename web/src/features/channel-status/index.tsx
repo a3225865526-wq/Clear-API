@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { RefreshCw } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { EmptyState } from '@/components/empty-state'
@@ -34,9 +34,15 @@ import { aggregateMonitorStatus, getMonitoring } from './api'
 import { ChannelCard } from './channel-card'
 import { statusColors } from './constants'
 
+const MonitorAdmin = lazy(() =>
+  import('./monitor-admin').then((module) => ({ default: module.MonitorAdmin }))
+)
+
 export function ChannelStatusPage() {
   const { t } = useTranslation()
   const userId = useAuthStore((state) => state.auth.user?.id)
+  const isRoot = useAuthStore((state) => state.auth.user?.role === 100)
+  const [manage, setManage] = useState(false)
   const [days, setDays] = useState(7)
   const [now, setNow] = useState(Date.now())
   const query = useQuery({
@@ -74,6 +80,20 @@ export function ChannelStatusPage() {
       </SectionPageLayout.Title>
       <SectionPageLayout.Content>
         <div className='space-y-6 pb-6'>
+          {isRoot && (
+            <Button
+              variant='outline'
+              aria-expanded={manage}
+              onClick={() => setManage(!manage)}
+            >
+              {t('Monitor administration')}
+            </Button>
+          )}
+          {isRoot && manage && (
+            <Suspense fallback={<LoadingState />}>
+              <MonitorAdmin />
+            </Suspense>
+          )}
           <div className='flex flex-wrap items-center justify-end gap-3'>
             <Tabs
               value={String(days)}

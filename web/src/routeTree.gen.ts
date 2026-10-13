@@ -47,6 +47,7 @@ import { Route as AuthenticatedFinanceIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
+import { Route as AuthenticatedMonitorTargetsIndexRouteImport } from './routes/_authenticated/monitor-targets/index'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedPoolIndexRouteImport } from './routes/_authenticated/pool/index'
 import { Route as AuthenticatedPoolAccountIdRouteImport } from './routes/_authenticated/pool/$accountId'
@@ -278,6 +279,12 @@ const AuthenticatedModelsSectionRoute =
   AuthenticatedModelsSectionRouteImport.update({
     id: '/models/$section',
     path: '/models/$section',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMonitorTargetsIndexRoute =
+  AuthenticatedMonitorTargetsIndexRouteImport.update({
+    id: '/monitor-targets/',
+    path: '/monitor-targets/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedPlaygroundIndexRoute =
@@ -528,6 +535,7 @@ export interface FileRoutesByFullPath {
   '/finance/': typeof AuthenticatedFinanceIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
+  '/monitor-targets/': typeof AuthenticatedMonitorTargetsIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/pool/': typeof AuthenticatedPoolIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
@@ -599,6 +607,7 @@ export interface FileRoutesByTo {
   '/finance': typeof AuthenticatedFinanceIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
+  '/monitor-targets': typeof AuthenticatedMonitorTargetsIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/pool': typeof AuthenticatedPoolIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
@@ -675,6 +684,7 @@ export interface FileRoutesById {
   '/_authenticated/finance/': typeof AuthenticatedFinanceIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
+  '/_authenticated/monitor-targets/': typeof AuthenticatedMonitorTargetsIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/pool/': typeof AuthenticatedPoolIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
@@ -750,6 +760,7 @@ export interface FileRouteTypes {
     | '/finance/'
     | '/keys/'
     | '/models/'
+    | '/monitor-targets/'
     | '/playground/'
     | '/pool/'
     | '/profile/'
@@ -821,6 +832,7 @@ export interface FileRouteTypes {
     | '/finance'
     | '/keys'
     | '/models'
+    | '/monitor-targets'
     | '/playground'
     | '/pool'
     | '/profile'
@@ -896,6 +908,7 @@ export interface FileRouteTypes {
     | '/_authenticated/finance/'
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
+    | '/_authenticated/monitor-targets/'
     | '/_authenticated/playground/'
     | '/_authenticated/pool/'
     | '/_authenticated/profile/'
@@ -1215,6 +1228,13 @@ declare module '@tanstack/react-router' {
       path: '/models/$section'
       fullPath: '/models/$section'
       preLoaderRoute: typeof AuthenticatedModelsSectionRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/monitor-targets/': {
+      id: '/_authenticated/monitor-targets/'
+      path: '/monitor-targets'
+      fullPath: '/monitor-targets/'
+      preLoaderRoute: typeof AuthenticatedMonitorTargetsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/playground/': {
@@ -1572,6 +1592,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFinanceIndexRoute: typeof AuthenticatedFinanceIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
+  AuthenticatedMonitorTargetsIndexRoute: typeof AuthenticatedMonitorTargetsIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedPoolIndexRoute: typeof AuthenticatedPoolIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
@@ -1604,6 +1625,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFinanceIndexRoute: AuthenticatedFinanceIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
+  AuthenticatedMonitorTargetsIndexRoute: AuthenticatedMonitorTargetsIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedPoolIndexRoute: AuthenticatedPoolIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
