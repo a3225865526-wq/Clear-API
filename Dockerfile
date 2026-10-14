@@ -39,7 +39,7 @@ ARG PG03_BASE_COMMIT="fd98c9aad0374581e46e5ba13bcf18ec96046559"
 ARG WRAPPER_COMMIT=""
 ARG BUILD_TIMESTAMP=""
 
-LABEL org.opencontainers.image.revision="fd98c9aad0374581e46e5ba13bcf18ec96046559" \
+LABEL org.opencontainers.image.revision="${WRAPPER_COMMIT}" \
       org.opencontainers.image.source="https://github.com/a3225865526-wq/Clear-API" \
       org.clearapi.pg03.base="${PG03_BASE_COMMIT}" \
       org.clearapi.wrapper.commit="${WRAPPER_COMMIT}" \
