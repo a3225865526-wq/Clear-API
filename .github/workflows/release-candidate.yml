@@ -351,6 +351,36 @@ jobs:
             echo "| created | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Generate release-manifest.json from verified build
+        run: |
+          python3 - <<'PY'
+          import datetime, hashlib, json, os, pathlib, re
+          commit = os.environ['GITHUB_SHA']
+          digest = os.environ['IMAGE_DIGEST']  # Extracted from docker push, never a manual input.
+          run = os.environ['GITHUB_RUN_ID']
+          attempt = os.environ['GITHUB_RUN_ATTEMPT']
+          for value, pattern in ((commit, r'[0-9a-f]{40}'), (digest, r'sha256:[0-9a-f]{64}'),
+                                 (run, r'[1-9][0-9]*'), (attempt, r'[1-9][0-9]*')):
+              if not re.fullmatch(pattern, value):
+                  raise SystemExit('BLOCK: invalid release identity')
+          manifest = {
+              'release_id': f'{commit}-{run}-{attempt}',
+              'source_commit': commit,
+              'image_digest': digest,
+              'workflow_run': run,
+              'wrapper_sha256': hashlib.sha256(pathlib.Path('scripts/production-deploy.sh').read_bytes()).hexdigest(),
+              'created_at': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+          }
+          pathlib.Path('release-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PY
+
+      - name: Save release manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-manifest-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-manifest.json
+          if-no-files-found: error
+
       - name: Logout from GHCR
         if: always()
         run: docker logout ghcr.io

@@ -25,7 +25,9 @@
 #
 # Usage:
 #   production-deploy.sh --digest sha256:<64hex> --commit <40hex-sha> \
-#     [--workflow-run <id>] [--migration-compatible true|false]
+#     [--workflow-run <id>] [--migration-compatible true|false] [--manifest <path>]
+#   --manifest accepts the CI-generated six-field release-manifest.json.
+#   Keep it separate from the live state/rollback manifest configured below.
 #
 # Operator-owned configuration: /opt/clearapi/config/deploy.env (mode 0600,
 # not in the repository). Defaults below document every supported key and
@@ -140,12 +142,16 @@ OVERRIDE_FILE="${DEPLOY_OVERRIDE_FILE:-${APP_DIR}/compose-candidate.yaml}"
 # Args (validated before any state change)
 # ---------------------------------------------------------------------------
 DIGEST=""; COMMIT=""; WORKFLOW_RUN=""; MIGRATION_COMPATIBLE="false"; GHCR_TOKEN_STDIN=""; VERIFY_ONLY="0"
+RELEASE_MANIFEST=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --digest) DIGEST="$2"; shift 2 ;;
     --commit) COMMIT="$2"; shift 2 ;;
     --workflow-run) WORKFLOW_RUN="$2"; shift 2 ;;
     --migration-compatible) MIGRATION_COMPATIBLE="$2"; shift 2 ;;
+    --manifest)
+      [ $# -ge 2 ] && [ -n "$2" ] || { echo "BLOCK: --manifest requires a path" >&2; exit 2; }
+      RELEASE_MANIFEST="$2"; shift 2 ;;
     # The pull credential is piped in on stdin. This is a CLI flag rather than
     # an environment variable because sudo env_reset discards caller-set env
     # vars for allowlisted commands, and widening the sudoers environment
@@ -607,6 +613,7 @@ PY
 # backup subsystem, or replace any container. The binary digest check uses a
 # temporary networkless, read-only container and does not start the application.
 if [ "$VERIFY_ONLY" = "1" ]; then
+  [ -z "$RELEASE_MANIFEST" ] || { echo "BLOCK: --manifest requires deploy mode" >&2; exit 2; }
   if verify_running_identity; then
     if ! verify_runtime_gate before "$PREV_IMAGE_ID"; then
       audit "verify" "blocked" 'Runtime Integrity Gate BLOCKED'
@@ -631,6 +638,33 @@ printf '%s' "$COMMIT" | grep -Eq '^[0-9a-f]{40}$' || {
 # ===========================================================================
 # 1. acquire deploy lock
 # ===========================================================================
+# Optional candidate identity gate; BLOCK before lock, backup, pull or replacement.
+# The live state manifest and every existing deployment gate remain independent.
+if [ -n "$RELEASE_MANIFEST" ]; then
+  python3 - "$RELEASE_MANIFEST" "$DIGEST" "$COMMIT" "${BASH_SOURCE[0]}" <<'PY' || exit 1
+import hashlib, json, pathlib, sys
+try:
+    with open(sys.argv[1]) as f:
+        manifest = json.load(f)
+    fields = ('release_id', 'source_commit', 'image_digest', 'workflow_run', 'wrapper_sha256', 'created_at')
+    if not isinstance(manifest, dict) or any(
+            not isinstance(manifest.get(key), str) or not manifest[key].strip() for key in fields):
+        raise ValueError('manifest requires six non-empty string fields')
+    expected = {
+        'image_digest': sys.argv[2],
+        'source_commit': sys.argv[3],
+        'wrapper_sha256': hashlib.sha256(pathlib.Path(sys.argv[4]).read_bytes()).hexdigest(),
+    }
+    for key, value in expected.items():
+        if manifest[key] != value:
+            raise ValueError(f'manifest {key} mismatch')
+except (OSError, ValueError) as exc:
+    print(f'BLOCK: release manifest validation failed: {exc}', file=sys.stderr)
+    sys.exit(1)
+PY
+  log "release manifest identity PASS (digest, commit, wrapper SHA256)"
+fi
+
 mkdir -p /run/lock
 exec 9>"/run/lock/clearapi-production-deploy.lock"
 flock -n 9 || die "deploy lock held: another production deploy is in progress"
