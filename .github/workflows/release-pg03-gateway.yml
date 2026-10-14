@@ -83,7 +83,7 @@ jobs:
           trap 'rm -f web/dist/index.html; rmdir web/dist' EXIT
           printf 'test-only embed placeholder\n' > web/dist/index.html
           go test -p 1 -count=1 -v ./cmd/production-bootstrap/... ./service/accountpool ./cmd/finance-migrate ./cmd/billing-migrate | tee release/source-tests.log
-          [[ -z "$(gofmt -l model/bootstrap.go cmd/production-bootstrap)" ]]
+          [[ -z "$(gofmt -l model/bootstrap.go $(find cmd/production-bootstrap -name '*.go'))" ]]
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
       - name: Build all binaries from wrapper source
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
