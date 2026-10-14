@@ -89,6 +89,12 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
+      - type: bind
+        source: /opt/clearapi/runtime/new-api
+        target: /run/clearapi
+        read_only: true
+        bind:
+          create_host_path: false
       - ./data:/data
       - ./logs:/app/logs
     secrets:

@@ -44,3 +44,7 @@ web/src/routeTree.gen.ts linguist-generated
 
 # SSE fixtures used verbatim by stream fidelity tests
 *.sse text eol=lf
+
+# Installer approvals hash the exact LF artifact bytes.
+scripts/runtime-identity-refresh.py text eol=lf
+scripts/runtime-identity-artifacts.sha256 text eol=lf
