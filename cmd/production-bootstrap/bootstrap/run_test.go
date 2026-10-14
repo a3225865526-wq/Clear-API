@@ -62,7 +62,9 @@ func TestBootstrapRecordsDatabaseCompatibility(t *testing.T) {
 			require.Error(t, db.Transaction(func(tx *gorm.DB) error {
 				changed := *state
 				changed.AdminUsername = "rolled-back"
-				if err := model.WriteBootstrapStateTx(tx, &changed); err != nil { return err }
+				if err := model.WriteBootstrapStateTx(tx, &changed); err != nil {
+					return err
+				}
 				return fmt.Errorf("intentional rollback")
 			}))
 			got, err := model.ReadBootstrapState(db)

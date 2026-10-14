@@ -293,22 +293,22 @@ func ReadBootstrapLegalManifest(db *gorm.DB) (*LegalApprovalManifest, error) {
 // BootstrapCompletionMarker is written last, only after every bootstrap step
 // (migrations, admin, finance owner, legal, manifest, readiness) passed.
 type BootstrapCompletionMarker struct {
-	SchemaVersion            int    `json:"schema_version"`
-	CompletedAt              string `json:"completed_at"`
-	BootstrapToolVersion     string `json:"bootstrap_tool_version"`
-	CandidateCommit          string `json:"candidate_commit"`
-	AdminUserID              int    `json:"admin_user_id"`
-	AdminUsername            string `json:"admin_username"`
-	FinanceOwnerUserID       int    `json:"finance_owner_user_id"`
-	TermsVersion             string `json:"terms_version"`
-	TermsSHA256              string `json:"terms_sha256"`
-	PrivacyVersion           string `json:"privacy_version"`
-	PrivacySHA256            string `json:"privacy_sha256"`
-	ApprovedBy               string `json:"approved_by"`
-	ApprovedAt               string `json:"approved_at"`
-	FinanceSchemaVersion     int    `json:"finance_schema_version"`
+	SchemaVersion            int      `json:"schema_version"`
+	CompletedAt              string   `json:"completed_at"`
+	BootstrapToolVersion     string   `json:"bootstrap_tool_version"`
+	CandidateCommit          string   `json:"candidate_commit"`
+	AdminUserID              int      `json:"admin_user_id"`
+	AdminUsername            string   `json:"admin_username"`
+	FinanceOwnerUserID       int      `json:"finance_owner_user_id"`
+	TermsVersion             string   `json:"terms_version"`
+	TermsSHA256              string   `json:"terms_sha256"`
+	PrivacyVersion           string   `json:"privacy_version"`
+	PrivacySHA256            string   `json:"privacy_sha256"`
+	ApprovedBy               string   `json:"approved_by"`
+	ApprovedAt               string   `json:"approved_at"`
+	FinanceSchemaVersion     int      `json:"finance_schema_version"`
 	BillingMigrationsApplied []string `json:"billing_migrations_applied"`
-	DatabaseType             string `json:"database_type"`
+	DatabaseType             string   `json:"database_type"`
 }
 
 func WriteBootstrapMarkerTx(tx *gorm.DB, marker *BootstrapCompletionMarker) error {
