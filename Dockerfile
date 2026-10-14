@@ -12,6 +12,9 @@ ENV GO111MODULE=on CGO_ENABLED=0 GOWORK=off
 
 ARG TARGETOS
 ARG TARGETARCH
+ARG PG03_BASE_COMMIT="fd98c9aad0374581e46e5ba13bcf18ec96046559"
+ARG WRAPPER_COMMIT=""
+ARG BUILD_TIMESTAMP=""
 ENV GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64}
 ENV GOEXPERIMENT=greenteagc
 
@@ -25,9 +28,22 @@ RUN go mod download
 
 COPY . .
 COPY --from=builder /build/web/dist ./web/dist
-RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
+RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api \
+    && go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o production-bootstrap ./cmd/production-bootstrap \
+    && go build -ldflags "-s -w" -o finance-migrate ./cmd/finance-migrate \
+    && go build -ldflags "-s -w" -o billing-migrate ./cmd/billing-migrate
 
 FROM debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
+
+ARG PG03_BASE_COMMIT="fd98c9aad0374581e46e5ba13bcf18ec96046559"
+ARG WRAPPER_COMMIT=""
+ARG BUILD_TIMESTAMP=""
+
+LABEL org.opencontainers.image.revision="fd98c9aad0374581e46e5ba13bcf18ec96046559" \
+      org.opencontainers.image.source="https://github.com/a3225865526-wq/Clear-API" \
+      org.clearapi.pg03.base="${PG03_BASE_COMMIT}" \
+      org.clearapi.wrapper.commit="${WRAPPER_COMMIT}" \
+      org.opencontainers.image.created="${BUILD_TIMESTAMP}"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
@@ -35,6 +51,11 @@ RUN apt-get update \
     && update-ca-certificates
 
 COPY --from=builder2 /build/new-api /
+COPY --from=builder2 /build/production-bootstrap /
+COPY --from=builder2 /build/finance-migrate /
+COPY --from=builder2 /build/billing-migrate /
+COPY scripts/production-entrypoint.sh /entrypoint-secure.sh
+RUN chmod 0755 /entrypoint-secure.sh
 COPY LICENSE THIRD-PARTY-LICENSES.md /licenses/
 EXPOSE 3000
 WORKDIR /data
