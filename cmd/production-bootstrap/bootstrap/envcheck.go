@@ -22,16 +22,16 @@ type EnvIssue struct {
 // service.ValidateProductionReadiness so misconfiguration surfaces before any
 // write happens instead of after migrations have run.
 var productionEnvPairs = map[string]string{
-	"GIN_MODE":                                         "release",
-	"SESSION_COOKIE_SECURE":                            "true",
-	"CLEARAPI_DURABLE_WALLET":                          "true",
-	"CLEARAPI_BILLING_OUTBOX":                          "true",
-	"CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE":  "true",
-	"CLEARAPI_TASK_SETTLEMENT":                         "true",
-	"CLEARAPI_STRICT_PREPAID":                          "true",
-	"CLEARAPI_TOKEN_ENCRYPTION":                        "true",
-	"CLEARAPI_DEPLOYMENT_INSTANCES":                    "1",
-	"CLEARAPI_ENABLE_REALTIME":                         "false",
+	"GIN_MODE":                "release",
+	"SESSION_COOKIE_SECURE":   "true",
+	"CLEARAPI_DURABLE_WALLET": "true",
+	"CLEARAPI_BILLING_OUTBOX": "true",
+	"CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE": "true",
+	"CLEARAPI_TASK_SETTLEMENT":                        "true",
+	"CLEARAPI_STRICT_PREPAID":                         "true",
+	"CLEARAPI_TOKEN_ENCRYPTION":                       "true",
+	"CLEARAPI_DEPLOYMENT_INSTANCES":                   "1",
+	"CLEARAPI_ENABLE_REALTIME":                        "false",
 }
 
 var productionFalseEnv = []string{"DEBUG", "DIFY_DEBUG", "ENABLE_PPROF", "BATCH_UPDATE_ENABLED"}

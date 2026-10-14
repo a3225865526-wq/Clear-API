@@ -116,11 +116,11 @@ func RunDryRun(cfg *Config) int {
 			"base_and_finance_and_billing_migrations": !(snapshot.FinanceSchemaPresent && snapshot.FinanceSchemaVersion == 9 &&
 				snapshot.ReservationsReady && snapshot.OutboxReady && snapshot.ReconciliationReady &&
 				snapshot.SettlementReady && snapshot.SettlementLogsReady),
-			"admin_creation": needAdmin,
-			"legal_write":    needLegal,
+			"admin_creation":    needAdmin,
+			"legal_write":       needLegal,
 			"completion_marker": true,
 		},
-		"missing_inputs":      missingInputs,
+		"missing_inputs":       missingInputs,
 		"environment_findings": environmentIssueMap(envIssues),
 	}
 	Emit("dry_run", plan)

@@ -18,9 +18,9 @@ type Snapshot struct {
 	FinanceSchemaPresent bool
 	FinanceSchemaVersion int
 
-	State        *model.BootstrapState
-	StateCorrupt bool
-	Marker       *model.BootstrapCompletionMarker
+	State         *model.BootstrapState
+	StateCorrupt  bool
+	Marker        *model.BootstrapCompletionMarker
 	MarkerCorrupt bool
 
 	LegalUserAgreementPresent bool
