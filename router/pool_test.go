@@ -84,6 +84,10 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 			require.Equal(t, http.StatusOK, setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input).Code)
 			user := model.User{Id: 20, Username: "pg03-refund-" + scenario, Quota: 1000, Status: common.UserStatusEnabled, AffCode: "pg03-" + scenario}
 			require.NoError(t, setup.db.Create(&user).Error)
+			if setup.db.Dialector.Name() == "postgres" {
+				// Explicit fixture IDs do not advance PostgreSQL sequences.
+				require.NoError(t, setup.db.Exec("SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users), true)").Error)
+			}
 			token := model.Token{UserId: user.Id, Key: "synthetic-refund-" + scenario, RemainQuota: 1000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
 			require.NoError(t, setup.db.Create(&token).Error)
 			stream, limit := true, uint(99)
