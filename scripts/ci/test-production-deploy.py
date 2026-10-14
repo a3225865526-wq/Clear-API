@@ -40,6 +40,22 @@ COMMIT = "b" * 40
 INSTALLER_COMMIT = "f1797fbb3752100c665ddf85d9dfae89b7765ad7"
 
 
+def generate_release_manifest(root, wrapper, **identity):
+    """Execute the actual CI generation step with an isolated build identity."""
+    (root / "scripts").mkdir(parents=True, exist_ok=True)
+    (root / "scripts/production-deploy.sh").write_bytes(wrapper.read_bytes())
+    workflow = SOURCE.parents[1] / ".github/workflows/release-candidate.yml"
+    block = workflow.read_text().split(
+        "      - name: Generate release-manifest.json from verified build\n", 1)[1]
+    block = textwrap.dedent(block.split("        run: |\n", 1)[1].split(
+        "\n      - name:", 1)[0])
+    env = dict(os.environ, GITHUB_SHA=COMMIT, IMAGE_DIGEST=DIGEST,
+               GITHUB_RUN_ID="123", GITHUB_RUN_ATTEMPT="2")
+    env.update(identity)
+    return subprocess.run(["bash", "-c", block], cwd=root, env=env,
+                          capture_output=True, text=True, timeout=10)
+
+
 class WrapperModesTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -228,6 +244,80 @@ else:
                 self.assertIn(message, result.stderr)
                 self.assertFalse(self.audit.exists())
                 self.assertFalse(self.trace.exists())
+
+    def test_ci_manifest_contains_build_identity_and_wrapper_hash(self):
+        build = self.root / "build"
+        result = generate_release_manifest(build, self.wrapper)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = json.loads((build / "release-manifest.json").read_text())
+        self.assertEqual(set(manifest), {"release_id", "source_commit", "image_digest",
+                                         "workflow_run", "wrapper_sha256", "created_at"})
+        self.assertEqual(manifest["release_id"], COMMIT + "-123-2")
+        self.assertEqual(manifest["source_commit"], COMMIT)
+        self.assertEqual(manifest["image_digest"], DIGEST)
+        self.assertEqual(manifest["workflow_run"], "123")
+        self.assertEqual(manifest["wrapper_sha256"], hashlib.sha256(self.wrapper.read_bytes()).hexdigest())
+        self.assertRegex(manifest["created_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+    def test_ci_manifest_rejects_missing_or_invalid_build_identity(self):
+        for field, value in (("IMAGE_DIGEST", ""), ("IMAGE_DIGEST", "latest"),
+                             ("GITHUB_SHA", "short"), ("GITHUB_RUN_ID", ""),
+                             ("GITHUB_RUN_ATTEMPT", "0")):
+            with self.subTest(field=field, value=value):
+                build = self.root / field / (value or "empty")
+                result = generate_release_manifest(build, self.wrapper, **{field: value})
+                self.assertNotEqual(result.returncode, 0, result.stderr)
+                self.assertFalse((build / "release-manifest.json").exists())
+
+    def test_release_manifest_mismatches_block_before_any_deploy_operation(self):
+        build = self.root / "build"
+        result = generate_release_manifest(build, self.wrapper)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        candidate = build / "release-manifest.json"
+        valid = json.loads(candidate.read_text())
+        cases = [
+            ({**valid, "image_digest": "sha256:" + "c" * 64}, "image_digest mismatch"),
+            ({**valid, "source_commit": "c" * 40}, "source_commit mismatch"),
+            ({**valid, "wrapper_sha256": "c" * 64}, "wrapper_sha256 mismatch"),
+            ({key: value for key, value in valid.items() if key != "created_at"}, "six non-empty"),
+            ({**valid, "workflow_run": 123}, "six non-empty"),
+            ([], "six non-empty"),
+        ]
+        for manifest, message in cases:
+            with self.subTest(message=message):
+                candidate.write_text(json.dumps(manifest))
+                result = self.run_wrapper("--digest", DIGEST, "--commit", COMMIT,
+                                          "--manifest", str(candidate))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("BLOCK:", result.stderr)
+                self.assertIn(message, result.stderr)
+                self.assertFalse(self.trace.exists())
+                self.assertFalse(self.audit.exists())
+        candidate.write_text(json.dumps(valid))
+        with self.wrapper.open("a") as f:
+            f.write("\n# Old manifest paired with a changed wrapper.\n")
+        result = self.run_wrapper("--digest", DIGEST, "--commit", COMMIT,
+                                  "--manifest", str(candidate))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("wrapper_sha256 mismatch", result.stderr)
+        self.assertFalse(self.trace.exists())
+
+    def test_release_manifest_unreadable_or_malformed_blocks(self):
+        candidate = self.root / "candidate.json"
+        for contents in (None, "not-json", "{}"):
+            with self.subTest(contents=contents):
+                if contents is not None:
+                    candidate.write_text(contents)
+                result = self.run_wrapper("--digest", DIGEST, "--commit", COMMIT,
+                                          "--manifest", str(candidate))
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("BLOCK:", result.stderr)
+                self.assertFalse(self.trace.exists())
+        for args in (("--manifest",), ("--manifest", ""),
+                     ("--verify", "--manifest", str(candidate))):
+            result = self.run_wrapper(*args)
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertIn("BLOCK:", result.stderr)
 
     def run_gate(self, body, config="", **fixtures):
         with self.config.open("a") as f:
@@ -741,7 +831,7 @@ class WorkflowStdinTest(unittest.TestCase):
     setUp = WrapperModesTest.setUp
 
     def run_chain(self, failure="", payload="non-secret-ci-credential", framed=True,
-                  legacy=False, compatible=False, migration=False):
+                  legacy=False, compatible=False, migration=False, release_manifest=False):
         workflow = SOURCE.parents[1] / ".github/workflows/deploy-production.yml"
         block = workflow.read_text().split("      - name: Run controlled deploy on VPS\n")[1]
         block = textwrap.dedent(block.split("        run: |\n", 1)[1].split(
@@ -764,6 +854,12 @@ class WorkflowStdinTest(unittest.TestCase):
             source = source.replace("printf '%s' \"$GHCR_PULL_TOKEN\" | ", "")
         self.wrapper.write_text(source)
         self.wrapper.chmod(0o755)
+        if release_manifest:
+            build = self.root / "build"
+            generated = generate_release_manifest(build, self.wrapper)
+            self.assertEqual(generated.returncode, 0, generated.stderr)
+            block = block.replace("--ghcr-token-stdin", "--ghcr-token-stdin --manifest " +
+                                  shlex.quote(str(build / "release-manifest.json")))
         self.manifest.write_text(json.dumps({"releases": {"current": {
             "new_api_image_id": "sha256:running-local-id", "image_digest": DIGEST
         }}}))
@@ -944,6 +1040,17 @@ else: sys.exit('Forbidden docker operation')
         self.assertEqual(result.returncode, 2)
         self.assertFalse(logins)
         self.assertEqual([x["name"] for x in trace], ["ssh"])
+
+    def test_ci_manifest_matching_wrapper_allows_existing_deploy_chain(self):
+        result, trace, logins = self.run_chain(release_manifest=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("release manifest identity PASS", result.stderr)
+        self.assertIn("DEPLOYMENT SUCCESS", result.stderr)
+        self.assertEqual(len(logins), 1)
+        self.assertTrue((self.root / "replaced").exists())
+        manifest = json.loads((self.root / "build/release-manifest.json").read_text())
+        self.assertEqual(manifest["image_digest"], DIGEST)
+        self.assertNotIn("releases", manifest)  # Candidate identity isn't rewritten as live state.
 
     def test_truncated_frame_rejected(self):
         result, trace, logins = self.run_chain(framed=False)
