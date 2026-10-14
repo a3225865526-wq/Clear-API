@@ -1181,15 +1181,18 @@ class RuntimeIdentityTest(unittest.TestCase):
         patch.object(self.tool.os, "geteuid", return_value=0).start()
         patch.object(self.tool, "secure_directory", return_value=self.directory).start()
         patch.object(self.tool.os, "fchown").start()
-        original_lstat = os.lstat
+        self.identity_owner = (0, 0)
+        # Mock the consumer's metadata boundary, not pathlib's version-dependent
+        # os.stat/os.lstat implementation. Preserve real mode/type/link counts.
+        original_lstat = Path.lstat
         def root_fixture(path, *args, **kwargs):
             info = original_lstat(path, *args, **kwargs)
             if Path(path) == self.directory / "runtime-identity.json":
                 values = list(info)
-                values[4], values[5] = 0, 0
+                values[4], values[5] = self.identity_owner
                 return os.stat_result(values)
             return info
-        patch.object(self.tool.os, "lstat", side_effect=root_fixture).start()
+        patch.object(Path, "lstat", new=root_fixture).start()
 
     def refresh(self, check=False):
         self.tool.refresh("app", self.ref, COMMIT, self.directory, check)
@@ -1203,6 +1206,40 @@ class RuntimeIdentityTest(unittest.TestCase):
         self.assertEqual(identity["image_digest"], DIGEST)
         self.assertEqual(identity["oci_revision"], COMMIT)
         self.refresh(check=True)
+
+    def test_unsafe_owner_rejected_without_repair(self):
+        self.refresh()
+        path = self.directory / "runtime-identity.json"
+        before = path.read_bytes()
+        for owner in ((1001, 0), (0, 1001), (1001, 1001)):
+            with self.subTest(owner=owner):
+                self.identity_owner = owner
+                with self.assertRaisesRegex(self.tool.IdentityError, "UNSAFE_IDENTITY_FILE"):
+                    self.refresh(check=True)
+                with self.assertRaisesRegex(self.tool.IdentityError, "UNSAFE_IDENTITY_FILE"):
+                    self.tool.reconcile("app", self.ref, COMMIT, self.directory)
+                self.assertEqual(path.read_bytes(), before)
+
+    def test_unsafe_mode_rejected(self):
+        self.refresh()
+        path = self.directory / "runtime-identity.json"
+        path.chmod(0o600)
+        with self.assertRaisesRegex(self.tool.IdentityError, "UNSAFE_IDENTITY_FILE"):
+            self.tool.reconcile("app", self.ref, COMMIT, self.directory)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_hardlinked_identity_rejected(self):
+        self.refresh()
+        path = self.directory / "runtime-identity.json"
+        os.link(path, self.directory / "second-identity-link")
+        with self.assertRaisesRegex(self.tool.IdentityError, "UNSAFE_IDENTITY_FILE"):
+            self.tool.reconcile("app", self.ref, COMMIT, self.directory)
+        self.assertEqual(path.stat().st_nlink, 2)
+
+    def test_nonregular_identity_rejected(self):
+        (self.directory / "runtime-identity.json").mkdir()
+        with self.assertRaisesRegex(self.tool.IdentityError, "UNSAFE_IDENTITY_FILE"):
+            self.tool.reconcile("app", self.ref, COMMIT, self.directory)
 
     def test_restart_stale_then_refresh(self):
         self.refresh()
