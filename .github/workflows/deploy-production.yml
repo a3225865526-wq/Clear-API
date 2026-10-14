@@ -129,6 +129,12 @@ jobs:
             exit 1
           fi
           echo "deploy wrapper integrity PASS: $LOCAL_SHA"
+          LOCAL_IDENTITY_SHA="$(sha256sum scripts/runtime-identity-refresh.py | cut -d' ' -f1)"
+          REMOTE_IDENTITY_SHA="$(ssh "${PROD_SSH_ALIAS}" "sudo sha256sum /opt/clearapi/bin/runtime-identity-refresh.py | cut -d' ' -f1")"
+          [ "$LOCAL_IDENTITY_SHA" = "$REMOTE_IDENTITY_SHA" ] || {
+            echo 'runtime identity tool integrity FAILED'
+            exit 1
+          }
 
       - name: Run controlled deploy on VPS
         env:

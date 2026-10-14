@@ -1,15 +1,26 @@
 #!/usr/bin/env bash
-# One-time operator-console installer. It installs only the audited wrapper and
+# One-time operator-console installer. Installs the approved two-artifact bundle and
 # never starts a deployment. Run as root on the authorized Clear API VPS.
 set -Eeuo pipefail
 umask 077
 
 TARGET=/opt/clearapi/bin/production-deploy.sh
 LOCK=/run/lock/clearapi-production-deploy.lock
-EXPECTED_SHA=7c1798e8a84d3e0e521f4fad28ee27f0039b75330b2021d0c7ac505885e3467c
-EXPECTED_COMMIT=f1797fbb3752100c665ddf85d9dfae89b7765ad7
-RELEASE_COMMIT=${2:-}
-SOURCE=${1:-}
+EXPECTED_SHA=4fe5fefd8aacea55427eebcb1183c89df5fc9b01fa9c968071cdca71395febbb
+EXPECTED_IDENTITY_SHA=afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e
+EXPECTED_LIST_SHA=b7fea21a60fe2bb1e6d9d8e976ec3cf7121865e5efa7809991fd4e13c7a1964e
+# Approval is pinned to bytes, not to an arbitrary caller-provided checksum.
+# The supplied release commit is recorded provenance, not a Git signature check.
+EXPECTED_COMMIT=${2:-}
+SOURCE_DIR=${1:-}
+SOURCE=${SOURCE_DIR}/production-deploy.sh
+IDENTITY_SOURCE=${SOURCE_DIR}/runtime-identity-refresh.py
+ARTIFACT_LIST=${SOURCE_DIR}/runtime-identity-artifacts.sha256
+IDENTITY_TARGET=/opt/clearapi/bin/runtime-identity-refresh.py
+IDENTITY_EXISTED=0
+IDENTITY_REPLACED=0
+IDENTITY_BACKUP=
+OLD_IDENTITY_SHA=
 STAGE=
 BACKUP=
 REPLACED=0
@@ -33,37 +44,56 @@ print(f'{status}: {detail}')
 PY
 }
 restore() {
-  [ "$REPLACED" = 1 ] || return 0
   [ "$RESTORING" = 0 ] || return 1
   RESTORING=1
-  if [ -f "$BACKUP" ] && [ ! -L "$BACKUP" ]; then
+  if [ "$REPLACED" = 1 ]; then
+    [ -f "$BACKUP" ] && [ ! -L "$BACKUP" ] || return 1
     cp --preserve=all -- "$BACKUP" "$STAGE/restore.sh" || return 1
     chown root:root "$STAGE/restore.sh" || return 1
     chmod 0750 "$STAGE/restore.sh" || return 1
     mv -fT -- "$STAGE/restore.sh" "$TARGET" || return 1
     test "$(sha256sum "$TARGET" | cut -d' ' -f1)" = "$OLD_SHA" || return 1
     test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:0:750 || return 1
-    audit RESTORED "old wrapper restored after post-replace verification failure" || return 1
-    return 0
   fi
-  return 1
+  if [ "$IDENTITY_REPLACED" = 1 ]; then
+    if [ "$IDENTITY_EXISTED" = 1 ]; then
+      cp --preserve=all -- "$IDENTITY_BACKUP" "$STAGE/identity-restore.py" || return 1
+      chown root:root "$STAGE/identity-restore.py" || return 1
+      chmod 0750 "$STAGE/identity-restore.py" || return 1
+      mv -fT -- "$STAGE/identity-restore.py" "$IDENTITY_TARGET" || return 1
+      test "$(sha256sum "$IDENTITY_TARGET" | cut -d' ' -f1)" = "$OLD_IDENTITY_SHA" || return 1
+      test "$(stat -c '%u:%g:%a' "$IDENTITY_TARGET")" = 0:0:750 || return 1
+    elif [ -e "$IDENTITY_TARGET" ] || [ -L "$IDENTITY_TARGET" ]; then
+      [ ! -L "$IDENTITY_TARGET" ] || return 1
+      test "$(sha256sum "$IDENTITY_TARGET" | cut -d' ' -f1)" = "$EXPECTED_IDENTITY_SHA" || return 1
+      rm -- "$IDENTITY_TARGET" || return 1
+    fi
+  fi
+  audit RESTORED 'original wrapper/helper state restored' || return 1
 }
+
 on_error() {
   local code=$?
   trap - ERR
-  if [ "$REPLACED" = 1 ] && ! restore; then
-    printf 'RESTORE_FAILED: original wrapper could not be restored\n' >&2
-    [ -z "$STAGE" ] || audit RESTORE_FAILED "original wrapper could not be restored" || true
+  if { [ "$REPLACED" = 1 ] || [ "$IDENTITY_REPLACED" = 1 ]; } && ! restore; then
+    printf 'RESTORE_FAILED: original artifact pair could not be restored\n' >&2
+    [ -z "$STAGE" ] || audit RESTORE_FAILED "original artifact pair could not be restored" || true
   fi
   printf 'INSTALL_FAILED: exit=%s backup=%s audit=%s\n' "$code" "$BACKUP" "${STAGE:-unavailable}" >&2
   exit "$code"
 }
 trap on_error ERR
+trap 'false' HUP INT TERM
 
 [ "$(id -u)" = 0 ] || fail 'root is required'
-[ -n "$SOURCE" ] || fail 'usage: clearapi-install-approved-script.sh /root/input/approved-wrapper.sh'
-[[ "$RELEASE_COMMIT" == "$EXPECTED_COMMIT" ]] || fail 'release commit does not match the approved installer identity'
-[ -f "$SOURCE" ] && [ ! -L "$SOURCE" ] || fail 'source must be a regular non-symlink file'
+[ -n "$SOURCE_DIR" ] || fail 'usage: clearapi-install-approved-script.sh <approved-bundle-directory> <release-commit>'
+[[ "$EXPECTED_COMMIT" =~ ^[a-f0-9]{40}$ ]] || fail 'release commit must be full 40-hex'
+[ -d "$SOURCE_DIR" ] && [ ! -L "$SOURCE_DIR" ] || fail 'unsafe source directory'
+for artifact in "$SOURCE" "$IDENTITY_SOURCE" "$ARTIFACT_LIST"; do
+  [ -f "$artifact" ] && [ ! -L "$artifact" ] || fail 'missing or unsafe required artifact'
+done
+test "$(sha256sum "$ARTIFACT_LIST" | cut -d' ' -f1)" = "$EXPECTED_LIST_SHA"
+(cd "$SOURCE_DIR" && sha256sum --check runtime-identity-artifacts.sha256)
 for directory in /opt /opt/clearapi /opt/clearapi/bin /run /run/lock; do
   [ -d "$directory" ] && [ ! -L "$directory" ] || fail "unsafe directory: $directory"
   test "$(stat -c '%u' "$directory")" = 0 || fail "directory is not root-owned: $directory"
@@ -98,11 +128,28 @@ test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:0:750 || fail 'existing wrapper must 
 BACKUP="$STAGE/production-deploy.old.sh"
 cp --preserve=all -- "$TARGET" "$BACKUP"
 test "$(sha256sum "$BACKUP" | cut -d' ' -f1)" = "$OLD_SHA"
-audit PREPARED "source commit ${EXPECTED_COMMIT}; old_sha ${OLD_SHA}; backup ${BACKUP}"
+if [ -e "$IDENTITY_TARGET" ] || [ -L "$IDENTITY_TARGET" ]; then
+  [ -f "$IDENTITY_TARGET" ] && [ ! -L "$IDENTITY_TARGET" ] || fail 'unsafe existing identity helper'
+  test "$(stat -c '%u:%g:%a' "$IDENTITY_TARGET")" = 0:0:750
+  IDENTITY_EXISTED=1
+  OLD_IDENTITY_SHA=$(sha256sum "$IDENTITY_TARGET" | cut -d' ' -f1)
+  IDENTITY_BACKUP="$STAGE/runtime-identity.old.py"
+  cp --preserve=all -- "$IDENTITY_TARGET" "$IDENTITY_BACKUP"
+  test "$(sha256sum "$IDENTITY_BACKUP" | cut -d' ' -f1)" = "$OLD_IDENTITY_SHA"
+fi
+
+audit PREPARED "supplied release commit ${EXPECTED_COMMIT}; wrapper backup ${BACKUP}; helper existed ${IDENTITY_EXISTED}"
 
 install -o root -g root -m 0750 -- "$SOURCE" "$STAGE/production-deploy.new.sh"
 test "$(sha256sum "$STAGE/production-deploy.new.sh" | cut -d' ' -f1)" = "$EXPECTED_SHA"
 bash -n "$STAGE/production-deploy.new.sh"
+install -o root -g root -m 0750 -- "$IDENTITY_SOURCE" "$STAGE/runtime-identity.new.py"
+test "$(sha256sum "$STAGE/runtime-identity.new.py" | cut -d' ' -f1)" = "$EXPECTED_IDENTITY_SHA"
+test "$(stat -c '%u:%g:%a' "$STAGE/runtime-identity.new.py")" = 0:0:750
+python3 - "$STAGE/runtime-identity.new.py" <<'PY'
+import ast, pathlib, sys
+ast.parse(pathlib.Path(sys.argv[1]).read_text(encoding='utf-8'))
+PY
 test "$(stat -c '%u:%g:%a' "$STAGE/production-deploy.new.sh")" = 0:0:750
 test "$(stat -c %d "$STAGE")" = "$(stat -c %d /opt/clearapi/bin)"
 
@@ -111,12 +158,17 @@ id clearapi-deploy >/dev/null
 sudo -n /usr/bin/sha256sum "$TARGET" >/dev/null
 audit VERIFIED "vps=$(hostname -f 2>/dev/null || hostname); deploy_account=clearapi-deploy"
 
-mv -fT -- "$STAGE/production-deploy.new.sh" "$TARGET"
+IDENTITY_REPLACED=1
+mv -fT -- "$STAGE/runtime-identity.new.py" "$IDENTITY_TARGET"
+test "$(sha256sum "$IDENTITY_TARGET" | cut -d' ' -f1)" = "$EXPECTED_IDENTITY_SHA"
+test "$(stat -c '%u:%g:%a' "$IDENTITY_TARGET")" = 0:0:750
 REPLACED=1
+mv -fT -- "$STAGE/production-deploy.new.sh" "$TARGET"
 test "$(sha256sum "$TARGET" | cut -d' ' -f1)" = "$EXPECTED_SHA"
 test "$(stat -c '%u:%g:%a' "$TARGET")" = 0:0:750
 bash -n "$TARGET"
 sudo -n /usr/bin/sha256sum "$TARGET" | grep -q "$EXPECTED_SHA"
-audit INSTALLED "new_sha ${EXPECTED_SHA}; no container replacement performed"
+sudo -n /usr/bin/sha256sum "$IDENTITY_TARGET" | grep -q "$EXPECTED_IDENTITY_SHA"
+audit INSTALLED "wrapper_sha ${EXPECTED_SHA}; identity_sha ${EXPECTED_IDENTITY_SHA}; no container operation performed"
 
-printf 'INSTALL_PASS: target=%s sha=%s backup=%s audit=%s\n' "$TARGET" "$EXPECTED_SHA" "$BACKUP" "$STAGE/audit.jsonl"
+printf 'INSTALL_PASS: wrapper=%s identity=%s wrapper_sha=%s identity_sha=%s audit=%s\n' "$TARGET" "$IDENTITY_TARGET" "$EXPECTED_SHA" "$EXPECTED_IDENTITY_SHA" "$STAGE/audit.jsonl"

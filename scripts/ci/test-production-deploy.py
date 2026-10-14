@@ -12,6 +12,9 @@ import subprocess
 import tempfile
 import textwrap
 import unittest
+import importlib.util
+import sys
+from unittest.mock import patch
 
 CONTAINER_ID = "c" * 64
 STARTED_AT = "2026-10-13T00:00:00Z"
@@ -94,6 +97,10 @@ class Response:
             if failure == 'probe-post-config': data['config_generation'] = 'sha256:'+'0'*64
             if failure == 'probe-post-approval': data['approval_view_digest'] = 'sha256:'+'0'*64
             if failure == 'probe-post-products': data['product_view_digest'] = 'sha256:'+'0'*64
+        if root and os.path.exists(root+'/restarted'):
+            data['instance_id'] = '7f6ebdbe-9e74-4d25-b608-64eecbe0c0b2'
+            data['started_at'] = '2026-10-13T01:00:00Z'
+            if failure == 'restart-config': data['config_generation'] = 'sha256:'+'0'*64
         return json.dumps(body).encode()[:limit]
 class Opener:
     def open(self, request, timeout):
@@ -138,6 +145,8 @@ else:
     os.execv('/usr/bin/python3', ['/usr/bin/python3', *args])
 ''')
         python.chmod(0o755)
+        self.identity_tool = self.root / "runtime-identity-refresh.py"
+        self.identity_tool.write_text("import json,os,sys\nif 'TEST_ROOT' in os.environ:\n with open(os.environ['TEST_TRACE'],'a') as f: f.write(json.dumps({'name':'identity-refresh','args':sys.argv[1:]})+'\\n')\nif '--prepare-only' not in sys.argv and (os.environ.get('TEST_FAILURE') == 'identity-refresh' or os.environ.get('TEST_FAILURE') == 'rollback-identity' and os.path.exists(os.environ['TEST_ROOT']+'/rolled-back')): sys.exit(1)\n")
         # Redirect only the fixed operator config path in the test copy.
         self.wrapper = self.root / "wrapper.sh"
         self.wrapper.write_text(SOURCE.read_text().replace(
@@ -145,7 +154,7 @@ else:
             "production_path = False # isolated non-production fixture"
         ).replace(
             "/opt/clearapi/config/deploy.env", str(self.config)
-        ))
+        ).replace("/opt/clearapi/bin/runtime-identity-refresh.py", str(self.identity_tool)).replace("/run/lock", str(self.root / "lock")))
         fake_sudo = self.root / "sudo"
         fake_sudo.write_text("#!/usr/bin/env python3\n" + '''
 import json, os, sys
@@ -190,6 +199,25 @@ else:
         self.assertIn("identity OK", result.stderr)
         self.assertEqual(json.loads(self.audit.read_text())["result"], "ok")
         self.assertIn("Runtime Gate PASS", result.stderr)
+
+    def test_wrapper_reconcile_uses_approved_release_and_runtime_gate(self):
+        self.manifest.write_text(json.dumps({"releases":{"current":{
+            "new_api_image_id":"sha256:running-local-id", "image_ref":"registry/example@"+DIGEST,
+            "image_digest":DIGEST, "candidate_commit":COMMIT, "status":"success"}}}))
+        result = self.run_wrapper("--reconcile")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        commands = [json.loads(line) for line in self.trace.read_text().splitlines()]
+        self.assertFalse(any("up" in x or "restart" in x or "pull" in x for x in commands))
+        self.assertTrue(any("--entrypoint" in x and "sha256sum" in x for x in commands))
+        self.assertEqual(json.loads(self.audit.read_text())["event"], "reconcile")
+
+    def test_wrapper_reconcile_rejects_unapproved_digest(self):
+        self.manifest.write_text(json.dumps({"releases":{"current":{
+            "new_api_image_id":"sha256:running-local-id", "image_ref":"registry/example@sha256:"+"f"*64,
+            "image_digest":"sha256:"+"f"*64, "candidate_commit":COMMIT, "status":"success"}}}))
+        result = self.run_wrapper("--reconcile")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved digest drift", result.stderr)
 
     def test_verify_missing_override_fails(self):
         self.override.unlink()
@@ -250,6 +278,7 @@ elif a == ["docker", "inspect", "--format", "{{.Image}}", "running-container"]:
     print("sha256:running-local-id")
 elif a[:4] == ["docker", "image", "inspect", "--format"] and a[4] == "{{.Id}}":
     print("sha256:running-local-id")
+elif a[:4] == ['docker','image','inspect','--format'] and 'revision' in a[4]: print('b'*40)
 elif a[:3] == ['docker','inspect','--format'] and a[3] == '{{.Id}} {{.State.StartedAt}} {{.Image}}':
     print('c'*64+' 2026-10-13T00:00:00Z sha256:running-local-id')
 elif a[:2] == ['docker','run'] and '--entrypoint' in a and a[a.index('--entrypoint')+1] == 'sha256sum':
@@ -548,18 +577,20 @@ class InstallerFaultTest(unittest.TestCase):
         self.old = b"#!/bin/bash\n# old wrapper\nexit 0\n"
         self.target.write_bytes(self.old)
         self.target.chmod(0o750)
-        self.source = self.root / "source.sh"
+        self.bundle = self.root / "bundle"
+        self.bundle.mkdir()
+        self.source = self.bundle / "production-deploy.sh"
         self.source.write_bytes(SOURCE.read_bytes())
+        self.identity_source = self.bundle / "runtime-identity-refresh.py"
+        self.identity_source.write_bytes((SOURCE.parent / "runtime-identity-refresh.py").read_bytes())
+        self.artifact_list = self.bundle / "runtime-identity-artifacts.sha256"
+        self.artifact_list.write_bytes((SOURCE.parent / "runtime-identity-artifacts.sha256").read_bytes())
+        self.identity_target = self.bin / "runtime-identity-refresh.py"
         self.machine = self.root / "machine-id"
         self.machine.write_text("virtual-vps")
         installer = SOURCE.parent / "clearapi-install-approved-script.sh"
         text = installer.read_text().replace("/opt", str(self.root / "opt"))
-        # Authorize only the disposable test copy's fixture bytes. The real
-        # installer retains its old reviewed hash and cannot install this change.
-        text = re.sub(r'^EXPECTED_SHA=.*$',
-                      'EXPECTED_SHA=' + hashlib.sha256(self.source.read_bytes()).hexdigest(),
-                      text, count=1, flags=re.MULTILINE)
-        text = text.replace("/run", str(self.root / "run"))
+        text = text.replace("/run/", str(self.root / "run")+"/").replace("/run ", str(self.root / "run")+" ")
         text = text.replace("/etc/machine-id", str(self.machine))
         # The production script still requires root. Here, only filesystem
         # ownership is virtualized so CI may run the sandbox without root.
@@ -589,6 +620,8 @@ if name=='sudo':
     if n==2 and failure in ('post','restore'): sys.exit(1)
     os.execv('/usr/bin/sha256sum',['sha256sum',a[-1]])
 if name=='mv':
+    if failure=='helper-move' and a[-2].endswith('runtime-identity.new.py'): sys.exit(1)
+    if failure=='wrapper-move' and a[-2].endswith('production-deploy.new.sh'): sys.exit(1)
     if 'restore.sh' in a[-2]:
         with open(root/'restore-lock','w') as f:
             probe=subprocess.run(['/usr/bin/flock','-n',str(root/'run/lock/clearapi-production-deploy.lock'),'true'])
@@ -614,7 +647,7 @@ sys.exit('unexpected mock command')
 
     def run_install(self, failure=""):
         env = dict(self.env, INSTALL_FAILURE=failure)
-        return subprocess.run(["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
+        return subprocess.run(["bash", str(self.installer), str(self.bundle), INSTALLER_COMMIT],
                               env=env, capture_output=True, text=True, timeout=10)
 
     def test_lock_directory_accepts_root_0755_and_sticky_1777(self):
@@ -623,7 +656,7 @@ sys.exit('unexpected mock command')
                 self.target.write_bytes(self.old)
                 self.lockdir.chmod(int(mode, 8))
                 result = subprocess.run(
-                    ["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
+                    ["bash", str(self.installer), str(self.bundle), INSTALLER_COMMIT],
                     env=dict(self.env, LOCK_MODE=mode), capture_output=True, text=True, timeout=10,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -650,7 +683,7 @@ sys.exit('unexpected mock command')
                     self.lockdir.unlink()
                     self.lockdir.touch()
                 result = subprocess.run(
-                    ["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
+                    ["bash", str(self.installer), str(self.bundle), INSTALLER_COMMIT],
                     env=dict(self.env, **env), capture_output=True, text=True, timeout=10,
                 )
                 self.assertNotEqual(result.returncode, 0)
@@ -676,7 +709,7 @@ sys.exit('unexpected mock command')
                 if "LOCK_LINKS" in env:
                     os.link(lock, self.lockdir / "second-link")
                 result = subprocess.run(
-                    ["bash", str(self.installer), str(self.source), INSTALLER_COMMIT],
+                    ["bash", str(self.installer), str(self.bundle), INSTALLER_COMMIT],
                     env=dict(self.env, **env), capture_output=True, text=True, timeout=10,
                 )
                 self.assertNotEqual(result.returncode, 0)
@@ -688,9 +721,72 @@ sys.exit('unexpected mock command')
         self.assertIn("INSTALL_PASS", result.stdout)
         self.assertEqual(self.target.read_bytes(), self.source.read_bytes())
         self.assertEqual(self.target.stat().st_mode & 0o777, 0o750)
+        self.assertEqual(self.identity_target.read_bytes(), self.identity_source.read_bytes())
+        self.assertEqual(self.identity_target.stat().st_mode & 0o777, 0o750)
+        self.assertEqual(self.identity_target.stat().st_uid, os.getuid())
+        self.assertEqual(self.identity_target.stat().st_gid, os.getgid())
         self.assertEqual(self.target.stat().st_uid, os.getuid())
         self.assertEqual(self.target.stat().st_gid, os.getgid())
         self.assertEqual(hashlib.sha256(self.target.read_bytes()).hexdigest(), hashlib.sha256(SOURCE.read_bytes()).hexdigest())
+
+    def test_missing_helper_blocks_before_target_changes(self):
+        self.identity_source.rename(self.bundle / "missing-helper.py")
+        result = self.run_install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing or unsafe required artifact", result.stderr)
+        self.assertEqual(self.target.read_bytes(), self.old)
+        self.assertFalse(self.identity_target.exists())
+        self.assertFalse(list(self.bin.glob(".script-install.*")))
+
+    def test_artifact_hash_mismatch_blocks_both_targets(self):
+        for source in (self.source, self.identity_source):
+            with self.subTest(source=source.name):
+                original = source.read_bytes()
+                source.write_bytes(original+b"\n# tampered fixture\n")
+                result = self.run_install()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.target.read_bytes(), self.old)
+                self.assertFalse(self.identity_target.exists())
+                self.assertNotIn("INSTALL_PASS", result.stdout)
+                source.write_bytes(original)
+
+    def test_caller_cannot_self_approve_tampered_artifact_list(self):
+        self.identity_source.write_bytes(b"print('tampered')\n")
+        entries = "".join(hashlib.sha256(p.read_bytes()).hexdigest()+"  "+p.name+"\n"
+                          for p in (self.source,self.identity_source))
+        self.artifact_list.write_text(entries)
+        result = self.run_install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.target.read_bytes(), self.old)
+        self.assertFalse(self.identity_target.exists())
+
+    def test_existing_helper_replaced_and_restored_as_pair(self):
+        old_helper = b"# old reviewed helper\n"
+        self.identity_target.write_bytes(old_helper)
+        self.identity_target.chmod(0o750)
+        result = self.run_install("post")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.target.read_bytes(), self.old)
+        self.assertEqual(self.identity_target.read_bytes(), old_helper)
+        self.assertEqual(self.identity_target.stat().st_mode & 0o777, 0o750)
+
+    def test_helper_move_failure_keeps_original_pair(self):
+        result = self.run_install("helper-move")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.target.read_bytes(), self.old)
+        self.assertFalse(self.identity_target.exists())
+        self.assertNotIn("RESTORE_FAILED", result.stderr)
+        self.assertNotIn("INSTALL_PASS", result.stdout)
+
+    def test_wrapper_move_failure_restores_helper(self):
+        old_helper = b"# existing helper\n"
+        self.identity_target.write_bytes(old_helper)
+        self.identity_target.chmod(0o750)
+        result = self.run_install("wrapper-move")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.target.read_bytes(), self.old)
+        self.assertEqual(self.identity_target.read_bytes(), old_helper)
+        self.assertNotIn("INSTALL_PASS", result.stdout)
 
     def test_post_replace_failure_restores_inside_lock(self):
         result = self.run_install("post")
@@ -698,6 +794,7 @@ sys.exit('unexpected mock command')
         self.assertNotIn("INSTALL_PASS", result.stdout)
         self.assertEqual(self.target.read_bytes(), self.old)
         self.assertEqual(self.target.stat().st_mode & 0o777, 0o750)
+        self.assertFalse(self.identity_target.exists())
         self.assertNotEqual((self.root / "restore-lock").read_text(), "0")
         audit = next(self.bin.glob(".script-install.*/audit.jsonl"))
         self.assertEqual(json.loads(audit.read_text().splitlines()[-1])["status"], "RESTORED")
@@ -741,7 +838,7 @@ class WorkflowStdinTest(unittest.TestCase):
     setUp = WrapperModesTest.setUp
 
     def run_chain(self, failure="", payload="non-secret-ci-credential", framed=True,
-                  legacy=False, compatible=False, migration=False):
+                  legacy=False, compatible=False, migration=False, restart=False):
         workflow = SOURCE.parents[1] / ".github/workflows/deploy-production.yml"
         block = workflow.read_text().split("      - name: Run controlled deploy on VPS\n")[1]
         block = textwrap.dedent(block.split("        run: |\n", 1)[1].split(
@@ -751,6 +848,10 @@ class WorkflowStdinTest(unittest.TestCase):
                                   "inputs.migration_compatible": "true" if compatible else "false",
                                   "github.run_id": "123"}.items():
             block = block.replace("${{ " + expression + " }}", value)
+        if restart:
+            block = block.replace("--ghcr-token-stdin", "--ghcr-token-stdin --restart")
+            with self.config.open("a") as f:
+                f.write("\nDEPLOY_IMAGE_BASE=registry/example\n")
         if not framed:
             block = block.replace("printf '%s\\n'", "printf '%s'")
         source = self.wrapper.read_text().replace("/run/lock", str(self.root / "lock"))
@@ -833,7 +934,7 @@ elif a[0]=='run':
 elif a[0]=='inspect':
     if a[2]=='{{.Id}} {{.State.StartedAt}} {{.Image}}':
         replaced=(root/'replaced').exists() and not (root/'rolled-back').exists()
-        print(('a' if replaced else 'c')*64+' 2026-10-13T00:00:00Z '+('sha256:candidate-local-id' if replaced else 'sha256:running-local-id'))
+        print(('a' if replaced else 'c')*64+(' 2026-10-13T01:00:00Z ' if (root/'restarted').exists() else ' 2026-10-13T00:00:00Z ')+('sha256:candidate-local-id' if replaced else 'sha256:running-local-id'))
     elif 'NetworkSettings' in a[2]: print('clearapi_internal')
     else: print('sha256:candidate-local-id' if (root/'replaced').exists() and not (root/'rolled-back').exists() else 'sha256:running-local-id')
 elif a[0]=='port':
@@ -859,11 +960,12 @@ elif a[0]=='compose':
         elif 'needs_review' in q: print('4/10/4\n41/93/41')
         elif 'SELECT value' in q: print('enforce')
         else: sys.exit('Forbidden query')
+    elif 'restart' in a: (root/'restarted').touch()
     elif 'up' in a:
         if (root/'replaced').exists(): (root/'rolled-back').touch()
         else:
             (root/'replaced').touch()
-            if fail=='partial': sys.exit(1)
+            if fail in ('partial', 'rollback-identity'): sys.exit(1)
     elif 'run' in a:
         if not any('compose-jobs.yaml' in x for x in a): sys.exit('job missing candidate override')
         if (root/'replaced').exists(): sys.exit('job ran after replacement')
@@ -998,12 +1100,46 @@ else: sys.exit('Forbidden docker operation')
         self.assertEqual(manifest["releases"]["current"]["new_api_image_id"], "sha256:running-local-id")
         self.assertEqual(manifest["failed_deployments"][0]["candidate"]["candidate_commit"], COMMIT)
         self.assertIn("rollback complete", result.stderr)
+        self.assertTrue(any(x["name"] == "identity-refresh" and "--container" in x["args"] for x in trace))
         compose_configs = [x for x in trace if x["name"] == "docker" and
                            x["args"][0] == "compose" and "config" in x["args"]]
         image_probes = [x for x in trace if x["name"] == "docker" and
                         x["args"][0:3] == ["image", "inspect", "--format"]]
         self.assertGreaterEqual(len(compose_configs), 2)
         self.assertGreaterEqual(len(image_probes), 2)
+
+    def test_deploy_refreshes_after_replace(self):
+        result, trace, _ = self.run_chain()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        replace = next(i for i, x in enumerate(trace) if x["name"] == "docker" and "up" in x["args"])
+        refresh = next(i for i, x in enumerate(trace) if x["name"] == "identity-refresh" and "--container" in x["args"])
+        self.assertLess(replace, refresh)
+
+    def test_refresh_failure_blocks_success(self):
+        result, trace, _ = self.run_chain(failure="identity-refresh")
+        self.assertEqual(result.returncode, 1)
+        self.assertNotEqual(json.loads(self.manifest.read_text())["releases"]["current"]["status"], "success")
+
+    def test_controlled_restart_refreshes_without_pull_or_migration(self):
+        result, trace, _ = self.run_chain(restart=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.root / "restarted").exists())
+        self.assertTrue(any(x["name"] == "identity-refresh" and "--container" in x["args"] for x in trace))
+        self.assertFalse(any(x["name"] == "docker" and ("pull" in x["args"] or "run" in x["args"] and "/billing-migrate" in x["args"]) for x in trace))
+
+    def test_restart_keeps_runtime_config_gate(self):
+        result, trace, _ = self.run_chain(restart=True, failure="restart-config")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RUNTIME_CONFIG_MISMATCH", result.stderr)
+
+    def test_rollback_refresh_failure_never_reports_recovery(self):
+        result, trace, _ = self.run_chain(failure="rollback-identity", compatible=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.root / "rolled-back").exists())
+        self.assertIn("ROLLBACK_FAILED", result.stderr)
+        self.assertNotIn("rollback complete", result.stderr)
+        self.assertNotIn("PRODUCTION DEPLOY COMPLETED", result.stderr)
+        self.assertEqual(json.loads(self.manifest.read_text())["releases"]["current"]["status"], "pending")
 
     def test_wrong_job_image_prevents_migration(self):
         result, trace, _ = self.run_chain(failure="job-image", migration=True)
@@ -1019,6 +1155,257 @@ else: sys.exit('Forbidden docker operation')
         overrides = [next(a for a in x["args"] if a.endswith("compose-jobs.yaml")) for x in jobs]
         self.assertEqual(overrides[0], overrides[1])
         self.assertTrue(all("--no-deps" in x["args"] and "never" in x["args"] for x in jobs))
+
+
+
+class RuntimeIdentityTest(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("identity_refresh", SOURCE.parent / "runtime-identity-refresh.py")
+        self.tool = importlib.util.module_from_spec(spec)
+        sys.dont_write_bytecode = True
+        spec.loader.exec_module(self.tool)
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.directory = Path(self.temp.name)
+        self.ref = "registry/example@" + DIGEST
+        self.current = {"Id": "c"*64, "Image": "sha256:"+"d"*64,
+                        "State": {"Running": True, "Restarting": False, "StartedAt": "2026-01-01T00:00:00Z"},
+                        "Config": {"Image": self.ref},
+                        "Mounts": [{"Type": "bind", "Source": str(self.directory), "Destination": "/run/clearapi", "RW": False}]}
+        self.image = {"Id": self.current["Image"], "RepoDigests": [self.ref],
+                      "Config": {"Labels": {"org.opencontainers.image.revision": COMMIT}}}
+        def docker(*args):
+            return [self.image if args[0] == "image" else self.current]
+        self.addCleanup(patch.stopall)
+        patch.object(self.tool, "docker_json", side_effect=docker).start()
+        patch.object(self.tool.os, "geteuid", return_value=0).start()
+        patch.object(self.tool, "secure_directory", return_value=self.directory).start()
+        patch.object(self.tool.os, "fchown").start()
+        original_lstat = os.lstat
+        def root_fixture(path, *args, **kwargs):
+            info = original_lstat(path, *args, **kwargs)
+            if Path(path) == self.directory / "runtime-identity.json":
+                values = list(info)
+                values[4], values[5] = 0, 0
+                return os.stat_result(values)
+            return info
+        patch.object(self.tool.os, "lstat", side_effect=root_fixture).start()
+
+    def refresh(self, check=False):
+        self.tool.refresh("app", self.ref, COMMIT, self.directory, check)
+
+    def test_publish_permissions_and_check(self):
+        self.refresh()
+        p = self.directory / "runtime-identity.json"
+        self.assertEqual(p.stat().st_mode & 0o777, 0o400)
+        identity = json.loads(p.read_text())
+        self.assertEqual(identity["container_id"], self.current["Id"])
+        self.assertEqual(identity["image_digest"], DIGEST)
+        self.assertEqual(identity["oci_revision"], COMMIT)
+        self.refresh(check=True)
+
+    def test_restart_stale_then_refresh(self):
+        self.refresh()
+        self.current["State"]["StartedAt"] = "2026-01-02T00:00:00Z"
+        with self.assertRaisesRegex(self.tool.IdentityError, "STALE_IDENTITY"):
+            self.refresh(check=True)
+        self.refresh()
+        self.refresh(check=True)
+
+    def test_recreate_and_rollback_stale(self):
+        self.refresh()
+        self.current["Id"] = "e"*64
+        with self.assertRaisesRegex(self.tool.IdentityError, "STALE_IDENTITY"):
+            self.refresh(check=True)
+        self.refresh()
+        self.current["Id"] = "f"*64
+        self.current["State"]["StartedAt"] = "2026-01-03T00:00:00Z"
+        self.refresh()
+        self.refresh(check=True)
+
+    def test_automatic_restart_blocks_until_host_refresh(self):
+        self.refresh()
+        path = self.directory / "runtime-identity.json"
+        before = path.read_bytes()
+        self.current["State"]["Running"] = False
+        with self.assertRaisesRegex(self.tool.IdentityError, "CONTAINER_NOT_RUNNING"):
+            self.refresh()
+        self.assertEqual(path.read_bytes(), before)
+        self.current["State"]["Running"] = True
+        self.current["State"]["StartedAt"] = "2026-01-04T00:00:00Z"
+        with self.assertRaisesRegex(self.tool.IdentityError, "STALE_IDENTITY"):
+            self.refresh(check=True)
+        self.assertEqual(path.read_bytes(), before)
+        # There is deliberately no automatic restart watcher in this implementation.
+        self.refresh()
+        self.refresh(check=True)
+
+    def test_rollback_uses_restored_image_and_new_lifecycle(self):
+        old_ref, old_image, old_revision = self.ref, self.current["Image"], COMMIT
+        self.refresh()
+        self.ref = "registry/example@sha256:" + "e"*64
+        self.current["Id"] = "e"*64
+        self.current["Image"] = "sha256:" + "f"*64
+        self.current["Config"]["Image"] = self.ref
+        self.current["State"]["StartedAt"] = "2026-01-02T00:00:00Z"
+        self.image = {"Id": self.current["Image"], "RepoDigests": [self.ref],
+                      "Config": {"Labels": {"org.opencontainers.image.revision": "e"*40}}}
+        self.tool.refresh("app", self.ref, "e"*40, self.directory)
+        candidate_identity = (self.directory / "runtime-identity.json").read_bytes()
+        candidate_ref = self.ref
+        self.ref = old_ref
+        self.current["Id"] = "f"*64
+        self.current["Image"] = old_image
+        self.current["Config"]["Image"] = old_ref
+        self.current["State"]["StartedAt"] = "2026-01-03T00:00:00Z"
+        self.image = {"Id": old_image, "RepoDigests": [old_ref],
+                      "Config": {"Labels": {"org.opencontainers.image.revision": old_revision}}}
+        with self.assertRaisesRegex(self.tool.IdentityError, "IMAGE_MISMATCH"):
+            self.tool.reconcile("app", candidate_ref, "e"*40, self.directory)
+        self.assertEqual((self.directory / "runtime-identity.json").read_bytes(), candidate_identity)
+        with self.assertRaisesRegex(self.tool.IdentityError, "STALE_IDENTITY"):
+            self.refresh(check=True)
+        self.assertEqual(self.tool.reconcile("app", self.ref, COMMIT, self.directory), "repaired")
+        identity = json.loads((self.directory / "runtime-identity.json").read_text())
+        self.assertEqual(identity["image_digest"], DIGEST)
+        self.assertEqual(identity["oci_revision"], old_revision)
+        self.assertEqual(identity["container_id"], "f"*64)
+        self.assertEqual(identity["started_at"], "2026-01-03T00:00:00Z")
+        self.refresh(check=True)
+
+    def test_reconcile_after_docker_restart(self):
+        self.refresh()
+        self.current["State"]["StartedAt"] = "2026-01-05T00:00:00Z"
+        result = self.tool.reconcile("app", self.ref, COMMIT, self.directory)
+        self.assertEqual(result, "repaired")
+        self.refresh(check=True)
+        path = self.directory / "runtime-identity.json"
+        before = path.read_bytes()
+        before_stat = path.stat()
+        self.assertEqual(self.tool.reconcile("app", self.ref, COMMIT, self.directory), "unchanged")
+        self.assertEqual(path.read_bytes(), before)
+        self.assertEqual(path.stat().st_ino, before_stat.st_ino)
+
+    def test_reconcile_repairs_each_stale_identity_field(self):
+        self.refresh()
+        path = self.directory / "runtime-identity.json"
+        for field, stale in (("container_id","f"*64), ("started_at","2025-01-01T00:00:00Z"),
+                             ("image_digest","sha256:"+"f"*64)):
+            with self.subTest(field=field):
+                stored = json.loads(path.read_text())
+                stored[field] = stale
+                path.chmod(0o600)
+                path.write_text(json.dumps(stored))
+                path.chmod(0o400)
+                with self.assertRaisesRegex(self.tool.StaleIdentityError, field):
+                    self.refresh(check=True)
+                self.assertEqual(self.tool.reconcile("app", self.ref, COMMIT, self.directory), "repaired")
+                self.refresh(check=True)
+
+    def test_reconcile_repair_failure_blocks_and_preserves_identity(self):
+        self.refresh()
+        path = self.directory / "runtime-identity.json"
+        before = path.read_bytes()
+        self.current["State"]["StartedAt"] = "2026-01-05T00:00:00Z"
+        with patch.object(self.tool.os, "replace", side_effect=PermissionError("fixture")):
+            with self.assertRaises(PermissionError):
+                self.tool.reconcile("app", self.ref, COMMIT, self.directory)
+        self.assertEqual(path.read_bytes(), before)
+        with self.assertRaises(self.tool.StaleIdentityError):
+            self.refresh(check=True)
+
+    def test_reconcile_verification_failure_blocks(self):
+        self.refresh()
+        self.current["State"]["StartedAt"] = "2026-01-05T00:00:00Z"
+        original = self.tool.refresh
+        def verify_failure(*args, **kwargs):
+            if kwargs.get("check") and verify_failure.repaired:
+                raise self.tool.IdentityError("CONTAINER_CHANGED")
+            result = original(*args, **kwargs)
+            if not kwargs.get("check"):
+                verify_failure.repaired = True
+            return result
+        verify_failure.repaired = False
+        with patch.object(self.tool, "refresh", side_effect=verify_failure):
+            with self.assertRaisesRegex(self.tool.IdentityError, "CONTAINER_CHANGED"):
+                self.tool.reconcile("app", self.ref, COMMIT, self.directory)
+
+    def test_reconcile_never_accepts_live_digest_drift(self):
+        self.refresh()
+        path = self.directory / "runtime-identity.json"
+        before = path.read_bytes()
+        self.image["RepoDigests"] = ["registry/example@sha256:"+"f"*64]
+        with self.assertRaisesRegex(self.tool.IdentityError, "DIGEST_MISMATCH"):
+            self.tool.reconcile("app", self.ref, COMMIT, self.directory)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_reconcile_creates_missing_identity(self):
+        self.assertEqual(self.tool.reconcile("app", self.ref, COMMIT, self.directory), "repaired")
+        self.refresh(check=True)
+
+    def test_digest_mismatch_does_not_overwrite(self):
+        self.refresh()
+        p = self.directory / "runtime-identity.json"
+        before = p.read_bytes()
+        self.image["RepoDigests"] = ["registry/example@sha256:"+"f"*64]
+        with self.assertRaisesRegex(self.tool.IdentityError, "DIGEST_MISMATCH"):
+            self.refresh()
+        self.assertEqual(p.read_bytes(), before)
+
+    def test_revision_mismatch(self):
+        self.image["Config"]["Labels"]["org.opencontainers.image.revision"] = "f"*40
+        with self.assertRaisesRegex(self.tool.IdentityError, "REVISION_MISMATCH"):
+            self.refresh()
+        self.assertFalse((self.directory / "runtime-identity.json").exists())
+
+    def test_writable_or_missing_mount_rejected(self):
+        self.current["Mounts"][0]["RW"] = True
+        with self.assertRaisesRegex(self.tool.IdentityError, "READ_ONLY_MOUNT_REQUIRED"):
+            self.refresh()
+        self.current["Mounts"] = []
+        with self.assertRaisesRegex(self.tool.IdentityError, "READ_ONLY_MOUNT_REQUIRED"):
+            self.refresh()
+
+    def test_symlink_not_followed(self):
+        target = self.directory / "other"
+        target.write_text("untouched")
+        (self.directory / "runtime-identity.json").symlink_to(target)
+        with self.assertRaisesRegex(self.tool.IdentityError, "UNSAFE_IDENTITY_FILE"):
+            self.refresh()
+        self.assertEqual(target.read_text(), "untouched")
+
+    def test_changed_container_not_published(self):
+        first = self.tool.observe("app", self.ref, COMMIT, self.directory)
+        changed = dict(first, started_at="2026-01-02T00:00:00Z")
+        with patch.object(self.tool, "observe", side_effect=[first, changed]):
+            with self.assertRaisesRegex(self.tool.IdentityError, "CONTAINER_CHANGED"):
+                self.refresh()
+        self.assertFalse((self.directory / "runtime-identity.json").exists())
+
+    @unittest.skipUnless(os.getuid() == 0, "real permission integration requires Linux root")
+    def test_cli_filesystem_integration(self):
+        # Actual CLI, Docker subprocess protocol, permissions and atomic publication.
+        state = self.directory / "fixture.json"
+        state.write_text(json.dumps({"container": self.current, "image": self.image}))
+        daemon = self.directory / "docker"
+        daemon.write_text("#!/usr/bin/python3\nimport json,os,sys\ns=json.load(open(os.environ['IDENTITY_FIXTURE']))\nprint(json.dumps([s['image' if sys.argv[1]=='image' else 'container']]))\n")
+        daemon.chmod(0o755)
+        env = dict(os.environ, PATH=str(self.directory)+os.pathsep+os.environ["PATH"], IDENTITY_FIXTURE=str(state))
+        cmd = ["/usr/bin/python3", str(SOURCE.parent / "runtime-identity-refresh.py"),
+               "--container", "app", "--image-ref", self.ref, "--expected-revision", COMMIT,
+               "--directory", str(self.directory)]
+        for extra in ([], ["--check"]):
+            result = subprocess.run(cmd+extra, env=env, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.current["State"]["StartedAt"] = "2026-01-02T00:00:00Z"
+        state.write_text(json.dumps({"container": self.current, "image": self.image}))
+        result = subprocess.run(cmd+["--check"], env=env, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        for extra in (["--reconcile"], ["--check"]):
+            result = subprocess.run(cmd+extra, env=env, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        p = self.directory / "runtime-identity.json"
+        self.assertEqual((p.stat().st_uid, p.stat().st_gid, p.stat().st_mode & 0o777), (0, 0, 0o400))
 
 
 if __name__ == "__main__":

@@ -124,9 +124,13 @@ jobs:
 
       - name: Validate deployment wrapper modes
         run: |
+          bash -n scripts/clearapi-install-approved-script.sh
+          shellcheck --severity=warning scripts/clearapi-install-approved-script.sh
+          (cd scripts && sha256sum --check runtime-identity-artifacts.sha256)
           bash -n scripts/production-deploy.sh
           shellcheck --severity=warning scripts/production-deploy.sh
           python3 scripts/ci/test-production-deploy.py
+          sudo python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest
           bash -n scripts/production-backup.sh
           shellcheck --severity=warning scripts/production-backup.sh
           python3 scripts/ci/test-backup-identity.py
