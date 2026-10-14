@@ -1,0 +1,186 @@
+name: PG03 exact Gateway RC
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pg03-exact-gateway-rc
+  cancel-in-progress: false
+
+env:
+  SOURCE_COMMIT: fd98c9aad0374581e46e5ba13bcf18ec96046559
+  GHCR_IMAGE: ghcr.io/a3225865526-wq/clearapi
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout exact PG03 source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: fd98c9aad0374581e46e5ba13bcf18ec96046559
+          path: source
+          persist-credentials: false
+
+      - name: Confirm exact source and PG03 wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git -C source rev-parse HEAD)" == "$SOURCE_COMMIT" ]]
+          [[ -z "$(git -C source status --porcelain)" ]]
+          test -f source/service/accountpool/policy_snapshot.go
+          grep -q 'FreezePG03Policy' source/relay/responses_request.go
+          grep -q 'ApplyPG03Policy' source/relay/channel/api_request.go
+          grep -q 'hmac.New(sha256.New' source/service/accountpool/policy_snapshot.go
+          echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          echo "LOCAL_TAG=$GHCR_IMAGE:pg03-fd98c9-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+
+      - name: Set up Go for targeted source tests
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.26.1'
+          cache: false
+
+      - name: Account pool source tests
+        working-directory: source
+        shell: bash
+        env:
+          GOWORK: 'off'
+          CGO_ENABLED: '1'
+        run: |
+          set -euo pipefail
+          # Test-only frontend placeholder is removed before the image build.
+          trap 'rm -f web/dist/index.html; rmdir web/dist 2>/dev/null || true' EXIT
+          mkdir -p web/dist
+          printf 'CI test-only embed placeholder\n' > web/dist/index.html
+          go test -count=1 ./service/accountpool
+
+      - name: Confirm build context remains exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -z "$(git -C source status --porcelain --untracked-files=all)" ]]
+          test ! -d source/web/dist
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+
+      - name: Build exact source once
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: ./source
+          file: ./source/Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          tags: ${{ env.LOCAL_TAG }}
+          labels: |
+            org.opencontainers.image.revision=${{ env.SOURCE_COMMIT }}
+            org.opencontainers.image.source=https://github.com/a3225865526-wq/Clear-API
+            org.opencontainers.image.version=pg03-rc-fd98c9
+            org.opencontainers.image.created=${{ env.BUILD_DATE }}
+
+      - name: Extract final binary identity without starting Gateway
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          CID=$(docker create --network none "$LOCAL_TAG")
+          trap 'docker rm "$CID" >/dev/null' EXIT
+          docker cp "$CID:/new-api" release/new-api
+          sha256sum release/new-api | cut -d' ' -f1 > release/binary.sha256
+          go version -m release/new-api > release/binary-build-info.txt
+          docker image inspect "$LOCAL_TAG" > release/local-image.json
+          docker export "$CID" > release/rootfs.tar
+          python3 - <<'PY'
+          import json, os, tarfile
+          c=json.load(open('release/local-image.json'))[0]
+          assert c['Os']=='linux' and c['Architecture']=='amd64'
+          assert c['Config']['Labels']['org.opencontainers.image.revision']==os.environ['SOURCE_COMMIT']
+          assert c['Config']['Labels']['org.opencontainers.image.source']=='https://github.com/a3225865526-wq/Clear-API'
+          with tarfile.open('release/rootfs.tar') as t:
+              paths={m.name.lstrip('./') for m in t.getmembers()}
+          required=['entrypoint-secure.sh','production-bootstrap','finance-migrate','billing-migrate']
+          with open('release/missing-deployment-binaries.json','w') as f:
+              json.dump([p for p in required if p not in paths],f)
+          PY
+          rm release/rootfs.tar
+
+      - name: Login to GHCR
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the verified image and pull by digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "$LOCAL_TAG"
+          DIGEST=$(docker image inspect "$LOCAL_TAG" | python3 -c 'import json,os,re,sys; prefix=os.environ["GHCR_IMAGE"]+"@"; refs=json.load(sys.stdin)[0]["RepoDigests"]; ds={r[len(prefix):] for r in refs if r.startswith(prefix)}; assert len(ds)==1; d=ds.pop(); assert re.fullmatch("sha256:[0-9a-f]{64}",d); print(d)')
+          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+          docker pull --platform linux/amd64 "$GHCR_IMAGE@$DIGEST"
+          docker image inspect "$GHCR_IMAGE@$DIGEST" > release/published-image.json
+          CID=$(docker create --network none "$GHCR_IMAGE@$DIGEST")
+          trap 'docker rm "$CID" >/dev/null' EXIT
+          docker cp "$CID:/new-api" release/published-new-api
+          [[ "$(sha256sum release/published-new-api | cut -d' ' -f1)" == "$(cat release/binary.sha256)" ]]
+
+      - name: Write Release Manifest Lite and summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib
+          e=os.environ
+          local=json.load(open('release/local-image.json'))[0]
+          published=json.load(open('release/published-image.json'))[0]
+          assert local['Id']==published['Id']
+          assert published['Os']=='linux' and published['Architecture']=='amd64'
+          labels=published['Config']['Labels']
+          assert labels['org.opencontainers.image.revision']==e['SOURCE_COMMIT']
+          missing=json.load(open('release/missing-deployment-binaries.json'))
+          manifest={
+              'schema_version':1,'component':'gateway',
+              'source_commit':e['SOURCE_COMMIT'],'candidate_commit':e['SOURCE_COMMIT'],
+              'source_repository':'https://github.com/a3225865526-wq/Clear-API',
+              'image_repository':e['GHCR_IMAGE'],'image_digest':e['IMAGE_DIGEST'],
+              'image_ref':e['GHCR_IMAGE']+'@'+e['IMAGE_DIGEST'],
+              'oci_revision':labels['org.opencontainers.image.revision'],
+              'platform':'linux/amd64','new_api_image_id':published['Id'],
+              'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip(),
+              'dockerfile_sha256':hashlib.sha256(pathlib.Path('source/Dockerfile').read_bytes()).hexdigest(),
+              'workflow_run':e['GITHUB_RUN_ID'],'workflow_run_attempt':e['GITHUB_RUN_ATTEMPT'],
+              'workflow_commit':e['GITHUB_SHA'],'workflow_ref':e['GITHUB_WORKFLOW_REF'],
+              'workflow_run_url':e['GITHUB_SERVER_URL']+'/'+e['GITHUB_REPOSITORY']+'/actions/runs/'+e['GITHUB_RUN_ID'],
+              'created_at':e['BUILD_DATE'],
+              'runtime_identity':{'image_id':published['Id'],'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip()},
+              'verification':{'source_commit':'passed','targeted_accountpool_tests':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
+              'deployment_compatible':not missing,'missing_deployment_binaries':missing,
+              'production_ready':False,'production_acceptance':'not_run',
+              'sbom':None,'provenance':None
+          }
+          with open('release/gateway-image-release.json','w') as f:
+              json.dump(manifest,f,indent=2);f.write('\n')
+          with open(e['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## PG03 exact Gateway RC\n\n```json\n'+json.dumps(manifest,indent=2)+'\n```\n')
+          PY
+
+      - name: Upload release identity artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pg03-gateway-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release/gateway-image-release.json
+            release/binary-build-info.txt
+          if-no-files-found: error
