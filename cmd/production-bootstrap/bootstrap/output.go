@@ -1,9 +1,10 @@
 package bootstrap
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
+
+	"github.com/QuantumNous/new-api/common"
 )
 
 // Phase writes a human-readable progress line to stderr. stdout is reserved
@@ -19,7 +20,7 @@ func Emit(status string, fields map[string]any) {
 		payload[key] = value
 	}
 	payload["status"] = status
-	encoded, err := json.Marshal(payload)
+	encoded, err := common.Marshal(payload)
 	if err != nil {
 		fmt.Printf("{\"status\":%q}\n", status)
 		return

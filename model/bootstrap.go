@@ -3,7 +3,6 @@ package model
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -127,7 +126,7 @@ func WriteBootstrapStateTx(tx *gorm.DB, state *BootstrapState) error {
 	if state.AdminUserID <= 0 || state.AdminUsername == "" {
 		return errors.New("bootstrap state requires the real admin identity")
 	}
-	value, err := json.Marshal(state)
+	value, err := common.Marshal(state)
 	if err != nil {
 		return err
 	}
@@ -142,7 +141,7 @@ func ReadBootstrapState(db *gorm.DB) (*BootstrapState, error) {
 		return nil, err
 	}
 	var state BootstrapState
-	if err := json.Unmarshal([]byte(value), &state); err != nil {
+	if err := common.Unmarshal([]byte(value), &state); err != nil {
 		return nil, ErrBootstrapStateCorrupt
 	}
 	if state.SchemaVersion != bootstrapRecordSchemaVersion || state.AdminUserID <= 0 || state.AdminUsername == "" {
@@ -220,7 +219,7 @@ func WriteBootstrapLegalTx(tx *gorm.DB, in BootstrapLegalInput) error {
 	}
 	if found {
 		var manifest LegalApprovalManifest
-		if err := json.Unmarshal([]byte(existingManifest), &manifest); err != nil {
+		if err := common.Unmarshal([]byte(existingManifest), &manifest); err != nil {
 			return ErrLegalManifestCorrupt
 		}
 		if manifest.TermsSHA256 != termsSHA || manifest.PrivacySHA256 != privacySHA {
@@ -243,7 +242,7 @@ func WriteBootstrapLegalTx(tx *gorm.DB, in BootstrapLegalInput) error {
 			CandidateCommit:      in.CandidateCommit,
 			BootstrapToolVersion: in.BootstrapToolVersion,
 		}
-		value, err := json.Marshal(manifest)
+		value, err := common.Marshal(manifest)
 		if err != nil {
 			return err
 		}
@@ -285,7 +284,7 @@ func ReadBootstrapLegalManifest(db *gorm.DB) (*LegalApprovalManifest, error) {
 		return nil, err
 	}
 	var manifest LegalApprovalManifest
-	if err := json.Unmarshal([]byte(value), &manifest); err != nil {
+	if err := common.Unmarshal([]byte(value), &manifest); err != nil {
 		return nil, ErrLegalManifestCorrupt
 	}
 	return &manifest, nil
@@ -323,7 +322,7 @@ func WriteBootstrapMarkerTx(tx *gorm.DB, marker *BootstrapCompletionMarker) erro
 	if err := marker.Validate(); err != nil {
 		return err
 	}
-	value, err := json.Marshal(marker)
+	value, err := common.Marshal(marker)
 	if err != nil {
 		return err
 	}
@@ -338,7 +337,7 @@ func ReadBootstrapMarker(db *gorm.DB) (*BootstrapCompletionMarker, error) {
 		return nil, err
 	}
 	var marker BootstrapCompletionMarker
-	if err := json.Unmarshal([]byte(value), &marker); err != nil {
+	if err := common.Unmarshal([]byte(value), &marker); err != nil {
 		return nil, ErrBootstrapMarkerCorrupt
 	}
 	if err := marker.Validate(); err != nil {
