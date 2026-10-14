@@ -1,0 +1,171 @@
+name: PG03 production wrapper Gateway RC
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pg03-production-wrapper-rc
+  cancel-in-progress: false
+
+env:
+  PG03_BASE_COMMIT: fd98c9aad0374581e46e5ba13bcf18ec96046559
+  GHCR_IMAGE: ghcr.io/a3225865526-wq/clearapi
+  WRAPPER_SOURCE: 83a48cf5ca61032811a309d298c8af7542e6c4d1,4992178f8527cf43edbb6964677d0358a83bee1b,17e1904b4aabe732f34b5c025b28331ee4281239,080203bbc73b27e16c9db0ae723ab85a66cde75b,1bfedb6f93f8cb4b14f71a4eb7102d7da4541c47,62835197af8b3ee76a7493feedb4a2f90119c169
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: isolated-tests
+          MYSQL_DATABASE: wrapper_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pisolated-tests"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_PASSWORD: isolated-tests
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Source scope and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_COMMIT=$(git rev-parse HEAD)
+          [[ "$SOURCE_COMMIT" == "$GITHUB_SHA" ]]
+          git merge-base --is-ancestor "$PG03_BASE_COMMIT" "$SOURCE_COMMIT"
+          [[ -z "$(git status --porcelain)" ]]
+          git diff --name-only "$PG03_BASE_COMMIT" "$SOURCE_COMMIT" > /tmp/wrapper-diff.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          allowed={'Dockerfile','model/bootstrap.go','scripts/production-entrypoint.sh',
+                   'scripts/validate-pg03-wrapper.sh','.github/workflows/release-pg03-gateway.yml'}
+          for p in Path('/tmp/wrapper-diff.txt').read_text().splitlines():
+              assert p in allowed or p.startswith('cmd/production-bootstrap/'), p
+          PY
+          echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          echo "LOCAL_TAG=$GHCR_IMAGE:pg03-wrapper-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.26.1'
+          cache: false
+      - name: Bootstrap regression and PG03 tests
+        shell: bash
+        env:
+          GOWORK: 'off'
+          CGO_ENABLED: '0'
+          BOOTSTRAP_TEST_PG_DSN: postgres://postgres:isolated-tests@localhost:5432/postgres?sslmode=disable
+          BOOTSTRAP_TEST_MYSQL_DSN: root:isolated-tests@tcp(localhost:3306)/wrapper_test?charset=utf8mb4&parseTime=True&loc=Local
+        run: |
+          set -euo pipefail
+          mkdir -p release web/dist
+          trap 'rm -f web/dist/index.html; rmdir web/dist' EXIT
+          printf 'test-only embed placeholder\n' > web/dist/index.html
+          go test -p 1 -count=1 -v ./cmd/production-bootstrap/... ./service/accountpool ./cmd/finance-migrate ./cmd/billing-migrate | tee release/source-tests.log
+          [[ -z "$(gofmt -l model/bootstrap.go cmd/production-bootstrap)" ]]
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
+      - name: Build all binaries from wrapper source
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          load: true
+          push: false
+          provenance: false
+          sbom: false
+          tags: ${{ env.LOCAL_TAG }}
+          build-args: |
+            WRAPPER_COMMIT=${{ env.SOURCE_COMMIT }}
+            PG03_BASE_COMMIT=${{ env.PG03_BASE_COMMIT }}
+            BUILD_TIMESTAMP=${{ env.BUILD_DATE }}
+          labels: |
+            org.clearapi.wrapper.source=${{ env.WRAPPER_SOURCE }}
+            org.opencontainers.image.version=pg03-wrapper-rc
+      - name: Isolated image production acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/validate-pg03-wrapper.sh "$LOCAL_TAG" release/validation
+          docker image inspect "$LOCAL_TAG" > release/local-image.json
+          CID=$(docker create --network none "$LOCAL_TAG")
+          trap 'docker rm "$CID" >/dev/null' EXIT
+          for b in new-api production-bootstrap finance-migrate billing-migrate; do
+            docker cp "$CID:/$b" "/tmp/pg03-$b"
+            go version -m "/tmp/pg03-$b" > "release/$b-build-info.txt"
+          done
+      - uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish verified RC and verify digest roundtrip
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker push "$LOCAL_TAG"
+          DIGEST=$(docker image inspect "$LOCAL_TAG" | python3 -c 'import json,os,re,sys; p=os.environ["GHCR_IMAGE"]+"@"; refs=json.load(sys.stdin)[0]["RepoDigests"]; ds={r[len(p):] for r in refs if r.startswith(p)}; assert len(ds)==1; d=ds.pop(); assert re.fullmatch("sha256:[0-9a-f]{64}",d); print(d)')
+          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+          docker pull --platform linux/amd64 "$GHCR_IMAGE@$DIGEST"
+          docker image inspect "$GHCR_IMAGE@$DIGEST" > release/published-image.json
+          docker run --rm --network none --entrypoint /bin/sh "$GHCR_IMAGE@$DIGEST" -c 'sha256sum /new-api /production-bootstrap /finance-migrate /billing-migrate /entrypoint-secure.sh' > release/published-binary-sha256.txt
+          cmp release/validation/binary-sha256.txt release/published-binary-sha256.txt
+      - name: Gateway image release artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          e=os.environ
+          local=json.load(open('release/local-image.json'))[0]
+          published=json.load(open('release/published-image.json'))[0]
+          assert local['Id']==published['Id']
+          labels=published['Config']['Labels']
+          assert labels['org.opencontainers.image.revision']==e['SOURCE_COMMIT']
+          assert labels['org.clearapi.pg03.base']==e['PG03_BASE_COMMIT']
+          assert published['Os']=='linux' and published['Architecture']=='amd64'
+          v=json.load(open('release/validation/validation.json'))
+          assert v['bootstrap_verify_only']=='verified' and v['verify_only_zero_write']=='passed'
+          hashes={line.split()[1]:line.split()[0] for line in pathlib.Path('release/published-binary-sha256.txt').read_text().splitlines()}
+          artifact=dict(schema_version=1, component='gateway', source_commit=e['SOURCE_COMMIT'],
+            pg03_base_commit=e['PG03_BASE_COMMIT'],wrapper_commits=e['WRAPPER_SOURCE'].split(','),
+            excluded_commits=['6af33fbca43d3cf8a232d593823458a397aa119e'],
+            image_repository=e['GHCR_IMAGE'], image_digest=e['IMAGE_DIGEST'],
+            image_ref=e['GHCR_IMAGE']+'@'+e['IMAGE_DIGEST'], oci_revision=labels['org.opencontainers.image.revision'],
+            platform='linux/amd64', binary_sha256=hashes,
+            workflow_run=e['GITHUB_RUN_ID'],workflow_commit=e['GITHUB_SHA'],
+            validation=v, deployment_compatible=True, production_ready=True,
+            production_ready_scope='Gateway image wrapper only; VPS and dual-component acceptance not performed',
+            production_acceptance='not_run',sbom=None,provenance=None)
+          pathlib.Path('release/gateway-image-release.json').write_text(json.dumps(artifact,indent=2)+'\n')
+          with open(e['GITHUB_STEP_SUMMARY'],'a') as f:
+            f.write('## Gateway wrapper RC\n```json\n'+json.dumps(artifact,indent=2)+'\n```\n')
+          PY
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pg03-gateway-wrapper-release-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release/
+          if-no-files-found: error

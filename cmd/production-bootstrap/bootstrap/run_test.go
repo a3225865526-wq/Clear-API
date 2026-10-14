@@ -17,13 +17,63 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )
 
 const pgTestDSNEnv = "BOOTSTRAP_TEST_PG_DSN"
+
+// Exercise imported option-record helpers on all supported primary dialects.
+// These fixtures create only the existing Option table in disposable databases.
+func TestBootstrapRecordsDatabaseCompatibility(t *testing.T) {
+	for _, dialect := range []string{"sqlite", "mysql", "postgres"} {
+		t.Run(dialect, func(t *testing.T) {
+			var driver gorm.Dialector
+			switch dialect {
+			case "sqlite":
+				driver = sqlite.Open(filepath.Join(t.TempDir(), "records.db"))
+			case "mysql":
+				dsn := os.Getenv("BOOTSTRAP_TEST_MYSQL_DSN")
+				require.NotEmpty(t, dsn, "a disposable MySQL database is required")
+				driver = mysql.Open(dsn)
+			case "postgres":
+				driver = postgres.Open(createFreshDatabase(t, requirePG(t)))
+			}
+			db, err := gorm.Open(driver, &gorm.Config{Logger: gormlogger.Discard})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = sqlDB.Close() })
+			require.NoError(t, db.AutoMigrate(&model.Option{}))
+			state := &model.BootstrapState{SchemaVersion: 1, AdminUserID: 1, AdminUsername: "fixture", StartedAt: "2026-10-14T00:00:00Z", BootstrapToolVersion: "fixture", CandidateCommit: "fixture"}
+			for range 2 {
+				require.NoError(t, db.Transaction(func(tx *gorm.DB) error { return model.WriteBootstrapStateTx(tx, state) }))
+				got, err := model.ReadBootstrapState(db)
+				require.NoError(t, err)
+				require.Equal(t, state, got)
+			}
+			var rows int64
+			require.NoError(t, db.Model(&model.Option{}).Count(&rows).Error)
+			require.EqualValues(t, 1, rows, "repeated writes must not duplicate option records")
+			require.Error(t, db.Transaction(func(tx *gorm.DB) error {
+				changed := *state
+				changed.AdminUsername = "rolled-back"
+				if err := model.WriteBootstrapStateTx(tx, &changed); err != nil { return err }
+				return fmt.Errorf("intentional rollback")
+			}))
+			got, err := model.ReadBootstrapState(db)
+			require.NoError(t, err)
+			require.Equal(t, state, got)
+			require.NoError(t, db.Model(&model.Option{}).Where(&model.Option{Key: model.BootstrapStateOptionKey}).Update("value", "corrupt").Error)
+			_, err = model.ReadBootstrapState(db)
+			require.ErrorIs(t, err, model.ErrBootstrapStateCorrupt)
+		})
+	}
+}
 
 // requirePG gates the flow tests on a real PostgreSQL instance, mirroring the
 // repository's external-database test convention. The acceptance run provides
