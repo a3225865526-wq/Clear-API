@@ -10,7 +10,7 @@ The approved Route Chain / Account Pool integration is present on the integratio
 
 - Latest `production/main` baseline: `2694ca19ebb13f0f1fa3045da0d141a6fd38ecdd`
 - Integration branch: `codex/pg03-mainline-integration-20261015`
-- Current local integration commit: `b9c75d89`
+- Current integration commit: `2cdf9b9e4e7b652ede81fbcfd3eb23ce4a017184`
 - Historical source reference: `pg03-ci-pass-backup` / `codex/pg03-account-pool-mvp`
 - The old PR #36 was not merged wholesale.
 
@@ -44,8 +44,8 @@ The branch now contains the coupled path required for the approved scope:
 
 ## CI, RC, and production
 
-- Branch push / Required Checks: pending.
-- Pull request: not created yet.
+- GitHub PR: [#38](https://github.com/a3225865526-wq/Clear-API/pull/38).
+- Required Checks for commit `2cdf9b9e`: Backend vet/build/test/migration binaries `PASS`; Frontend typecheck/test `PASS`; Secret scan/forbidden files `PASS`.
 - RC workflow, image, OCI revision, digest, and Release Manifest: `NOT_RUN`.
 - Runtime Integrity, Billing, Backup, Deploy V2 gates: `NOT_RUN`.
 - VPS Gateway, website, Executor identity/health, and production database: not updated or verified.
