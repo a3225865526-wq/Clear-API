@@ -45,6 +45,12 @@ func BillingReservationsReady(db *gorm.DB) error {
 }
 
 func ReserveBillingRequest(requestID string, userID, tokenID, quota int) error {
+	return ReserveBillingRequestWithAuth(requestID, userID, tokenID, quota, nil)
+}
+
+// ReserveBillingRequestWithAuth atomically commits the reservation together
+// with its durable authorization snapshot when hardening provides one.
+func ReserveBillingRequestWithAuth(requestID string, userID, tokenID, quota int, auth *BillingAuthSnapshot) error {
 	if requestID == "" || len(requestID) > 64 || userID <= 0 || tokenID <= 0 || quota < 0 || quota > math.MaxInt32 {
 		return errors.New("invalid billing reservation")
 	}
@@ -62,6 +68,9 @@ func ReserveBillingRequest(requestID string, userID, tokenID, quota int) error {
 		r := BillingReservation{RequestID: requestID, UserID: userID, TokenID: tokenID, Reserved: quota, Applied: quota, State: "active", UpdatedAt: time.Now().Unix()}
 		if err := tx.Create(&r).Error; err != nil {
 			return err // The unique request ID prevents duplicate submission/reservation.
+		}
+		if err := UpsertBillingAuthSnapshotTx(tx, auth); err != nil {
+			return err
 		}
 		if quota == 0 {
 			var user User
@@ -113,6 +122,12 @@ func ReserveBillingRequest(requestID string, userID, tokenID, quota int) error {
 
 // RaiseBillingReservation atomically grows an active wallet/token reservation.
 func RaiseBillingReservation(requestID string, quota int) error {
+	return RaiseBillingReservationWithAuth(requestID, quota, nil)
+}
+
+// RaiseBillingReservationWithAuth grows the reservation and freezes the new
+// authorization snapshot in the same transaction.
+func RaiseBillingReservationWithAuth(requestID string, quota int, auth *BillingAuthSnapshot) error {
 	if quota < 0 || quota > math.MaxInt32 {
 		return ErrBillingReservationConflict
 	}
@@ -148,6 +163,9 @@ func RaiseBillingReservation(requestID string, quota int) error {
 		}
 		if claim.RowsAffected != 1 {
 			return ErrBillingReservationConflict
+		}
+		if err := UpsertBillingAuthSnapshotTx(tx, auth); err != nil {
+			return err
 		}
 		return nil
 	})

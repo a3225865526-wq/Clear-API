@@ -13,6 +13,9 @@ import (
 )
 
 func SetApiRouter(router *gin.Engine) {
+	// Runtime Integrity is a read-only root-session diagnostic and must be
+	// registered before PAT/audit middleware can create persistent side effects.
+	router.GET("/api/clearapi/runtime-integrity", middleware.DisableCache(), middleware.RuntimeIntegrityAuth(), controller.GetRuntimeIntegrity)
 	apiRouter := router.Group("/api")
 	apiRouter.Use(middleware.RouteTag("api"))
 	apiRouter.Use(gzip.Gzip(gzip.DefaultCompression))

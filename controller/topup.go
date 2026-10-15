@@ -131,7 +131,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"discount":                operation_setting.GetPaymentSetting().AmountDiscount,
 		"topup_link":              common.TopUpLink,
 		"store_recharge_enabled":  operation_setting.StoreRechargeEnabled,
-		"store_products":          getStoreProductsForUser(),
+		"store_products":          func() []map[string]any { products, _ := getStoreProductsForUser(); return products }(),
 		"vip":                     getUserVipInfo(c.GetInt("id")),
 	}
 	common.ApiSuccess(c, data)
