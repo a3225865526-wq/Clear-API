@@ -11,10 +11,14 @@ import (
 )
 
 type OpenAIError struct {
-	Message  string          `json:"message"`
-	Type     string          `json:"type"`
-	Param    string          `json:"param"`
-	Code     any             `json:"code"`
+	Message string `json:"message"`
+	Type    string `json:"type"`
+	Param   string `json:"param"`
+	Code    any    `json:"code"`
+	// Origin marks errors synthesized by a trusted local executor itself
+	// (executor provenance contract, Stage 4). Forwarded provider bodies and
+	// status-derived fallbacks never carry it.
+	Origin   string          `json:"origin,omitempty"`
 	Metadata json.RawMessage `json:"metadata,omitempty"`
 }
 
@@ -49,6 +53,7 @@ const (
 	ErrorCodeJsonMarshalFailed  ErrorCode = "json_marshal_failed"
 	ErrorCodeDoRequestFailed    ErrorCode = "do_request_failed"
 	ErrorCodeGetChannelFailed   ErrorCode = "get_channel_failed"
+	ErrorCodeRouteExhausted     ErrorCode = "route_exhausted"
 	ErrorCodeGenRelayInfoFailed ErrorCode = "gen_relay_info_failed"
 
 	// channel error
@@ -96,6 +101,57 @@ type NewAPIError struct {
 	errorCode      ErrorCode
 	StatusCode     int
 	Metadata       json.RawMessage
+	// executorErrorOrigin carries the value of the executor's reserved
+	// transport provenance header (ExecutorErrorOriginHeader) captured from
+	// the upstream response, if any. Stage 7.1 provenance contract: this is
+	// the trust root for executor-local pre-dispatch classifications; the
+	// body-level error.origin field is advisory only.
+	executorErrorOrigin       string
+	executorDispatchPhase     string
+	executorProviderTransport string
+}
+
+// ExecutorErrorOriginHeader is the reserved response header the trusted local
+// executor (CLIProxyAPI) sets on error envelopes it synthesized itself. The
+// executor registers the name in its reserved-header registry, so a provider
+// cannot inject it through forwarding. Header names are case-insensitive on
+// the wire; consumers compare the captured value exactly.
+const (
+	ExecutorErrorOriginHeader = "X-Cpa-Executor-Error-Origin"
+	// ExecutorErrorOriginLocal is the only trusted value of
+	// ExecutorErrorOriginHeader.
+	ExecutorErrorOriginLocal        = "local"
+	ExecutorDispatchPhaseHeader     = "X-Cpa-Executor-Dispatch-Phase"
+	ExecutorProviderTransportHeader = "X-Cpa-Executor-Provider-Transport"
+)
+
+// WithExecutorDispatchProof captures reserved response headers, never request metadata.
+func WithExecutorDispatchProof(phase, transport string) NewAPIErrorOptions {
+	return func(e *NewAPIError) { e.executorDispatchPhase, e.executorProviderTransport = phase, transport }
+}
+
+func (e *NewAPIError) HasExecutorModelResolutionProof() bool {
+	return e != nil && e.executorErrorOrigin == ExecutorErrorOriginLocal && e.executorDispatchPhase == "model_resolution" && e.executorProviderTransport == "not_started"
+}
+
+// WithExecutorErrorOrigin captures the executor provenance header value from
+// an upstream response onto the error.
+func WithExecutorErrorOrigin(origin string) NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		if e == nil {
+			return
+		}
+		e.executorErrorOrigin = origin
+	}
+}
+
+// GetExecutorErrorOrigin returns the captured executor provenance header
+// value, or "" when the response carried none.
+func (e *NewAPIError) GetExecutorErrorOrigin() string {
+	if e == nil {
+		return ""
+	}
+	return e.executorErrorOrigin
 }
 
 // Unwrap enables errors.Is / errors.As to work with NewAPIError by exposing the underlying error.

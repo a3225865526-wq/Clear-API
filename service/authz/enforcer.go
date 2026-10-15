@@ -32,10 +32,14 @@ m = r.sub == p.sub && r.obj == p.obj && r.act == p.act && p.eft == "allow"
 
 func Init(db *gorm.DB) error {
 	if common.IsMasterNode {
-		if err := seedBuiltInRoles(db); err != nil {
-			return err
-		}
-		if err := resetBuiltInRolePolicies(db); err != nil {
+		// Roles and built-in policy reconciliation commit together so a startup
+		// failure or a concurrent master never observes a half-seeded baseline.
+		if err := db.Transaction(func(tx *gorm.DB) error {
+			if err := seedBuiltInRoles(tx); err != nil {
+				return err
+			}
+			return reconcileBuiltInRolePolicies(tx)
+		}); err != nil {
 			return err
 		}
 	}

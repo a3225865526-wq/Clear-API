@@ -3,19 +3,34 @@ package router_test
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay"
+	relaychannel "github.com/QuantumNous/new-api/relay/channel"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	relaytypes "github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/router"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/accountpool"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +41,352 @@ import (
 )
 
 const poolRawIdentity = "secret-identity@example-upstream.com"
+
+// Run against the isolated Executor production-handler bridge. Both sides use
+// their real policy, transport, receipt and billing paths; only providers mock.
+func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
+	endpoint := os.Getenv("PG03_REFUND_EXECUTOR_URL")
+	if endpoint == "" {
+		t.Skip("requires isolated Executor production-handler bridge")
+	}
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	t.Setenv("CLEARAPI_PG03_POLICY_KEY", "synthetic-pg03-policy-key-012345678901234567890123456789")
+	t.Setenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY", "synthetic-pg03-proof-key-for-unit-tests-only")
+	oldCount, oldBatch, oldLog := constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled
+	constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled = true, false, false
+	oldTimeout, oldRetries := constant.StreamingTimeout, common.RetryTimes
+	constant.StreamingTimeout, common.RetryTimes = 10, 0
+	oldRatio, oldCompletion := ratio_setting.ModelRatio2JSONString(), ratio_setting.CompletionRatio2JSONString()
+	t.Cleanup(func() {
+		constant.CountToken, common.BatchUpdateEnabled, common.LogConsumeEnabled = oldCount, oldBatch, oldLog
+		constant.StreamingTimeout, common.RetryTimes = oldTimeout, oldRetries
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatio))
+		require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(oldCompletion))
+	})
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"synthetic-native":1}`))
+	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"synthetic-native":1}`))
+	service.InitTokenEncoders()
+	for _, scenario := range []string{"all-reject", "success", "started", "unknown", "tools", "multimodal", "over-budget", "insufficient-quota"} {
+		t.Run(scenario, func(t *testing.T) {
+			setup := newPoolTestSetup(t, true)
+			require.NoError(t, setup.db.AutoMigrate(&model.Token{}, &model.UserSubscription{}, &model.Channel{}, &model.Log{}, &model.BillingReviewMarker{}))
+			require.NoError(t, model.MigrateBillingReservations(setup.db))
+			require.NoError(t, model.MigrateUpstreamPool(setup.db))
+			require.NoError(t, model.MigratePoolFallback(setup.db))
+			channel := model.Channel{Type: constant.ChannelTypeOpenAI, Name: "pg03-refund", BaseURL: &endpoint, OtherSettings: `{"upstream_pool":"codex-pool","pool_routing_enabled":true}`}
+			require.NoError(t, setup.db.Create(&channel).Error)
+			input := accountpool.FallbackPolicyInput{PoolId: "codex-pool", ModelName: "synthetic-native", MaxFallbackCount: 3, Enabled: true}
+			for i := range 4 {
+				account := model.UpstreamPoolAccount{Platform: "codex", ExecutorId: accountpool.ExecutorCliproxyAPI, CredentialRef: fmt.Sprintf("pg03-%c", 'A'+i)}
+				require.NoError(t, setup.db.Create(&account).Error)
+				input.Members = append(input.Members, accountpool.FallbackMemberInput{AccountId: account.Id, Priority: 100 - 10*i, Enabled: true})
+			}
+			require.Equal(t, http.StatusOK, setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input).Code)
+			user := model.User{Id: 20, Username: "pg03-refund-" + scenario, Quota: 1000, Status: common.UserStatusEnabled, AffCode: "pg03-" + scenario}
+			require.NoError(t, setup.db.Create(&user).Error)
+			if setup.db.Dialector.Name() == "postgres" {
+				// Explicit fixture IDs do not advance PostgreSQL sequences.
+				require.NoError(t, setup.db.Exec("SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users), true)").Error)
+			}
+			token := model.Token{UserId: user.Id, Key: "synthetic-refund-" + scenario, RemainQuota: 1000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+			require.NoError(t, setup.db.Create(&token).Error)
+			stream, limit := true, uint(99)
+			request := &dto.OpenAIResponsesRequest{Model: "synthetic-native", Stream: &stream, MaxOutputTokens: &limit, Input: []byte(`"synthetic"`)}
+			switch scenario {
+			case "tools":
+				request.Tools = []byte(`[{"type":"web_search"}]`)
+			case "multimodal":
+				request.Input = []byte(`[{"role":"user","content":[{"type":"input_image","image_url":"synthetic"}]}]`)
+			case "over-budget":
+				limit = 1 << 31
+			case "insufficient-quota":
+				limit = 2000
+			}
+			body, err := common.Marshal(request)
+			require.NoError(t, err)
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+			c.Request.Header.Set("Content-Type", "application/json")
+			common.SetContextKey(c, constant.ContextKeyChannelId, channel.Id)
+			common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+			common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, endpoint)
+			common.SetContextKey(c, constant.ContextKeyOriginalModel, request.Model)
+			info := relaycommon.GenRelayInfoResponses(c, request)
+			info.UserId, info.TokenId, info.RequestId = user.Id, token.Id, "pg03-billing-"+scenario
+			info.UserQuota, info.UserSetting.QuotaWarningThreshold = 1000, 1
+			info.UsingGroup, info.UserGroup = "default", "default"
+			info.UserSetting.BillingPreference = "wallet_only"
+			apiErr := relay.PrepareRequestBilling(c, info)
+			if scenario == "tools" || scenario == "multimodal" || scenario == "over-budget" || scenario == "insufficient-quota" {
+				require.NotNil(t, apiErr)
+				require.Nil(t, info.Billing)
+				var count int64
+				require.NoError(t, setup.db.Model(&model.BillingReservation{}).Where("request_id = ?", info.RequestId).Count(&count).Error)
+				assert.Zero(t, count)
+				var after model.User
+				require.NoError(t, setup.db.First(&after, user.Id).Error)
+				assert.Equal(t, 1000, after.Quota)
+				t.Logf("scenario=%s rejected before reservation and Executor dispatch", scenario)
+				return
+			}
+			require.Nil(t, apiErr)
+			require.True(t, info.ProtectedTextBudget)
+			require.NotNil(t, info.Billing)
+			require.Contains(t, c.GetStringSlice(model.BillingExecutionContextKey), info.RequestId)
+			billing := info.Billing
+			var before model.BillingReservation
+			require.NoError(t, setup.db.Where("request_id = ?", info.RequestId).First(&before).Error)
+			require.Equal(t, info.PriceData.QuotaToPreConsume, before.Reserved)
+			require.Greater(t, before.Reserved, 0)
+			// Configure only the isolated provider mock. The actual request keeps
+			// /v1/responses and does not need channel/header overrides.
+			control, err := http.Post(endpoint+"/rc/scenario/"+scenario, "application/json", nil)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, control.StatusCode)
+			require.NoError(t, control.Body.Close())
+			apiErr = relay.ResponsesHelper(c, info)
+			if scenario == "success" {
+				require.Nil(t, apiErr)
+			} else {
+				require.NotNil(t, apiErr)
+			}
+			relay.RefundFailedRequestBilling(c, info, apiErr)
+			relay.RefundFailedRequestBilling(c, info, apiErr)
+			if scenario == "success" {
+				billing.Refund(c)
+				billing.Refund(c)
+			}
+			var rows []model.BillingReservation
+			require.NoError(t, setup.db.Where("request_id = ?", info.RequestId).Find(&rows).Error)
+			require.Len(t, rows, 1)
+			var after model.User
+			var afterToken model.Token
+			require.NoError(t, setup.db.First(&after, user.Id).Error)
+			require.NoError(t, setup.db.First(&afterToken, token.Id).Error)
+			charge, state := before.Reserved, "settled"
+			if scenario == "all-reject" {
+				charge, state = 0, "refunded"
+			}
+			if scenario == "success" {
+				charge = 2
+			}
+			assert.Equal(t, 1000-charge, after.Quota)
+			assert.Equal(t, after.Quota, afterToken.RemainQuota)
+			assert.Equal(t, charge, afterToken.UsedQuota)
+			assert.Equal(t, charge, rows[0].Applied)
+			assert.Equal(t, state, rows[0].State)
+			response, err := http.Get(endpoint + "/rc/result/" + scenario)
+			require.NoError(t, err)
+			defer response.Body.Close()
+			var evidence struct {
+				Order    []string `json:"order"`
+				Dispatch int      `json:"dispatch"`
+			}
+			require.NoError(t, common.DecodeJson(response.Body, &evidence))
+			order, dispatch := []string{"pg03-A"}, 0
+			if scenario == "all-reject" {
+				order = []string{"pg03-A", "pg03-B", "pg03-C", "pg03-D"}
+			}
+			if scenario == "success" {
+				order, dispatch = []string{"pg03-A", "pg03-B", "pg03-C"}, 1
+			}
+			if scenario == "started" {
+				dispatch = 1
+			}
+			assert.Equal(t, order, evidence.Order)
+			assert.Equal(t, dispatch, evidence.Dispatch)
+			t.Logf("scenario=%s reservation=%d reserved=%d quota=1000->%d applied=%d state=%s dispatch=%d order=%v", scenario, len(rows), before.Reserved, after.Quota, rows[0].Applied, rows[0].State, evidence.Dispatch, evidence.Order)
+			if scenario == "success" || scenario == "all-reject" {
+				// Exercise the actual client Relay entry as well, including parsing,
+				// protection admission, reservation, dispatch and its billing defer.
+				clientUser := model.User{Username: "client-relay-" + scenario, Quota: 1000, Status: common.UserStatusEnabled, AffCode: "client-" + scenario}
+				require.NoError(t, setup.db.Create(&clientUser).Error)
+				clientToken := model.Token{UserId: clientUser.Id, Key: "synthetic-client-" + scenario, RemainQuota: 1000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
+				require.NoError(t, setup.db.Create(&clientToken).Error)
+				recorder := httptest.NewRecorder()
+				client, _ := gin.CreateTestContext(recorder)
+				client.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+				client.Request.Header.Set("Content-Type", "application/json")
+				requestID := "pg03-client-" + scenario
+				common.SetContextKey(client, common.RequestIdKey, requestID)
+				common.SetContextKey(client, constant.ContextKeyUserId, clientUser.Id)
+				common.SetContextKey(client, constant.ContextKeyTokenId, clientToken.Id)
+				common.SetContextKey(client, constant.ContextKeyUserQuota, 1000)
+				common.SetContextKey(client, constant.ContextKeyUserGroup, "default")
+				common.SetContextKey(client, constant.ContextKeyUsingGroup, "default")
+				common.SetContextKey(client, constant.ContextKeyUserSetting, dto.UserSetting{BillingPreference: "wallet_only", QuotaWarningThreshold: 1})
+				common.SetContextKey(client, constant.ContextKeyOriginalModel, request.Model)
+				common.SetContextKey(client, constant.ContextKeyChannelId, channel.Id)
+				common.SetContextKey(client, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+				common.SetContextKey(client, constant.ContextKeyChannelBaseUrl, endpoint)
+				controller.Relay(client, relaytypes.RelayFormatOpenAIResponses)
+				var clientRows []model.BillingReservation
+				require.NoError(t, setup.db.Where("request_id = ?", requestID).Find(&clientRows).Error)
+				require.Len(t, clientRows, 1)
+				assert.Equal(t, state, clientRows[0].State)
+				assert.Equal(t, charge, clientRows[0].Applied)
+				require.NoError(t, setup.db.First(&clientUser, clientUser.Id).Error)
+				assert.Equal(t, 1000-charge, clientUser.Quota)
+				if scenario == "success" {
+					assert.Equal(t, http.StatusOK, recorder.Code)
+					assert.Contains(t, recorder.Body.String(), "response.completed")
+				} else {
+					assert.GreaterOrEqual(t, recorder.Code, http.StatusBadRequest)
+				}
+				response, err := http.Get(endpoint + "/rc/result/" + scenario)
+				require.NoError(t, err)
+				require.NoError(t, common.DecodeJson(response.Body, &evidence))
+				require.NoError(t, response.Body.Close())
+				assert.Equal(t, order, evidence.Order)
+				assert.Equal(t, dispatch, evidence.Dispatch)
+				t.Logf("client Relay scenario=%s reservation=1 applied=%d state=%s dispatch=%d order=%v", scenario, clientRows[0].Applied, clientRows[0].State, evidence.Dispatch, evidence.Order)
+			}
+		})
+	}
+}
+
+type pg03WireAdaptor struct {
+	relaychannel.Adaptor
+	url string
+}
+
+func (a pg03WireAdaptor) GetRequestURL(*relaycommon.RelayInfo) (string, error) { return a.url, nil }
+func (a pg03WireAdaptor) SetupRequestHeader(c *gin.Context, header *http.Header, _ *relaycommon.RelayInfo) error {
+	*header = c.Request.Header.Clone()
+	return nil
+}
+
+func TestPG03PolicySnapshotWiring(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, setup.db.AutoMigrate(&model.Channel{}))
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	t.Setenv("CLEARAPI_PG03_POLICY_KEY", "synthetic-pg03-policy-key-012345678901234567890123456789")
+	t.Setenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY", "synthetic-pg03-proof-key-for-unit-tests-only")
+	endpoint := "http://synthetic.invalid"
+	channel := model.Channel{Type: 1, Name: "pg03", BaseURL: &endpoint, OtherSettings: `{"upstream_pool":"codex-pool","pool_routing_enabled":true}`}
+	require.NoError(t, setup.db.Create(&channel).Error)
+	input := accountpool.FallbackPolicyInput{PoolId: "codex-pool", ModelName: "synthetic-native", MaxFallbackCount: 3, Enabled: true}
+	for id := 1; id <= 4; id++ {
+		ref := fmt.Sprintf("pg03-%c", 'A'+id-1)
+		require.NoError(t, setup.db.Create(&model.UpstreamPoolAccount{Id: id, Platform: "codex", ExecutorId: accountpool.ExecutorCliproxyAPI, CredentialRef: ref}).Error)
+		input.Members = append(input.Members, accountpool.FallbackMemberInput{AccountId: id, Priority: 110 - 10*id, Enabled: true})
+	}
+	path := "/api/owner/pool/fallback-policy"
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	body := `{"model":"synthetic-native","stream":true}`
+	newContext := func() *gin.Context {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+		c.Request.Header.Set(accountpool.PG03PolicyHeader, "client-forged")
+		common.SetContextKey(c, constant.ContextKeyChannelId, channel.Id)
+		common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+		common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, endpoint)
+		common.SetContextKey(c, constant.ContextKeyOriginalModel, input.ModelName)
+		return c
+	}
+	prepare := func(c *gin.Context) {
+		stream := true
+		request := &dto.OpenAIResponsesRequest{Model: input.ModelName, Stream: &stream, Input: []byte(`"synthetic"`)}
+		info := relaycommon.GenRelayInfoResponses(c, request)
+		_, _, closer, apiErr := relay.PrepareResponsesRequest(c, info, request)
+		require.Nil(t, apiErr)
+		if closer != nil {
+			require.NoError(t, closer.Close())
+		}
+	}
+	sign := func(c *gin.Context, name string) []string {
+		var req *http.Request
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			req = r.Clone(r.Context())
+			data, err := io.ReadAll(r.Body)
+			if err != nil || string(data) != body {
+				t.Errorf("outbound body=%s err=%v", data, err)
+			}
+			w.Header().Set("Content-Type", "text/event-stream")
+			fmt.Fprint(w, "data: synthetic\n\n")
+		}))
+		defer server.Close()
+		info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{HeadersOverride: map[string]any{accountpool.PG03SignatureHeader: "override-forged", accountpool.PG03PolicyHeader: "override-forged"}}}
+		response, err := relaychannel.DoApiRequest(pg03WireAdaptor{url: server.URL + "/v1/responses"}, c, info, strings.NewReader(body))
+		require.NoError(t, err)
+		require.NoError(t, response.Body.Close())
+		require.NotNil(t, req)
+		payload, err := base64.RawURLEncoding.DecodeString(req.Header.Get(accountpool.PG03PolicyHeader))
+		require.NoError(t, err)
+		var snapshot struct {
+			AccountOrder []string `json:"account_order"`
+			RequestID    string   `json:"request_id"`
+			BodyDigest   string   `json:"body_digest"`
+		}
+		require.NoError(t, common.Unmarshal(payload, &snapshot))
+		assert.Equal(t, snapshot.RequestID, req.Header.Get(accountpool.PG03RequestHeader))
+		assert.Equal(t, snapshot.RequestID, req.Header.Get("X-ClearAPI-PG02-Request"))
+		digest := sha256.Sum256([]byte(body))
+		assert.Equal(t, hex.EncodeToString(digest[:]), snapshot.BodyDigest)
+		mac := hmac.New(sha256.New, []byte(os.Getenv("CLEARAPI_PG03_POLICY_KEY")))
+		mac.Write([]byte("clearapi-pg03-policy-v1\n"))
+		mac.Write(payload)
+		assert.Equal(t, hex.EncodeToString(mac.Sum(nil)), req.Header.Get(accountpool.PG03SignatureHeader))
+		if directory := os.Getenv("PG03_WIRE_EVIDENCE_DIR"); directory != "" {
+			wire, err := common.Marshal(struct {
+				Headers http.Header `json:"headers"`
+				Body    string      `json:"body"`
+			}{req.Header, body})
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(directory, name+".json"), wire, 0600))
+		}
+		return snapshot.AccountOrder
+	}
+	old := newContext()
+	prepare(old)
+	assert.Equal(t, []string{"pg03-A", "pg03-B", "pg03-C", "pg03-D"}, sign(old, "gateway-ABCD"))
+	for i := range input.Members {
+		input.Members[i].Priority = 70 + 10*i
+	}
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	prepare(old)
+	assert.Equal(t, []string{"pg03-A", "pg03-B", "pg03-C", "pg03-D"}, sign(old, "gateway-old-ABCD"))
+	fresh := newContext()
+	prepare(fresh)
+	assert.Equal(t, []string{"pg03-D", "pg03-C", "pg03-B", "pg03-A"}, sign(fresh, "gateway-DCBA"))
+	changed, err := http.NewRequest(http.MethodPost, endpoint+"/v1/responses", strings.NewReader(body+" "))
+	require.NoError(t, err)
+	require.Error(t, accountpool.ApplyPG03Policy(old, changed))
+	for _, ref := range []string{"", "pg03-A"} {
+		require.NoError(t, setup.db.Model(&model.UpstreamPoolAccount{}).Where("id = ?", 2).Update("credential_ref", ref).Error)
+		require.Error(t, accountpool.FreezePG03Policy(newContext(), channel.Id, input.ModelName))
+	}
+	require.NoError(t, setup.db.Model(&model.UpstreamPoolAccount{}).Where("id = ?", 2).Update("credential_ref", "pg03-B").Error)
+	// Absence is a frozen decision too: enabling a policy cannot affect an old request.
+	input.Enabled = false
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	absent := newContext()
+	require.NoError(t, accountpool.FreezePG03Policy(absent, channel.Id, input.ModelName))
+	input.Enabled = true
+	require.Equal(t, http.StatusOK, setup.request("PUT", path, "synthetic-owner-pat", input).Code)
+	require.NoError(t, accountpool.FreezePG03Policy(absent, channel.Id, input.ModelName))
+	// A legacy channel retry must retain frozen absence even if its pool now has a policy.
+	retryChannel := channel
+	retryChannel.Id = 0
+	retryChannel.Name = "pg03-retry"
+	require.NoError(t, setup.db.Create(&retryChannel).Error)
+	common.SetContextKey(absent, constant.ContextKeyChannelId, retryChannel.Id)
+	prepare(absent)
+	require.Error(t, accountpool.FreezePG03Policy(old, retryChannel.Id, input.ModelName))
+	req, err := http.NewRequest(http.MethodPost, endpoint+"/v1/responses", strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header = absent.Request.Header.Clone()
+	req.Header.Set(accountpool.PG03SignatureHeader, "client-forged")
+	req.Header.Set(accountpool.PG03RequestHeader, "client-forged")
+	require.NoError(t, accountpool.ApplyPG03Policy(absent, req))
+	assert.Empty(t, req.Header.Get(accountpool.PG03PolicyHeader))
+	assert.Empty(t, req.Header.Get(accountpool.PG03SignatureHeader))
+	assert.Empty(t, req.Header.Get(accountpool.PG03RequestHeader))
+	data, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	assert.Equal(t, body, string(data))
+}
 
 // mockPoolExecutor implements accountpool.ExecutorClient with configurable
 // outcomes; counters let tests assert the executor really was consulted.
@@ -427,10 +788,124 @@ func TestPoolModuleDisabledReturns404ForOwner(t *testing.T) {
 		{"GET", "/api/owner/pool/capability"},
 		{"GET", "/api/owner/pool/accounts"},
 		{"POST", "/api/owner/pool/accounts"},
+		{"GET", "/api/owner/pool/fallback-policy"},
+		{"PUT", "/api/owner/pool/fallback-policy"},
 	} {
 		result := setup.request(endpoint.method, endpoint.path, "synthetic-owner-pat", map[string]any{})
 		assert.Equal(t, http.StatusNotFound, result.Code, endpoint.path)
 	}
+}
+
+func TestPoolFallbackPolicyRoundTrip(t *testing.T) {
+	t.Run("fresh_migration", func(t *testing.T) {
+		db := poolFixtureDB(t)
+		for range 2 {
+			require.NoError(t, model.MigratePoolFallback(db))
+		}
+		assert.True(t, db.Migrator().HasTable(&model.PoolFallbackPolicy{}))
+		assert.True(t, db.Migrator().HasTable(&model.PoolFallbackMember{}))
+	})
+	setup := newPoolTestSetup(t, true)
+	var engineVersion string
+	versionQuery := "SELECT version()"
+	if setup.db.Dialector.Name() == "sqlite" {
+		versionQuery = "SELECT sqlite_version()"
+	}
+	require.NoError(t, setup.db.Raw(versionQuery).Scan(&engineVersion).Error)
+	t.Logf("database=%s version=%s", setup.db.Dialector.Name(), engineVersion)
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
+	// Representative pre-PG03 account data must survive repeated migration.
+	for id := 1; id <= 4; id++ {
+		require.NoError(t, setup.db.Create(&model.UpstreamPoolAccount{Id: id, Platform: "codex", ExecutorId: accountpool.ExecutorCliproxyAPI, CredentialRef: fmt.Sprintf("synthetic-%d", id), Note: "preserve"}).Error)
+	}
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	var retained model.UpstreamPoolAccount
+	require.NoError(t, setup.db.First(&retained, 1).Error)
+	assert.Equal(t, "preserve", retained.Note)
+
+	readPath := "/api/owner/pool/fallback-policy?pool_id=codex-pool&model=codex"
+	missing := setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, missing.Code)
+	assert.Contains(t, missing.Body.String(), `"data":null`)
+
+	input := accountpool.FallbackPolicyInput{PoolId: "codex-pool", ModelName: "codex", MaxFallbackCount: 3, Enabled: true}
+	for id := 1; id <= 4; id++ {
+		input.Members = append(input.Members, accountpool.FallbackMemberInput{AccountId: id, Priority: 110 - 10*id, Enabled: true})
+	}
+	saved := setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	require.Equal(t, http.StatusOK, saved.Code, saved.Body.String())
+	read := setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, read.Code, read.Body.String())
+	var result struct {
+		Data model.PoolFallbackPolicy `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(read.Body.Bytes(), &result))
+	assert.Equal(t, 3, result.Data.MaxFallbackCount)
+	require.Len(t, result.Data.Members, 4)
+	for i, member := range result.Data.Members {
+		assert.Equal(t, i+1, member.AccountId)
+	}
+	policyID := result.Data.Id
+	// Same-policy replacement is atomic and new reads immediately see the order.
+	for i := range input.Members {
+		input.Members[i].Priority = 70 + 10*i
+	}
+	saved = setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	require.Equal(t, http.StatusOK, saved.Code, saved.Body.String())
+	read = setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.NoError(t, common.Unmarshal(read.Body.Bytes(), &result))
+	assert.Equal(t, policyID, result.Data.Id)
+	for i, member := range result.Data.Members {
+		assert.Equal(t, 4-i, member.AccountId)
+	}
+	// Uniqueness constraints survive migrations without discarding policy data.
+	require.NoError(t, model.MigratePoolFallback(setup.db))
+	require.Error(t, setup.db.Create(&model.PoolFallbackPolicy{PoolId: "codex-pool", ModelName: "codex"}).Error)
+	require.Error(t, setup.db.Create(&model.PoolFallbackMember{PolicyId: policyID, AccountId: 1}).Error)
+	for _, tc := range []struct {
+		name   string
+		mutate func(*accountpool.FallbackPolicyInput)
+	}{
+		{"over_limit", func(p *accountpool.FallbackPolicyInput) { p.MaxFallbackCount = 4 }},
+		{"negative_limit", func(p *accountpool.FallbackPolicyInput) { p.MaxFallbackCount = -1 }},
+		{"duplicate", func(p *accountpool.FallbackPolicyInput) { p.Members[1].AccountId = p.Members[0].AccountId }},
+		{"unknown_account", func(p *accountpool.FallbackPolicyInput) { p.Members[0].AccountId = 999 }},
+		{"wildcard", func(p *accountpool.FallbackPolicyInput) { p.ModelName = "*" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			invalid := input
+			invalid.Members = append([]accountpool.FallbackMemberInput(nil), input.Members...)
+			tc.mutate(&invalid)
+			rejected := setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", invalid)
+			assert.Equal(t, http.StatusBadRequest, rejected.Code, rejected.Body.String())
+		})
+	}
+	// A member insert failure must roll back the policy update and member deletion.
+	require.NoError(t, setup.db.Callback().Create().Before("gorm:create").Register("pg03_member_failure", func(tx *gorm.DB) {
+		if tx.Statement.Table == "pool_fallback_member" {
+			tx.AddError(fmt.Errorf("synthetic member failure"))
+		}
+	}))
+	input.Enabled = false
+	failed := setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	assert.Equal(t, http.StatusInternalServerError, failed.Code)
+	require.NoError(t, setup.db.Callback().Create().Remove("pg03_member_failure"))
+	read = setup.request("GET", readPath, "synthetic-owner-pat", nil)
+	require.NoError(t, common.Unmarshal(read.Body.Bytes(), &result))
+	assert.True(t, result.Data.Enabled)
+	require.Len(t, result.Data.Members, 4)
+	assert.Equal(t, 4, result.Data.Members[0].AccountId)
+	input.MaxFallbackCount = 0
+	input.Members[0].Enabled = false
+	saved = setup.request("PUT", "/api/owner/pool/fallback-policy", "synthetic-owner-pat", input)
+	require.Equal(t, http.StatusOK, saved.Code, saved.Body.String())
+	require.NoError(t, common.Unmarshal(saved.Body.Bytes(), &result))
+	assert.False(t, result.Data.Enabled)
+	assert.Zero(t, result.Data.MaxFallbackCount)
+	var accounts int64
+	require.NoError(t, setup.db.Model(&model.UpstreamPoolAccount{}).Count(&accounts).Error)
+	assert.EqualValues(t, 4, accounts)
 }
 
 func TestPoolRequiresOwnerIdentityOnEveryEndpoint(t *testing.T) {
@@ -445,6 +920,7 @@ func TestPoolRequiresOwnerIdentityOnEveryEndpoint(t *testing.T) {
 		{"POST", "/accounts/1/resume"}, {"POST", "/accounts/1/reauth"},
 		{"POST", "/accounts/1/delete"}, {"POST", "/accounts/1/sync"},
 		{"GET", "/accounts/1/quota"},
+		{"GET", "/fallback-policy"}, {"PUT", "/fallback-policy"},
 	}
 	actors := []struct {
 		token  string

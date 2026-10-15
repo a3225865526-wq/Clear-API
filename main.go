@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/internal/stagingdiag"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
@@ -27,6 +28,7 @@ import (
 	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
 	"github.com/QuantumNous/new-api/pkg/wsmanager"
 	"github.com/QuantumNous/new-api/relay"
+	relayhelper "github.com/QuantumNous/new-api/relay/helper"
 	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
@@ -78,6 +80,9 @@ func main() {
 		return
 	}
 	common.SysLog("New API " + common.Version + " started")
+	if err := stagingdiag.Start(relayhelper.RuntimePricingDiagnostic); err != nil {
+		common.SysError("staging diagnostic initialization refused")
+	}
 	if os.Getenv("GIN_MODE") != "debug" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -186,6 +191,16 @@ func main() {
 	if err := service.StartBillingProtectionWorker(); err != nil {
 		common.FatalLog("billing protection unavailable; explicit migration and direct database accounting required")
 		return
+	}
+
+	// Stage 4: close ledger records left non-terminal by a previous process
+	// life. Recovery classification is hard rule §十七: OUTCOME_UNCERTAIN,
+	// never safe-to-advance — a restart can never silently replay a
+	// dispatched request. Runs once, before the listener accepts traffic.
+	if recoveredAttempts, recoveredRequests, recoverErr := model.RecoverRouteChainLedgerInFlight(); recoverErr != nil {
+		common.SysError("route chain ledger recovery failed: " + recoverErr.Error())
+	} else if recoveredAttempts > 0 || recoveredRequests > 0 {
+		common.SysLog(fmt.Sprintf("route chain ledger recovery: %d attempts and %d requests marked outcome-uncertain", recoveredAttempts, recoveredRequests))
 	}
 
 	if os.Getenv("ENABLE_PPROF") == "true" {

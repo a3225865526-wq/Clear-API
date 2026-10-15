@@ -1,0 +1,155 @@
+package routechain
+
+import (
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/gin-gonic/gin"
+)
+
+// Health report orchestration (Stage 5 design §2.6): turn one finished
+// attempt into a provider-health verdict and apply it to the candidate's
+// circuit. Memory-only on the breaker side (§二十九) — a ledger failure can
+// never block these decisions, and nothing here can influence billing.
+
+// UpstreamRetryAfterKey holds the raw Retry-After header value the transport
+// captured on a 429 response (relay/channel/api_request.go). The value is
+// parsed — and bounded — only here, never trusted verbatim.
+const UpstreamRetryAfterKey = "upstream_retry_after"
+
+const probeHeldKey = "route_chain_probe_held"
+
+// retryAfterFallbackSeconds is the short conservative cooldown for a missing,
+// negative, unparseable or overflowed Retry-After (§十八).
+const retryAfterFallbackSeconds = 5
+
+func markProbeHeld(c *gin.Context, candidateId int) {
+	c.Set(probeHeldKey, candidateId)
+}
+
+func probeHeldFor(c *gin.Context, candidateId int) bool {
+	value, exists := c.Get(probeHeldKey)
+	if !exists {
+		return false
+	}
+	held, _ := value.(int)
+	return held == candidateId && candidateId > 0
+}
+
+func releaseProbeHeld(c *gin.Context) {
+	c.Set(probeHeldKey, 0)
+}
+
+// ParseRetryAfterSeconds resolves a Retry-After value into a bounded cooldown
+// (§十七/§十八): delta-seconds and HTTP-date forms are supported; anything
+// negative, unparseable or overflowing falls back to the short conservative
+// default; anything above maxSeconds is capped so a provider can never make
+// a candidate permanently unavailable.
+func ParseRetryAfterSeconds(raw string, maxSeconds int) int {
+	if maxSeconds < 1 {
+		maxSeconds = 1
+	}
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return retryAfterFallbackSeconds
+	}
+	if seconds, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		if seconds <= 0 {
+			return retryAfterFallbackSeconds
+		}
+		if seconds > int64(maxSeconds) {
+			return maxSeconds
+		}
+		return int(seconds)
+	}
+	if when, err := http.ParseTime(raw); err == nil {
+		until := int64(time.Until(when).Seconds())
+		if until <= 0 {
+			return retryAfterFallbackSeconds
+		}
+		if until > int64(maxSeconds) {
+			return maxSeconds
+		}
+		return int(until)
+	}
+	return retryAfterFallbackSeconds
+}
+
+// upstreamRetryAfterCooldown resolves the cooldown effect seconds for this
+// attempt: only a 429 response feeds the cooldown, and only from the
+// transport-captured header.
+func upstreamRetryAfterCooldown(c *gin.Context, httpStatus int) int {
+	if httpStatus != http.StatusTooManyRequests {
+		return 0
+	}
+	return ParseRetryAfterSeconds(c.GetString(UpstreamRetryAfterKey), ResolveCircuitConfig(nil).RetryAfterMax)
+}
+
+// AttemptHealth is the computed health verdict of one finished attempt plus
+// the effect the breaker applied. Both land on the attempt ledger's health
+// columns; empty (zero value) means the breaker gate left it unobserved.
+type AttemptHealth struct {
+	Verdict HealthOutcome
+	Effect  string
+}
+
+// ComputeAttemptHealth turns one finished attempt into a provider-health
+// verdict, applies it to the candidate's circuit and returns the pair for the
+// ledger's finalize write. Memory-only on the breaker side (§二十九) — a
+// ledger failure can never block these decisions, and nothing here can
+// influence billing.
+func ComputeAttemptHealth(c *gin.Context, state *RequestState, signals HealthSignals) AttemptHealth {
+	if state == nil || state.Snapshot == nil {
+		return AttemptHealth{}
+	}
+	if !common.RouteCircuitBreakerEnabled() {
+		// Proven admission rejection is neutral even with the breaker off.
+		// Persist the verdict without feeding any provider circuit.
+		if signals.Outcome == OutcomePoolNoEligibleAccount {
+			return AttemptHealth{Verdict: HealthNeutral, Effect: "breaker_disabled"}
+		}
+		return AttemptHealth{}
+	}
+	candidate := state.FailingCandidate()
+	if candidate == nil {
+		return AttemptHealth{}
+	}
+	verdict, reason := ClassifyHealthOutcome(signals)
+	cooldownSeconds := upstreamRetryAfterCooldown(c, signals.Evidence.HTTPStatus)
+	probeHeld := probeHeldFor(c, candidate.Id)
+	effect := Breaker.ReportAttemptHealth(c, state.Snapshot.ChainId, candidate.Id, candidate.Policy,
+		verdict, string(signals.Outcome), signals.Evidence.UpstreamErrorCode, cooldownSeconds, probeHeld)
+	if probeHeld {
+		releaseProbeHeld(c)
+	}
+	logger.LogInfo(c, fmt.Sprintf("route_chain subsystem=breaker event=health_report request_id=%s chain_id=%d candidate_id=%d outcome=%s verdict=%s reason=%s effect=%s cooldown_seconds=%d",
+		c.GetString(common.RequestIdKey), state.Snapshot.ChainId, candidate.Id, signals.Outcome, verdict, reason, effect, cooldownSeconds))
+	return AttemptHealth{Verdict: verdict, Effect: effect}
+}
+
+// ComputeRequestSuccessHealth builds the health signals of the attempt that
+// completed the request from the relay facts. The stream completion status
+// decides between a real success and the SSE-abnormal failure (§四 A/B) —
+// billing success never implies provider health (§三).
+func ComputeRequestSuccessHealth(c *gin.Context, state *RequestState, relayInfo *relaycommon.RelayInfo) AttemptHealth {
+	signals := HealthSignals{
+		Outcome: OutcomeSuccess,
+		Evidence: Evidence{
+			CandidateSelected:    true,
+			DispatchStarted:      true,
+			RequestWritten:       true,
+			ClientOutputObserved: c.Writer.Written(),
+		},
+		ContextErr: c.Request.Context().Err(),
+	}
+	if relayInfo != nil {
+		signals.Stream = relayInfo.StreamStatus.OutcomeSnapshot()
+	}
+	return ComputeAttemptHealth(c, state, signals)
+}
