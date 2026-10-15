@@ -189,6 +189,22 @@ class ReleaseApprovalTest(unittest.TestCase):
             link=Path(directory)/'link';link.symlink_to(target)
             with self.assertRaises(OSError):CONTROL.install_target(link,b'new')
 
+    @unittest.skipUnless(os.geteuid()==0,'root entry point contract')
+    def test_unexpected_library_exception_cannot_print_the_credential(self):
+        # Even a library ValueError containing a credential must be redacted.
+        script = '''import runpy,sys,urllib.request
+def fail(*args,**kwargs):raise ValueError('synthetic-sensitive-token')
+urllib.request.build_opener=fail
+sys.argv=[sys.argv[1],'prepare']
+runpy.run_path(sys.argv[0],run_name='__main__')
+'''
+        payload=dict(self.data,token='synthetic-sensitive-token')
+        r=subprocess.run(['python3','-c',script,str(SCRIPTS/'pg03-release-control.py')],
+            input=json.dumps(payload),capture_output=True,text=True)
+        self.assertNotEqual(r.returncode,0)
+        self.assertNotIn('synthetic-sensitive-token',r.stdout+r.stderr)
+        self.assertIn('BLOCKED',r.stderr)
+
 
 class ProbeSessionTest(unittest.TestCase):
     def response(self, expiry):

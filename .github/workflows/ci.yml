@@ -131,7 +131,10 @@ jobs:
           shellcheck --severity=warning scripts/production-deploy.sh
           python3 scripts/ci/test-production-deploy.py
           bash -n scripts/production-deploy-v2.sh
-          shellcheck --severity=warning scripts/production-deploy-v2.sh
+          # Preserve the installed V2 bytes (also asserted by the contract test).
+          # Its parsed digest tuple includes an unused field, and export "$name"
+          # intentionally exports the validated variable named by $name.
+          shellcheck --severity=warning --exclude=SC2034,SC2163 scripts/production-deploy-v2.sh
           DEPLOY_SOURCE=scripts/production-deploy-v2.sh python3 scripts/ci/test-production-deploy.py WrapperModesTest WorkflowStdinTest
           sudo python3 scripts/ci/test-pg03-release.py
           sudo visudo --check --file scripts/pg03-deploy.sudoers
