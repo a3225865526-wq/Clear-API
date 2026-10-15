@@ -6,6 +6,7 @@ No production socket, credentials, database or container is accessed.
 """
 import hashlib
 import io
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -42,6 +43,8 @@ elif a[:2] == ["image", "inspect"]:
     else: sys.exit("unexpected image")
 elif a[:3] == ["exec", "clearapi-postgres-1", "pg_dump"]:
     print("isolated dump fixture")
+    if s.get("pg03_drift"):
+        Path(s["pg03_drift"]).write_text('{"guard_version":3,"revision":9}')
     if s.get("drift_on_dump"):
         s["container"]["Id"] = "replacement-container"
         p.write_text(json.dumps(s))
@@ -172,7 +175,7 @@ class BackupIdentityTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("changed during backup", result.stderr)
 
-    def full_backup(self, drift=False):
+    def full_backup(self, drift=False, pg03=False, pg03_drift=False):
         base = self.root / "opt/clearapi/backups"
         (base / "bin").mkdir(parents=True)
         (base / "manifests").mkdir()
@@ -191,6 +194,29 @@ class BackupIdentityTest(unittest.TestCase):
         helper = base / "bin/backup-identity.py"
         helper.write_text((SCRIPTS / "backup-identity.py").read_text().replace(
             "/opt/clearapi/app", str(self.app)))
+        original_state = {}
+        if pg03:
+            state_tool = base / 'bin/pg03-backup-state.py'
+            state_tool.write_text((SCRIPTS / 'pg03-backup-state.py').read_text())
+            pg03_files = {
+                'opt/clearapi/app/compose-pg03.yaml': 'services: {}\n',
+                'opt/clearapi/config/pg03/pg03.env': 'synthetic test-only environment\n',
+                'data/clearapi/pool-executor/pool/checkpoint.journal': '{"guard_version":3,"revision":8,"checkpoint":"signed-fixture-bytes"}',
+                'data/clearapi/pool-executor/pool/admission.json': '{"guard_version":3,"revision":12,"grants":["synthetic-grant"],"capabilities":["synthetic-capability"]}',
+                'data/clearapi/pool-executor/receipts/receipt.json': '{"state":"STARTED","id":"synthetic-receipt"}',
+                'data/clearapi/pool-executor/auths/account.json': '{"synthetic_credential":true}',
+            }
+            for name, value in pg03_files.items():
+                p = self.root / name
+                p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                for parent in p.parents:
+                    if parent == self.root: break
+                    if 'pool-executor' in str(parent): parent.chmod(0o700)
+                p.write_text(value)
+                p.chmod(0o644 if name.endswith('yaml') else 0o600)
+                original_state[name] = p.read_bytes()
+            if pg03_drift:
+                self.state['pg03_drift'] = str(self.root / 'data/clearapi/pool-executor/pool/checkpoint.journal')
         gnupg = self.root / "gnupg"
         gnupg.mkdir(mode=0o700)
         env = dict(self.env, GNUPGHOME=str(gnupg))
@@ -203,6 +229,8 @@ class BackupIdentityTest(unittest.TestCase):
         gpg("--quick-add-key", fingerprint, "cv25519", "encr", "0")
         source = Path(os.environ.get("BACKUP_SOURCE", SCRIPTS / "production-backup.sh")).read_text()
         source = source.replace("/opt/clearapi", str(self.root / "opt/clearapi"))
+        source = source.replace("/data/clearapi", str(self.root / "data/clearapi"))
+        source = source.replace('--root / ', '--root ' + str(self.root) + ' ')
         source = source.replace("/var/log/clearapi", str(self.root / "log"))
         source = source.replace("/run/lock/clearapi-backup.lock", str(self.root / "backup.lock"))
         source = source.replace(" -C / ", " -C " + str(self.root) + " ")
@@ -215,7 +243,7 @@ class BackupIdentityTest(unittest.TestCase):
                                 text=True, timeout=45)
         self.assertEqual(old_bytes, (old_manifest.read_bytes(), old_bundle.read_bytes()))
         manifests = [p for p in (base / "manifests").glob("*.json") if p != old_manifest]
-        if drift:
+        if drift or pg03_drift:
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(manifests, [])
             return
@@ -238,6 +266,22 @@ class BackupIdentityTest(unittest.TestCase):
             for item in manifest["artifacts"].values():
                 self.assertEqual(hashlib.sha256(archive.extractfile(item["name"]).read()).hexdigest(), item["sha256"])
             config = archive.extractfile(manifest["artifacts"]["config_archive"]["name"]).read()
+            if pg03:
+                state_archive = self.root / 'pg03.tar.gz'
+                state_archive.write_bytes(archive.extractfile(manifest['artifacts']['pg03_state_archive']['name']).read())
+                snapshot = self.root / 'pg03.json'
+                snapshot.write_bytes(archive.extractfile(manifest['artifacts']['pg03_state_snapshot']['name']).read())
+                state_archive.chmod(0o600)
+                snapshot.chmod(0o600)
+                restored = self.root / 'isolated-restore'
+                result = subprocess.run(['python3', str(state_tool), 'restore',
+                    '--archive', str(state_archive), '--snapshot', str(snapshot),
+                    '--destination', str(restored)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                for name, expected in original_state.items():
+                    self.assertEqual((restored / name).read_bytes(), expected)
+                self.assertEqual((restored / 'data/clearapi/pool-executor/pool/admission.json').stat().st_mode & 0o777, 0o600)
+                self.assertEqual(manifest['pg03_recovery']['consistency'], 'unchanged_across_dump_and_bundle')
         with tarfile.open(fileobj=io.BytesIO(config), mode="r:gz") as archive:
             self.assertIn("opt/clearapi/app/compose-candidate.yaml", archive.getnames())
         point = manifest["database_recovery_point"]
@@ -249,6 +293,31 @@ class BackupIdentityTest(unittest.TestCase):
 
     def test_backup_drift_fails_without_publishing_manifest(self):
         self.full_backup(drift=True)
+
+    def test_pg03_encrypted_backup_and_isolated_restore_preserve_all_state(self):
+        self.full_backup(pg03=True)
+
+    def test_pg03_change_during_dump_does_not_publish_recovery_point(self):
+        self.full_backup(pg03=True, pg03_drift=True)
+
+    def test_restore_rejects_traversal_links_and_existing_runtime(self):
+        spec = importlib.util.spec_from_file_location('pg03_state', SCRIPTS / 'pg03-backup-state.py')
+        tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool)
+        for name, link in [('../escape', False), ('data/clearapi/pool-executor/pool/checkpoint.journal', True)]:
+            with self.subTest(name=name):
+                path=self.root/'unsafe.tar.gz'
+                with tarfile.open(path,'w:gz') as archive:
+                    member=tarfile.TarInfo(name)
+                    if link:
+                        member.type=tarfile.SYMTYPE;member.linkname='/etc/passwd'
+                    archive.addfile(member)
+                snapshot=self.root/'snapshot.json'
+                snapshot.write_text(json.dumps({name:{'mode':0o600,'uid':0,'gid':0,'directory':False,'bytes':0,'sha256':hashlib.sha256(b'').hexdigest()}}))
+                destination=self.root/'not-created'
+                with self.assertRaises(ValueError):tool.restore(path,snapshot,destination)
+                self.assertFalse(destination.exists())
+        with self.assertRaises(ValueError):tool.restore(path,snapshot,self.root)
 
 
 if __name__ == "__main__":

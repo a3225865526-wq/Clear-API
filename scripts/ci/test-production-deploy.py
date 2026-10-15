@@ -37,7 +37,7 @@ def runtime_report():
     }}
 
 
-SOURCE = Path(__file__).resolve().parents[1] / "production-deploy.sh"
+SOURCE = Path(os.environ.get("DEPLOY_SOURCE", Path(__file__).resolve().parents[1] / "production-deploy.sh"))
 DIGEST = "sha256:" + "a" * 64
 COMMIT = "b" * 40
 INSTALLER_COMMIT = "f1797fbb3752100c665ddf85d9dfae89b7765ad7"
@@ -978,6 +978,9 @@ else: sys.exit('Forbidden docker operation')
             (self.root / name).symlink_to(fake)
         env = dict(self.env, TEST_ROOT=str(self.root), TEST_FAILURE=failure,
                    GH_PULL_TOKEN=payload, PROD_SSH_ALIAS="fixture-vps",
+                   POOL_MODE="off", DEPLOY_WRAPPER="/opt/clearapi/bin/production-deploy.sh",
+                   IMAGE_DIGEST=DIGEST, EXPECTED_COMMIT=COMMIT, GITHUB_RUN_ID="123",
+                   MIGRATION_COMPATIBLE="true" if compatible else "false",
                    GHCR_PULL_TOKEN="must-not-be-exported",
                    TMPDIR=str(self.root))
         result = subprocess.run(["bash", "-c", block], env=env, capture_output=True,

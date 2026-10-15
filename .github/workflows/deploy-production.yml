@@ -11,6 +11,16 @@ on:
         description: 'Expected source commit (full 40 hex) of the image'
         required: true
         type: string
+      pool_mode:
+        description: 'Pool mode; pg03 requires real review and exact paired identities'
+        type: choice
+        required: true
+        default: 'off'
+        options: ['off', 'pg03']
+      rc_run_id:
+        description: 'Successful same-commit PG03 RC run (required for pg03)'
+        type: string
+        required: false
       migration_compatible:
         description: 'Is the candidate migration backward-compatible with the previous image?'
         required: true
@@ -29,6 +39,7 @@ permissions:
   # packages: read lets the job's short-lived GITHUB_TOKEN pull the private
   # GHCR candidate on the VPS. It grants no write access to any package.
   packages: read
+  actions: read
 
 concurrency:
   group: production
@@ -46,6 +57,12 @@ jobs:
       PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
       PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
       PROD_SSH_ALIAS: clearapi-vps
+      POOL_MODE: ${{ inputs.pool_mode }}
+      RC_RUN_ID: ${{ inputs.rc_run_id }}
+      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
+      IMAGE_DIGEST: ${{ inputs.image_digest }}
+      CONFIRMATION: ${{ inputs.confirmation }}
+      MIGRATION_COMPATIBLE: ${{ inputs.migration_compatible }}
 
     steps:
       - name: Checkout deploy assets
@@ -56,25 +73,38 @@ jobs:
       - name: Validate manual gate inputs
         run: |
           set -euo pipefail
-          if [ "${{ inputs.confirmation }}" != "DEPLOY_PRODUCTION" ]; then
+          if [ "$CONFIRMATION" != "DEPLOY_PRODUCTION" ]; then
             echo "confirmation input does not match DEPLOY_PRODUCTION — refusing to deploy"
             exit 1
           fi
-          if [ ! "${{ inputs.expected_commit }}" =~ ^[0-9a-f]{40}$ ]; then
+          if [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
             echo "expected_commit is not a full 40-hex commit SHA"
             exit 1
           fi
-          if [ "${{ inputs.expected_commit }}" != "${{ github.sha }}" ]; then
-            echo "expected_commit '${{ inputs.expected_commit }}' does not match the workflow's own commit '${{ github.sha }}'"
+          if [ "$EXPECTED_COMMIT" != "$GITHUB_SHA" ]; then
+            echo 'expected_commit does not match the workflow commit'
             exit 1
           fi
-          if [ ! "${{ inputs.image_digest }}" =~ ^sha256:[a-f0-9]{64}$ ]; then
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "image_digest must be an exact 'sha256:<64 hex>' digest — tags and 'latest' are forbidden"
             exit 1
           fi
-          case "${{ inputs.migration_compatible }}" in
+          case "$MIGRATION_COMPATIBLE" in
             true|false) ;;
             *) echo "migration_compatible must be true or false"; exit 1 ;;
+          esac
+          case "$POOL_MODE" in
+            off)
+              echo 'DEPLOY_SOURCE=scripts/production-deploy.sh' >> "$GITHUB_ENV"
+              echo 'DEPLOY_WRAPPER=/opt/clearapi/bin/production-deploy.sh' >> "$GITHUB_ENV"
+              ;;
+            pg03)
+              [[ "$GITHUB_REF" == refs/heads/main ]]
+              [[ "$RC_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+              echo 'DEPLOY_SOURCE=scripts/production-deploy-v2.sh' >> "$GITHUB_ENV"
+              echo 'DEPLOY_WRAPPER=/opt/clearapi/bin/production-deploy-v2.sh' >> "$GITHUB_ENV"
+              ;;
+            *) echo 'Unsupported pool mode' >&2; exit 1 ;;
           esac
 
       - name: Set up SSH with pinned host key
@@ -119,12 +149,12 @@ jobs:
         # different release, and the deploy is blocked.
         run: |
           set -euo pipefail
-          LOCAL_SHA="$(sha256sum scripts/production-deploy.sh | cut -d' ' -f1)"
-          REMOTE_SHA="$(ssh "${PROD_SSH_ALIAS}" "sudo sha256sum /opt/clearapi/bin/production-deploy.sh | cut -d' ' -f1")"
+          LOCAL_SHA="$(sha256sum "$DEPLOY_SOURCE" | cut -d' ' -f1)"
+          REMOTE_SHA="$(ssh "${PROD_SSH_ALIAS}" "sudo sha256sum $DEPLOY_WRAPPER | cut -d' ' -f1")"
           if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
             echo "deploy wrapper integrity check FAILED"
             echo "  repo (${{ github.sha }}): $LOCAL_SHA"
-            echo "  VPS  /opt/clearapi/bin/production-deploy.sh: $REMOTE_SHA"
+            echo "  VPS  ${DEPLOY_WRAPPER}: $REMOTE_SHA"
             echo "refusing to deploy; the installed wrapper is not the audited script for this commit"
             exit 1
           fi
@@ -135,6 +165,31 @@ jobs:
             echo 'runtime identity tool integrity FAILED'
             exit 1
           }
+
+      - name: Verify PG03 control tool and prepare approved pair
+        if: inputs.pool_mode == 'pg03'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          LOCAL_SHA=$(sha256sum scripts/pg03-release-control.py | cut -d' ' -f1)
+          REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-release-control.py' | cut -d' ' -f1)
+          [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
+          LOCAL_SHA=$(sha256sum scripts/production-backup.sh | cut -d' ' -f1)
+          REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/backups/bin/clearapi-backup.sh' | cut -d' ' -f1)
+          [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
+          LOCAL_SHA=$(sha256sum scripts/pg03-backup-state.py | cut -d' ' -f1)
+          REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/backups/bin/pg03-backup-state.py' | cut -d' ' -f1)
+          [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
+          # Independently read GitHub's real review and immutable RC artifact.
+          # Credentials remain on stdin; pending drafts cannot approve a pair.
+          python3 - <<'PY' | ssh "$PROD_SSH_ALIAS" 'sudo /opt/clearapi/bin/pg03-release-control.py prepare'
+          import json, os
+          e = os.environ
+          print(json.dumps({'token': e['GH_TOKEN'], 'run': e['GITHUB_RUN_ID'],
+                            'rc_run': e['RC_RUN_ID'], 'commit': e['EXPECTED_COMMIT'],
+                            'digest': e['IMAGE_DIGEST']}))
+          PY
 
       - name: Run controlled deploy on VPS
         env:
@@ -147,13 +202,15 @@ jobs:
           # the job. The stdin mode is selected with an explicit CLI flag:
           # sudo env_reset discards caller-set env vars for allowlisted
           # commands, so an env-based switch cannot reach the wrapper.
+          MODE_ARGS=''
+          if [[ "$POOL_MODE" == pg03 ]]; then MODE_ARGS='--pool-mode pg03'; fi
           printf '%s\n' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
-            "sudo /opt/clearapi/bin/production-deploy.sh \
-              --ghcr-token-stdin \
-              --digest '${{ inputs.image_digest }}' \
-              --commit '${{ inputs.expected_commit }}' \
-              --workflow-run '${{ github.run_id }}' \
-              --migration-compatible '${{ inputs.migration_compatible }}'"
+            "sudo $DEPLOY_WRAPPER \
+              $MODE_ARGS --ghcr-token-stdin \
+              --digest '$IMAGE_DIGEST' \
+              --commit '$EXPECTED_COMMIT' \
+              --workflow-run '$GITHUB_RUN_ID' \
+              --migration-compatible '$MIGRATION_COMPATIBLE'"
 
       - name: Clear deploy key material
         if: always()

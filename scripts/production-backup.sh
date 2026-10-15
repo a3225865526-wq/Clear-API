@@ -42,6 +42,13 @@ chmod 700 "$STAGE" "$ENC"
 # Freeze the old running release, never the candidate about to be deployed.
 IDENTITY_TOOL=/opt/clearapi/backups/bin/backup-identity.py
 python3 "$IDENTITY_TOOL" capture > "$STAGE/running-identity.json"
+PG03_TOOL=/opt/clearapi/backups/bin/pg03-backup-state.py
+PG03_ARTIFACTS=()
+if [ -e /opt/clearapi/app/compose-pg03.yaml ] || [ -e /data/clearapi/pool-executor ]; then
+  python3 "$PG03_TOOL" capture --root / \
+    --archive "$STAGE/clearapi-pg03-$TS.tar.gz" --snapshot "$STAGE/pg03-state-$TS.json"
+  PG03_ARTIFACTS=("clearapi-pg03-$TS.tar.gz" "pg03-state-$TS.json")
+fi
 DUMP_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # 1. consistent logical dump (container-local socket; no password in argv)
@@ -71,9 +78,13 @@ docker run --rm -v "$STAGE:/b:ro" "$PGIMG" \
   pg_restore -l "/b/clearapi-pg-dump-$TS.dump" > /dev/null
 
 # 5. bundle + encrypt (AES256 + OCB AEAD; public key only on this host)
+if [ "${#PG03_ARTIFACTS[@]}" -gt 0 ]; then
+  python3 "$PG03_TOOL" check --root / --snapshot "$STAGE/pg03-state-$TS.json"
+fi
 tar -czf "$STAGE/bundle-$TS.tar.gz" -C "$STAGE" \
   "clearapi-pg-dump-$TS.dump" "clearapi-pg-globals-$TS.sql" \
-  "clearapi-config-$TS.tar.gz" "clearapi-edge-$TS.tar.gz" "clearapi-legal-$TS.tar.gz" "clearapi-secrets-$TS.tar" "clearapi-deployctl-$TS.tar.gz"
+  "clearapi-config-$TS.tar.gz" "clearapi-edge-$TS.tar.gz" "clearapi-legal-$TS.tar.gz" "clearapi-secrets-$TS.tar" "clearapi-deployctl-$TS.tar.gz" \
+  "${PG03_ARTIFACTS[@]}"
 gpg --batch --yes --trust-model always --recipient "$RECIPIENT" --force-ocb \
   --encrypt --output "$ENC/clearapi-backup-$TS.tar.gz.gpg" "$STAGE/bundle-$TS.tar.gz"
 
@@ -131,6 +142,23 @@ cat > "$STAGE/manifest.json" <<EOF
 EOF
 python3 "$IDENTITY_TOOL" finalize --snapshot "$STAGE/running-identity.json" \
   --manifest "$STAGE/manifest.json" --dump-started "$DUMP_STARTED" --dump-completed "$DUMP_COMPLETED"
+if [ "${#PG03_ARTIFACTS[@]}" -gt 0 ]; then
+  python3 "$PG03_TOOL" check --root / --snapshot "$STAGE/pg03-state-$TS.json"
+  python3 - "$STAGE" "$TS" <<'PYPG03'
+import hashlib, json, pathlib, sys
+stage, stamp = pathlib.Path(sys.argv[1]), sys.argv[2]
+path = stage / 'manifest.json'
+manifest = json.loads(path.read_text())
+for key, name in [('pg03_state_archive', f'clearapi-pg03-{stamp}.tar.gz'),
+                  ('pg03_state_snapshot', f'pg03-state-{stamp}.json')]:
+    manifest['artifacts'][key] = {'name': name, 'sha256': hashlib.sha256((stage / name).read_bytes()).hexdigest()}
+manifest['pg03_recovery'] = {'schema_version': 1, 'consistency': 'unchanged_across_dump_and_bundle',
+    'scope': ['compose-pg03.yaml', 'config/pg03', 'pool-executor/auths',
+              'pool-executor/pool', 'pool-executor/receipts'],
+    'restore_policy': 'isolated_only; reconcile live runtime high-water marks before production recovery'}
+path.write_text(json.dumps(manifest, indent=2) + '\n')
+PYPG03
+fi
 python3 -m json.tool "$STAGE/manifest.json" > /dev/null
 mv "$STAGE/manifest.json" "$BASE/manifests/$TS.json"
 chmod 640 "$BASE/manifests/$TS.json"

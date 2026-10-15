@@ -1,0 +1,4 @@
+# Install only after this change is reviewed and merged; never permit a shell,
+# interpreter, arbitrary sha256sum path, install, docker or environment override.
+# Existing Pool OFF permissions remain in the operator's original policy.
+clearapi-deploy ALL=(root) NOPASSWD: /usr/bin/sha256sum /opt/clearapi/bin/production-deploy-v2.sh, /opt/clearapi/bin/production-deploy-v2.sh, /usr/bin/sha256sum /opt/clearapi/bin/runtime-identity-refresh.py, /usr/bin/sha256sum /opt/clearapi/bin/pg03-release-control.py, /usr/bin/sha256sum /opt/clearapi/backups/bin/clearapi-backup.sh, /usr/bin/sha256sum /opt/clearapi/backups/bin/pg03-backup-state.py, /opt/clearapi/bin/pg03-release-control.py prepare
