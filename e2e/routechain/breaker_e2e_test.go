@@ -182,7 +182,7 @@ func TestE2EBreakerHalfOpenProbeFailureReopens(t *testing.T) {
 func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	breakerE2ESetup(t)
 	oldMax := common.RouteChainRetryAfterMaxSeconds
-	common.RouteChainRetryAfterMaxSeconds = 1
+	common.RouteChainRetryAfterMaxSeconds = 5
 	t.Cleanup(func() { common.RouteChainRetryAfterMaxSeconds = oldMax })
 
 	h := newHarness(t)
@@ -224,7 +224,7 @@ func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	require.Equal(t, 2, mockB.count())
 
 	// Cooldown (2s) elapses → probe; A answers 429 with Retry-After 999999999
-	// → capped to RouteChainRetryAfterMaxSeconds=1 (C21). The probe request
+	// → capped to RouteChainRetryAfterMaxSeconds=5 (C21). The probe request
 	// still advances to B per policy.
 	time.Sleep(2100 * time.Millisecond)
 	before := time.Now().Unix()
@@ -236,12 +236,12 @@ func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	require.Eventually(t, func() bool {
 		snapshot := routechain.Breaker.CandidateSnapshot(1, 1, nil)
 		return snapshot.Counters["retry_after_cooldown_total"] == 2 &&
-			snapshot.OpenUntil >= before+1 &&
-			snapshot.OpenUntil <= after+1 // Retry-After capped to max seconds
+		snapshot.OpenUntil >= before+5 &&
+			snapshot.OpenUntil <= after+5 // Retry-After capped to max seconds
 	}, 3*time.Second, 10*time.Millisecond, "capped cooldown window applied")
 
 	// After the capped window the probe succeeds and closes the circuit.
-	time.Sleep(1200 * time.Millisecond)
+	time.Sleep(5200 * time.Millisecond)
 	status, body, _ = h.postChat(t, e2eModel, "", false)
 	require.Equal(t, http.StatusOK, status)
 	require.Contains(t, body, "from-a")
