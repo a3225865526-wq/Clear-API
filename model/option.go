@@ -169,6 +169,12 @@ func InitOptionMap() {
 	//common.OptionMap["ChatLink2"] = common.ChatLink2
 	common.OptionMap["QuotaPerUnit"] = strconv.FormatFloat(common.QuotaPerUnit, 'f', -1, 64)
 	common.OptionMap["RetryTimes"] = strconv.Itoa(common.RetryTimes)
+	common.OptionMap["RouteChainMaxCandidates"] = strconv.Itoa(common.RouteChainMaxCandidates)
+	common.OptionMap["RouteChainOverallDeadlineMs"] = strconv.Itoa(common.RouteChainOverallDeadlineMs)
+	common.OptionMap["RouteChainCircuitFailureThreshold"] = strconv.Itoa(common.RouteChainCircuitFailureThreshold)
+	common.OptionMap["RouteChainCircuitOpenSeconds"] = strconv.Itoa(common.RouteChainCircuitOpenSeconds)
+	common.OptionMap["RouteChainCircuitHalfOpenMaxProbes"] = strconv.Itoa(common.RouteChainCircuitHalfOpenMaxProbes)
+	common.OptionMap["RouteChainRetryAfterMaxSeconds"] = strconv.Itoa(common.RouteChainRetryAfterMaxSeconds)
 	common.OptionMap["DataExportInterval"] = strconv.Itoa(common.DataExportInterval)
 	common.OptionMap["DataExportDefaultTime"] = common.DataExportDefaultTime
 	common.OptionMap["DefaultCollapseSidebar"] = strconv.FormatBool(common.DefaultCollapseSidebar)
@@ -674,6 +680,57 @@ func updateOptionMap(key string, value string) (err error) {
 		err = setting.UpdateModelRequestRateLimitGroupByJSONString(value)
 	case "RetryTimes":
 		common.RetryTimes, _ = strconv.Atoi(value)
+	case "RouteChainMaxCandidates":
+		v, _ := strconv.Atoi(value)
+		if v < 1 {
+			v = 1
+		}
+		if v > 10 {
+			v = 10
+		}
+		common.RouteChainMaxCandidates = v
+	case "RouteChainOverallDeadlineMs":
+		v, _ := strconv.Atoi(value)
+		if v < 0 {
+			v = 0
+		}
+		common.RouteChainOverallDeadlineMs = v
+	case "RouteChainCircuitFailureThreshold":
+		v, _ := strconv.Atoi(value)
+		if v < 1 {
+			v = 1
+		}
+		if v > 20 {
+			v = 20
+		}
+		common.RouteChainCircuitFailureThreshold = v
+	case "RouteChainCircuitOpenSeconds":
+		v, _ := strconv.Atoi(value)
+		if v < 1 {
+			v = 1
+		}
+		if v > 3600 {
+			v = 3600
+		}
+		common.RouteChainCircuitOpenSeconds = v
+	case "RouteChainCircuitHalfOpenMaxProbes":
+		v, _ := strconv.Atoi(value)
+		if v < 1 {
+			v = 1
+		}
+		if v > 10 {
+			v = 10
+		}
+		common.RouteChainCircuitHalfOpenMaxProbes = v
+	case "RouteChainRetryAfterMaxSeconds":
+		v, _ := strconv.Atoi(value)
+		if v < 1 {
+			v = 1
+		}
+		if v > 3600 {
+			v = 3600
+		}
+		common.RouteChainRetryAfterMaxSeconds = v
 	case "DataExportInterval":
 		common.DataExportInterval, _ = strconv.Atoi(value)
 	case "DataExportDefaultTime":

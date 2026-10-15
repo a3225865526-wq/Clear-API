@@ -17,7 +17,7 @@ type BalanceTransaction struct {
 	ReferenceType string `json:"reference_type" gorm:"type:varchar(16);default:''"`
 	ReferenceId   int    `json:"reference_id" gorm:"default:0"`
 	Description   string `json:"description" gorm:"type:varchar(255);default:''"`
-	Metadata      string `json:"metadata" gorm:"type:text;default:''"` // JSON，禁止存完整兑换码
+	Metadata      string `json:"metadata" gorm:"type:text"` // JSON，禁止存完整兑换码
 }
 
 const (

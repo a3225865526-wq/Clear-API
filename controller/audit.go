@@ -82,6 +82,16 @@ var auditContentTemplates = map[string]string{
 
 	"subscription.plan_reset":      "Reset active subscriptions for plan ${plan_id}",
 	"subscription.user_plan_reset": "Reset active plan ${plan_id} subscriptions for user ${target_user_id}",
+
+	"route_chain.create":             "Created route chain ${model}/${group} (ID: ${chain_id}, candidates ${candidate_count})",
+	"route_chain.update":             "Updated route chain (ID: ${chain_id}, version ${old_version} to ${new_version})",
+	"route_chain.enable":             "Set route chain (ID: ${chain_id}) enabled=${enabled} (version ${old_version} to ${new_version})",
+	"route_chain.reorder":            "Reordered route chain candidates (ID: ${chain_id}, version ${old_version} to ${new_version})",
+	"route_chain.archive":            "Archived route chain (ID: ${chain_id}, version ${old_version} to ${new_version})",
+	"route_chain.delete":             "Deleted route chain (ID: ${chain_id})",
+	"route_chain.candidate_enable":   "Set route chain candidate (ID: ${candidate_id}) enabled=${enabled}",
+	"route_chain.circuit_reset":      "Reset runtime circuit for route chain candidate (chain ${chain_id}, candidate ${candidate_id})",
+	"route_chain.circuit_force_open": "Force-opened runtime circuit for route chain candidate (chain ${chain_id}, candidate ${candidate_id}, duration ${duration_seconds})",
 }
 
 func recordPasskeyDomainAudit(c *gin.Context, change *model.PasskeyDomainChange, confirmed bool, err error) {

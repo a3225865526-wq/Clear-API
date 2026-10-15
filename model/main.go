@@ -40,6 +40,11 @@ func jsonScanBytes(value any) []byte {
 	}
 }
 
+// InitColumnQuotingForTest exposes dialect-aware column quoting to
+// out-of-package integration tests that drive ability queries without a full
+// InitDB. Production paths call initCol inside InitDB.
+func InitColumnQuotingForTest() { initCol() }
+
 func initCol() {
 	// init common column names
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
@@ -334,6 +339,12 @@ func migrateDB() error {
 		common.SysError("failed to migrate options primary key: " + err.Error())
 	}
 
+	if err := MigrateRouteChain(DB); err != nil {
+		return err
+	}
+	if err := MigratePoolFallback(DB); err != nil {
+		return err
+	}
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},
@@ -377,6 +388,9 @@ func migrateDB() error {
 		&SystemTaskLock{},
 		&CasbinRule{},
 		&AuthzRole{},
+		&RouteChainRequestRecord{},
+		&RouteChainAttemptRecord{},
+		&RouteChainDecisionRecord{},
 	)
 	if err != nil {
 		return err

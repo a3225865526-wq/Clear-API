@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,6 +25,38 @@ func EnableCodexMetering(c *gin.Context) {
 	if _, ok := c.Get(codexMeterKey); !ok {
 		c.Set(codexMeterKey, &codexMeterState{})
 	}
+}
+
+// CodexMeteringAttemptID exposes the latest observed upstream metering
+// attempt id so the route-chain engine can derive per-attempt work evidence
+// (a changed id marks upstream work on the current attempt). Empty when no
+// metering envelope has been observed.
+func CodexMeteringAttemptID(c *gin.Context) string {
+	value, exists := c.Get(codexMeterKey)
+	if !exists {
+		return ""
+	}
+	state, ok := value.(*codexMeterState)
+	if !ok {
+		return ""
+	}
+	return state.AttemptID
+}
+
+// CodexMeteringAccountRef exposes the executor-annotated safe account
+// reference (sha256, never a credential) of the observed final envelope, for
+// the attempt ledger's pool linkage. Empty when the executor never selected
+// an account.
+func CodexMeteringAccountRef(c *gin.Context) string {
+	value, exists := c.Get(codexMeterKey)
+	if !exists {
+		return ""
+	}
+	state, ok := value.(*codexMeterState)
+	if !ok || state.Final == nil {
+		return ""
+	}
+	return state.Final.AccountRef
 }
 
 // ObserveCodexMetering reads upstream bytes before DTO defaulting and before
@@ -144,6 +177,8 @@ func PostCodexUnavailableQuota(c *gin.Context, info *relaycommon.RelayInfo, usag
 		if err := session.SettleUncertain(); err != nil {
 			status = "unavailable_reconciliation_required"
 			logger.LogError(c, "Codex usage unavailable; billing requires reconciliation")
+		} else {
+			routechain.NoteRequestBilling(c, model.RouteChainBillingSettledUncertain)
 		}
 		charged = session.ChargedQuota()
 		if !session.durable {
@@ -160,5 +195,6 @@ func PostCodexUnavailableQuota(c *gin.Context, info *relaycommon.RelayInfo, usag
 	other.SetAdmin("stream_interrupted", streamInterrupted)
 	CaptureFinanceUsage(c, info, map[string]*string{}, "codex_authoritative_usage_unavailable")
 	CaptureFinanceBilling(info, "text_settlement", &charged, info.BillingSource, status)
+	routechain.NoteAttemptUsage(c, usage, CodexMeteringAccountRef(c), CodexMeteringAttemptID(c))
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{ChannelId: info.ChannelId, ModelName: info.GetBillingModelName(), TokenId: info.TokenId, Quota: charged, IsStream: info.IsStream, Group: info.UsingGroup, Content: "Codex authoritative usage unavailable; retained reservation is not a token bill", Other: other})
 }

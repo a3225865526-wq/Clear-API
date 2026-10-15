@@ -20,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
@@ -97,34 +98,56 @@ func Distribute() func(c *gin.Context) {
 				}
 			}
 		}
+		chainBound := false
 		if pinned || shouldSelectChannel {
 			usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
 			var selectErr *service.ChannelSelectError
-			channel, _, selectErr = service.SelectChannelForRequest(c, modelRequest.Model, &service.RetryParam{
-				Ctx:         c,
-				ModelName:   modelRequest.Model,
-				TokenGroup:  usingGroup,
-				RequestPath: c.Request.URL.Path,
-				Retry:       common.GetPointer(0),
-			})
-			if selectErr != nil {
-				if selectErr.FilterKind == taskdto.FilterTaskPluginIdentity {
-					logTaskPluginChannelDecision(c, selectErr.Channel, modelRequest.Model, "channel_rejected", "identity_mismatch")
+			var chainState *routechain.RequestState
+			if routeChainEligibleRequest(c) {
+				chainState = routechain.BeginRequest(c, modelRequest.Model, usingGroup)
+			}
+			if chainState != nil {
+				// Route Chain mode: the engine binds each candidate to its
+				// exact target channel (Amendment 2 C2) and runs per-candidate
+				// admission; the weighted selection pool never runs.
+				common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
+				if chainErr := chainState.BindCandidate(c, SetupContextForSelectedChannel, service.RouteChainCandidateGroups(c), routechain.ChainFilters(service.GetChannelConstraints(c).Filters)); chainErr != nil {
+					// Stage 4: the request never reaches the relay loop, so its
+					// ledger row would stay unfinished — close it here.
+					routechain.FinishRequestLedger(c, chainState, nil, chainErr)
+					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, chainErr.Error(), "route_exhausted")
+					return
 				}
-				message := selectErr.Message
-				if selectErr.NoAvailableChannel {
-					message = noAvailableChannelMessage(c, usingGroup, modelRequest.Model)
-				} else if selectErr.MessageID != "" {
-					message = i18n.T(c, selectErr.MessageID, selectErr.Params)
+				chainBound = true
+			} else {
+				channel, _, selectErr = service.SelectChannelForRequest(c, modelRequest.Model, &service.RetryParam{
+					Ctx:         c,
+					ModelName:   modelRequest.Model,
+					TokenGroup:  usingGroup,
+					RequestPath: c.Request.URL.Path,
+					Retry:       common.GetPointer(0),
+				})
+				if selectErr != nil {
+					if selectErr.FilterKind == taskdto.FilterTaskPluginIdentity {
+						logTaskPluginChannelDecision(c, selectErr.Channel, modelRequest.Model, "channel_rejected", "identity_mismatch")
+					}
+					message := selectErr.Message
+					if selectErr.NoAvailableChannel {
+						message = noAvailableChannelMessage(c, usingGroup, modelRequest.Model)
+					} else if selectErr.MessageID != "" {
+						message = i18n.T(c, selectErr.MessageID, selectErr.Params)
+					}
+					abortWithOpenAiMessage(c, selectErr.StatusCode, message, selectErr.Code)
+					return
 				}
-				abortWithOpenAiMessage(c, selectErr.StatusCode, message, selectErr.Code)
-				return
 			}
 		}
 		common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
-		if setupErr := SetupContextForSelectedChannel(c, channel, modelRequest.Model); setupErr != nil {
-			abortWithOpenAiMessage(c, http.StatusServiceUnavailable, setupErr.Error(), "channel_admission_failed")
-			return
+		if !chainBound {
+			if setupErr := SetupContextForSelectedChannel(c, channel, modelRequest.Model); setupErr != nil {
+				abortWithOpenAiMessage(c, http.StatusServiceUnavailable, setupErr.Error(), "channel_admission_failed")
+				return
+			}
 		}
 		c.Next()
 		if channel != nil && c.Writer != nil && c.Writer.Status() < http.StatusBadRequest {
@@ -586,8 +609,17 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	// mere input alias.
 	if !channel.PoolChannelBound() {
 		if err := channel.CheckPoolModelRoute(modelName); err != nil {
-			logPoolAdmissionDecision(c, channel, modelName, err)
-			return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+			// A chain with allow_cross_source_failover explicitly authorizes
+			// pool→api transitions for its candidates (design §2.8): the
+			// blanket source isolation is relaxed ONLY for chain-routed
+			// requests whose snapshot carries the operator's cross-source
+			// permission. Legacy requests and same-source chains stay
+			// fail-closed, and the pool-side gates above remain untouched.
+			if !routechain.CrossSourceChainActive(c) {
+				logPoolAdmissionDecision(c, channel, modelName, err)
+				return types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
+			}
+			logger.LogWarn(c, fmt.Sprintf("route_chain subsystem=engine event=cross_source_admission_relaxed channel_id=%d model=%q reason=%q", channel.Id, modelName, err.Error()))
 		}
 	}
 	// Pool channels additionally need the master switch, channel routing
@@ -728,4 +760,29 @@ func extractModelNameFromGeminiPath(path string) string {
 
 	// 返回模型名部分
 	return path[startIndex : startIndex+colonIndex]
+}
+
+// routeChainEligibleRequest scopes the Route Chain to the ordinary HTTP
+// relay loop (design §2.3 v1 transport scope): POST requests heading for
+// controller.Relay. WebSocket transports (Responses WS, realtime), Midjourney,
+// and async task/video/plugin endpoints stay out of scope — the task path
+// additionally carries the pre-existing PG-06 deviation recorded in the
+// design (§2.18) and must never enter the chain.
+func routeChainEligibleRequest(c *gin.Context) bool {
+	if c.Request.Method != http.MethodPost {
+		return false
+	}
+	path := c.Request.URL.Path
+	if strings.Contains(path, "/mj/") {
+		return false
+	}
+	for _, prefix := range []string{"/v1/tasks", "/v1/video", "/v1/videos"} {
+		if strings.HasPrefix(path, prefix) {
+			return false
+		}
+	}
+	if _, pinned := c.Get(jsplugin.ContextKeyPinnedPlugin); pinned {
+		return false
+	}
+	return true
 }

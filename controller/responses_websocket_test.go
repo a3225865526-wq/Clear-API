@@ -1045,7 +1045,10 @@ func TestResponsesHTTPHealthCountsFinalResult(t *testing.T) {
 	}{
 		{"business rejection", "context_length_exceeded", 400, 1, false, true},
 		{"credentials rejected as 400", "invalid_api_key", 400, 1, false, false},
-		{"retry succeeds", "server_error", 500, 2, true, false},
+		// The HTTP upstream has already received the request when it returns a
+		// response error. Usage is therefore unknown and retrying would replay
+		// an ambiguous request. The retry contract requires a terminal result.
+		{"dispatch failure is terminal", "server_error", 500, 1, false, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			fixture := newResponsesWSBillingTest(t, `tier("request", fixed(0.002))`, func(*websocket.Conn, *http.Request) {})

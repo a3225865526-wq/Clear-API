@@ -19,6 +19,8 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/accountpool"
+	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -334,6 +336,9 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, err
 	}
 	applyHeaderOverrideToRequest(req, headerOverride)
+	if err := accountpool.ApplyPG03Policy(c, req); err != nil {
+		return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+	}
 	resp, err := doRequest(c, req, info)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
@@ -582,10 +587,15 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	}
 
 	financeAttempt := service.BeginFinanceAttempt(c, info)
+	// Stage 4 ledger: mark the coarse connecting phase at the transport
+	// entry, and the dispatched phase at the WroteRequest fence (the same
+	// evidence point the dispatch fence uses).
+	routechain.NoteAttemptConnecting(c)
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), &httptrace.ClientTrace{
 		WroteRequest: func(wrote httptrace.WroteRequestInfo) {
 			if wrote.Err == nil {
 				c.Set("upstream_attempted", true)
+				routechain.NoteAttemptDispatched(c)
 			}
 		},
 	}))
@@ -625,6 +635,14 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	}
 	if upID := resp.Header.Get(common2.RequestIdKey); upID != "" {
 		c.Set(common2.UpstreamRequestIdKey, upID)
+	}
+	// Stage 5: capture the raw Retry-After on a 429 for the route chain
+	// breaker's bounded cooldown (§十七). The value is parsed — never
+	// trusted — at the report site; non-429 responses never read it.
+	if resp.StatusCode == http.StatusTooManyRequests {
+		if retryAfter := resp.Header.Get("Retry-After"); retryAfter != "" {
+			c.Set(routechain.UpstreamRetryAfterKey, retryAfter)
+		}
 	}
 
 	_ = req.Body.Close()
