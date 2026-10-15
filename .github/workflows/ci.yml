@@ -20,6 +20,28 @@ jobs:
     timeout-minutes: 15
     env:
       GOWORK: 'off'
+      BOOTSTRAP_TEST_MYSQL_DSN: root:ci-test@tcp(127.0.0.1:3306)/bootstrap_test?charset=utf8mb4&parseTime=True&loc=Local
+      BOOTSTRAP_TEST_PG_DSN: postgres://postgres:ci-test@127.0.0.1:5432/postgres?sslmode=disable
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-test
+          MYSQL_DATABASE: bootstrap_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pci-test"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_PASSWORD: ci-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 20
 
     steps:
       - name: Checkout

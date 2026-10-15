@@ -22,6 +22,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type responsesTestBilling struct{}
+
+func (responsesTestBilling) Settle(int) error { return nil }
+func (responsesTestBilling) Refund(*gin.Context) {}
+func (responsesTestBilling) NeedsRefund() bool { return false }
+func (responsesTestBilling) GetPreConsumedQuota() int { return 0 }
+func (responsesTestBilling) Reserve(int) error { return nil }
+
 func TestPrepareResponsesRequestRetainsConvertedAdaptor(t *testing.T) {
 	type capturedRequest struct {
 		path string
@@ -54,6 +62,7 @@ func TestPrepareResponsesRequestRetainsConvertedAdaptor(t *testing.T) {
 	})
 	request := &dto.OpenAIResponsesRequest{Model: "gpt-4o", Input: []byte(`"hello"`)}
 	info := relaycommon.GenRelayInfoResponses(c, request)
+	info.Billing = responsesTestBilling{}
 	adaptor, body, closer, apiErr := PrepareResponsesRequest(c, info, request)
 	require.Nil(t, apiErr)
 	defer closer.Close()
