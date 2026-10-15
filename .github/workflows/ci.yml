@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend vet, build, and test
+    name: Backend vet, build, test, migration binaries
     if: github.event.action != 'closed' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -109,3 +109,19 @@ jobs:
 
       - name: Test
         run: bun run test
+
+  secret-scan:
+    name: Secret scan and forbidden files
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Scan tracked files for secrets and forbidden artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! git ls-files | grep -E '(^|/)(\.env|.*\.pem|.*\.key)$'
+          ! git grep -n -I -E '(ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|-----BEGIN [A-Z ]+ PRIVATE KEY-----)' -- . ':!*.md'
