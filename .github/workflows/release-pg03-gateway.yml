@@ -1,17 +1,18 @@
-name: PG03 exact Gateway RC
+name: PG03 reviewed main Gateway RC
 
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: pg03-exact-gateway-rc
   cancel-in-progress: false
 
 env:
-  SOURCE_COMMIT: fd98c9aad0374581e46e5ba13bcf18ec96046559
+  SOURCE_COMMIT: ${{ github.sha }}
   GHCR_IMAGE: ghcr.io/a3225865526-wq/clearapi
 
 jobs:
@@ -20,12 +21,33 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      actions: read
       packages: write
     steps:
+      - name: Require main and successful CI for this source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == refs/heads/main ]]
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          [[ "$SOURCE_COMMIT" == "$MAIN_SHA" ]]
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml \
+            --commit "$SOURCE_COMMIT" --event push --limit 20 \
+            --json databaseId,headSha,status,conclusion > /tmp/source-ci.json
+          python3 - <<'PY'
+          import json, os
+          runs = json.load(open('/tmp/source-ci.json'))
+          assert any(r['headSha'] == os.environ['SOURCE_COMMIT']
+                     and r['status'] == 'completed' and r['conclusion'] == 'success'
+                     for r in runs), 'main source has no successful push CI run'
+          PY
+
       - name: Checkout exact PG03 source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: fd98c9aad0374581e46e5ba13bcf18ec96046559
+          ref: ${{ github.sha }}
           path: source
           persist-credentials: false
 
@@ -36,16 +58,18 @@ jobs:
           [[ "$(git -C source rev-parse HEAD)" == "$SOURCE_COMMIT" ]]
           [[ -z "$(git -C source status --porcelain)" ]]
           test -f source/service/accountpool/policy_snapshot.go
+          test -f source/service/routechain/ledger.go
+          test -f source/model/route_chain_ledger.go
           grep -q 'FreezePG03Policy' source/relay/responses_request.go
           grep -q 'ApplyPG03Policy' source/relay/channel/api_request.go
           grep -q 'hmac.New(sha256.New' source/service/accountpool/policy_snapshot.go
           echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
-          echo "LOCAL_TAG=$GHCR_IMAGE:pg03-fd98c9-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+          echo "LOCAL_TAG=$GHCR_IMAGE:pg03-${SOURCE_COMMIT:0:12}-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
 
       - name: Set up Go for targeted source tests
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
-          go-version: '1.26.1'
+          go-version-file: source/go.mod
           cache: false
 
       - name: Account pool source tests
@@ -60,7 +84,7 @@ jobs:
           trap 'rm -f web/dist/index.html; rmdir web/dist 2>/dev/null || true' EXIT
           mkdir -p web/dist
           printf 'CI test-only embed placeholder\n' > web/dist/index.html
-          go test -count=1 ./service/accountpool
+          go test -count=1 ./service/accountpool ./service/routechain
 
       - name: Confirm build context remains exact
         shell: bash
@@ -83,10 +107,15 @@ jobs:
           provenance: false
           sbom: false
           tags: ${{ env.LOCAL_TAG }}
+          build-args: |
+            SOURCE_COMMIT=${{ env.SOURCE_COMMIT }}
+            SOURCE_REPO=https://github.com/a3225865526-wq/Clear-API
+            BUILD_TIMESTAMP=${{ env.BUILD_DATE }}
+            VERSION_LABEL=pg03-rc-${{ env.SOURCE_COMMIT }}
           labels: |
             org.opencontainers.image.revision=${{ env.SOURCE_COMMIT }}
             org.opencontainers.image.source=https://github.com/a3225865526-wq/Clear-API
-            org.opencontainers.image.version=pg03-rc-fd98c9
+            org.opencontainers.image.version=pg03-rc-${{ env.SOURCE_COMMIT }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
 
       - name: Extract final binary identity without starting Gateway
@@ -107,11 +136,13 @@ jobs:
           assert c['Os']=='linux' and c['Architecture']=='amd64'
           assert c['Config']['Labels']['org.opencontainers.image.revision']==os.environ['SOURCE_COMMIT']
           assert c['Config']['Labels']['org.opencontainers.image.source']=='https://github.com/a3225865526-wq/Clear-API'
+          assert c['Config']['Entrypoint'] == ['/new-api']
           with tarfile.open('release/rootfs.tar') as t:
               paths={m.name.lstrip('./') for m in t.getmembers()}
           required=['entrypoint-secure.sh','production-bootstrap','finance-migrate','billing-migrate']
           with open('release/missing-deployment-binaries.json','w') as f:
               json.dump([p for p in required if p not in paths],f)
+          assert all(p in paths for p in required), 'deployment binaries missing; refusing publication'
           PY
           rm release/rootfs.tar
 
@@ -150,6 +181,7 @@ jobs:
           labels=published['Config']['Labels']
           assert labels['org.opencontainers.image.revision']==e['SOURCE_COMMIT']
           missing=json.load(open('release/missing-deployment-binaries.json'))
+          assert not missing
           manifest={
               'schema_version':1,'component':'gateway',
               'source_commit':e['SOURCE_COMMIT'],'candidate_commit':e['SOURCE_COMMIT'],
@@ -165,7 +197,9 @@ jobs:
               'workflow_run_url':e['GITHUB_SERVER_URL']+'/'+e['GITHUB_REPOSITORY']+'/actions/runs/'+e['GITHUB_RUN_ID'],
               'created_at':e['BUILD_DATE'],
               'runtime_identity':{'image_id':published['Id'],'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip()},
-              'verification':{'source_commit':'passed','targeted_accountpool_tests':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
+              'source_ci_runs':json.load(open('/tmp/source-ci.json')),
+              'wrapper_sha256':hashlib.sha256(pathlib.Path('source/scripts/production-deploy.sh').read_bytes()).hexdigest(),
+              'verification':{'source_commit':'passed','targeted_accountpool_routechain_tests':'passed','deployment_binaries':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
               'deployment_compatible':not missing,'missing_deployment_binaries':missing,
               'production_ready':False,'production_acceptance':'not_run',
               'sbom':None,'provenance':None
