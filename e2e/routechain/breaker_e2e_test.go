@@ -147,13 +147,13 @@ func TestE2EBreakerHalfOpenProbeFailureReopens(t *testing.T) {
 	h.addChannel(21, mockA.srv.URL, "")
 	h.addChannel(22, mockB.srv.URL, "")
 	h.setChain(t, false, []model.RouteChainCandidate{
-		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 21, Policy: `{"health_policy":{"failure_threshold":1,"cooldown_seconds":1}}`},
+		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 21, Policy: `{"health_policy":{"failure_threshold":1,"cooldown_seconds":5}}`},
 		{CandidateType: model.RouteChainCandidateTypeAPIChannel, TargetId: 22},
 	})
 
 	status, _, _ := h.postChat(t, e2eModel, "", false)
 	require.NotEqual(t, http.StatusOK, status)
-	time.Sleep(1100 * time.Millisecond)
+	time.Sleep(5100 * time.Millisecond)
 
 	// The probe fails again → back OPEN, no failover for this request (§六).
 	status, body, _ := h.postChat(t, e2eModel, "", false)
@@ -162,7 +162,7 @@ func TestE2EBreakerHalfOpenProbeFailureReopens(t *testing.T) {
 	require.Equal(t, 2, mockA.count())
 	require.Eventually(t, func() bool {
 		snapshot := routechain.Breaker.CandidateSnapshot(1, 1, nil)
-		// Open or half_open both prove the reopen — a 1s cooldown can lazily
+		// Open or half_open both prove the reopen — a 5s cooldown can lazily
 		// flip to half_open while this poll runs.
 		return snapshot.State != routechain.CircuitStateClosed && snapshot.Counters["circuit_open_total"] == 2
 	}, 3*time.Second, 10*time.Millisecond, "half-open probe failure reopened the circuit")
