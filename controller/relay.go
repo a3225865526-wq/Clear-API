@@ -583,6 +583,9 @@ func RelayTaskFetch(c *gin.Context) {
 		})
 		return
 	}
+	if relayInfo.RelayMode == relayconstant.RelayModeUnknown {
+		relayInfo.RelayMode = relayconstant.RelayModeVideoFetchByID
+	}
 	if taskErr := relay.RelayTaskFetch(c, relayInfo.RelayMode); taskErr != nil {
 		respondTaskError(c, taskErr)
 	}

@@ -25,9 +25,10 @@ func SetVideoRouter(router *gin.Engine) {
 
 	videoV1Router := router.Group("/v1")
 	videoV1Router.Use(middleware.RouteTag("relay"))
-	videoV1Router.Use(middleware.TokenAuth(), relayConcurrencyLimit, middleware.Distribute())
-	{
-		videoV1Router.GET("/video/generations/:task_id", controller.RelayTaskFetch)
-		videoV1Router.POST("/videos/:video_id/remix", controller.RelayTask)
-	}
+	videoV1Router.Use(middleware.TokenAuth(), relayConcurrencyLimit)
+	// Fetching an existing task is a read-only lookup and has no model request
+	// to distribute. Remix creates a new upstream request and still requires
+	// normal channel admission.
+	videoV1Router.GET("/video/generations/:task_id", controller.RelayTaskFetch)
+	videoV1Router.POST("/videos/:video_id/remix", middleware.Distribute(), controller.RelayTask)
 }

@@ -27,11 +27,14 @@ func TestGetOpenAIVideoRouteRendersJimengTask(t *testing.T) {
 	previousRedisEnabled := common.RedisEnabled
 	common.SQLitePath = t.TempDir() + "/router-video.db"
 	common.IsMasterNode = false
+	previousMemoryCache := common.MemoryCacheEnabled
+	common.MemoryCacheEnabled = true
+	t.Cleanup(func() { common.MemoryCacheEnabled = previousMemoryCache })
 	common.RedisEnabled = false
 	t.Setenv("SQL_DSN", "")
 	require.NoError(t, model.InitDB())
 	database := model.DB
-	require.NoError(t, database.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}, &model.Task{}))
+	require.NoError(t, database.AutoMigrate(&model.User{}, &model.Token{}, &model.Channel{}, &model.Ability{}, &model.Task{}))
 	t.Cleanup(func() {
 		sqlDB, closeErr := database.DB()
 		require.NoError(t, closeErr)
@@ -70,6 +73,10 @@ func TestGetOpenAIVideoRouteRendersJimengTask(t *testing.T) {
 		Models: "jimeng_vgfm_t2v_l20",
 		Group:  "default",
 	}).Error)
+	require.NoError(t, database.Create(&model.Ability{ChannelId: 17, Model: "jimeng_vgfm_t2v_l20", Group: "default", Enabled: true}).Error)
+	model.InitChannelCache()
+	_, cacheErr := model.CacheGetChannel(17)
+	require.NoError(t, cacheErr)
 
 	task := &model.Task{
 		CreatedAt: 1710000000,

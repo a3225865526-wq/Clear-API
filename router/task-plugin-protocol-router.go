@@ -51,7 +51,8 @@ func taskPluginProtocolHandlers(protocol, operation string) ([]gin.HandlerFunc, 
 	case "openai_responses.retrieve":
 		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, controller.RetrieveTaskPluginResponse}, nil
 	case "openai_video.retrieve":
-		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, middleware.Distribute(), controller.RelayTaskFetch}, nil
+		// Retrieval reads an existing task and has no model request to admit.
+		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, controller.RelayTaskFetch}, nil
 	case "openai_video.content":
 		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, controller.VideoProxy}, nil
 	default:
