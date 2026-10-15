@@ -1,3 +1,6 @@
+# Historical frozen-baseline record only; NOT an active CI exemption.
+# Strict CI and RC no longer consume these entries. The compatibility runner
+# now propagates every test failure. Do not restore fail-open behavior.
 # Known frozen-baseline test failures — PRODUCTION CI/CD ACCEPTANCE spec §11.
 #
 # CI must distinguish "known baseline issue" from "new regression": any test

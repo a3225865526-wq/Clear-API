@@ -1,0 +1,181 @@
+name: Release validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  race:
+    name: Race — billing/reservation critical packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GOWORK: 'off'
+      CGO_ENABLED: '1'
+      BOOTSTRAP_TEST_PG_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/postgres?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Create frontend embed placeholder
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Race test critical packages (baseline-aware)
+        env:
+          GOFLAGS: -p=2
+        run: go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/...
+
+      - name: Race test controller serially (SQLite concurrency contention)
+        env:
+          GOFLAGS: -p=1
+        run: go test -race -count=1 ./controller/...
+
+      - name: Race test production-bootstrap serially (stdout capture is process-global)
+        env:
+          GOFLAGS: -p=1
+        run: go test -race -count=1 ./cmd/production-bootstrap/...
+
+  db-matrix:
+    name: DB matrix — ${{ matrix.dialect }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dialect: sqlite
+          - dialect: mysql
+          - dialect: postgres
+
+    services:
+      mysql:
+        image: mysql:8.4.6@sha256:c296d65ee6ab3ce2f608c1d1b2bdd3c08b087a5834101d76a6db2e00875216cc
+        env:
+          MYSQL_ROOT_PASSWORD: clearapi_test
+          MYSQL_USER: clearapi
+          MYSQL_PASSWORD: clearapi_test
+          MYSQL_DATABASE: clearapi_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u clearapi -pclearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: clearapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi -d clearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GOWORK: 'off'
+      TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
+      TEST_SERVICE_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_service_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_SERVICE_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_service_test?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Create frontend embed placeholder
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Select dialect env (sqlite default; explicit DSN for mysql/postgres)
+        run: |
+          case "${{ matrix.dialect }}" in
+            sqlite)   echo 'TEST_BILLING_DIALECT=sqlite' >> "$GITHUB_ENV" ;;
+            mysql)    echo 'TEST_BILLING_DIALECT=mysql'  >> "$GITHUB_ENV"
+                      echo "TEST_BILLING_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_TASK_LOG_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_SERVICE_DSN=$TEST_SERVICE_MYSQL_DSN" >> "$GITHUB_ENV" ;;
+            postgres) echo 'TEST_BILLING_DIALECT=postgres' >> "$GITHUB_ENV"
+                      echo "TEST_BILLING_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_TASK_LOG_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_SERVICE_DSN=$TEST_SERVICE_POSTGRES_DSN" >> "$GITHUB_ENV" ;;
+            *) echo "unknown dialect"; exit 1 ;;
+          esac
+
+      - name: Provision isolated service-package database (${{ matrix.dialect }})
+        if: matrix.dialect != 'sqlite'
+        run: |
+          case "${{ matrix.dialect }}" in
+            mysql)
+              mysql --host 127.0.0.1 --port 3306 --user root --password=clearapi_test \
+                -e "CREATE DATABASE IF NOT EXISTS clearapi_service_test; GRANT ALL PRIVILEGES ON clearapi_service_test.* TO 'clearapi'@'%'; FLUSH PRIVILEGES;"
+              ;;
+            postgres)
+              if ! PGPASSWORD=clearapi_test psql --host 127.0.0.1 --username clearapi --dbname clearapi_test --tuples-only \
+                   --command "SELECT 1 FROM pg_database WHERE datname = 'clearapi_service_test'" | grep -q 1; then
+                PGPASSWORD=clearapi_test psql --host 127.0.0.1 --username clearapi --dbname clearapi_test \
+                  --command "CREATE DATABASE clearapi_service_test"
+              fi
+              ;;
+          esac
+
+      - name: Test model-side billing-critical packages against ${{ matrix.dialect }}
+        run: go test -count=1 ./pkg/billingexpr/... ./model/... ./setting/...
+
+      - name: Test service package against isolated ${{ matrix.dialect }} database
+        env:
+          TEST_BILLING_DSN: ${{ env.TEST_SERVICE_DSN || '' }}
+          TEST_TASK_LOG_DSN: ${{ env.TEST_SERVICE_DSN || '' }}
+        run: go test -count=1 ./service/...
+
+
+      - name: Gateway Route Chain mock-provider and usage billing acceptance
+        if: matrix.dialect == 'sqlite'
+        run: go test -count=1 ./e2e/routechain/...

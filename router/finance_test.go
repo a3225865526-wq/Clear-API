@@ -212,7 +212,7 @@ func TestFinanceStageOne(t *testing.T) {
 		}
 	})
 	t.Run("cost input output cache and unknown usage", func(t *testing.T) {
-		prices := []service.FinanceUnitPrice{{"input", "token", "1000000", "2"}, {"output", "token", "1000000", "8"}, {"cache_read", "token", "1000000", "0.5"}, {"cache_write_5m", "token", "1000000", "3"}}
+		prices := []service.FinanceUnitPrice{{Meter: "input", Unit: "token", Per: "1000000", Price: "2"}, {Meter: "output", Unit: "token", Per: "1000000", Price: "8"}, {Meter: "cache_read", Unit: "token", Per: "1000000", Price: "0.5"}, {Meter: "cache_write_5m", Unit: "token", Per: "1000000", Price: "3"}}
 		rule := service.FinanceCostRule{ChannelID: 10, UpstreamModel: "executed-model", Currency: "USD", Prices: prices}
 		payload, err := common.Marshal(rule)
 		require.NoError(t, err)

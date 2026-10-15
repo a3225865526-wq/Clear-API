@@ -978,6 +978,8 @@ else: sys.exit('Forbidden docker operation')
             (self.root / name).symlink_to(fake)
         env = dict(self.env, TEST_ROOT=str(self.root), TEST_FAILURE=failure,
                    GH_PULL_TOKEN=payload, PROD_SSH_ALIAS="fixture-vps",
+                   RELEASE_DIGEST=DIGEST, RELEASE_COMMIT=COMMIT,
+                   RELEASE_MIGRATION="true" if compatible else "false",
                    GHCR_PULL_TOKEN="must-not-be-exported",
                    TMPDIR=str(self.root))
         result = subprocess.run(["bash", "-c", block], env=env, capture_output=True,

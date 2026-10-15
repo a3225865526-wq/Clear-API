@@ -1,6 +1,12 @@
 name: Deploy Production
 
 on:
+  workflow_call:
+    inputs:
+      rehearsal_run_id:
+        description: 'Rehearsal run whose authenticated release proof authorizes this deployment'
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       image_digest:
@@ -26,6 +32,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   # packages: read lets the job's short-lived GITHUB_TOKEN pull the private
   # GHCR candidate on the VPS. It grants no write access to any package.
   packages: read
@@ -35,7 +42,67 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  authorize:
+    name: Validate release authorization before production credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      image_digest: ${{ steps.release.outputs.image_digest }}
+      expected_commit: ${{ steps.release.outputs.expected_commit }}
+      migration_compatible: ${{ steps.release.outputs.migration_compatible }}
+      previous_source_commit: ${{ steps.release.outputs.previous_source_commit }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Authenticate automatic proof or explicit manual inputs
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REHEARSAL_RUN_ID: ${{ inputs.rehearsal_run_id }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          AUTO_ENABLED: ${{ vars.CLEARAPI_AUTO_PRODUCTION_ENABLED }}
+          CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
+          INPUT_DIGEST: ${{ inputs.image_digest }}
+          INPUT_COMMIT: ${{ inputs.expected_commit }}
+          INPUT_MIGRATION: ${{ inputs.migration_compatible }}
+          INPUT_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = a3225865526-wq/Clear-API
+          test "$GITHUB_REF" = refs/heads/main
+          if [ -n "$REHEARSAL_RUN_ID" ]; then
+            test "$AUTO_ENABLED" = true
+            test "$GITHUB_EVENT_NAME" = workflow_run
+            test "$REHEARSAL_RUN_ID" = "$TRIGGER_RUN_ID"
+            python3 scripts/ci/automatic-release.py authorize --destination "$RUNNER_TEMP/verified-release-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" 2>&1 | tee "$RUNNER_TEMP/release-authorization.log"
+          else
+            test "$GITHUB_EVENT_NAME" = workflow_dispatch
+            test "$INPUT_CONFIRMATION" = DEPLOY_PRODUCTION
+            [[ "$INPUT_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+            test "$INPUT_COMMIT" = "$GITHUB_SHA"
+            [[ "$INPUT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+            case "$INPUT_MIGRATION" in true|false) ;; *) exit 1 ;; esac
+            echo "image_digest=$INPUT_DIGEST" >> "$GITHUB_OUTPUT"
+            echo "expected_commit=$INPUT_COMMIT" >> "$GITHUB_OUTPUT"
+            echo "migration_compatible=$INPUT_MIGRATION" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Preserve authorization evidence
+        if: always() && inputs.rehearsal_run_id != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-authorization-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-authorization.log
+          if-no-files-found: error
+
+      - name: Report a blocked release
+        if: failure()
+        run: |
+          echo 'Release BLOCKED. Production credentials were not requested. Review the authorization evidence; automatic retry is forbidden.' >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
+    needs: authorize
     name: Controlled production deploy (exact digest)
     runs-on: ubuntu-latest
     environment: production
@@ -46,36 +113,33 @@ jobs:
       PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
       PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
       PROD_SSH_ALIAS: clearapi-vps
+      RELEASE_DIGEST: ${{ needs.authorize.outputs.image_digest }}
+      RELEASE_COMMIT: ${{ needs.authorize.outputs.expected_commit }}
+      RELEASE_MIGRATION: ${{ needs.authorize.outputs.migration_compatible }}
+      PREVIOUS_COMMIT: ${{ needs.authorize.outputs.previous_source_commit }}
 
     steps:
       - name: Checkout deploy assets
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ needs.authorize.outputs.expected_commit }}
           persist-credentials: false
 
-      - name: Validate manual gate inputs
+      - name: Validate authorized immutable release inputs
         run: |
           set -euo pipefail
-          if [ "${{ inputs.confirmation }}" != "DEPLOY_PRODUCTION" ]; then
-            echo "confirmation input does not match DEPLOY_PRODUCTION — refusing to deploy"
-            exit 1
-          fi
-          if [ ! "${{ inputs.expected_commit }}" =~ ^[0-9a-f]{40}$ ]; then
-            echo "expected_commit is not a full 40-hex commit SHA"
-            exit 1
-          fi
-          if [ "${{ inputs.expected_commit }}" != "${{ github.sha }}" ]; then
-            echo "expected_commit '${{ inputs.expected_commit }}' does not match the workflow's own commit '${{ github.sha }}'"
-            exit 1
-          fi
-          if [ ! "${{ inputs.image_digest }}" =~ ^sha256:[a-f0-9]{64}$ ]; then
-            echo "image_digest must be an exact 'sha256:<64 hex>' digest — tags and 'latest' are forbidden"
-            exit 1
-          fi
-          case "${{ inputs.migration_compatible }}" in
-            true|false) ;;
-            *) echo "migration_compatible must be true or false"; exit 1 ;;
-          esac
+          [[ "$RELEASE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$RELEASE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          case "$RELEASE_MIGRATION" in true|false) ;; *) exit 1 ;; esac
+
+      - name: Recheck current main after any environment queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          test "$RELEASE_COMMIT" = "$MAIN_SHA"
 
       - name: Set up SSH with pinned host key
         env:
@@ -123,7 +187,7 @@ jobs:
           REMOTE_SHA="$(ssh "${PROD_SSH_ALIAS}" "sudo sha256sum /opt/clearapi/bin/production-deploy.sh | cut -d' ' -f1")"
           if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
             echo "deploy wrapper integrity check FAILED"
-            echo "  repo (${{ github.sha }}): $LOCAL_SHA"
+            echo "  repo (${RELEASE_COMMIT}): $LOCAL_SHA"
             echo "  VPS  /opt/clearapi/bin/production-deploy.sh: $REMOTE_SHA"
             echo "refusing to deploy; the installed wrapper is not the audited script for this commit"
             exit 1
@@ -135,6 +199,14 @@ jobs:
             echo 'runtime identity tool integrity FAILED'
             exit 1
           }
+
+      - name: Verify the exact rehearsed production predecessor
+        if: needs.authorize.outputs.previous_source_commit != ''
+        run: |
+          set -euo pipefail
+          [[ "$PREVIOUS_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          CURRENT_COMMIT=$(ssh "$PROD_SSH_ALIAS" "sudo python3 -c 'import json; print(json.load(open(\"/opt/clearapi/app/release-manifest.json\"))[\"releases\"][\"current\"][\"candidate_commit\"])'")
+          test "$CURRENT_COMMIT" = "$PREVIOUS_COMMIT"
 
       - name: Run controlled deploy on VPS
         env:
@@ -150,11 +222,16 @@ jobs:
           printf '%s\n' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
             "sudo /opt/clearapi/bin/production-deploy.sh \
               --ghcr-token-stdin \
-              --digest '${{ inputs.image_digest }}' \
-              --commit '${{ inputs.expected_commit }}' \
+              --digest '${RELEASE_DIGEST}' \
+              --commit '${RELEASE_COMMIT}' \
               --workflow-run '${{ github.run_id }}' \
-              --migration-compatible '${{ inputs.migration_compatible }}'"
+              --migration-compatible '${RELEASE_MIGRATION}'"
 
       - name: Clear deploy key material
         if: always()
         run: rm -f ~/.ssh/ci_deploy_key ~/.ssh/ci_known_hosts ~/.ssh/config
+
+      - name: Report deployment failure
+        if: failure()
+        run: |
+          echo 'Production deployment FAILED. Further automatic releases are blocked. Review Deploy V2 audit and rollback results; do not restore the database automatically.' >> "$GITHUB_STEP_SUMMARY"

@@ -54,6 +54,9 @@ func TestPrepareResponsesRequestRetainsConvertedAdaptor(t *testing.T) {
 	})
 	request := &dto.OpenAIResponsesRequest{Model: "gpt-4o", Input: []byte(`"hello"`)}
 	info := relaycommon.GenRelayInfoResponses(c, request)
+	// This adaptor contract test still passes through the real dispatch guard;
+	// provide the same bounded reservation fixture used by image adaptor tests.
+	info.Billing = &imageReservation{limit: 1 << 30}
 	adaptor, body, closer, apiErr := PrepareResponsesRequest(c, info, request)
 	require.Nil(t, apiErr)
 	defer closer.Close()

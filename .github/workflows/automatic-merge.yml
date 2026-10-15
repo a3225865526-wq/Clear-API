@@ -1,0 +1,73 @@
+name: Controlled automatic merge
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  checks: write
+
+concurrency:
+  group: automatic-merge-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  policy:
+    if: >-
+      vars.CLEARAPI_AUTO_MERGE_ENABLED == 'true' &&
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Never check out or execute PR code in this privileged workflow.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Create short-lived repository-scoped merge token
+        id: merge-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.CLEARAPI_MERGE_APP_ID }}
+          private-key: ${{ secrets.CLEARAPI_MERGE_APP_PRIVATE_KEY }}
+          owner: a3225865526-wq
+          repositories: Clear-API
+          permission-contents: write
+          permission-pull-requests: write
+          permission-administration: read
+          permission-actions: read
+      - name: Evaluate trusted main policy against current PR
+        id: policy
+        env:
+          GH_TOKEN: ${{ steps.merge-token.outputs.token }}
+        run: python3 scripts/ci/automatic-release.py pr
+      - name: Record the policy decision for this exact head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD: ${{ steps.policy.outputs.head }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/check-runs" \
+            -f name='Automatic merge policy' -f head_sha="$EXPECTED_HEAD" \
+            -f status=completed -f conclusion=success > /dev/null
+      - name: Merge the exact passing head through the protected merge API
+        env:
+          # The GitHub App token allows the resulting main push to trigger
+          # normal CI; it has no production secrets or protection bypass.
+          GH_TOKEN: ${{ steps.merge-token.outputs.token }}
+          PR_NUMBER: ${{ steps.policy.outputs.number }}
+          EXPECTED_HEAD: ${{ steps.policy.outputs.head }}
+        run: |
+          set -euo pipefail
+          test -n "$GH_TOKEN"
+          # Do not queue auto-merge: a queued authorization can survive a new
+          # sensitive commit. This operation succeeds now for the exact head
+          # or fails, while GitHub enforces every branch protection rule.
+          gh pr merge "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --squash --match-head-commit "$EXPECTED_HEAD"

@@ -1,0 +1,25 @@
+name: Automatic production release
+
+on:
+  workflow_run:
+    workflows: [Deployment rehearsal]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+jobs:
+  deploy:
+    if: >-
+      vars.CLEARAPI_AUTO_PRODUCTION_ENABLED == 'true' &&
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.event.workflow_run.event == 'workflow_run' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success'
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      rehearsal_run_id: ${{ format('{0}', github.event.workflow_run.id) }}
+    secrets: inherit

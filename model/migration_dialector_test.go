@@ -3,6 +3,7 @@ package model
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -83,6 +84,50 @@ func TestMigrationSchemaStability(t *testing.T) {
 			t.Cleanup(func() { _ = sqlDB.Close() })
 			recorder := &migrationSQLRecorder{}
 			db = db.Session(&gorm.Session{Logger: recorder})
+
+			t.Run("billing_auth_snapshot_tag_compatibility", func(t *testing.T) {
+				// Reconstruct the exact pre-fix tag spacing from main 0406a48a.
+				// Both GORM and JSON must retain the existing schema and wire contract.
+				current := reflect.TypeFor[BillingAuthSnapshot]()
+				fields := make([]reflect.StructField, current.NumField())
+				for i := range current.NumField() {
+					fields[i] = current.Field(i)
+					fields[i].Tag = reflect.StructTag(strings.ReplaceAll(string(fields[i].Tag), `" json:`, `"json:`))
+				}
+				legacy := reflect.New(reflect.StructOf(fields)).Interface()
+				for _, mode := range []string{"fresh", "upgrade"} {
+					t.Run(mode, func(t *testing.T) {
+						table := "migration_billing_auth_" + mode
+						t.Cleanup(func() { _ = db.Migrator().DropTable(table) })
+						tableDB := db.Table(table)
+						if mode == "upgrade" {
+							require.NoError(t, tableDB.AutoMigrate(legacy))
+						} else {
+							require.NoError(t, tableDB.AutoMigrate(&BillingAuthSnapshot{}))
+						}
+						row := BillingAuthSnapshot{RequestID: "preserved", Mode: "enforce", EstimatorVersion: "v1", ProfileSource: "fixture", CacheMode: "disabled", PricingMode: "tiered_expr", PricingFingerprint: "fingerprint", RequiredQuota: 52}
+						require.NoError(t, tableDB.Create(&row).Error)
+						for range 2 {
+							recorder.reset()
+							require.NoError(t, tableDB.AutoMigrate(&BillingAuthSnapshot{}))
+							assert.Empty(t, recorder.schemaMutations())
+						}
+						var preserved BillingAuthSnapshot
+						require.NoError(t, tableDB.First(&preserved, row.ID).Error)
+						assert.Equal(t, row, preserved)
+						duplicate := row
+						duplicate.ID = 0
+						assert.Error(t, tableDB.Create(&duplicate).Error, "request identity must remain unique")
+						before := reflect.ValueOf(legacy).Elem()
+						before.Set(reflect.ValueOf(row).Convert(before.Type()))
+						oldJSON, err := common.Marshal(legacy)
+						require.NoError(t, err)
+						newJSON, err := common.Marshal(row)
+						require.NoError(t, err)
+						assert.JSONEq(t, string(oldJSON), string(newJSON))
+					})
+				}
+			})
 
 			t.Run("balance_transaction_metadata", func(t *testing.T) {
 				const table = "migration_balance_transactions"

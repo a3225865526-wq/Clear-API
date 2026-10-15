@@ -17,14 +17,14 @@ type BillingAuthSnapshot struct {
 	ID                    int64
 	RequestID             string  `gorm:"type:varchar(128);uniqueIndex:idx_billing_auth_request_id"`
 	PolicyVersion         int     `json:"policy_version"`
-	Mode                  string  `gorm:"type:varchar(16)"json:"mode"`
-	EstimatorVersion      string  `gorm:"type:varchar(32)"json:"estimator_version"`
-	ProfileSource         string  `gorm:"type:varchar(255)"json:"profile_source"`
+	Mode                  string  `gorm:"type:varchar(16)" json:"mode"`
+	EstimatorVersion      string  `gorm:"type:varchar(32)" json:"estimator_version"`
+	ProfileSource         string  `gorm:"type:varchar(255)" json:"profile_source"`
 	ProfileVersion        int     `json:"profile_version"`
 	ProfileApproved       bool    `json:"profile_approved"`
-	CacheMode             string  `gorm:"type:varchar(16)"json:"cache_mode"`
-	PricingMode           string  `gorm:"type:varchar(24)"json:"pricing_mode"`
-	PricingFingerprint    string  `gorm:"type:varchar(80)"json:"pricing_fingerprint"`
+	CacheMode             string  `gorm:"type:varchar(16)" json:"cache_mode"`
+	PricingMode           string  `gorm:"type:varchar(24)" json:"pricing_mode"`
+	PricingFingerprint    string  `gorm:"type:varchar(80)" json:"pricing_fingerprint"`
 	GroupRatio            float64 `json:"group_ratio"`
 	QuotaPerUnit          float64 `json:"quota_per_unit"`
 	Margin                float64 `json:"margin"`

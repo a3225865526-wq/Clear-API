@@ -2,6 +2,10 @@ name: PG03 reviewed main Gateway RC
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: read
@@ -12,11 +16,18 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SOURCE_COMMIT: ${{ github.sha }}
+  SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
   GHCR_IMAGE: ghcr.io/a3225865526-wq/clearapi
 
 jobs:
   release:
+    if: >-
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (vars.CLEARAPI_AUTO_RC_ENABLED == 'true' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -47,9 +58,15 @@ jobs:
       - name: Checkout exact PG03 source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.SOURCE_COMMIT }}
           path: source
           persist-credentials: false
+
+      - name: Verify automatic source CI, including release qualification
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 source/scripts/ci/automatic-release.py source
 
       - name: Confirm exact source and PG03 wiring
         shell: bash
@@ -146,6 +163,14 @@ jobs:
           PY
           rm release/rootfs.tar
 
+      - name: Recheck current main immediately before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          test "$SOURCE_COMMIT" = "$MAIN_SHA"
+
       - name: Login to GHCR
         uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
         with:
@@ -206,6 +231,8 @@ jobs:
           }
           with open('release/gateway-image-release.json','w') as f:
               json.dump(manifest,f,indent=2);f.write('\n')
+          with open('release/artifact-hashes.json','w') as f:
+              json.dump({name:hashlib.sha256(pathlib.Path('release',name).read_bytes()).hexdigest() for name in ['gateway-image-release.json','binary-build-info.txt']},f,indent=2)
           with open(e['GITHUB_STEP_SUMMARY'],'a') as f:
               f.write('## PG03 exact Gateway RC\n\n```json\n'+json.dumps(manifest,indent=2)+'\n```\n')
           PY
@@ -217,4 +244,5 @@ jobs:
           path: |
             release/gateway-image-release.json
             release/binary-build-info.txt
+            release/artifact-hashes.json
           if-no-files-found: error

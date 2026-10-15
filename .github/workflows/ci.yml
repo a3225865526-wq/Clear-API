@@ -19,7 +19,7 @@ jobs:
   backend:
     name: Backend vet, build, test, migration binaries
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       GOWORK: 'off'
 
@@ -42,11 +42,11 @@ jobs:
           mkdir -p web/dist
           touch web/dist/index.html
 
-      # go vet is intentionally absent: the frozen 603b217 baseline is not
-      # vet-clean (pre-existing struct-tag / unkeyed-field findings in
-      # business code), and the acceptance spec requires tests + build
-      # validation, not vet. Fixing the findings would violate the
-      # zero-business-change constraint.
+      - name: Vet both Go modules without exemptions
+        run: |
+          go vet ./...
+          (cd relaykit && GOWORK=off go vet ./...)
+
       - name: Build root module
         run: go build ./...
 
@@ -64,12 +64,12 @@ jobs:
             exit 1
           }
 
-      - name: Test root and relaykit modules (baseline-aware)
+      - name: Test root and relaykit modules without exemptions
         # -p=2: the 2-vCPU runner starves SQLite-backed concurrency tests
         # when every package runs in parallel (SQLITE_BUSY flakes).
         env:
           GOFLAGS: -p=2
-        run: bash scripts/ci/go-test-baseline.sh make test
+        run: make test
 
   frontend:
     name: Frontend typecheck and test
@@ -97,9 +97,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # tsgo typecheck is intentionally absent: the frozen 603b217 baseline
-      # has a pre-existing TS6133 finding in a business test file; the
-      # production build path (rsbuild) does not run it either.
+      - name: Full frontend typecheck
+        run: bun run typecheck
+
       - name: Test
         run: bun run test
 
@@ -124,6 +124,7 @@ jobs:
 
       - name: Validate deployment wrapper modes
         run: |
+          python3 scripts/ci/test-automatic-release.py -v
           bash -n scripts/clearapi-install-approved-script.sh
           shellcheck --severity=warning scripts/clearapi-install-approved-script.sh
           (cd scripts && sha256sum --check runtime-identity-artifacts.sha256)
@@ -134,3 +135,7 @@ jobs:
           bash -n scripts/production-backup.sh
           shellcheck --severity=warning scripts/production-backup.sh
           python3 scripts/ci/test-backup-identity.py
+
+  qualification:
+    name: Release qualification
+    uses: ./.github/workflows/release-validation.yml
