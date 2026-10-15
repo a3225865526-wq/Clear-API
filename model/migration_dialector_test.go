@@ -84,6 +84,34 @@ func TestMigrationSchemaStability(t *testing.T) {
 			recorder := &migrationSQLRecorder{}
 			db = db.Session(&gorm.Session{Logger: recorder})
 
+			t.Run("balance_transaction_metadata", func(t *testing.T) {
+				const table = "migration_balance_transactions"
+				t.Cleanup(func() { _ = db.Migrator().DropTable(table) })
+				tableDB := db.Table(table).Session(&gorm.Session{})
+				if dialect != "mysql" {
+					type legacyBalanceTransaction struct {
+						BalanceTransaction
+						Metadata string `gorm:"type:text;default:''"`
+					}
+					require.NoError(t, tableDB.AutoMigrate(&legacyBalanceTransaction{}))
+				}
+				require.NoError(t, tableDB.AutoMigrate(&BalanceTransaction{}))
+				existing := BalanceTransaction{UserId: 7, AmountQuota: 100, BalanceBefore: 200, BalanceAfter: 300, Metadata: `{"code_tail":"1234"}`}
+				require.NoError(t, tableDB.Create(&existing).Error)
+				require.NoError(t, tableDB.AutoMigrate(&BalanceTransaction{}))
+				recorder.reset()
+				require.NoError(t, tableDB.AutoMigrate(&BalanceTransaction{}))
+				assert.Empty(t, recorder.schemaMutations())
+				var preserved BalanceTransaction
+				require.NoError(t, tableDB.First(&preserved, existing.Id).Error)
+				assert.Equal(t, existing, preserved)
+				empty := BalanceTransaction{UserId: 8}
+				require.NoError(t, tableDB.Create(&empty).Error)
+				var metadata string
+				require.NoError(t, tableDB.Where("id = ?", empty.Id).Pluck("metadata", &metadata).Error)
+				assert.Empty(t, metadata)
+			})
+
 			t.Run("identity_and_indexes", func(t *testing.T) {
 				const table = "migration_identity_test"
 				t.Cleanup(func() { _ = db.Migrator().DropTable(table) })
