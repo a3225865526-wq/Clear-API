@@ -1089,12 +1089,13 @@ CADDY_MD5="$(md5sum "$CADDYFILE" | cut -d' ' -f1)"
 systemctl is-active --quiet "$BACKUP_TIMER" || die "step 17: ${BACKUP_TIMER} not active after deploy"
 log "step 17: runtime negative gates PASS (env, binding, PG ports, network, pool, Caddyfile, backup timer)"
 
-# ===========================================================================
-# 18. billing invariants (read-only, least-privileged app role)
-# ===========================================================================
 if [ "$LAUNCH_BASELINE" = commercial ]; then
   verify_commercial_billing
 fi
+
+# ===========================================================================
+# 18. billing invariants (read-only, least-privileged app role)
+# ===========================================================================
 POLICY_MODE="$(psql_q "SELECT value FROM options WHERE key='${POLICY_MODE_KEY}';")"
 [ "$POLICY_MODE" = "enforce" ] || die "step 18: ${POLICY_MODE_KEY}='${POLICY_MODE}' expected 'enforce'"
 
