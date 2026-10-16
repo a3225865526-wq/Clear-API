@@ -114,7 +114,9 @@ jobs:
   secret-scan:
     name: Secret scan and forbidden files
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Run 38890189683 exhausted 5 minutes in the unchanged full wrapper suite.
+    # Keep every check and assertion; allow the real regression suite to finish.
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
