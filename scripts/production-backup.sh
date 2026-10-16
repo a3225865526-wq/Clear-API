@@ -11,6 +11,10 @@ PGIMG=postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d
 RECIPIENT=D675187C7097EF9D8C3BFF966B1439F896043FFD
 KEEP_DAILY=14
 KEEP_MONTHLY=6
+case "${CLEARAPI_BACKUP_PRESERVE_EXISTING:-false}" in
+  true|false) ;;
+  *) echo 'invalid backup preservation policy' >&2; exit 1 ;;
+esac
 
 log() { echo "$(date -u +%FT%TZ) $*" >> /var/log/clearapi/backup.log; }
 
@@ -189,9 +193,12 @@ if [ -f "$OFFSITE_CONF" ]; then
 fi
 
 # 8. retention: keep last 14 daily + last 6 monthly (01-MM), prune only on success
-python3 - "$BASE" "$KEEP_DAILY" "$KEEP_MONTHLY" <<'PYEOF'
+python3 - "$BASE" "$KEEP_DAILY" "$KEEP_MONTHLY" "${CLEARAPI_BACKUP_PRESERVE_EXISTING:-false}" <<'PYEOF'
 import os, re, shutil, sys
 base, kd, km = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+if sys.argv[4] == 'true':
+    print('all existing backups preserved by release policy')
+    sys.exit(0)
 dirs = sorted(d for d in os.listdir(f"{base}/encrypted") if re.fullmatch(r"\d{8}T\d{6}Z", d))
 daily = [d for d in dirs if d[6:8] != "01"]
 monthly = [d for d in dirs if d[6:8] == "01"]

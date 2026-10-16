@@ -277,6 +277,30 @@ class TransitionTest(unittest.TestCase):
                     lambda _: {'display_title': title}, self.paths)
         self.assertFalse(self.paths.authorization.exists())
 
+    def test_owner_dispatch_authority_binds_the_same_one_use_request(self):
+        sha = self.review()
+        data = dict(self.data, run='100', transition_sha256=sha)
+        evidence = {
+            'actions/runs/100': {
+                'display_title': 'Deploy pg03 ' + data['digest'] + ' ' + sha,
+                'actor': {'login': 'a3225865526-wq'},
+                'triggering_actor': {'login': 'a3225865526-wq'}},
+            'environments/production': {'id': 23693288049, 'name': 'production',
+                'deployment_branch_policy': {'protected_branches': False, 'custom_branch_policies': True},
+                'protection_rules': [{'type': 'branch_policy'}]},
+            'environments/production/deployment-branch-policies': {
+                'branch_policies': [{'name': 'main', 'type': 'branch'}]}}
+        M.CONTROL.maintenance_authorization(data, self.manifest, '8' * 64, [],
+            evidence.__getitem__, self.paths)
+        authority = M.read_json(self.paths.authorization)
+        self.assertEqual(authority['reviewers'], [])
+        self.assertEqual(authority['authorization']['mode'], 'owner-dispatch-v1')
+        self.phase('preflight')
+        authority['authorization']['actor'] = 'other'
+        M.publish(self.paths.authorization, authority, exclusive=False)
+        with self.assertRaises(ValueError):
+            self.phase('preflight')
+
     def test_preparation_refuses_auth_failure_and_unrelated_scope(self):
         self.io.auth_status = 401
         with self.assertRaises(ValueError):
@@ -506,11 +530,15 @@ class V2MaintenanceChainTest(unittest.TestCase):
         paths.session.chmod(0o600)
         M.publish(paths.authorization, {'schema_version': M.SCHEMA, 'transition_id': request['transition_id'],
             'request_sha256': M.digest(M.read_file(paths.request)), 'approval_run': '123',
-            'reviewers': ['a3225865526-wq'], 'candidate': io.candidate_value, 'schema_transition': io.schema_transition()})
+            'reviewers': [], 'authorization': {'mode': 'owner-dispatch-v1',
+                'actor': 'a3225865526-wq', 'run': '123'},
+            'candidate': io.candidate_value, 'schema_transition': io.schema_transition()})
         target = {'schema_version': 1, 'pool_mode': 'pg03', 'components': {
             'gateway': {'image_ref': io.candidate_value['image_ref'], 'image_digest': self.base.DIGEST,
                 'oci_revision': self.base.COMMIT, 'image_id': io.candidate_value['image_id']}, 'executor': executor},
-            'validation': {'approval': 'passed'}, 'legacy_transition': {'schema_version': M.SCHEMA,
+            'validation': {'reviewers': [], 'approval_run': '123', 'authorization': {
+                'mode': 'owner-dispatch-v1', 'actor': 'a3225865526-wq', 'run': '123'}},
+            'legacy_transition': {'schema_version': M.SCHEMA,
                 'request_sha256': M.digest(M.read_file(paths.request))}}
         M.publish(paths.app / 'pg03-target-manifest.json', target)
         paths.app.joinpath('compose-pg03.yaml').write_text('services: {}\n')
@@ -640,6 +668,9 @@ if name=='docker':
         self.assertIn('Runtime Gate PASS (after)', result.stderr)
         self.assertIn('DEPLOYMENT SUCCESS', result.stderr)
         self.assertEqual(M.read_json(M.Paths(self.root).state)['stage'], 'passed')
+        validation = M.read_json(M.Paths(self.root).manifest)['releases']['current']['validation']
+        self.assertNotIn('approval', validation, 'automatic authority must not invent human approval')
+        self.assertEqual(validation['authorization']['mode'], 'owner-dispatch-v1')
         self.assertFalse(json.loads((self.root/'transport.json').read_text())['edge']['paused'])
         self.assertTrue(all('--no-deps' in r['args'] for r in trace if r['name']=='docker' and 'up' in r['args']))
 

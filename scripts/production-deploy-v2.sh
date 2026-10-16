@@ -769,8 +769,17 @@ try:
                 or g['image_id'] != c['new_api_image_id'] or g['oci_revision'] != c['candidate_commit']
                 or c.get('status') not in ('success', 'pending')):
             raise ValueError()
-    elif m.get('validation', {}).get('approval') != 'passed':
-        raise ValueError()
+    else:
+        validation = m.get('validation', {})
+        autonomous = validation.get('authorization')
+        if autonomous is not None:
+            if (validation.get('reviewers') != [] or autonomous != {
+                    'mode': 'owner-dispatch-v1', 'actor': 'a3225865526-wq',
+                    'run': validation.get('approval_run')}
+                    or not re.fullmatch(r'[1-9][0-9]*', autonomous.get('run', ''))):
+                raise ValueError()
+        elif validation.get('approval') != 'passed':
+            raise ValueError()
     if kind == 'target' and bool(m.get('legacy_transition')) != (legacy_transition == '1'):
         raise ValueError()
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', e['image_id']):
@@ -1425,8 +1434,8 @@ if [ "$POOL_MODE" = pg03 ]; then PG03_ATTEMPT_ID="$(python3 -I -c 'import uuid; 
 python3 - "$MANIFEST" "$MANIFEST_TMP" "$COMMIT" "$IMAGE_REF" "$DIGEST" "$CANDIDATE_IMAGE_ID" \
   "$PREV_IMAGE_ID" "$WORKFLOW_RUN" "$MIGRATION_VERSION" "$STAMP" "$POOL_MODE" \
   "$PG03_EXECUTOR_REF" "$PG03_EXECUTOR_IMAGE_ID" "$PG03_EXECUTOR_REVISION" "$PG03_EXECUTOR_BINARY" \
-  "$PG03_EXECUTOR_CONTAINER" "$PG03_ATTEMPT_ID" "$PG03_APPROVAL_SHA256" <<'PYEOF'
-import json, os, sys
+  "$PG03_EXECUTOR_CONTAINER" "$PG03_ATTEMPT_ID" "$PG03_APPROVAL_SHA256" "$PG03_TARGET_MANIFEST" <<'PYEOF'
+import hashlib, json, os, sys
 src, dst, commit, image_ref, digest, image_id, prev_id, run_id, migration_version, stamp = sys.argv[1:11]
 pool_mode, executor_ref, executor_id, executor_revision, executor_binary, executor_container, attempt_id, approval_sha = sys.argv[11:19]
 try:
@@ -1470,6 +1479,14 @@ if pool_mode == "pg03":
         "approval": "passed", "manifest_sha256": approval_sha,
         "executor_prepared": True, "secrets": "presence-only",
         "gateway_executor_connection": "pending"}
+    with open(sys.argv[19], 'rb') as f:
+        target_raw = f.read(131073)
+    if hashlib.sha256(target_raw).hexdigest() != approval_sha:
+        raise SystemExit('PG03 target changed before recording deployment')
+    authority = json.loads(target_raw)['validation'].get('authorization')
+    if authority is not None:
+        del new_current['validation']['approval']
+        new_current['validation']['authorization'] = authority
 rel["previous"] = old_current or rel.get("previous") or {}
 rel["current"] = new_current
 m["updated_at_utc"] = stamp

@@ -175,7 +175,7 @@ class BackupIdentityTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("changed during backup", result.stderr)
 
-    def full_backup(self, drift=False, pg03=False, pg03_drift=False, legacy=False):
+    def full_backup(self, drift=False, pg03=False, pg03_drift=False, legacy=False, preserve=False):
         base = self.root / "opt/clearapi/backups"
         (base / "bin").mkdir(parents=True)
         (base / "manifests").mkdir()
@@ -204,6 +204,15 @@ class BackupIdentityTest(unittest.TestCase):
         old_bundle.parent.mkdir(parents=True)
         old_bundle.write_bytes(b"historical encrypted fixture")
         old_bytes = old_manifest.read_bytes(), old_bundle.read_bytes()
+        historical = {}
+        if preserve:
+            self.env['CLEARAPI_BACKUP_PRESERVE_EXISTING'] = 'true'
+            for day in range(2, 20):
+                stamp = f'202609{day:02d}T000000Z'
+                path = base / 'encrypted' / stamp / 'historical.gpg'
+                path.parent.mkdir(parents=True)
+                path.write_bytes(b'existing encrypted backup')
+                historical[path] = path.read_bytes()
         (self.root / "log").mkdir()
         helper = base / "bin/backup-identity.py"
         helper.write_text((SCRIPTS / "backup-identity.py").read_text().replace(
@@ -262,6 +271,8 @@ class BackupIdentityTest(unittest.TestCase):
             self.assertEqual(manifests, [])
             return
         self.assertEqual(result.returncode, 0, result.stderr)
+        for path, expected in historical.items():
+            self.assertEqual(path.read_bytes(), expected, 'release backup must not prune existing backups')
         self.assertEqual(len(manifests), 1)
         manifest = json.loads(manifests[0].read_text())
         self.assertEqual(manifest["candidate_commit"], self.current["candidate_commit"])
@@ -309,6 +320,9 @@ class BackupIdentityTest(unittest.TestCase):
 
     def test_full_encrypted_backup_offsite_and_legacy_restore_reader(self):
         self.full_backup()
+
+    def test_release_backup_preserves_history_beyond_the_retention_limit(self):
+        self.full_backup(preserve=True)
 
     def test_backup_drift_fails_without_publishing_manifest(self):
         self.full_backup(drift=True)
