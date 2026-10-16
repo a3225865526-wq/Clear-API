@@ -243,6 +243,13 @@ class Production:
         catalog = json.loads(raw_catalog, object_pairs_hook=CONTROL.unique)
         catalog['_raw_digest'] = digest(raw_catalog.encode())
         business = dict(result)
+        schema = self.command(['docker', 'exec', 'clearapi-postgres-1', 'pg_dump',
+            '-U', 'clearapi_app', '-d', 'clearapi', '--schema-only', '--no-owner', '--no-privileges'])
+        # PostgreSQL 17 emits random psql restrict nonces; they are transport
+        # framing, not schema. Preserve every other schema byte in the binding.
+        canonical = '\n'.join(line for line in schema.splitlines()
+            if not line.startswith(('\\restrict ', '\\unrestrict ')))
+        business['schema_sha256'] = digest(canonical.encode())
         config = business['config']
         referral = json.loads(config.get('clearapi.referral', '{}'))
         if (config.get('StoreRechargeEnabled') != 'false' or config.get('DisableOnlinePayments') != 'true'
@@ -319,6 +326,8 @@ class Transition:
         manifest, manifest_sha = CONTROL.release_manifest(data, rc,
             get('actions/runs/' + str(data['rc_run']) + '/artifacts?per_page=100'),
             lambda ident: CONTROL.api('actions/artifacts/' + str(ident) + '/zip', token, archive=True))
+        if manifest.get('verification', {}).get('legacy_retirement_source_tests') != 'passed':
+            raise Blocked('same-main RC must include the retirement Runtime regressions')
         candidate = {'image_ref': manifest['image_ref'], 'image_digest': manifest['image_digest'],
             'image_id': manifest['new_api_image_id'], 'commit': manifest['source_commit'],
             'binary_sha256': manifest['binary_sha256'], 'retire_binary_sha256': manifest['legacy_retire_binary_sha256'],

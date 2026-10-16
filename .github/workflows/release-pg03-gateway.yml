@@ -85,6 +85,7 @@ jobs:
           mkdir -p web/dist
           printf 'CI test-only embed placeholder\n' > web/dist/index.html
           go test -count=1 ./service/accountpool ./service/routechain
+          go test -count=1 ./controller -run "TestLegacyRetirement|TestRuntimeIntegrity"
 
       - name: Confirm build context remains exact
         shell: bash
@@ -201,7 +202,7 @@ jobs:
               'runtime_identity':{'image_id':published['Id'],'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip()},
               'source_ci_runs':json.load(open('/tmp/source-ci.json')),
               'wrapper_sha256':hashlib.sha256(pathlib.Path('source/scripts/production-deploy.sh').read_bytes()).hexdigest(),
-              'verification':{'source_commit':'passed','targeted_accountpool_routechain_tests':'passed','deployment_binaries':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
+              'verification':{'legacy_retirement_source_tests':'passed','source_commit':'passed','targeted_accountpool_routechain_tests':'passed','deployment_binaries':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
               'deployment_compatible':not missing,'missing_deployment_binaries':missing,
               'production_ready':False,'production_acceptance':'not_run',
               'sbom':None,'provenance':None

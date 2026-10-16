@@ -142,7 +142,8 @@ class TransitionTest(unittest.TestCase):
                 'token_type': 'bearer', 'access_expires_at': self.now + 900}}}
         self.manifest = {'image_ref': self.io.candidate_value['image_ref'], 'image_digest': self.io.candidate_value['image_digest'],
             'new_api_image_id': self.io.candidate_value['image_id'], 'source_commit': self.io.candidate_value['commit'],
-            'binary_sha256': self.io.candidate_value['binary_sha256'], 'legacy_retire_binary_sha256': self.io.candidate_value['retire_binary_sha256']}
+            'binary_sha256': self.io.candidate_value['binary_sha256'], 'legacy_retire_binary_sha256': self.io.candidate_value['retire_binary_sha256'],
+            'verification': {'legacy_retirement_source_tests': 'passed'}}
         self.args = ('100', self.io.candidate_value['image_digest'], self.io.candidate_value['commit'])
 
     def review(self):
@@ -213,6 +214,13 @@ class TransitionTest(unittest.TestCase):
         self.assertNotIn('synthetic-private', journal)
         self.assertEqual(self.io.events.count('retirement-committed'), 1)
 
+    def test_review_refuses_an_rc_without_its_own_retirement_regression_evidence(self):
+        self.manifest['verification'] = {}
+        with self.assertRaises(ValueError):
+            self.review()
+        self.assertFalse(self.paths.request.exists())
+        self.assertTrue(self.io.running)
+
     def test_missing_or_mismatched_authority_cannot_consume_or_stop(self):
         self.review()
         with self.assertRaises(OSError):
@@ -221,7 +229,7 @@ class TransitionTest(unittest.TestCase):
         self.assertTrue(self.io.running)
 
     def test_authenticated_failure_expiry_identity_and_invariant_drift_reject(self):
-        for change in ('401', '403', 'identity', 'billing', 'checkpoint', 'expired', 'digest'):
+        for change in ('401', '403', 'identity', 'billing', 'checkpoint', 'schema', 'expired', 'digest'):
             with self.subTest(change=change):
                 # A separate fixture keeps every authority genuinely one-use.
                 case = TransitionTest()
@@ -236,6 +244,8 @@ class TransitionTest(unittest.TestCase):
                         case.io.business['balances'] = 'changed'
                     elif change == 'checkpoint':
                         case.io.business['checkpoint.journal'] = 'changed'
+                    elif change == 'schema':
+                        case.io.business['schema_sha256'] = 'changed'
                     elif change == 'expired':
                         case.now += 601
                     else:
