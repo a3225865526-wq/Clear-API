@@ -139,7 +139,7 @@ jobs:
           assert c['Config']['Entrypoint'] == ['/new-api']
           with tarfile.open('release/rootfs.tar') as t:
               paths={m.name.lstrip('./') for m in t.getmembers()}
-          required=['entrypoint-secure.sh','production-bootstrap','finance-migrate','billing-migrate']
+          required=['entrypoint-secure.sh','production-bootstrap','finance-migrate','billing-migrate','legacy-store-retire']
           with open('release/missing-deployment-binaries.json','w') as f:
               json.dump([p for p in required if p not in paths],f)
           assert all(p in paths for p in required), 'deployment binaries missing; refusing publication'
@@ -165,6 +165,7 @@ jobs:
           CID=$(docker create --network none "$GHCR_IMAGE@$DIGEST")
           trap 'docker rm "$CID" >/dev/null' EXIT
           docker cp "$CID:/new-api" release/published-new-api
+          docker cp "$CID:/legacy-store-retire" release/published-legacy-store-retire
           [[ "$(sha256sum release/published-new-api | cut -d' ' -f1)" == "$(cat release/binary.sha256)" ]]
 
       - name: Write Release Manifest Lite and summary
@@ -191,6 +192,7 @@ jobs:
               'oci_revision':labels['org.opencontainers.image.revision'],
               'platform':'linux/amd64','new_api_image_id':published['Id'],
               'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip(),
+              'legacy_retire_binary_sha256':hashlib.sha256(pathlib.Path('release/published-legacy-store-retire').read_bytes()).hexdigest(),
               'dockerfile_sha256':hashlib.sha256(pathlib.Path('source/Dockerfile').read_bytes()).hexdigest(),
               'workflow_run':e['GITHUB_RUN_ID'],'workflow_run_attempt':e['GITHUB_RUN_ATTEMPT'],
               'workflow_commit':e['GITHUB_SHA'],'workflow_ref':e['GITHUB_WORKFLOW_REF'],

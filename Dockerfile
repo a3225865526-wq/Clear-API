@@ -29,7 +29,8 @@ COPY --from=builder /build/web/dist ./web/dist
 RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api \
     && go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o production-bootstrap ./cmd/production-bootstrap \
     && go build -ldflags "-s -w" -o finance-migrate ./cmd/finance-migrate \
-    && go build -ldflags "-s -w" -o billing-migrate ./cmd/billing-migrate
+    && go build -ldflags "-s -w" -o billing-migrate ./cmd/billing-migrate \
+    && go build -ldflags "-s -w" -o legacy-store-retire ./cmd/legacy-store-retire
 
 FROM debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
 
@@ -54,6 +55,7 @@ COPY --from=builder2 /build/new-api /
 COPY --from=builder2 /build/production-bootstrap /
 COPY --from=builder2 /build/finance-migrate /
 COPY --from=builder2 /build/billing-migrate /
+COPY --from=builder2 /build/legacy-store-retire /
 COPY scripts/production-entrypoint.sh /entrypoint-secure.sh
 RUN chmod 0755 /entrypoint-secure.sh
 COPY LICENSE THIRD-PARTY-LICENSES.md /licenses/

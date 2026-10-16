@@ -6,6 +6,7 @@ logged or persisted. It cannot run deployment commands or write arbitrary paths.
 """
 import hashlib
 import io
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -14,6 +15,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -23,7 +25,7 @@ IMAGE = 'ghcr.io/a3225865526-wq/clearapi'
 EXECUTOR = 'ghcr.io/a3225865526-wq/clearapi-executor@sha256:0838072c3fd61165ba20f78084dafe678114dd5c8b19a1e8b4acd31eee2ad821'
 EXECUTOR_REVISION = 'e5f33dc6412d17bd058bd3de2e053c3b45b9a359'
 EXECUTOR_BINARY = '527b1814c7b4ef1ec52b2f416ec329192ffb50dc1e9b819763e7a82b0965c898'
-V2_SHA = '2d7fee67a57a5c5e408067a44ceb3f5b29399dd7aa62edc7c845bd36b7ae9408'
+V2_SHA = '2591c1d17a17879e32cff896214574d08a36343b2af2588cdd7b61873a564615'
 TARGET = Path('/opt/clearapi/app/pg03-target-manifest.json')
 
 
@@ -90,6 +92,17 @@ def approved_run(data, get):
                          for e in r['environments'])]
     if not reviewers:
         raise ReleaseBlocked('real production review required')
+    rc = approved_rc(data, get)
+    return sorted(set(reviewers)), rc
+
+
+def approved_rc(data, get):
+    commit = data['commit']
+    if (not re.fullmatch(r'[a-f0-9]{40}', commit)
+            or not re.fullmatch(r'sha256:[a-f0-9]{64}', data['digest'])
+            or not re.fullmatch(r'[1-9][0-9]*', str(data['rc_run']))
+            or get('git/ref/heads/main')['object']['sha'] != commit):
+        raise ReleaseBlocked('RC must identify current main')
     rc = get('actions/runs/' + str(data['rc_run']))
     if (rc['head_sha'] != commit or rc['head_branch'] != 'main'
             or rc['event'] != 'workflow_dispatch' or rc['status'] != 'completed'
@@ -101,7 +114,7 @@ def approved_run(data, get):
     if not any(r['head_sha'] == commit and r.get('head_branch') == 'main' and r['status'] == 'completed'
                and r['conclusion'] == 'success' for r in ci['workflow_runs']):
         raise ReleaseBlocked('same-source push CI required')
-    return sorted(set(reviewers)), rc
+    return rc
 
 
 def release_manifest(data, rc, artifacts, download):
@@ -195,6 +208,36 @@ def install_target(target, raw):
         os.unlink(temporary)
 
 
+def maintenance_authorization(data, manifest, manifest_sha, reviewers, get, paths=None):
+    if not data.get('transition_sha256'):
+        return None
+    # GitHub's immutable display title binds the actual production review to
+    # the dispatch request digest; caller-supplied approval booleans cannot.
+    run = get('actions/runs/' + str(data['run']))
+    expected = 'Deploy pg03 ' + data['digest'] + ' ' + data['transition_sha256']
+    if reviewers != ['a3225865526-wq'] or run.get('display_title') != expected or not re.fullmatch(r'[a-f0-9]{64}', data['transition_sha256']):
+        raise ReleaseBlocked('production review is not for this maintenance request')
+    location = importlib.util.spec_from_file_location('pg03_legacy_transition', Path(__file__).with_name('pg03-legacy-transition.py'))
+    module = importlib.util.module_from_spec(location)
+    location.loader.exec_module(module)
+    paths = paths or module.Paths()
+    raw = module.read_file(paths.request)
+    request = json.loads(raw, object_pairs_hook=unique)
+    candidate = {'image_ref': manifest['image_ref'], 'image_digest': manifest['image_digest'],
+        'image_id': manifest['new_api_image_id'], 'commit': manifest['source_commit'],
+        'binary_sha256': manifest['binary_sha256'], 'retire_binary_sha256': manifest.get('legacy_retire_binary_sha256'),
+        'rc_run': str(data['rc_run']), 'rc_manifest_sha256': manifest_sha}
+    if (hashlib.sha256(raw).hexdigest() != data['transition_sha256'] or request['schema_version'] != module.SCHEMA
+            or request['candidate'] != candidate or not re.fullmatch(r'[a-f0-9]{64}', candidate['retire_binary_sha256'] or '')
+            or request['expires_at'] <= time.time()):
+        raise ReleaseBlocked('maintenance request identity, RC or expiry mismatch')
+    authority = {'schema_version': module.SCHEMA, 'transition_id': request['transition_id'],
+        'request_sha256': data['transition_sha256'], 'approval_run': str(data['run']),
+        'reviewers': reviewers, 'candidate': request['candidate']}
+    install_target(paths.authorization, (json.dumps(authority, sort_keys=True) + '\n').encode())
+    return {'schema_version': module.SCHEMA, 'request_sha256': data['transition_sha256']}
+
+
 def main():
     if os.geteuid() != 0 or sys.argv[1:] != ['prepare']:
         raise ReleaseBlocked('root prepare entry point required')
@@ -211,6 +254,7 @@ def main():
         return subprocess.run(['docker', *args], check=True, capture_output=True,
                               text=True, timeout=30).stdout.strip()
     e = executor_identity(docker)
+    transition = maintenance_authorization(data, m, manifest_sha, reviewers, get)
     target = {'schema_version': 1, 'pool_mode': 'pg03', 'components': {
         'gateway': {'image_ref': m['image_ref'], 'image_digest': m['image_digest'],
                     'image_id': m['new_api_image_id'], 'oci_revision': m['oci_revision'],
@@ -218,6 +262,8 @@ def main():
         'validation': {'approval': 'passed', 'reviewers': reviewers,
                        'approval_run': str(data['run']), 'rc_run': str(data['rc_run']),
                        'rc_manifest_sha256': manifest_sha}}
+    if transition is not None:
+        target['legacy_transition'] = transition
     install_target(TARGET, (json.dumps(target, indent=2) + '\n').encode())
     print('PG03 exact target created from real production review and RC artifact')
 

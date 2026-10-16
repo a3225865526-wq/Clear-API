@@ -160,6 +160,9 @@ PG03_ATTEMPT_ID=""
 PG03_EXECUTOR_CONTAINER=""
 PG03_EXECUTOR_IMAGE_ID=""
 PG03_APPROVAL_SHA256=""
+LEGACY_TRANSITION=0
+LEGACY_TRANSITION_ENTERED=0
+LEGACY_TRANSITION_TOOL=/opt/clearapi/bin/pg03-legacy-transition.py
 
 # ---------------------------------------------------------------------------
 # Args (validated before any state change)
@@ -170,6 +173,7 @@ while [ $# -gt 0 ]; do
     --pool-mode)
       [ "$#" -ge 2 ] || { echo 'REFUSING: --pool-mode requires off or pg03' >&2; exit 2; }
       POOL_MODE="$2"; shift 2 ;;
+    --legacy-transition-v1) LEGACY_TRANSITION=1; shift ;;
     --digest) DIGEST="$2"; shift 2 ;;
     --commit) COMMIT="$2"; shift 2 ;;
     --workflow-run) WORKFLOW_RUN="$2"; shift 2 ;;
@@ -235,9 +239,14 @@ cleanup() {
 }
 trap cleanup EXIT
 die() {
-  trap - ERR
+  trap - ERR INT TERM HUP
   log "FAIL: $*"
   audit "deploy_failed" "failed" "$*" || log "AUDIT_FAILED: deployment failure could not be persisted"
+  if [ "$LEGACY_TRANSITION_ENTERED" = 1 ]; then
+    legacy_transition_phase fail || log 'maintenance journal requires manual reconciliation'
+    compose stop --timeout 150 "$SERVICE" || log 'MAINTENANCE CONTAINMENT FAILED: verify Gateway stopped manually'
+    log 'LEGACY TRANSITION FAILED CLOSED: no old-image restart, database restore or Pool rollback'
+  fi
   if [ "$POOL_MODE" = pg03 ]; then
     pg03_mark_failed || log 'PG03 failure manifest could not be persisted; manual review required'
     log 'PG03 BLOCKED: preserving Gateway, Executor, auth, receipts, checkpoint and data; no automatic rollback'
@@ -251,6 +260,9 @@ die() {
     log "no automatic rollback (migration_compatible=${MIGRATION_COMPATIBLE}) — MANUAL REVIEW REQUIRED"
   fi
   exit 1
+}
+legacy_transition_phase() {
+  python3 -I "$LEGACY_TRANSITION_TOOL" phase "$1" "$WORKFLOW_RUN" "$DIGEST" "$COMMIT" "${@:2}"
 }
 compose() {
   # The override file (exact-digest pin, written by write_override) MUST be
@@ -692,7 +704,7 @@ PY
 pg03_load_pair() { # approved target for deploy; current release for other modes
   local source="$1" kind="$2" metadata
   metadata="$(python3 -I - "$source" "$kind" "$PG03_COMPOSE_FILE" \
-      "$PG03_EXECUTOR_REF" "$PG03_EXECUTOR_REVISION" "$PG03_EXECUTOR_BINARY" <<'PY'
+      "$PG03_EXECUTOR_REF" "$PG03_EXECUTOR_REVISION" "$PG03_EXECUTOR_BINARY" "$LEGACY_TRANSITION" <<'PY'
 import hashlib, json, os, pathlib, re, stat, sys
 
 def secure_file(name, private=False):
@@ -725,7 +737,7 @@ def unique(pairs):
     return result
 
 try:
-    name, kind, overlay, pinned_ref, pinned_revision, pinned_binary = sys.argv[1:]
+    name, kind, overlay, pinned_ref, pinned_revision, pinned_binary, legacy_transition = sys.argv[1:]
     secure_file(overlay)
     raw = secure_file(name)
     m = json.loads(raw, object_pairs_hook=unique)
@@ -758,6 +770,8 @@ try:
                 or c.get('status') not in ('success', 'pending')):
             raise ValueError()
     elif m.get('validation', {}).get('approval') != 'passed':
+        raise ValueError()
+    if kind == 'target' and bool(m.get('legacy_transition')) != (legacy_transition == '1'):
         raise ValueError()
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', e['image_id']):
         raise ValueError()
@@ -847,6 +861,13 @@ PYPG03ENV
 
 pg03_configure() {
   case "$POOL_MODE" in off|pg03) ;; *) echo 'REFUSING: --pool-mode must be off or pg03' >&2; return 1 ;; esac
+  if [ "$LEGACY_TRANSITION" = 1 ]; then
+    [ "$POOL_MODE" = pg03 ] && [ "$VERIFY_ONLY$RESTART_ONLY$RECONCILE_ONLY" = 000 ] \
+      && [ "$MIGRATION_COMPATIBLE" = false ] && [[ "$WORKFLOW_RUN" =~ ^[1-9][0-9]*$ ]] \
+      && [ "$APP_DIR" = /opt/clearapi/app ] && [ "$SERVICE" = new-api ] \
+      || { echo 'REFUSING: legacy transition is an explicitly reviewed PG03 maintenance deploy only' >&2; return 1; }
+    RUNTIME_PROBE_TOKEN_FILE=/opt/clearapi/secrets/legacy-transition-session
+  fi
   # Do not silently use off semantics on an existing PG03 manifest.
   if [ -f "$MANIFEST" ]; then
     python3 -I - "$MANIFEST" "$POOL_MODE" <<'PY'
@@ -1145,6 +1166,14 @@ exec 9>"/run/lock/clearapi-production-deploy.lock"
 flock -n 9 || die "deploy lock held: another production deploy is in progress"
 log "step 1: deploy lock acquired"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/clearapi-deploy.XXXXXXXX")"
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  TRANSITION_STATUS="$(legacy_transition_phase status)" || die 'maintenance authorization/state BLOCKED'
+  if [ "$TRANSITION_STATUS" = completed ]; then
+    audit legacy_transition_replay no_action 'previous one-use transition completed; no new Runtime PASS claimed'
+    exit 0
+  fi
+  [ "$TRANSITION_STATUS" = new ] || die 'unknown maintenance journal state'
+fi
 
 # ===========================================================================
 # 2. validate candidate metadata
@@ -1183,7 +1212,12 @@ verify_running_identity \
   || die "step 3: production identity drift (running image vs compose effective vs manifest current); refusing to deploy on an inconsistent baseline"
 verify_launch_baseline
 verify_stop_policy
-verify_runtime_gate before "$PREV_IMAGE_ID" || die 'Runtime Integrity Gate BLOCKED before deployment'
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  legacy_transition_phase preflight || die 'legacy maintenance preflight BLOCKED; old Runtime remains FAIL'
+  audit legacy_transition_preflight old_runtime_blocked 'APPROVAL_VIEW_INVALID; separate maintenance authorization; never a Runtime PASS'
+else
+  verify_runtime_gate before "$PREV_IMAGE_ID" || die 'Runtime Integrity Gate BLOCKED before deployment'
+fi
 if [ "$RESTART_ONLY" = 1 ]; then
   CURRENT_REF="$(compose_effective_image)"
   CURRENT_REVISION="$(sudo docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$PREV_IMAGE_ID")"
@@ -1220,6 +1254,9 @@ NEW_ARTIFACTS="$(find "$BACKUP_DIR" -type f -newermt "$BACKUP_STARTED_AT" -size 
 [ -n "$NEW_ARTIFACTS" ] || die "step 5: no new non-empty backup artifact under ${BACKUP_DIR} since ${BACKUP_STARTED_AT}; deployment BLOCKED"
 log "step 5: backup artifacts verified"
 printf '    %s\n' $NEW_ARTIFACTS >&2
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  legacy_transition_phase backup "$BACKUP_STARTED_AT" || die 'fresh encrypted maintenance backup BLOCKED'
+fi
 
 # ===========================================================================
 # 6. pull exact digest
@@ -1299,6 +1336,10 @@ if docker run --rm --entrypoint /billing-migrate "$IMAGE_REF" >/dev/null 2>&1; t
   die "step 8: billing-migrate ran without an approval flag; fail-closed contract violated"
 fi
 log "step 8: all required binaries present; migration binary fail-closed contract holds"
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  docker run --rm --network none --read-only --entrypoint /bin/sh "$IMAGE_REF" -c 'test -x /legacy-store-retire' \
+    || die 'verified retirement binary missing from candidate'
+fi
 
 # ===========================================================================
 # 9/10. migration gate (preflight; run only when flags are configured)
@@ -1332,6 +1373,18 @@ fi
 # ===========================================================================
 # 12/13. record old image + update release manifest (merge into live schema)
 # ===========================================================================
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  # All executable/source, encrypted backup, bootstrap and existing baseline
+  # checks above are still mandatory. Consume once BEFORE quiescing the writer.
+  legacy_transition_phase begin || die 'maintenance one-use entry BLOCKED'
+  LEGACY_TRANSITION_ENTERED=1
+  set -E
+  trap 'die "unexpected maintenance command failure"' ERR
+  trap 'die "maintenance interrupted; preserve stopped state"' INT TERM HUP
+  legacy_transition_phase isolate || die 'public writer isolation failed'
+  compose stop --timeout 150 "$SERVICE" || die 'cannot stop old Gateway writer'
+  legacy_transition_phase retire || die 'retirement failed or commit uncertain; preserve maintenance state'
+fi
 STAMP="$(TS_NOW)"
 PRE_DEPLOY_MANIFEST="${MANIFEST}.bak.$(date -u +%Y%m%dT%H%M%SZ).$$"
 cp -p "$MANIFEST" "$PRE_DEPLOY_MANIFEST"
@@ -1462,8 +1515,10 @@ log "step 15: localhost health PASS"
 # ===========================================================================
 # 16. public health via Cloudflare
 # ===========================================================================
-health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray" || die "step 16: public health (${PUBLIC_HEALTH_URL}) with CF-Ray failed"
-log "step 16: public HTTPS health via Cloudflare PASS"
+if [ "$LEGACY_TRANSITION" = 0 ]; then
+  health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray" || die "step 16: public health (${PUBLIC_HEALTH_URL}) with CF-Ray failed"
+  log "step 16: public HTTPS health via Cloudflare PASS"
+fi
 
 # ===========================================================================
 # 17. runtime negative gates
@@ -1542,12 +1597,20 @@ done
 POOL_ROWS="$(psql_q "SELECT count(*) FROM options WHERE key ILIKE '${POOL_OPTION_PATTERN}';")"
 [ "$POOL_ROWS" = "0" ] || die "step 18: ${POOL_ROWS} pool option row(s) present; Pool must stay OFF"
 log "step 18: billing invariants PASS (mode=enforce, needs_review set frozen, channels/user/token disabled, order tables empty, runtime product gate, no pool rows)"
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  legacy_transition_phase postflight || die 'new process Runtime, accounting or Pool invariants BLOCKED'
+  legacy_transition_phase release-edge || die 'verified public edge release failed'
+  health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray" || die 'maintenance public HTTPS health with CF-Ray failed'
+fi
 
 # ===========================================================================
 # 19. mark deployment success
 # ===========================================================================
 set_pg03_success || die 'PG03 success manifest update failed'
 set_manifest_status "success"
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  legacy_transition_phase complete || die 'maintenance completion evidence could not be persisted'
+fi
 audit "deploy_success" "success" "digest=${DIGEST} previous_image=${PREV_IMAGE_ID}"
 log "step 19: DEPLOYMENT SUCCESS"
 log "  commit:      ${COMMIT}"
