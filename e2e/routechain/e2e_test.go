@@ -884,11 +884,9 @@ func TestE2EAttemptLedgerRecordsTheChain(t *testing.T) {
 	require.Contains(t, body, "from-b")
 	require.Equal(t, int64(1), h.countReservations(), "L27: one reservation across A→B")
 
-	// The request record finalizes in a post-response defer — wait for it.
-	require.Eventually(t, func() bool {
-		rows := h.ledgerRequests(t)
-		return len(rows) == 1 && rows[0].FinalStatus != ""
-	}, 3*time.Second, 10*time.Millisecond)
+	// The response precedes both the request-final write and its usage sweep.
+	// Join the handler so assertions cannot observe the state between them.
+	h.Close()
 	requests := h.ledgerRequests(t)
 	require.Len(t, requests, 1)
 	request := requests[0]

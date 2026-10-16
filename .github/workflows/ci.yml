@@ -71,6 +71,9 @@ jobs:
           GOFLAGS: -p=2
         run: bash scripts/ci/go-test-baseline.sh make test
 
+      - name: Verify one-use legacy maintenance and V2 failure contracts
+        run: sudo python3 scripts/ci/test-legacy-transition.py
+
   frontend:
     name: Frontend typecheck and test
     runs-on: ubuntu-latest
@@ -111,7 +114,9 @@ jobs:
   secret-scan:
     name: Secret scan and forbidden files
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Run 38890189683 exhausted 5 minutes in the unchanged full wrapper suite.
+    # Keep every check and assertion; allow the real regression suite to finish.
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -131,7 +136,7 @@ jobs:
           shellcheck --severity=warning scripts/production-deploy.sh
           python3 scripts/ci/test-production-deploy.py
           bash -n scripts/production-deploy-v2.sh
-          # Preserve the installed V2 bytes (also asserted by the contract test).
+          # V2 bytes are pinned by the release control and contract test.
           # Its parsed digest tuple includes an unused field, and export "$name"
           # intentionally exports the validated variable named by $name.
           shellcheck --severity=warning --exclude=SC2034,SC2163 scripts/production-deploy-v2.sh

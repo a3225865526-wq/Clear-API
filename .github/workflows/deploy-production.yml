@@ -1,4 +1,5 @@
 name: Deploy Production
+run-name: Deploy ${{ inputs.pool_mode }} ${{ inputs.image_digest }} ${{ inputs.legacy_transition_sha256 || 'normal' }}
 
 on:
   workflow_dispatch:
@@ -21,6 +22,10 @@ on:
         description: 'Successful same-commit PG03 RC run (required for pg03)'
         type: string
         required: false
+      legacy_transition_sha256:
+        description: 'Optional legacy-retirement-v1 request SHA256; requires separate maintenance confirmation and review'
+        type: string
+        required: false
       migration_compatible:
         description: 'Is the candidate migration backward-compatible with the previous image?'
         required: true
@@ -30,7 +35,7 @@ on:
           - 'false'
           - 'true'
       confirmation:
-        description: 'Type DEPLOY_PRODUCTION to confirm'
+        description: 'Type DEPLOY_PRODUCTION, or DEPLOY_LEGACY_RETIREMENT_V1 for the separately reviewed transition'
         required: true
         type: string
 
@@ -63,6 +68,7 @@ jobs:
       IMAGE_DIGEST: ${{ inputs.image_digest }}
       CONFIRMATION: ${{ inputs.confirmation }}
       MIGRATION_COMPATIBLE: ${{ inputs.migration_compatible }}
+      LEGACY_TRANSITION_SHA256: ${{ inputs.legacy_transition_sha256 }}
 
     steps:
       - name: Checkout deploy assets
@@ -73,9 +79,11 @@ jobs:
       - name: Validate manual gate inputs
         run: |
           set -euo pipefail
-          if [ "$CONFIRMATION" != "DEPLOY_PRODUCTION" ]; then
-            echo "confirmation input does not match DEPLOY_PRODUCTION — refusing to deploy"
-            exit 1
+          if [[ -n "${LEGACY_TRANSITION_SHA256:-}" ]]; then
+            [[ "$LEGACY_TRANSITION_SHA256" =~ ^[a-f0-9]{64}$ ]]
+            [[ "$CONFIRMATION" == DEPLOY_LEGACY_RETIREMENT_V1 && "$POOL_MODE" == pg03 && "$MIGRATION_COMPATIBLE" == false ]]
+          else
+            [[ "$CONFIRMATION" == DEPLOY_PRODUCTION ]]
           fi
           if [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
             echo "expected_commit is not a full 40-hex commit SHA"
@@ -175,6 +183,18 @@ jobs:
           LOCAL_SHA=$(sha256sum scripts/pg03-release-control.py | cut -d' ' -f1)
           REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-release-control.py' | cut -d' ' -f1)
           [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
+          if [[ -n "${LEGACY_TRANSITION_SHA256:-}" ]]; then
+            LOCAL_SHA=$(sha256sum scripts/pg03-legacy-transition.py | cut -d' ' -f1)
+            REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-legacy-transition.py' | cut -d' ' -f1)
+            [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
+            for HELPER in runtime-probe-session backup-identity pg03-schema-rehearsal; do
+              LOCAL_SHA=$(sha256sum "scripts/$HELPER.py" | cut -d' ' -f1)
+              HELPER_DIR=/opt/clearapi/bin
+              if [[ "$HELPER" == backup-identity ]]; then HELPER_DIR=/opt/clearapi/backups/bin; fi
+              REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" "sudo sha256sum $HELPER_DIR/$HELPER.py" | cut -d' ' -f1)
+              [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
+            done
+          fi
           LOCAL_SHA=$(sha256sum scripts/production-backup.sh | cut -d' ' -f1)
           REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/backups/bin/clearapi-backup.sh' | cut -d' ' -f1)
           [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
@@ -188,7 +208,8 @@ jobs:
           e = os.environ
           print(json.dumps({'token': e['GH_TOKEN'], 'run': e['GITHUB_RUN_ID'],
                             'rc_run': e['RC_RUN_ID'], 'commit': e['EXPECTED_COMMIT'],
-                            'digest': e['IMAGE_DIGEST']}))
+                            'digest': e['IMAGE_DIGEST'],
+                            'transition_sha256': e.get('LEGACY_TRANSITION_SHA256', '')}))
           PY
 
       - name: Run controlled deploy on VPS
@@ -204,6 +225,7 @@ jobs:
           # commands, so an env-based switch cannot reach the wrapper.
           MODE_ARGS=''
           if [[ "$POOL_MODE" == pg03 ]]; then MODE_ARGS='--pool-mode pg03'; fi
+          if [[ -n "${LEGACY_TRANSITION_SHA256:-}" ]]; then MODE_ARGS+=' --legacy-transition-v1'; fi
           printf '%s\n' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
             "sudo $DEPLOY_WRAPPER \
               $MODE_ARGS --ghcr-token-stdin \

@@ -61,7 +61,7 @@ func getStoreProductsForUser() ([]map[string]any, error) {
 		return nil, err
 	}
 	for _, product := range effective.LegacyProducts {
-		if effective.Unified || !product.Enabled {
+		if effective.Unified || effective.LegacyRetirement != nil || !product.Enabled {
 			continue
 		}
 		withdrawn := false

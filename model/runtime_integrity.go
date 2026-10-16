@@ -306,12 +306,13 @@ func ObserveRuntimeIntegrityWithProvider(ctx context.Context, provider RuntimeId
 			}
 		}
 		raw, err := common.Marshal(struct {
-			Unified           bool            `json:"unified"`
-			Products          []CreditProduct `json:"products"`
-			LegacyProducts    []*StoreProduct `json:"legacy_products"`
-			LegacyCatalog     []CreditProduct `json:"legacy_catalog"`
-			LegacyWithdrawals []CreditProduct `json:"legacy_withdrawals"`
-		}{catalog.Unified, catalog.Products, catalog.LegacyProducts, catalog.LegacyCatalog, withdrawals})
+			Unified           bool                    `json:"unified"`
+			Products          []CreditProduct         `json:"products"`
+			LegacyProducts    []*StoreProduct         `json:"legacy_products"`
+			LegacyCatalog     []CreditProduct         `json:"legacy_catalog"`
+			LegacyWithdrawals []CreditProduct         `json:"legacy_withdrawals"`
+			LegacyRetirement  *LegacyCreditRetirement `json:"legacy_retirement,omitempty"`
+		}{catalog.Unified, catalog.Products, catalog.LegacyProducts, catalog.LegacyCatalog, withdrawals, catalog.LegacyRetirement})
 		if err != nil {
 			return ErrProbeUnavailable
 		}
@@ -347,17 +348,27 @@ func ObserveRuntimeIntegrityWithProvider(ctx context.Context, provider RuntimeId
 			configured["product/"+p.ID] = true
 		}
 		for _, legacy := range catalog.LegacyProducts {
-			if legacy.Enabled {
+			if catalog.LegacyRetirement == nil && legacy.Enabled {
 				configured[fmt.Sprintf("legacy/%d", legacy.Id)] = true
 			}
 		}
 		for _, legacy := range catalog.LegacyCatalog {
-			if legacy.Published {
+			if catalog.LegacyRetirement == nil && legacy.Published {
 				configured["product/"+legacy.ID] = true
 			}
 		}
 		result.EffectiveProductCount = len(configured)
 		raw, err = common.Marshal(evidence)
+		if catalog.LegacyRetirement != nil {
+			var retirement CreditApprovalEvent
+			if err := tx.First(&retirement, catalog.LegacyRetirement.EventID).Error; err != nil {
+				return ErrApprovalViewInvalid
+			}
+			raw, err = common.Marshal(struct {
+				Products   []approvalEvidence  `json:"products"`
+				Retirement CreditApprovalEvent `json:"legacy_retirement"`
+			}{evidence, retirement})
+		}
 		if err != nil {
 			return ErrProbeUnavailable
 		}

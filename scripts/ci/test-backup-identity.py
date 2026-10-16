@@ -175,7 +175,7 @@ class BackupIdentityTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("changed during backup", result.stderr)
 
-    def full_backup(self, drift=False, pg03=False, pg03_drift=False):
+    def full_backup(self, drift=False, pg03=False, pg03_drift=False, legacy=False):
         base = self.root / "opt/clearapi/backups"
         (base / "bin").mkdir(parents=True)
         (base / "manifests").mkdir()
@@ -183,6 +183,20 @@ class BackupIdentityTest(unittest.TestCase):
             directory = self.root / "opt/clearapi" / part
             directory.mkdir(exist_ok=True)
             (directory / "fixture").write_text("isolated fixture")
+        transition_files = {}
+        if legacy:
+            for name in ('request', 'authorization', 'plan', 'backup', 'state'):
+                relative = 'opt/clearapi/app/legacy-transition-'+name+'.json'
+                path = self.root/relative
+                path.write_text(json.dumps({'fixture': name}))
+                path.chmod(0o600)
+                transition_files[relative] = path.read_bytes()
+            relative = 'opt/clearapi/logs/legacy-transition.jsonl'
+            path = self.root/relative
+            path.parent.mkdir()
+            path.write_text('{"phase":"passed"}\n')
+            path.chmod(0o600)
+            transition_files[relative] = path.read_bytes()
         old_id = "20261008T000000Z"
         old_manifest = base / "manifests" / (old_id + ".json")
         old_manifest.write_text('{"candidate_commit":"603b217"}\n')
@@ -265,6 +279,11 @@ class BackupIdentityTest(unittest.TestCase):
         with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
             for item in manifest["artifacts"].values():
                 self.assertEqual(hashlib.sha256(archive.extractfile(item["name"]).read()).hexdigest(), item["sha256"])
+            if legacy:
+                deployctl = archive.extractfile(manifest['artifacts']['deploy_control_archive']['name']).read()
+                with tarfile.open(fileobj=io.BytesIO(deployctl), mode='r:gz') as control:
+                    for name, raw in transition_files.items():
+                        self.assertEqual(control.extractfile(name).read(), raw)
             config = archive.extractfile(manifest["artifacts"]["config_archive"]["name"]).read()
             if pg03:
                 state_archive = self.root / 'pg03.tar.gz'
@@ -296,6 +315,9 @@ class BackupIdentityTest(unittest.TestCase):
 
     def test_pg03_encrypted_backup_and_isolated_restore_preserve_all_state(self):
         self.full_backup(pg03=True)
+
+    def test_encrypted_backup_preserves_consumed_maintenance_proof_and_audit(self):
+        self.full_backup(pg03=True, legacy=True)
 
     def test_pg03_change_during_dump_does_not_publish_recovery_point(self):
         self.full_backup(pg03=True, pg03_drift=True)

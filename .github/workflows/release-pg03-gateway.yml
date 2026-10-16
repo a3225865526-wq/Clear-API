@@ -85,6 +85,7 @@ jobs:
           mkdir -p web/dist
           printf 'CI test-only embed placeholder\n' > web/dist/index.html
           go test -count=1 ./service/accountpool ./service/routechain
+          go test -count=1 ./controller -run "TestLegacyRetirement|TestRuntimeIntegrity"
 
       - name: Confirm build context remains exact
         shell: bash
@@ -139,12 +140,22 @@ jobs:
           assert c['Config']['Entrypoint'] == ['/new-api']
           with tarfile.open('release/rootfs.tar') as t:
               paths={m.name.lstrip('./') for m in t.getmembers()}
-          required=['entrypoint-secure.sh','production-bootstrap','finance-migrate','billing-migrate']
+          required=['entrypoint-secure.sh','production-bootstrap','finance-migrate','billing-migrate','legacy-store-retire']
           with open('release/missing-deployment-binaries.json','w') as f:
               json.dump([p for p in required if p not in paths],f)
           assert all(p in paths for p in required), 'deployment binaries missing; refusing publication'
           PY
           rm release/rootfs.tar
+
+      - name: Rehearse exact candidate startup against production schema only
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Dedicated runner, isolated namespaces/tmpfs, no production rows or credentials.
+          docker pull postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+          python3 source/scripts/pg03-schema-rehearsal.py --candidate "$LOCAL_TAG" \
+            --commit "$SOURCE_COMMIT" --schema source/scripts/ci/fixtures/pg03-legacy-v5-schema.sql \
+            --output release/schema-rehearsal.json
 
       - name: Login to GHCR
         uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
@@ -165,6 +176,7 @@ jobs:
           CID=$(docker create --network none "$GHCR_IMAGE@$DIGEST")
           trap 'docker rm "$CID" >/dev/null' EXIT
           docker cp "$CID:/new-api" release/published-new-api
+          docker cp "$CID:/legacy-store-retire" release/published-legacy-store-retire
           [[ "$(sha256sum release/published-new-api | cut -d' ' -f1)" == "$(cat release/binary.sha256)" ]]
 
       - name: Write Release Manifest Lite and summary
@@ -182,6 +194,8 @@ jobs:
           assert labels['org.opencontainers.image.revision']==e['SOURCE_COMMIT']
           missing=json.load(open('release/missing-deployment-binaries.json'))
           assert not missing
+          schema_transition=json.load(open('release/schema-rehearsal.json'))
+          assert schema_transition['candidate_image_id']==published['Id']
           manifest={
               'schema_version':1,'component':'gateway',
               'source_commit':e['SOURCE_COMMIT'],'candidate_commit':e['SOURCE_COMMIT'],
@@ -191,6 +205,7 @@ jobs:
               'oci_revision':labels['org.opencontainers.image.revision'],
               'platform':'linux/amd64','new_api_image_id':published['Id'],
               'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip(),
+              'legacy_retire_binary_sha256':hashlib.sha256(pathlib.Path('release/published-legacy-store-retire').read_bytes()).hexdigest(),
               'dockerfile_sha256':hashlib.sha256(pathlib.Path('source/Dockerfile').read_bytes()).hexdigest(),
               'workflow_run':e['GITHUB_RUN_ID'],'workflow_run_attempt':e['GITHUB_RUN_ATTEMPT'],
               'workflow_commit':e['GITHUB_SHA'],'workflow_ref':e['GITHUB_WORKFLOW_REF'],
@@ -199,7 +214,8 @@ jobs:
               'runtime_identity':{'image_id':published['Id'],'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip()},
               'source_ci_runs':json.load(open('/tmp/source-ci.json')),
               'wrapper_sha256':hashlib.sha256(pathlib.Path('source/scripts/production-deploy.sh').read_bytes()).hexdigest(),
-              'verification':{'source_commit':'passed','targeted_accountpool_routechain_tests':'passed','deployment_binaries':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
+              'schema_transition':schema_transition,
+              'verification':{'schema_rehearsal':'passed','legacy_retirement_source_tests':'passed','source_commit':'passed','targeted_accountpool_routechain_tests':'passed','deployment_binaries':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
               'deployment_compatible':not missing,'missing_deployment_binaries':missing,
               'production_ready':False,'production_acceptance':'not_run',
               'sbom':None,'provenance':None
@@ -216,5 +232,7 @@ jobs:
           name: pg03-gateway-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             release/gateway-image-release.json
+            release/schema-rehearsal.json
+            release/schema-rehearsal.target.sql
             release/binary-build-info.txt
           if-no-files-found: error

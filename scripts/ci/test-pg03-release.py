@@ -45,7 +45,7 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertNotIn('gh run cancel', self.workflow)
         self.assertEqual(hashlib.sha256((SCRIPTS / 'production-deploy-v2.sh').read_bytes()).hexdigest(), CONTROL.V2_SHA)
 
-    def invoke(self, mode='pg03', failure=''):
+    def invoke(self, mode='pg03', failure='', transition='', confirmation='DEPLOY_PRODUCTION'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             trace = root / 'trace.jsonl'
@@ -76,7 +76,7 @@ else:
                        GITHUB_ENV=str(root/'env'), GITHUB_SHA='b'*40,
                        EXPECTED_COMMIT='b'*40, IMAGE_DIGEST='sha256:'+'a'*64,
                        GITHUB_RUN_ID='100', GITHUB_REF='refs/heads/main',
-                       CONFIRMATION='DEPLOY_PRODUCTION', MIGRATION_COMPATIBLE='false',
+                       CONFIRMATION=confirmation, MIGRATION_COMPATIBLE='false', LEGACY_TRANSITION_SHA256=transition,
                        POOL_MODE=mode, RC_RUN_ID='99', PROD_SSH_ALIAS='isolated-vps',
                        GH_TOKEN='synthetic-ci-token', GH_PULL_TOKEN='synthetic-ci-token')
             selected = ['Validate manual gate inputs', 'Verify PG03 control tool and prepare approved pair',
@@ -119,6 +119,17 @@ else:
         rc, trace = self.invoke('unknown')
         self.assertNotEqual(rc,0)
         self.assertEqual(trace,'')
+
+    def test_maintenance_requires_its_exact_confirmation_and_cannot_use_pool_off(self):
+        code, trace = self.invoke(transition='a'*64, confirmation='DEPLOY_LEGACY_RETIREMENT_V1')
+        self.assertEqual(code, 0, trace)
+        self.assertIn('--legacy-transition-v1', trace)
+        for mode, sha, confirmation in [('off','a'*64,'DEPLOY_LEGACY_RETIREMENT_V1'),
+                ('pg03','a'*64,'DEPLOY_PRODUCTION'), ('pg03','invalid','DEPLOY_LEGACY_RETIREMENT_V1')]:
+            with self.subTest(mode=mode, sha=sha):
+                code, trace = self.invoke(mode, transition=sha, confirmation=confirmation)
+                self.assertNotEqual(code, 0)
+                self.assertEqual(trace, '')
 
 
 class ReleaseApprovalTest(unittest.TestCase):

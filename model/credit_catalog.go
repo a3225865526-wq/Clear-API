@@ -53,6 +53,8 @@ type CreditCatalog struct {
 	// The original products key remains readable by the previous image during
 	// schema preparation. New readers use this versioned authoritative list.
 	ApprovalProducts []CreditProduct `json:"approval_products,omitempty"`
+	// Additive withdrawal evidence; frozen compatibility snapshots stay intact.
+	LegacyRetirement *LegacyCreditRetirement `json:"legacy_retirement,omitempty"`
 }
 
 func DefaultCreditCatalog() CreditCatalog {
