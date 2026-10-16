@@ -228,12 +228,13 @@ def maintenance_authorization(data, manifest, manifest_sha, reviewers, get, path
         'binary_sha256': manifest['binary_sha256'], 'retire_binary_sha256': manifest.get('legacy_retire_binary_sha256'),
         'rc_run': str(data['rc_run']), 'rc_manifest_sha256': manifest_sha}
     if (hashlib.sha256(raw).hexdigest() != data['transition_sha256'] or request['schema_version'] != module.SCHEMA
-            or request['candidate'] != candidate or not re.fullmatch(r'[a-f0-9]{64}', candidate['retire_binary_sha256'] or '')
+            or request['candidate'] != candidate or request.get('schema_transition') != manifest.get('schema_transition')
+            or not re.fullmatch(r'[a-f0-9]{64}', candidate['retire_binary_sha256'] or '')
             or request['expires_at'] <= time.time()):
         raise ReleaseBlocked('maintenance request identity, RC or expiry mismatch')
     authority = {'schema_version': module.SCHEMA, 'transition_id': request['transition_id'],
         'request_sha256': data['transition_sha256'], 'approval_run': str(data['run']),
-        'reviewers': reviewers, 'candidate': request['candidate']}
+        'reviewers': reviewers, 'candidate': request['candidate'], 'schema_transition': request['schema_transition']}
     install_target(paths.authorization, (json.dumps(authority, sort_keys=True) + '\n').encode())
     return {'schema_version': module.SCHEMA, 'request_sha256': data['transition_sha256']}
 

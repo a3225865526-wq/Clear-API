@@ -70,7 +70,17 @@ tar -czf "$STAGE/clearapi-edge-$TS.tar.gz" -C / opt/clearapi/edge
 # Stage 3b: CI/CD deployment control plane (2026-10-08 acceptance). release-manifest
 # is the rollback source of truth; the wrapper is root-owned production deploy
 # logic; deploy.env holds non-secret deployment parameters only.
-tar -czf "$STAGE/clearapi-deployctl-$TS.tar.gz" -C /   opt/clearapi/app/release-manifest.json   opt/clearapi/bin opt/clearapi/config
+DEPLOY_CONTROL=(opt/clearapi/app/release-manifest.json opt/clearapi/bin opt/clearapi/config)
+# Preserve the one-use authorization/history; never restore these over live state.
+for name in request authorization plan backup state; do
+  if [ -f "/opt/clearapi/app/legacy-transition-${name}.json" ]; then
+    DEPLOY_CONTROL+=("opt/clearapi/app/legacy-transition-${name}.json")
+  fi
+done
+if [ -f /opt/clearapi/logs/legacy-transition.jsonl ]; then
+  DEPLOY_CONTROL+=(opt/clearapi/logs/legacy-transition.jsonl)
+fi
+tar -czf "$STAGE/clearapi-deployctl-$TS.tar.gz" -C / "${DEPLOY_CONTROL[@]}"
 chmod 600 "$STAGE"/*
 
 # 4. TOC parse check of the dump via pinned-image sidecar
@@ -129,7 +139,7 @@ cat > "$STAGE/manifest.json" <<EOF
     "legal_archive": {"name": "clearapi-legal-$TS.tar.gz", "sha256": "$LGSHA"},
     "edge_archive": {"name": "clearapi-edge-$TS.tar.gz", "sha256": "$EDGSHA", "contents": "opt/clearapi/edge (Caddyfile + docker-compose.yml, non-secret)", "acme_private_state": "excluded by design; Caddy re-issues via production ACME on restore"},
     "secrets_archive": {"name": "clearapi-secrets-$TS.tar", "sha256": "$SECSHA", "semantics": "sha256 of plaintext tar input; inside encrypted bundle only"},
-    "deploy_control_archive": {"name": "clearapi-deployctl-$TS.tar.gz", "sha256": "$DPLSHA", "contents": "opt/clearapi/app/release-manifest.json + opt/clearapi/bin (root-owned deploy wrapper) + opt/clearapi/config (deploy.env, non-secret parameters)"}
+    "deploy_control_archive": {"name": "clearapi-deployctl-$TS.tar.gz", "sha256": "$DPLSHA", "contents": "opt/clearapi/app/release-manifest.json + opt/clearapi/bin (root-owned deploy wrapper) + opt/clearapi/config (deploy.env, non-secret parameters) + existing legacy transition proof/journal/audit"}
   },
   "bundle": {"name": "bundle-$TS.tar.gz", "sha256": "$BUNSHA"},
   "encryption": {

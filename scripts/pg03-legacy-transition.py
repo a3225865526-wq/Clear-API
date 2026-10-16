@@ -31,6 +31,7 @@ def load(name):
 
 CONTROL = load('pg03-release-control')
 PROBE = load('runtime-probe-session')
+REHEARSAL = load('pg03-schema-rehearsal')
 SCHEMA = 'legacy-retirement-transition-v1'
 ACTOR = 'a3225865526-wq'
 
@@ -132,6 +133,10 @@ class Production:
         source = json.loads(self.command(['/usr/bin/python3',
             '/opt/clearapi/backups/bin/backup-identity.py', 'capture', '--app-dir', str(self.paths.app)]))
         cid = source['container_id']
+        # This contract rehearses master startup against the single main PG.
+        # Test presence only; never expose a configured DSN or environment.
+        self.command(['docker', 'exec', cid, '/bin/sh', '-ec',
+            'test -z "${LOG_SQL_DSN:-}" && test "${NODE_TYPE:-master}" != slave'])
         source['started_at'] = self.command(['docker', 'inspect', '--format', '{{.State.StartedAt}}', cid])
         source['restart_policy'] = json.loads(self.command(['docker', 'inspect', '--format', '{{json .HostConfig.RestartPolicy}}', cid]))
         mounts = json.loads(self.command(['docker', 'inspect', '--format', '{{json .Mounts}}', cid]))
@@ -233,7 +238,7 @@ class Production:
         for table, columns in projections.items():
             where = " WHERE decision <> 'retire_legacy'" if table == 'credit_approval_events' else ''
             fields += ["'%s', (SELECT encode(sha256(convert_to(COALESCE(string_agg(row_to_json(t)::text,'|' ORDER BY id),''),'UTF8')),'hex') FROM (SELECT %s FROM %s%s) t)" % (table, columns, table, where)]
-        fields += ["'catalog', (SELECT value FROM options WHERE key='clearapi.credit_catalog')",
+        fields += ["'postgres_version_num', current_setting('server_version_num')", "'catalog', (SELECT value FROM options WHERE key='clearapi.credit_catalog')",
             "'store_count', (SELECT count(*) FROM store_products)",
             "'config', (SELECT json_object_agg(key,value) FROM options WHERE key IN ('StoreRechargeEnabled','DisableOnlinePayments','billing_reserve_policy.mode','ClearAPIPoolMasterEnabled','clearapi.referral'))"]
         sql = 'BEGIN READ ONLY; SELECT json_build_object(' + ','.join(fields) + '); COMMIT;'
@@ -245,11 +250,9 @@ class Production:
         business = dict(result)
         schema = self.command(['docker', 'exec', 'clearapi-postgres-1', 'pg_dump',
             '-U', 'clearapi_app', '-d', 'clearapi', '--schema-only', '--no-owner', '--no-privileges'])
-        # PostgreSQL 17 emits random psql restrict nonces; they are transport
-        # framing, not schema. Preserve every other schema byte in the binding.
-        canonical = '\n'.join(line for line in schema.splitlines()
-            if not line.startswith(('\\restrict ', '\\unrestrict ')))
-        business['schema_sha256'] = digest(canonical.encode())
+        business['schema_sha256'] = REHEARSAL.schema_digest(schema)
+        if business['postgres_version_num'] != '170006':
+            raise Blocked('outside the rehearsed production PostgreSQL version')
         config = business['config']
         referral = json.loads(config.get('clearapi.referral', '{}'))
         if (config.get('StoreRechargeEnabled') != 'false' or config.get('DisableOnlinePayments') != 'true'
@@ -326,7 +329,8 @@ class Transition:
         manifest, manifest_sha = CONTROL.release_manifest(data, rc,
             get('actions/runs/' + str(data['rc_run']) + '/artifacts?per_page=100'),
             lambda ident: CONTROL.api('actions/artifacts/' + str(ident) + '/zip', token, archive=True))
-        if manifest.get('verification', {}).get('legacy_retirement_source_tests') != 'passed':
+        if any(manifest.get('verification', {}).get(k) != 'passed'
+               for k in ('legacy_retirement_source_tests', 'schema_rehearsal')):
             raise Blocked('same-main RC must include the retirement Runtime regressions')
         candidate = {'image_ref': manifest['image_ref'], 'image_digest': manifest['image_digest'],
             'image_id': manifest['new_api_image_id'], 'commit': manifest['source_commit'],
@@ -355,11 +359,13 @@ class Transition:
             raise Blocked('retirement plan operator or evidence mismatch')
         business, catalog = self.io.snapshot()
         self.validate_scope(plan, catalog)
+        schema_transition = manifest.get('schema_transition', {})
+        REHEARSAL.validate_receipt(schema_transition, candidate, business['schema_sha256'])
         if source != self.io.gateway():
             raise Blocked('old Gateway changed during review')
         request = {'schema_version': SCHEMA, 'transition_id': str(uuid.uuid4()),
             'created_at': int(self.now()), 'expires_at': min(int(self.now()) + 600, claims['exp'] - 60),
-            'source': source, 'edge': edge, 'candidate': candidate, 'review': review, 'invariants': business,
+            'source': source, 'edge': edge, 'candidate': candidate, 'review': review, 'invariants': business, 'schema_transition': schema_transition,
             'old_runtime': {'http_status': 503, 'status': 'BLOCKED', 'code': 'APPROVAL_VIEW_INVALID'}}
         # Each publication is exclusive. Partial preparation must be retained
         # for operator review; another request cannot silently replace it.
@@ -395,10 +401,19 @@ class Transition:
                 or request['created_at'] > self.now() + 5
                 or (not allow_expired and self.now() >= request['expires_at'])):
             raise Blocked('missing, expired or mismatched maintenance authorization')
+        REHEARSAL.validate_receipt(request['schema_transition'], request['candidate'], request['invariants']['schema_sha256'])
+        if authority.get('schema_transition') != request['schema_transition']:
+            raise Blocked('maintenance schema transition differs from the approved RC')
         uuid.UUID(request['transition_id'])
         if read_json(self.paths.plan) != request['review']:
             raise Blocked('retirement plan file changed')
         return request
+
+    def matches_invariants(self, request, business, candidate=False):
+        expected = dict(request['invariants'])
+        if candidate:
+            expected['schema_sha256'] = request['schema_transition']['target_schema_sha256']
+        return business == expected
 
     def check_before(self, request):
         if self.io.gateway() != request['source']:
@@ -411,7 +426,7 @@ class Transition:
             raise Blocked('old Runtime is not the approved authenticated failure')
         business, catalog = self.io.snapshot()
         self.validate_scope(request['review']['plan'], catalog)
-        if business != request['invariants'] or self.io.gateway() != request['source']:
+        if not self.matches_invariants(request, business) or self.io.gateway() != request['source']:
             raise Blocked('pre-transition business or process state changed')
 
     def checkpoint(self, stage, request, **values):
@@ -486,7 +501,7 @@ class Transition:
             self.io.stopped(request['source'])
             business, catalog = self.io.snapshot()
             self.validate_scope(request['review']['plan'], catalog)
-            if business != request['invariants']:
+            if not self.matches_invariants(request, business):
                 raise Blocked('state changed while quiescing the Gateway')
             self.io.disable_old_restart(request['source'])
             # Durable latch BEFORE the transaction: an ambiguous CLI failure
@@ -494,7 +509,7 @@ class Transition:
             self.checkpoint('retiring', request, backup=state['backup'])
             self.io.retirement(request['candidate'], apply=True)
             business, catalog = self.io.snapshot()
-            if business != request['invariants'] or catalog.get('legacy_retirement', {}).get('plan') != request['review']['plan']:
+            if not self.matches_invariants(request, business) or catalog.get('legacy_retirement', {}).get('plan') != request['review']['plan']:
                 raise Blocked('retirement postcondition or accounting mismatch')
             self.checkpoint('retired', request, backup=state['backup'])
         elif phase == 'postflight':
@@ -513,7 +528,7 @@ class Transition:
                     or report.get('referral_enabled') is not False or report.get('billing_mode') != 'enforce'):
                 raise Blocked('new Gateway did not produce its own safe Runtime PASS')
             business, catalog = self.io.snapshot()
-            if (business != request['invariants'] or catalog.get('legacy_retirement', {}).get('plan') != request['review']['plan']
+            if (not self.matches_invariants(request, business, candidate=True) or catalog.get('legacy_retirement', {}).get('plan') != request['review']['plan']
                     or self.candidate_identity(request) != source):
                 raise Blocked('postflight accounting or history changed')
             self.checkpoint('candidate_verified', request, candidate_container=source['container_id'], candidate_identity=source, backup=state['backup'])
@@ -521,7 +536,7 @@ class Transition:
             if state is None or state['stage'] != 'candidate_verified':
                 raise Blocked('public edge requires new Runtime and all V2 invariant gates')
             business, _ = self.io.snapshot()
-            if business != request['invariants'] or self.candidate_identity(request) != state['candidate_identity']:
+            if not self.matches_invariants(request, business, candidate=True) or self.candidate_identity(request) != state['candidate_identity']:
                 raise Blocked('state changed before opening public edge')
             self.checkpoint('edge_releasing', request, candidate_container=state['candidate_container'], candidate_identity=state['candidate_identity'], backup=state['backup'])
             self.io.edge_paused(request['edge'], False)
@@ -533,7 +548,7 @@ class Transition:
             if manifest.get('status') != 'success' or manifest.get('image_digest') != image_digest:
                 raise Blocked('V2 release has not completed')
             business, _ = self.io.snapshot()
-            if (business != request['invariants'] or self.candidate_identity(request) != state['candidate_identity']
+            if (not self.matches_invariants(request, business, candidate=True) or self.candidate_identity(request) != state['candidate_identity']
                     or self.io.edge() != request['edge']):
                 raise Blocked('final invariants changed')
             self.checkpoint('passed', request, candidate_container=state['candidate_container'], candidate_identity=state['candidate_identity'], backup=state['backup'])

@@ -187,7 +187,7 @@ jobs:
             LOCAL_SHA=$(sha256sum scripts/pg03-legacy-transition.py | cut -d' ' -f1)
             REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-legacy-transition.py' | cut -d' ' -f1)
             [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
-            for HELPER in runtime-probe-session backup-identity; do
+            for HELPER in runtime-probe-session backup-identity pg03-schema-rehearsal; do
               LOCAL_SHA=$(sha256sum "scripts/$HELPER.py" | cut -d' ' -f1)
               HELPER_DIR=/opt/clearapi/bin
               if [[ "$HELPER" == backup-identity ]]; then HELPER_DIR=/opt/clearapi/backups/bin; fi

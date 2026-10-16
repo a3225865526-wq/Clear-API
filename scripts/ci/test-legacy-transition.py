@@ -48,13 +48,21 @@ class FixtureIO:
             'prepare_event_id': 1, 'prepare_digest': 'e' * 64, 'actor_id': 1, 'evidence_ref': 'review/fixture'},
             'confirmation': 'RETIRE_LEGACY v5:fixture'}
         self.business = {'balances': 'unchanged', 'needs_review': '4/10/4 41/93/41',
-            'checkpoint.journal': 'f' * 64, 'admission.json': '1' * 64, 'channel2': 2}
+            'checkpoint.journal': 'f' * 64, 'admission.json': '1' * 64, 'channel2': 2,
+            'schema_sha256': '3'*64, 'postgres_version_num': '170006'}
         self.current = copy.deepcopy(self.source)
         self.running = True
         self.new = False
         self.auth_status = 503
         self.retire_fault = ''
         self.events = []
+
+    def schema_transition(self):
+        return {'schema_version': M.REHEARSAL.SCHEMA, 'profile': 'isolated_schema_only_master_single_postgres',
+            'source_commit': self.candidate_value['commit'], 'candidate_image_id': self.candidate_value['image_id'],
+            'candidate_binary_sha256': self.candidate_value['binary_sha256'],
+            'postgres_image_ref': M.REHEARSAL.POSTGRES, 'postgres_version_num': '170006',
+            'startup_passes': 2, 'source_schema_sha256': '3'*64, 'target_schema_sha256': '4'*64}
 
     def gateway(self):
         if not self.running:
@@ -118,6 +126,7 @@ class FixtureIO:
         self.current = dict(self.source, container_id='c' * 64, docker_image_id=self.candidate_value['image_id'],
             oci_revision=self.candidate_value['commit'], binary_sha256=self.candidate_value['binary_sha256'],
             started_at='2026-10-16T00:00:00Z')
+        self.business['schema_sha256'] = '4'*64
         self.running, self.new = True, True
         self.events.append('candidate-started')
 
@@ -143,7 +152,8 @@ class TransitionTest(unittest.TestCase):
         self.manifest = {'image_ref': self.io.candidate_value['image_ref'], 'image_digest': self.io.candidate_value['image_digest'],
             'new_api_image_id': self.io.candidate_value['image_id'], 'source_commit': self.io.candidate_value['commit'],
             'binary_sha256': self.io.candidate_value['binary_sha256'], 'legacy_retire_binary_sha256': self.io.candidate_value['retire_binary_sha256'],
-            'verification': {'legacy_retirement_source_tests': 'passed'}}
+            'verification': {'legacy_retirement_source_tests': 'passed', 'schema_rehearsal': 'passed'},
+            'schema_transition': self.io.schema_transition()}
         self.args = ('100', self.io.candidate_value['image_digest'], self.io.candidate_value['commit'])
 
     def review(self):
@@ -277,6 +287,25 @@ class TransitionTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.review()
 
+    def test_rc_schema_receipt_cannot_substitute_another_source_or_candidate(self):
+        for field, value in (('source_schema_sha256', 'f'*64), ('candidate_image_id', 'sha256:'+'0'*64),
+                ('startup_passes', 1), ('source_commit', '0'*40)):
+            with self.subTest(field=field):
+                original = copy.deepcopy(self.manifest['schema_transition'])
+                self.manifest['schema_transition'][field] = value
+                with self.assertRaises(ValueError):
+                    self.review()
+                self.assertFalse(self.paths.request.exists())
+                self.manifest['schema_transition'] = original
+
+    def test_schema_fingerprint_ignores_only_transport_and_package_labels(self):
+        fixture = (SCRIPTS/'ci/fixtures/pg03-legacy-v5-schema.sql').read_text()
+        metadata = fixture.replace('-- Dumped from database version 17.6', '-- Dumped from database version 17.6 (fixture)')
+        self.assertEqual(M.REHEARSAL.schema_digest(fixture), M.REHEARSAL.schema_digest(metadata))
+        self.assertNotEqual(M.REHEARSAL.schema_digest(fixture), M.REHEARSAL.schema_digest(fixture+'\nCREATE TABLE unexpected(id int);'))
+        self.assertNotIn('INSERT INTO', fixture)
+        self.assertNotIn('COPY public.', fixture)
+
     def test_backup_tamper_blocks_before_writer_isolation(self):
         self.authorize()
         artifact = self.backup()
@@ -318,7 +347,7 @@ class TransitionTest(unittest.TestCase):
         self.assertEqual(M.read_json(self.paths.state)['stage'], 'failed')
 
     def test_postflight_rejects_new_identity_auth_and_early_public_reopen(self):
-        for change in ('identity', 'auth', 'early-edge'):
+        for change in ('identity', 'auth', 'early-edge', 'unexpected-schema'):
             with self.subTest(change=change):
                 case = TransitionTest()
                 case.setUp()
@@ -330,8 +359,10 @@ class TransitionTest(unittest.TestCase):
                         case.io.current['docker_image_id'] = 'sha256:'+'0'*64
                     elif change == 'auth':
                         case.io.auth_status = 403
-                    else:
+                    elif change == 'early-edge':
                         case.io.edge_value['paused'] = False
+                    else:
+                        case.io.business['schema_sha256'] = 'f'*64
                     with case.assertRaises(ValueError):
                         case.phase('postflight')
                     case.phase('fail')
@@ -358,6 +389,65 @@ class TransitionTest(unittest.TestCase):
             self.phase('status')
         self.assertEqual(target.read_bytes(), b'preserve')
 
+
+class SchemaRehearsalTest(unittest.TestCase):
+    def test_exact_candidate_rehearsal_is_isolated_and_failures_never_issue_receipts(self):
+        for fault in ('', 'startup', 'second-schema-change'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root/'schema.sql'
+                source.write_text('-- PostgreSQL schema only\nCREATE TABLE old_table(id int);\n')
+                output = root/'receipt.json'
+                labels, calls = {}, []
+                dumps = 0
+                def command(args, raw=None):
+                    nonlocal dumps
+                    calls.append(args)
+                    if args[:2] == ['image', 'inspect']:
+                        return json.dumps([{'Id':'sha256:'+'7'*64,'Os':'linux','Architecture':'amd64',
+                            'Config':{'Labels':{'org.opencontainers.image.revision':'b'*40}}}])
+                    if args[0] == 'run':
+                        return 'd'*64+'  /new-api'
+                    if args[0] == 'create':
+                        cid = str(len(labels)+1)*64
+                        labels[cid] = args[args.index('--label')+1].split('=',1)[1]
+                        self.assertNotIn('--mount', args)
+                        self.assertNotIn('-v', args)
+                        self.assertNotIn('-p', args)
+                        self.assertIn(args[args.index('--network')+1], ('none','container:'+'1'*64))
+                        return cid
+                    if args[0] in ('start','stop','rm'):
+                        self.assertIn(args[-1], labels)
+                        return ''
+                    if args[0] == 'inspect':
+                        return 'false' if args[2]=='{{.State.Running}}' else labels[args[-1]]
+                    if args[0] == 'exec':
+                        if args[-1] == 'SHOW server_version_num': return '170006'
+                        if 'pg_isready' in args: return 'ready'
+                        if 'psql' in args:
+                            self.assertEqual(raw, source.read_bytes())
+                            return ''
+                        if 'pg_dump' in args:
+                            dumps += 1
+                            result = source.read_text()
+                            if dumps > 1: result += 'CREATE TABLE pg03_table(id int);\n'
+                            if dumps == 3 and fault=='second-schema-change': result += 'CREATE TABLE drift(id int);\n'
+                            return result
+                        if 'wget' in args:
+                            if fault=='startup': raise subprocess.CalledProcessError(1,['fixture'])
+                            return '{"success":true}'
+                    self.fail('unexpected isolated transport command')
+                if fault:
+                    with self.assertRaises(ValueError):
+                        M.REHEARSAL.rehearse('fixture','b'*40,source,output,command)
+                    self.assertFalse(output.exists())
+                else:
+                    receipt = M.REHEARSAL.rehearse('fixture','b'*40,source,output,command)
+                    self.assertEqual(receipt['startup_passes'],2)
+                    self.assertNotEqual(receipt['source_schema_sha256'],receipt['target_schema_sha256'])
+                    self.assertEqual(json.loads(output.read_text()),receipt)
+                removed = [a[-1] for a in calls if a[0]=='rm']
+                self.assertEqual(set(removed),set(labels))
 
 class V2MaintenanceChainTest(unittest.TestCase):
     """Run the actual V2 shell, validators and transition phases end to end.
@@ -407,6 +497,7 @@ class V2MaintenanceChainTest(unittest.TestCase):
         request = {'schema_version': M.SCHEMA, 'transition_id': '6f6ebdbe-9e74-4d25-b608-64eecbe0c0b1',
             'created_at': now, 'expires_at': now+600, 'source': io.source, 'edge': io.edge_value,
             'candidate': io.candidate_value, 'review': io.review, 'invariants': io.business,
+            'schema_transition': io.schema_transition(),
             'old_runtime': {'http_status': 503, 'status': 'BLOCKED', 'code': 'APPROVAL_VIEW_INVALID'}}
         M.publish(paths.request, request)
         M.publish(paths.plan, io.review)
@@ -414,7 +505,7 @@ class V2MaintenanceChainTest(unittest.TestCase):
         paths.session.chmod(0o600)
         M.publish(paths.authorization, {'schema_version': M.SCHEMA, 'transition_id': request['transition_id'],
             'request_sha256': M.digest(M.read_file(paths.request)), 'approval_run': '123',
-            'reviewers': ['a3225865526-wq'], 'candidate': io.candidate_value})
+            'reviewers': ['a3225865526-wq'], 'candidate': io.candidate_value, 'schema_transition': io.schema_transition()})
         target = {'schema_version': 1, 'pool_mode': 'pg03', 'components': {
             'gateway': {'image_ref': io.candidate_value['image_ref'], 'image_digest': self.base.DIGEST,
                 'oci_revision': self.base.COMMIT, 'image_id': io.candidate_value['image_id']}, 'executor': executor},
@@ -456,6 +547,7 @@ io.source=data['source'];io.candidate_value=data['candidate'];io.catalog=data['c
 io.current=dict(io.source)
 io.token='fixture.header.signature'
 io.new=(root/'replaced').exists()
+if io.new:io.business['schema_sha256']='4'*64
 io.running=not (root/'stopped').exists()
 if io.new:io.current.update(container_id='a'*64,docker_image_id=io.candidate_value['image_id'],oci_revision=io.candidate_value['commit'],binary_sha256=io.candidate_value['binary_sha256'])
 io.retire_fault='rollback' if os.environ['TEST_FAILURE']=='retire-rollback' else ''
