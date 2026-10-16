@@ -446,6 +446,7 @@ class SchemaRehearsalTest(unittest.TestCase):
                     self.assertEqual(receipt['startup_passes'],2)
                     self.assertNotEqual(receipt['source_schema_sha256'],receipt['target_schema_sha256'])
                     self.assertEqual(json.loads(output.read_text()),receipt)
+                    self.assertEqual(M.REHEARSAL.schema_digest(output.with_suffix('.target.sql').read_text()), receipt['target_schema_sha256'])
                 removed = [a[-1] for a in calls if a[0]=='rm']
                 self.assertEqual(set(removed),set(labels))
 

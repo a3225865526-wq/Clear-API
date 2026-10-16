@@ -132,6 +132,8 @@ def rehearse(candidate, commit, schema, output, command=None):
                 raise ValueError('isolated cleanup identity changed; manual containment required')
             command(['rm', '-f', cid])
     # Never replace a prior rehearsal receipt or publish before cleanup succeeds.
+    with output.with_suffix('.target.sql').open('x', encoding='utf-8') as f:
+        f.write(after+'\n')
     with output.open('x', encoding='utf-8') as f:
         json.dump(receipt, f, indent=2)
         f.write('\n')

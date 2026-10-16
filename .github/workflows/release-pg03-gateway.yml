@@ -232,5 +232,7 @@ jobs:
           name: pg03-gateway-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             release/gateway-image-release.json
+            release/schema-rehearsal.json
+            release/schema-rehearsal.target.sql
             release/binary-build-info.txt
           if-no-files-found: error
