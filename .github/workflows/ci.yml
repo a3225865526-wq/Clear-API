@@ -74,6 +74,65 @@ jobs:
       - name: Verify one-use legacy maintenance and V2 failure contracts
         run: sudo python3 scripts/ci/test-legacy-transition.py
 
+  commercial:
+    name: Commercial DB matrix — ${{ matrix.dialect }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [sqlite, mysql, postgres]
+
+    services:
+      mysql:
+        image: mysql:8.4.6@sha256:c296d65ee6ab3ce2f608c1d1b2bdd3c08b087a5834101d76a6db2e00875216cc
+        env:
+          MYSQL_ROOT_PASSWORD: clearapi_test
+          MYSQL_USER: clearapi
+          MYSQL_PASSWORD: clearapi_test
+          MYSQL_DATABASE: clearapi_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u clearapi -pclearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: clearapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi -d clearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GOWORK: 'off'
+      TEST_COMMERCIAL_DIALECT: ${{ matrix.dialect }}
+      CGO_ENABLED: '1'
+      TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+      - name: Verify commercial HTTP lifecycle on isolated database
+        run: go test -race -count=1 -timeout=5m -v ./e2e/commercial
+
   frontend:
     name: Frontend typecheck and test
     runs-on: ubuntu-latest
@@ -147,3 +206,4 @@ jobs:
           bash -n scripts/production-backup.sh
           shellcheck --severity=warning scripts/production-backup.sh
           python3 scripts/ci/test-backup-identity.py
+          python3 scripts/ci/test-automatic-release.py
