@@ -2,6 +2,7 @@ package controller_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -46,7 +47,7 @@ func runtimeFixtureIdentity() runtimeFixtureIdentityProvider {
 
 type runtimeSequenceIdentityProvider struct {
 	identities []model.RuntimeIdentity
-	index     int
+	index      int
 }
 
 func (p *runtimeSequenceIdentityProvider) RuntimeIdentity(context.Context) (model.RuntimeIdentity, error) {
@@ -486,4 +487,345 @@ func TestRuntimeIntegrityCollectionRejectsIdentityDrift(t *testing.T) {
 		return []byte("[]"), nil
 	}, provider)
 	require.ErrorIs(t, err, model.ErrProbeUnavailable)
+}
+
+// The fixture reproduces v5's independent legacy store/catalog publications.
+// It includes a second, disabled source whose identity must remain unchanged.
+func legacyRetirementFixture(t *testing.T, missing bool) (*gin.Engine, string, *gorm.DB) {
+	t.Helper()
+	engine, token, db := runtimeProbeFixture(t)
+	var row model.Option
+	require.NoError(t, db.Where(&model.Option{Key: model.CreditCatalogOptionKey}).First(&row).Error)
+	var catalog model.CreditCatalog
+	require.NoError(t, common.UnmarshalJsonStr(row.Value, &catalog))
+	other := &model.StoreProduct{Id: 2, Name: "unrelated disabled history", FaceValueCents: 500, StoreUrl: model.LegacyCreditPurchaseURL, Enabled: false}
+	require.NoError(t, db.Create(other).Error)
+	catalog.LegacyProducts = append(catalog.LegacyProducts, other)
+	catalog.LegacyCatalog[0].Published = true
+	catalog.LegacyCatalog[0].DeliveryVerified = true
+	catalog.LegacyCatalog[0].PurchaseURL = model.LegacyCreditPurchaseURL
+	catalog.Products, catalog.Version = catalog.LegacyCatalog, 5
+	raw, err := common.Marshal(catalog)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&model.Option{}).Where(&model.Option{Key: model.CreditCatalogOptionKey}).Update("value", string(raw)).Error)
+	if missing {
+		require.NoError(t, db.Delete(&model.StoreProduct{}, 1).Error)
+	}
+	require.NoError(t, model.UpdateOption("StoreRechargeEnabled", "false"))
+	for _, table := range []any{&model.BillingReservation{}, &model.BalanceTransaction{}, &model.TopUp{}, &model.Channel{}} {
+		require.NoError(t, db.Migrator().DropTable(table))
+		require.NoError(t, db.AutoMigrate(table))
+	}
+	require.NoError(t, db.Model(&model.User{}).Where("id = ?", 1).Updates(map[string]any{"quota": 123456, "used_quota": 41, "total_recharge_cents": 100}).Error)
+	require.NoError(t, db.Create(&model.BillingReservation{RequestID: "retirement-fixture", UserID: 1, Reserved: 4, Target: 10, Applied: 4, State: "needs_review"}).Error)
+	require.NoError(t, db.Create(&model.BalanceTransaction{UserId: 1, AmountQuota: 123456, BalanceBefore: 0, BalanceAfter: 123456, Type: model.BalanceTxTypeRecharge, ReferenceType: model.BalanceTxReferenceRedemption, ReferenceId: 1}).Error)
+	require.NoError(t, db.Create(&model.TopUp{UserId: 1, TradeNo: "retirement-fixture-order", Status: "success", Amount: 1, Money: 1}).Error)
+	require.NoError(t, db.Create(&model.Channel{Id: 2, Status: 2, Name: "disabled fixture"}).Error)
+	require.NoError(t, db.Create(&model.RedemptionBatch{Id: 77, Name: "historical", Status: model.RedemptionBatchStatusEnabled, Source: model.RedemptionSourceStore, Type: model.RedemptionTypeBalance, Count: 1, Quota: 500000, FaceValueCents: 100}).Error)
+	require.NoError(t, db.Create(&model.Redemption{BatchId: 77, Key: "retirement-fixture-only", Status: common.RedemptionCodeStatusEnabled, Source: model.RedemptionSourceStore, Type: model.RedemptionTypeBalance, Quota: 500000, FaceValueCents: 100}).Error)
+	engine.GET("/catalog", controller.GetCreditCatalog)
+	engine.GET("/purchase/:kind/:id", controller.ResolveCreditPurchase)
+	return engine, token, db
+}
+
+func legacyRetirementProtectedState(t *testing.T, db *gorm.DB) map[string]string {
+	t.Helper()
+	state := map[string]string{}
+	for _, table := range []string{"users", "store_products", "billing_reservations", "balance_transactions", "top_ups", "channels", "redemptions", "redemption_batches"} {
+		var rows []map[string]any
+		require.NoError(t, db.Table(table).Order("id").Find(&rows).Error)
+		raw, err := common.Marshal(rows)
+		require.NoError(t, err)
+		state[table] = string(raw)
+	}
+	return state
+}
+
+func TestLegacyRetirementPreservesHistoryAndRuntime(t *testing.T) {
+	for _, missing := range []bool{true, false} {
+		t.Run(fmt.Sprintf("missing=%t", missing), func(t *testing.T) {
+			engine, token, db := legacyRetirementFixture(t, missing)
+			response := runtimeProbeRequest(engine, token)
+			if missing {
+				require.Equal(t, http.StatusServiceUnavailable, response.Code)
+				assert.Contains(t, response.Body.String(), "APPROVAL_VIEW_INVALID")
+			} else {
+				require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+				assert.Contains(t, response.Body.String(), `"effective_product_count":2`)
+			}
+			before, err := model.GetCreditCatalog()
+			require.NoError(t, err)
+			protected := legacyRetirementProtectedState(t, db)
+			var originalEvents []model.CreditApprovalEvent
+			require.NoError(t, db.Order("id").Find(&originalEvents).Error)
+			plan, err := model.ReviewLegacyCreditRetirement(context.Background(), db, 1, "review/legacy-retirement-fixture")
+			require.NoError(t, err)
+			if missing {
+				assert.Equal(t, []int{1}, plan.MissingStoreIDs)
+			} else {
+				assert.Empty(t, plan.MissingStoreIDs)
+			}
+			assert.Equal(t, protected, legacyRetirementProtectedState(t, db), "review performs no business writes")
+			confirmation, err := plan.Confirmation()
+			require.NoError(t, err)
+			require.NoError(t, model.RetireLegacyCreditCatalog(context.Background(), db, plan, confirmation))
+			after, err := model.GetCreditCatalog()
+			require.NoError(t, err)
+			assert.Equal(t, before.LegacyProducts, after.LegacyProducts)
+			assert.Equal(t, before.LegacyCatalog, after.LegacyCatalog)
+			assert.Equal(t, before.LegacyEvidenceBatchIDs, after.LegacyEvidenceBatchIDs)
+			assert.Equal(t, before.ApprovalProducts, after.ApprovalProducts)
+			assert.Equal(t, before.Version+1, after.Version)
+			require.NotNil(t, after.LegacyRetirement)
+			assert.Equal(t, plan, after.LegacyRetirement.Plan)
+			var events []model.CreditApprovalEvent
+			require.NoError(t, db.Order("id").Find(&events).Error)
+			require.Len(t, events, len(originalEvents)+1)
+			assert.Equal(t, originalEvents, events[:len(originalEvents)])
+			audit := events[len(events)-1]
+			assert.Equal(t, "retire_legacy", audit.Decision)
+			assert.Equal(t, plan.PrepareEventID, audit.ReferenceApprovalID)
+			require.NoError(t, model.RetireLegacyCreditCatalog(context.Background(), db, plan, confirmation))
+			var count int64
+			require.NoError(t, db.Model(&model.CreditApprovalEvent{}).Count(&count).Error)
+			assert.EqualValues(t, len(events), count, "retry appends no event")
+			assert.Equal(t, protected, legacyRetirementProtectedState(t, db))
+			response = runtimeProbeRequest(engine, token)
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			assert.Contains(t, response.Body.String(), `"effective_product_count":0`)
+			assert.Contains(t, response.Body.String(), `"status":"PASS"`)
+			assert.Contains(t, response.Body.String(), `"billing_mode":"enforce"`)
+			// Even a later switch change cannot resurrect retired cached cards.
+			require.NoError(t, model.UpdateOption("StoreRechargeEnabled", "true"))
+			for _, path := range []string{"/purchase/legacy/1", "/purchase/product/credit-1?revision=0"} {
+				rec := httptest.NewRecorder()
+				engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+				assert.Equal(t, http.StatusNotFound, rec.Code, path)
+				assert.Empty(t, rec.Header().Get("Location"))
+			}
+			public, err := model.GetPublicCreditCatalog()
+			require.NoError(t, err)
+			assert.Empty(t, public.Products)
+			assert.Nil(t, public.LegacyRetirement)
+			rec := httptest.NewRecorder()
+			engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/catalog", nil))
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.NotContains(t, rec.Body.String(), "legacy_retirement")
+			assert.NotContains(t, rec.Body.String(), "evidence_ref")
+			response = runtimeProbeRequest(engine, token)
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+			assert.Contains(t, response.Body.String(), `"effective_product_count":0`)
+			var stored model.Option
+			require.NoError(t, db.Where(&model.Option{Key: model.CreditCatalogOptionKey}).First(&stored).Error)
+			var oldReader struct {
+				Products []model.CreditProduct `json:"products"`
+			}
+			require.NoError(t, common.UnmarshalJsonStr(stored.Value, &oldReader))
+			assert.Empty(t, oldReader.Products, "previous catalog reader cannot republish frozen history")
+		})
+	}
+}
+
+func TestLegacyRetirementRejectsDriftAndRollsBack(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		change func(*testing.T, *gorm.DB, *model.LegacyCreditRetirementPlan)
+	}{
+		{"stale catalog", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) { p.CatalogVersion++ }},
+		{"changed source", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) {
+			require.NoError(t, db.Model(&model.StoreProduct{}).Where("id = ?", 2).Update("name", "changed").Error)
+		}},
+		{"restored missing source", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) {
+			require.NoError(t, db.Create(&model.StoreProduct{Id: 1, Name: "unexpected"}).Error)
+		}},
+		{"store enabled", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) {
+			require.NoError(t, model.UpdateOption("StoreRechargeEnabled", "true"))
+		}},
+		{"payments enabled", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) {
+			require.NoError(t, model.UpdateOption("DisableOnlinePayments", "false"))
+		}},
+		{"operator disabled", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) {
+			require.NoError(t, db.Model(&model.User{}).Where("id = ?", 1).Update("status", common.UserStatusDisabled).Error)
+		}},
+		{"prepare missing", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) {
+			require.NoError(t, db.Delete(&model.CreditApprovalEvent{}, p.PrepareEventID).Error)
+		}},
+		{"persistence failure", func(t *testing.T, db *gorm.DB, p *model.LegacyCreditRetirementPlan) {
+			require.NoError(t, db.Callback().Update().Before("gorm:update").Register("retirement:fail", func(tx *gorm.DB) {
+				if tx.Statement.Table == "options" {
+					tx.AddError(errors.New("injected persistence failure"))
+				}
+			}))
+			t.Cleanup(func() { require.NoError(t, db.Callback().Update().Remove("retirement:fail")) })
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, _, db := legacyRetirementFixture(t, true)
+			plan, err := model.ReviewLegacyCreditRetirement(context.Background(), db, 1, "review/failure-fixture")
+			require.NoError(t, err)
+			test.change(t, db, &plan)
+			protected := legacyRetirementProtectedState(t, db)
+			confirmation, err := plan.Confirmation()
+			require.NoError(t, err)
+			require.Error(t, model.RetireLegacyCreditCatalog(context.Background(), db, plan, confirmation))
+			assert.Equal(t, protected, legacyRetirementProtectedState(t, db))
+			var count int64
+			require.NoError(t, db.Model(&model.CreditApprovalEvent{}).Where("decision = ?", "retire_legacy").Count(&count).Error)
+			assert.Zero(t, count)
+			catalog, err := model.GetCreditCatalog()
+			require.NoError(t, err)
+			assert.EqualValues(t, 5, catalog.Version)
+			assert.Nil(t, catalog.LegacyRetirement)
+		})
+	}
+}
+
+func TestLegacyRetirementAuditTamperingFailsClosed(t *testing.T) {
+	for _, field := range []string{"missing event", "changed digest", "changed preparation", "changed frozen history", "removed marker", "republished compatibility"} {
+		t.Run(field, func(t *testing.T) {
+			engine, token, db := legacyRetirementFixture(t, true)
+			plan, err := model.ReviewLegacyCreditRetirement(context.Background(), db, 1, "review/tamper-fixture")
+			require.NoError(t, err)
+			confirmation, err := plan.Confirmation()
+			require.NoError(t, err)
+			require.Error(t, model.RetireLegacyCreditCatalog(context.Background(), db, plan, "wrong confirmation"))
+			require.NoError(t, model.RetireLegacyCreditCatalog(context.Background(), db, plan, confirmation))
+			var row model.Option
+			require.NoError(t, db.Where(&model.Option{Key: model.CreditCatalogOptionKey}).First(&row).Error)
+			var catalog model.CreditCatalog
+			require.NoError(t, common.UnmarshalJsonStr(row.Value, &catalog))
+			switch field {
+			case "missing event":
+				require.NoError(t, db.Delete(&model.CreditApprovalEvent{}, catalog.LegacyRetirement.EventID).Error)
+			case "changed digest":
+				require.NoError(t, db.Model(&model.CreditApprovalEvent{}).Where("id = ?", catalog.LegacyRetirement.EventID).Update("digest", "forged").Error)
+			case "changed preparation":
+				require.NoError(t, db.Model(&model.CreditApprovalEvent{}).Where("id = ?", plan.PrepareEventID).Update("created_time", 1).Error)
+			case "changed frozen history":
+				catalog.LegacyCatalog[0].Published = false
+			case "removed marker":
+				catalog.LegacyRetirement = nil
+			case "republished compatibility":
+				catalog.Products = catalog.LegacyCatalog
+			}
+			raw, err := common.Marshal(catalog)
+			require.NoError(t, err)
+			require.NoError(t, db.Model(&model.Option{}).Where(&model.Option{Key: model.CreditCatalogOptionKey}).Update("value", string(raw)).Error)
+			response := runtimeProbeRequest(engine, token)
+			assert.Equal(t, http.StatusServiceUnavailable, response.Code)
+			assert.Contains(t, response.Body.String(), "APPROVAL_VIEW_INVALID")
+		})
+	}
+}
+
+func TestLegacyRetirementKeepsNewPublications(t *testing.T) {
+	engine, token, db := legacyRetirementFixture(t, true)
+	product := runtimePublishedProduct(t, db)
+	plan, err := model.ReviewLegacyCreditRetirement(context.Background(), db, 1, "review/new-publication-fixture")
+	require.NoError(t, err)
+	confirmation, err := plan.Confirmation()
+	require.NoError(t, err)
+	require.NoError(t, model.RetireLegacyCreditCatalog(context.Background(), db, plan, confirmation))
+	response := runtimeProbeRequest(engine, token)
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), `"effective_product_count":1`, "new publications still block the zero-product deployment policy")
+	require.NoError(t, model.UpdateOption("StoreRechargeEnabled", "true"))
+	public, err := model.GetPublicCreditCatalog()
+	require.NoError(t, err)
+	require.Len(t, public.Products, 1)
+	assert.Equal(t, product.ID, public.Products[0].ID)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, fmt.Sprintf("/purchase/product/%s?revision=%d", product.ID, product.Revision), nil))
+	assert.Equal(t, http.StatusFound, rec.Code)
+	assert.Equal(t, product.PurchaseURL, rec.Header().Get("Location"))
+}
+
+// Opt-in handoff to real dump/restore tools. The seed has only synthetic data;
+// verify never drops tables or targets a caller-provided database address.
+func TestLegacyRetirementRecoveryFixture(t *testing.T) {
+	mode := os.Getenv("LEGACY_RETIREMENT_RECOVERY")
+	if mode != "seed" && mode != "verify" {
+		t.Skip("isolated recovery artifact not requested")
+	}
+	dialect := os.Getenv("RUNTIME_PROBE_DIALECT")
+	require.Contains(t, []string{"sqlite", "mysql", "postgres"}, dialect)
+	path := "/evidence/recovery-" + dialect + ".json"
+	var artifact struct {
+		Plan         model.LegacyCreditRetirementPlan `json:"plan"`
+		Confirmation string                           `json:"confirmation"`
+		Protected    map[string]string                `json:"protected"`
+		Catalog      model.CreditCatalog              `json:"catalog"`
+	}
+	if mode == "seed" {
+		_, _, db := legacyRetirementFixture(t, true)
+		var err error
+		artifact.Plan, err = model.ReviewLegacyCreditRetirement(context.Background(), db, 1, "review/isolated-recovery")
+		require.NoError(t, err)
+		artifact.Confirmation, err = artifact.Plan.Confirmation()
+		require.NoError(t, err)
+		artifact.Protected = legacyRetirementProtectedState(t, db)
+		artifact.Catalog, err = model.GetCreditCatalog()
+		require.NoError(t, err)
+		raw, err := common.Marshal(artifact)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, raw, 0o600))
+		if dialect == "sqlite" {
+			require.NoError(t, db.Exec("VACUUM INTO ?", "/evidence/recovery-sqlite.db").Error)
+		}
+		return
+	}
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NoError(t, common.Unmarshal(raw, &artifact))
+	priorDB, priorLog := model.DB, model.LOG_DB
+	priorMain, priorLogType := common.MainDatabaseType(), common.LogDatabaseType()
+	priorPath, priorOptions := common.SQLitePath, common.OptionMap
+	priorStore, priorPayments := operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments
+	priorMode := operation_setting.GetBillingReservePolicy().Mode
+	common.SQLitePath = "/evidence/recovery-sqlite.db"
+	t.Setenv("LOG_SQL_DSN", "")
+	switch dialect {
+	case "sqlite":
+		t.Setenv("SQL_DSN", "local")
+	case "mysql":
+		t.Setenv("SQL_DSN", "root:probe-fixture@tcp(clearapi-runtime-probe-mysql:3306)/runtime_probe_test?charset=utf8mb4&parseTime=True&loc=UTC")
+	case "postgres":
+		t.Setenv("SQL_DSN", "postgres://postgres:probe-fixture@clearapi-runtime-probe-pg:5432/runtime_probe_test?sslmode=disable")
+	}
+	require.NoError(t, model.InitDBWithoutMigration())
+	db := model.DB
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+		model.DB, model.LOG_DB = priorDB, priorLog
+		common.SetDatabaseTypes(priorMain, priorLogType)
+		model.InitColumnQuotingForTest()
+		common.SQLitePath, common.OptionMap = priorPath, priorOptions
+		operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments = priorStore, priorPayments
+		require.NoError(t, config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_reserve_policy"), map[string]string{"mode": priorMode}))
+	})
+	common.OptionMap = map[string]string{model.PoolMasterOptionKey: "false", "DisableOnlinePayments": "true", "StoreRechargeEnabled": "false", "billing_reserve_policy.mode": "enforce"}
+	operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments = false, true
+	require.NoError(t, config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_reserve_policy"), map[string]string{"mode": "enforce"}))
+	before, err := model.GetCreditCatalog()
+	require.NoError(t, err)
+	for range 2 {
+		require.NoError(t, db.AutoMigrate(&model.Option{}, &model.StoreProduct{}, &model.CreditApprovalEvent{}, &model.RedemptionBatch{}, &model.Redemption{}))
+		require.NoError(t, model.PrepareCreditCatalog())
+	}
+	after, err := model.GetCreditCatalog()
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "repeated migrations preserve retirement and frozen history")
+	require.NoError(t, model.RetireLegacyCreditCatalog(context.Background(), db, artifact.Plan, artifact.Confirmation))
+	assert.Equal(t, artifact.Protected, legacyRetirementProtectedState(t, db))
+	assert.Equal(t, artifact.Catalog.LegacyProducts, after.LegacyProducts)
+	assert.Equal(t, artifact.Catalog.LegacyCatalog, after.LegacyCatalog)
+	assert.Equal(t, artifact.Catalog.ApprovalProducts, after.ApprovalProducts)
+	engine := gin.New()
+	engine.GET("/api/clearapi/runtime-integrity", controller.RuntimeIntegrityHandler(runtimeFixtureIdentity()))
+	response := runtimeProbeRequest(engine, "")
+	require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+	assert.Contains(t, response.Body.String(), `"effective_product_count":0`)
+	t.Logf("restored %s: history, accounting, idempotency, two migrations and both runtime buying views verified", dialect)
 }

@@ -92,6 +92,9 @@ func lockedCreditCatalog(tx *gorm.DB) (Option, CreditCatalog, error) {
 	var c CreditCatalog
 	err := common.UnmarshalJsonStr(row.Value, &c)
 	if err == nil && c.ApprovalSchema == 1 {
+		if c.LegacyRetirement != nil && len(c.Products) != 0 {
+			return row, c, errors.New("retired compatibility projection was republished")
+		}
 		c.Products = c.ApprovalProducts
 	}
 	return row, c, err
@@ -109,6 +112,9 @@ func persistCreditCatalog(tx *gorm.DB, row Option, c CreditCatalog) error {
 			return err
 		}
 		c.Products = products
+	} else if c.LegacyRetirement != nil {
+		// Previous readers must also see no legacy catalog publication.
+		c.Products = []CreditProduct{}
 	} else {
 		c.Products = c.LegacyCatalog
 	}
@@ -487,7 +493,7 @@ func MapLegacyCreditProduct(id string, version, revision int64, legacyID int, ac
 		if err != nil {
 			return err
 		}
-		if actor <= 0 || c.Unified || c.ApprovalSchema != 1 || c.Version != version || legacyID <= 0 {
+		if actor <= 0 || c.Unified || c.LegacyRetirement != nil || c.ApprovalSchema != 1 || c.Version != version || legacyID <= 0 {
 			return errors.New("invalid legacy mapping operation")
 		}
 		var legacy *StoreProduct
@@ -589,36 +595,14 @@ func getEffectiveCreditProducts(tx *gorm.DB) (CreditCatalog, error) {
 
 func validateLegacyCreditSnapshot(tx *gorm.DB, c CreditCatalog) error {
 	var current []*StoreProduct
-	if err := tx.Find(&current).Error; err != nil {
+	if err := tx.Order("id").Find(&current).Error; err != nil {
 		return err
 	}
-	for _, row := range current {
-		found := false
-		for _, frozen := range c.LegacyProducts {
-			if row.Id != frozen.Id {
-				continue
-			}
-			if !reflect.DeepEqual(row, frozen) {
-				return errors.New("legacy product changed outside approval workflow")
-			}
-			found = true
-		}
-		if !found {
-			return errors.New("unknown legacy product outside frozen compatibility set")
-		}
+	missing, err := legacyCreditMissingSources(c, current)
+	if err != nil {
+		return err
 	}
-	for _, frozen := range c.LegacyProducts {
-		found := false
-		for _, row := range current {
-			if row.Id == frozen.Id {
-				found = true
-			}
-		}
-		if !found {
-			return errors.New("frozen legacy product missing")
-		}
-	}
-	return nil
+	return validateLegacyCreditRetirement(tx, c, current, missing)
 }
 
 // ActivateUnifiedCreditView is deliberately not registered as an HTTP route in
@@ -629,7 +613,7 @@ func ActivateUnifiedCreditView(version int64, actor int) error {
 		if err != nil {
 			return err
 		}
-		if actor <= 0 || c.Version != version || c.Unified || !operation_setting.StoreRechargeEnabled {
+		if actor <= 0 || c.Version != version || c.Unified || c.LegacyRetirement != nil || !operation_setting.StoreRechargeEnabled {
 			return errors.New("invalid unified cutover")
 		}
 		if err := validateLegacyCreditSnapshot(tx, c); err != nil {
@@ -683,7 +667,7 @@ func GetPublicCreditCatalog() (CreditCatalog, error) {
 	if err != nil {
 		return effective, err
 	}
-	if !effective.Unified && operation_setting.StoreRechargeEnabled {
+	if !effective.Unified && effective.LegacyRetirement == nil && operation_setting.StoreRechargeEnabled {
 		for _, legacy := range effective.LegacyCatalog {
 			if !legacy.Published {
 				continue
@@ -706,6 +690,7 @@ func GetPublicCreditCatalog() (CreditCatalog, error) {
 	}
 	effective.LegacyProducts, effective.LegacyCatalog, effective.ApprovalProducts = nil, nil, nil
 	effective.LegacyEvidenceBatchIDs = nil
+	effective.LegacyRetirement = nil
 	// Public projections cannot disclose internal approval actors or evidence.
 	for i := range effective.Products {
 		p := &effective.Products[i]
