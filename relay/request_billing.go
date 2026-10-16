@@ -104,6 +104,19 @@ func RefundFailedRequestBilling(c *gin.Context, info *relaycommon.RelayInfo, api
 				c.Set("upstream_usage_uncertain", true)
 			}
 		}
+		// An ordinary API channel's sole attempt can definitively reject work.
+		// Pool/route-chain policies, retries and ambiguous usage retain their
+		// existing conservative reconciliation path.
+		if routechain.StateFrom(c) == nil && info.ChannelMeta != nil && info.RetryIndex == 0 &&
+			service.IsUpstreamRejectionNoWork(apiErr) && !c.GetBool("upstream_usage_uncertain") &&
+			!c.GetBool("tool_chain_no_retry") && (!c.Writer.Written() || (!info.IsStream && c.Writer.Status() >= 400)) &&
+			service.CodexUsageForSettlement(c, info) == nil && code != "account_revoked" && code != "pool_admission_required" {
+			channel, err := model.GetChannelById(info.ChannelId, false)
+			if err == nil && !channel.PoolChannelBound() {
+				info.Billing.Refund(c)
+				return apiErr
+			}
+		}
 		if c.GetBool("upstream_usage_uncertain") || c.GetBool("upstream_attempted") {
 			if usage := service.CodexUsageForSettlement(c, info); usage != nil {
 				service.PostTextConsumeQuota(c, info, usage, nil)

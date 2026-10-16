@@ -300,7 +300,14 @@ elif "psql" in a:
     elif "id=1 AND status=1" in q: print(f.get("provider", "1"))
     elif "FROM abilities" in q and "NOT" not in q: print(f.get("ability", "1"))
     elif "FROM abilities" in q: print(f.get("extra_ability", "0"))
+    elif "clearapi-commercial-billing" in q: print(f.get("invalid_commercial_billing", "0"))
+    elif "status NOT IN" in q:
+        print(f.get("invalid_channel_status", "0"))
     elif "count(*) FROM channels" in q: print(f.get("extra_channel", "0"))
+    elif "clearapi-commercial-config" in q:
+        print(f.get("commercial_config", '1\\t1\\tmodel-a,model-b\\tdefault\\tmodel-a\\tdefault\\ttrue\\n1\\t1\\tmodel-a,model-b\\tdefault\\tmodel-b\\tdefault\\ttrue').encode().decode('unicode_escape'))
+    elif "clearapi-commercial-pricing" in q:
+        print(f.get("commercial_pricing", 'ModelRatio\\t{"model-a":1,"model-b":2}\\nGroupRatio\\t{"default":1}\\nSelfUseModeEnabled\\tfalse'))
     elif "SELECT status FROM channels" in q: print(f.get("disabled", "2"))
     elif "DisableOnlinePayments" in q: print(f.get("off", "2"))
     else: sys.exit("Forbidden query")
@@ -376,9 +383,13 @@ print(json.dumps({"success":True,"data":{
 
     def test_commercial_rejects_drift_and_unsafe_stop(self):
         for fixture in ({"closed":"true"}, {"register":False}, {"password":False},
-                        {"email":False}, {"password_login":False}, {"provider":"0"}, {"ability":"0"},
-                        {"extra_ability":"1"}, {"extra_channel":"1"},
-                        {"disabled":"1"}, {"grace":"10s"},
+                        {"email":False}, {"password_login":False},
+                        {"commercial_config":'1\t1\tmodel-a\tdefault\tmodel-b\tdefault\ttrue'},
+                        {"commercial_config":'1\t2\tmodel-a\tdefault\tmodel-a\tdefault\ttrue'},
+                        {"commercial_pricing":'ModelRatio\t{"model-a":0}\nGroupRatio\t{"default":1}'},
+                        {"commercial_pricing":'ModelRatio\t{"other-model":1}\nGroupRatio\t{"default":1}'},
+                        {"commercial_pricing":'ModelRatio\tbroken-json'},
+                        {"invalid_channel_status":"1"}, {"grace":"10s"},
                         {"signal":"SIGKILL"}, {"timeout":"180"}, {"sql_error":True}):
             with self.subTest(fixture=fixture):
                 r = self.run_gate("verify_launch_baseline; verify_stop_policy",
@@ -386,13 +397,37 @@ print(json.dumps({"success":True,"data":{
                 self.assertEqual(r.returncode, 1, r.stderr)
                 self.assertIn("FAIL:", r.stderr)
 
+    def test_commercial_accepts_multiple_dynamic_channels_models_and_groups(self):
+        config = (
+            "1\t1\tmodel-a,shared-model\tdefault,vip\tmodel-a\tdefault\ttrue\n"
+            "1\t1\tmodel-a,shared-model\tdefault,vip\tshared-model\tvip\ttrue\n"
+            "7\t1\tshared-model,model-c\tpro\tshared-model\tpro\ttrue\n"
+            "7\t1\tshared-model,model-c\tpro\tmodel-c\tpro\ttrue"
+        )
+        pricing = (
+            "ModelRatio\t{\"model-a\":1,\"shared-model\":2,\"model-c\":3}\n"
+            "GroupRatio\t{\"default\":1,\"vip\":1.2,\"pro\":0.8}\n"
+            "SelfUseModeEnabled\tfalse"
+        )
+        r = self.run_gate("verify_launch_baseline", "DEPLOY_LAUNCH_BASELINE=commercial\nDEPLOY_EXPECT_CHANNELS=1,2",
+                          commercial_config=config, commercial_pricing=pricing)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("dynamic commercial configuration PASS", r.stderr)
+
+    def test_commercial_accounting_accepts_orders_and_blocks_invalid_balances(self):
+        r = self.run_gate("verify_commercial_billing", "DEPLOY_LAUNCH_BASELINE=commercial")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        r = self.run_gate("verify_commercial_billing", "DEPLOY_LAUNCH_BASELINE=commercial", invalid_commercial_billing="1")
+        self.assertEqual(r.returncode, 1, r.stderr)
+        self.assertIn("invalid wallet, token or offline-order accounting", r.stderr)
+
     def test_closed_baseline_rejects_open_state(self):
         r = self.run_gate("verify_launch_baseline", closed="false")
         self.assertEqual(r.returncode, 1, r.stderr)
 
-    def test_commercial_rejects_old_channel_expectations(self):
-        r = self.run_gate("true", "DEPLOY_LAUNCH_BASELINE=commercial\nDEPLOY_EXPECT_CHANNELS=1,2")
-        self.assertEqual(r.returncode, 2, r.stderr)
+    def test_commercial_does_not_require_fixed_channel_expectations(self):
+        r = self.run_gate("verify_launch_baseline", "DEPLOY_LAUNCH_BASELINE=commercial\nDEPLOY_EXPECT_CHANNELS=1,2")
+        self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_unknown_baseline_rejected(self):
         r = self.run_gate("true", "DEPLOY_LAUNCH_BASELINE=typo")
@@ -952,6 +987,9 @@ elif a[0]=='compose':
     elif 'psql' in a:
         q=a[-1]
         if 'EmailVerificationEnabled' in q: print('true')
+        elif 'clearapi-commercial-config' in q: print(('1\\t2\\tmodel-a\\tdefault\\tmodel-a\\tdefault\\ttrue' if fail=='provider' else '1\\t1\\tmodel-a,model-b\\tdefault\\tmodel-a\\tdefault\\ttrue\\n1\\t1\\tmodel-a,model-b\\tdefault\\tmodel-b\\tdefault\\ttrue').encode().decode('unicode_escape'))
+        elif 'clearapi-commercial-pricing' in q: print('ModelRatio\\t{"model-a":1,"model-b":2}\\nGroupRatio\\t{"default":1}\\nSelfUseModeEnabled\\tfalse'.encode().decode('unicode_escape'))
+        elif 'status NOT IN' in q: print('0')
         elif 'id=1 AND status=1' in q: print('0' if fail=='provider' else '1')
         elif 'FROM abilities' in q: print('0' if 'NOT' in q else '1')
         elif 'DisableOnlinePayments' in q: print('2')
@@ -1007,7 +1045,7 @@ else: sys.exit('Forbidden docker operation')
         self.assertEqual(logins[0]["stdin_sha256"], hashlib.sha256(b"non-secret-ci-credential").hexdigest())
         self.assertTrue(all(x.get("stdin_length", 0) == 0 for x in trace if x not in logins))
         queries = [x["args"][-1] for x in trace if "psql" in x["args"]]
-        self.assertTrue(any("id=1 AND status=1" in q for q in queries))
+        self.assertTrue(any("clearapi-commercial-config" in q for q in queries))
         self.assertTrue(any("SELECT status FROM channels WHERE id=2" in q for q in queries))
         self.assertFalse(any("SELECT status FROM channels WHERE id=1;" in q for q in queries))
         self.assertTrue(any(x["args"][-5:] == ["up","-d","--timeout","150","new-api"] for x in trace))
@@ -1065,7 +1103,7 @@ else: sys.exit('Forbidden docker operation')
         result, trace, logins = self.run_chain(failure="provider")
         self.assertEqual(result.returncode, 1)
         self.assertFalse(logins)
-        self.assertIn("Channel 1", result.stderr)
+        self.assertIn("invalid commercial channel/model/group configuration", result.stderr)
 
     def test_backup_failure_prevents_login(self):
         result, trace, logins = self.run_chain(failure="backup")

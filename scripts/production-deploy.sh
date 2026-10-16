@@ -69,8 +69,8 @@ else
 fi
 LAUNCH_BASELINE="${DEPLOY_LAUNCH_BASELINE:-closed}"
 case "$LAUNCH_BASELINE" in
-  closed) CLOSED_LAUNCH=true; DEFAULT_CHANNELS=1,2 ;;
-  commercial) CLOSED_LAUNCH=false; DEFAULT_CHANNELS=2 ;;
+  closed) CLOSED_LAUNCH=true; DEFAULT_CHANNELS=1,2; DEFAULT_EMPTY_TABLES=store_products,top_ups,offline_orders,subscription_orders ;;
+  commercial) CLOSED_LAUNCH=false; DEFAULT_CHANNELS=; DEFAULT_EMPTY_TABLES=store_products,top_ups,subscription_orders ;;
   *) echo "REFUSING: DEPLOY_LAUNCH_BASELINE must be closed or commercial" >&2; exit 2 ;;
 esac
 
@@ -115,13 +115,10 @@ MIGRATION_FLAGS="${DEPLOY_MIGRATION_FLAGS:-}"
 # Frozen negative-gate expectations (H4 acceptance baseline, live-verified).
 EXPECT_ENV_KEYS="${DEPLOY_EXPECT_ENV_KEYS:-CLEARAPI_ENABLE_RESPONSES_WEBSOCKET=false CLEARAPI_ENABLE_REALTIME=false}"
 EXPECT_CHANNELS="${DEPLOY_EXPECT_CHANNELS:-$DEFAULT_CHANNELS}"
-if [ "$LAUNCH_BASELINE" = commercial ] && [ "$EXPECT_CHANNELS" != 2 ]; then
-  echo "REFUSING: commercial baseline requires DEPLOY_EXPECT_CHANNELS=2" >&2; exit 2
-fi
 EXPECT_USER_ID="${DEPLOY_EXPECT_USER_ID:-2}"
 EXPECT_TOKEN_IDS="${DEPLOY_EXPECT_TOKEN_IDS:-1,2}"
 EXPECT_REVIEW_ROWS="${DEPLOY_EXPECT_REVIEW_ROWS:-4/10/4 41/93/41}"
-EXPECT_EMPTY_TABLES="${DEPLOY_EXPECT_EMPTY_TABLES:-store_products,top_ups,offline_orders,subscription_orders}"
+EXPECT_EMPTY_TABLES="${DEPLOY_EXPECT_EMPTY_TABLES:-$DEFAULT_EMPTY_TABLES}"
 POOL_OPTION_PATTERN="${DEPLOY_POOL_OPTION_PATTERN:-%pool%}"
 POLICY_MODE_KEY="${DEPLOY_POLICY_MODE_KEY:-billing_reserve_policy.mode}"
 
@@ -296,6 +293,101 @@ PYEOF
 psql_q() { # read-only single query against the production database
   compose exec -T "$PG_SERVICE" psql -U "$PG_USER" -d "$PG_DB" -Atq -v ON_ERROR_STOP=1 -c "$1" \
     || die "read-only database probe failed"
+}
+verify_commercial_configuration() {
+  local rows active_pairs pricing
+  rows="$(psql_q "/* clearapi-commercial-config */ SELECT concat_ws(E'\t', c.id::text, c.status::text, replace(replace(replace(coalesce(c.models, ''), E'\t', ' '), E'\r', ' '), E'\n', ' '), replace(replace(replace(coalesce(c.\"group\", ''), E'\t', ' '), E'\r', ' '), E'\n', ' '), coalesce(a.model, ''), coalesce(a.\"group\", ''), coalesce(a.enabled::text, '')) FROM channels c FULL OUTER JOIN abilities a ON a.channel_id = c.id WHERE c.status = 1 OR a.enabled = true ORDER BY c.id, a.model, a.\"group\";")" \
+    || die "launch baseline: commercial configuration query failed"
+  active_pairs="$(printf '%s\n' "$rows" | python3 -c '
+import sys
+
+channels = {}
+abilities = []
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    fields = line.split("\t")
+    if len(fields) != 7:
+        raise SystemExit("invalid configuration row")
+    channel_id, status, models, groups, model, group, enabled = fields
+    if not channel_id.isdigit() or status not in {"1", "2", "3"}:
+        raise SystemExit("invalid channel identity or status")
+    channel = channels.setdefault(channel_id, {"status": status, "models": set(), "groups": set()})
+    if channel["status"] != status:
+        raise SystemExit("inconsistent channel status")
+    channel["models"].update(item.strip() for item in models.split(",") if item.strip())
+    channel["groups"].update(item.strip() for item in groups.split(",") if item.strip())
+    if enabled == "true":
+        abilities.append((channel_id, model.strip(), group.strip()))
+if not channels:
+    raise SystemExit("no configured channels")
+if not abilities:
+    raise SystemExit("no enabled abilities")
+active_channels = {channel_id for channel_id, _, _ in abilities}
+if any(channel["status"] == "1" and channel_id not in active_channels for channel_id, channel in channels.items()):
+    raise SystemExit("enabled channel has no enabled abilities")
+for channel_id, model, group in abilities:
+    channel = channels.get(channel_id)
+    if channel is None or channel["status"] != "1":
+        raise SystemExit("enabled ability is not attached to an enabled channel")
+    if not model or not group or model not in channel["models"] or group not in channel["groups"]:
+        raise SystemExit("enabled ability does not match its channel model/group configuration")
+    print(model + "\t" + group)
+')" || die "launch baseline: invalid commercial channel/model/group configuration"
+  pricing="$(psql_q "/* clearapi-commercial-pricing */ SELECT concat_ws(E'\t', key, replace(replace(replace(value, E'\t', ' '), E'\r', ' '), E'\n', ' ')) FROM options WHERE key IN ('ModelPrice', 'ModelRatio', 'GroupRatio', 'SelfUseModeEnabled', 'billing_setting.billing_mode', 'billing_setting.billing_expr') ORDER BY key;")" \
+    || die "launch baseline: commercial pricing query failed"
+  ACTIVE_PAIRS="$active_pairs" python3 -c '
+import json
+import math
+import os
+import sys
+
+pricing = {}
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if not line:
+        continue
+    fields = line.split("\t")
+    if len(fields) != 2:
+        raise SystemExit("invalid pricing row")
+    pricing[fields[0]] = fields[1]
+if not pricing:
+    raise SystemExit("missing pricing options")
+
+def read_map(name):
+    raw = pricing.get(name, "")
+    if not raw:
+        return {}
+    value = json.loads(raw)
+    if not isinstance(value, dict):
+        raise SystemExit(name + " must be a JSON object")
+    return value
+
+prices = read_map("ModelPrice")
+ratios = read_map("ModelRatio")
+modes = read_map("billing_setting.billing_mode")
+expressions = read_map("billing_setting.billing_expr")
+groups = read_map("GroupRatio")
+self_use = pricing.get("SelfUseModeEnabled", "false").lower() == "true"
+def positive(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value > 0
+models = os.environ.get("ACTIVE_PAIRS", "")
+for pair in models.splitlines():
+    model, group = pair.split("\t", 1)
+    has_legacy_price = positive(prices[model]) if model in prices else positive(ratios.get(model))
+    has_expression = modes.get(model) == "tiered_expr" and isinstance(expressions.get(model), str) and expressions[model].strip()
+    if not (has_legacy_price or has_expression or self_use):
+        raise SystemExit("enabled model has no effective price: " + model)
+    if not positive(groups.get(group, 1)):
+        raise SystemExit("enabled group has no positive ratio: " + group)
+' <<< "$(printf '%s\n' "$pricing")" || die "launch baseline: missing or invalid commercial pricing"
+  log "launch baseline: dynamic commercial configuration PASS"
+}
+verify_commercial_billing() {
+  local invalid
+  invalid="$(psql_q "/* clearapi-commercial-billing */ SELECT (SELECT count(*) FROM users WHERE quota < 0 OR used_quota < 0) + (SELECT count(*) FROM tokens WHERE used_quota < 0 OR (NOT unlimited_quota AND remain_quota < 0)) + (SELECT count(*) FROM offline_orders o WHERE o.money_cents <= 0 OR o.quota_per_code <= 0 OR o.code_count <= 0 OR o.status NOT IN ('paid', 'void') OR (SELECT count(*) FROM offline_order_codes l WHERE l.order_id = o.id) <> o.code_count) + (SELECT count(*) FROM offline_order_codes l LEFT JOIN offline_orders o ON o.id = l.order_id LEFT JOIN redemptions r ON r.id = l.redemption_id WHERE o.id IS NULL OR r.id IS NULL OR r.quota <> o.quota_per_code OR r.source <> 'OFFLINE_ORDER');")" \
+    || die "commercial billing query failed"
+  [ "$invalid" = 0 ] || die "commercial billing: invalid wallet, token or offline-order accounting"
+  log "commercial billing: wallet/token/offline-order invariants PASS"
 }
 verify_runtime_gate() { # phase expected-image-id; failure never falls back to SQL
   local phase="$1" expected_image="$2" cid identity binary receipt
@@ -497,13 +589,8 @@ actual="$(psql_q "SELECT value FROM options WHERE key='EmailVerificationEnabled'
 [ "$actual" = "$expected_email_verification" ] \
   || die "launch baseline: database EmailVerificationEnabled mismatch"
   if [ "$LAUNCH_BASELINE" = commercial ]; then
-    approved="$(psql_q "SELECT count(*) FROM channels WHERE id=1 AND status=1 AND base_url='https://api.88token.net' AND models='gpt-6-luna' AND \"group\"='default';")"
-    [ "$approved" = 1 ] || die "launch baseline: Channel 1 approved provider/model/group mismatch"
-    approved="$(psql_q "SELECT count(*) FROM abilities WHERE channel_id=1 AND enabled=true AND model='gpt-6-luna' AND \"group\"='default';")"
-    [ "$approved" = 1 ] || die "launch baseline: Channel 1 approved ability missing"
-    other="$(psql_q "SELECT count(*) FROM abilities WHERE enabled=true AND NOT (channel_id=1 AND model='gpt-6-luna' AND \"group\"='default');")"
-    [ "$other" = 0 ] || die "launch baseline: unapproved enabled abilities"
-    other="$(psql_q "SELECT count(*) FROM channels WHERE id<>1 AND status<>2;")"
+    verify_commercial_configuration
+    other="$(psql_q "SELECT count(*) FROM channels WHERE status NOT IN (1, 2, 3);")"
   else
     other="$(psql_q "SELECT count(*) FROM channels WHERE status<>2;")"
   fi
@@ -1005,6 +1092,9 @@ log "step 17: runtime negative gates PASS (env, binding, PG ports, network, pool
 # ===========================================================================
 # 18. billing invariants (read-only, least-privileged app role)
 # ===========================================================================
+if [ "$LAUNCH_BASELINE" = commercial ]; then
+  verify_commercial_billing
+fi
 POLICY_MODE="$(psql_q "SELECT value FROM options WHERE key='${POLICY_MODE_KEY}';")"
 [ "$POLICY_MODE" = "enforce" ] || die "step 18: ${POLICY_MODE_KEY}='${POLICY_MODE}' expected 'enforce'"
 

@@ -84,6 +84,15 @@ func ClaudeErrorWrapperLocal(err error, code string, statusCode int) *dto.Claude
 	return claudeErr
 }
 
+type upstreamRejectionNoWork struct{ error }
+
+// IsUpstreamRejectionNoWork requires evidence captured from the complete raw
+// response. A remapped status code or provider error string cannot create it.
+func IsUpstreamRejectionNoWork(apiErr *types.NewAPIError) bool {
+	var rejection *upstreamRejectionNoWork
+	return apiErr != nil && errors.As(apiErr.Err, &rejection)
+}
+
 func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFail bool) (newApiErr *types.NewAPIError) {
 	// Stage 7.1 provenance: capture the executor's reserved transport header
 	// from the raw response, before anything can rebuild the error. It is the
@@ -124,6 +133,15 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		oaiError := errResponse.TryToOpenAIError()
 		if oaiError != nil {
 			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode, types.WithExecutorErrorOrigin(executorOrigin), types.WithExecutorDispatchProof(dispatchPhase, providerTransport))
+			// Capture a complete rejection before channel status-code mapping.
+			// A malformed/truncated body or any work/usage payload is ambiguous.
+			var envelope map[string]json.RawMessage
+			if common.Unmarshal(responseBody, &envelope) == nil && len(envelope) == 1 && len(envelope["error"]) > 0 && len(oaiError.Metadata) == 0 {
+				switch resp.StatusCode {
+				case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusTooManyRequests:
+					newApiErr.Err = &upstreamRejectionNoWork{newApiErr.Err}
+				}
+			}
 			if showBodyWhenFail {
 				newApiErr.Err = buildErrWithBody(newApiErr.Error())
 			}

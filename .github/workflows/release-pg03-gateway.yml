@@ -2,6 +2,10 @@ name: PG03 reviewed main Gateway RC
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [CI]
+    branches: [main]
+    types: [completed]
 
 permissions:
   contents: read
@@ -12,11 +16,18 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SOURCE_COMMIT: ${{ github.sha }}
+  SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
   GHCR_IMAGE: ghcr.io/a3225865526-wq/clearapi
 
 jobs:
   release:
+    if: >-
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (vars.CLEARAPI_AUTO_RC_ENABLED == 'true' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -47,9 +58,15 @@ jobs:
       - name: Checkout exact PG03 source
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ env.SOURCE_COMMIT }}
           path: source
           persist-credentials: false
+
+      - name: Authenticate automatic CI source before release credentials
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 source/scripts/ci/automatic-release.py source
 
       - name: Confirm exact source and PG03 wiring
         shell: bash
@@ -213,9 +230,12 @@ jobs:
           [[ "$(sha256sum release/published-new-api | cut -d' ' -f1)" == "$(cat release/binary.sha256)" ]]
 
       - name: Write Release Manifest Lite and summary
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          [[ "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" == "$SOURCE_COMMIT" ]]
           python3 - <<'PY'
           import hashlib,json,os,pathlib
           e=os.environ
@@ -247,6 +267,7 @@ jobs:
               'runtime_identity':{'image_id':published['Id'],'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip()},
               'source_ci_runs':json.load(open('/tmp/source-ci.json')),
               'wrapper_sha256':hashlib.sha256(pathlib.Path('source/scripts/production-deploy.sh').read_bytes()).hexdigest(),
+              'v2_wrapper_sha256':hashlib.sha256(pathlib.Path('source/scripts/production-deploy-v2.sh').read_bytes()).hexdigest(),
               'schema_transition':schema_transition,
               'verification':{'schema_rehearsal':'passed','legacy_retirement_source_tests':'passed','source_commit':'passed','targeted_accountpool_routechain_tests':'passed','deployment_binaries':'passed','platform':'passed','oci_revision':'passed','digest_pull':'passed','binary_roundtrip':'passed'},
               'deployment_compatible':not missing,'missing_deployment_binaries':missing,
@@ -259,11 +280,23 @@ jobs:
               f.write('## PG03 exact Gateway RC\n\n```json\n'+json.dumps(manifest,indent=2)+'\n```\n')
           PY
 
+      - name: Bind actual release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          files=('gateway-image-release.json','binary-build-info.txt','schema-rehearsal.json','schema-rehearsal.target.sql')
+          hashes={name:hashlib.sha256((pathlib.Path('release')/name).read_bytes()).hexdigest() for name in files}
+          pathlib.Path('release/artifact-hashes.json').write_text(json.dumps(hashes,indent=2)+'\n')
+          PY
+
       - name: Upload release identity artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: pg03-gateway-release-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
+            release/artifact-hashes.json
             release/gateway-image-release.json
             release/schema-rehearsal.json
             release/schema-rehearsal.target.sql

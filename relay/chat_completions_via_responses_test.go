@@ -54,6 +54,8 @@ func TestPrepareResponsesRequestRetainsConvertedAdaptor(t *testing.T) {
 	})
 	request := &dto.OpenAIResponsesRequest{Model: "gpt-4o", Input: []byte(`"hello"`)}
 	info := relaycommon.GenRelayInfoResponses(c, request)
+	// Reuse the existing reservation fixture so the real dispatch guard stays on.
+	info.Billing = &imageReservation{limit: 1 << 30}
 	adaptor, body, closer, apiErr := PrepareResponsesRequest(c, info, request)
 	require.Nil(t, apiErr)
 	defer closer.Close()

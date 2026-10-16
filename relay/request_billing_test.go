@@ -4,15 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -24,6 +27,62 @@ import (
 type cancellationBilling struct {
 	refunded bool
 	charged  int
+}
+
+func TestOrdinaryChannelRejectionRefundRequiresCompleteZeroWorkEvidence(t *testing.T) {
+	for _, test := range []struct {
+		name                            string
+		status                          int
+		body                            string
+		retry                           int
+		uncertain, output, pool, refund bool
+	}{
+		{name: "authentication rejection", status: 401, refund: true},
+		{name: "permission rejection", status: 403, refund: true},
+		{name: "missing model rejection", status: 404, refund: true},
+		{name: "rate limit rejection", status: 429, refund: true},
+		{name: "server failure", status: 500},
+		{name: "mapped server failure", status: 500},
+		{name: "truncated rejection", status: 401, body: `{"error":`},
+		{name: "usage on error", status: 401, body: `{"error":{"message":"rejected"},"usage":{"total_tokens":15}}`},
+		{name: "earlier attempt", status: 401, retry: 1},
+		{name: "uncertain usage", status: 401, uncertain: true},
+		{name: "client output", status: 401, output: true},
+		{name: "pool remains frozen", status: 401, pool: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			newSettlementDatabase(t)
+			channel := &model.Channel{Id: 11, Type: 1, Status: 1}
+			if test.pool {
+				channel.OtherSettings = `{"upstream_pool":"fixture"}`
+			}
+			require.NoError(t, model.DB.Create(channel).Error)
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+			c.Set("upstream_attempted", true)
+			c.Set("upstream_usage_uncertain", test.uncertain)
+			if test.output {
+				c.String(200, "partial")
+			}
+			body := test.body
+			if body == "" {
+				body = `{"error":{"message":"rejected","type":"invalid_request_error","code":"invalid_api_key"}}`
+			}
+			apiErr := service.RelayErrorHandler(c, &http.Response{StatusCode: test.status, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(body))}, false)
+			if test.name == "mapped server failure" {
+				service.ResetStatusCode(apiErr, `{"500":401}`)
+			}
+			billing := &fakeTextBilling{preConsumed: 100}
+			RefundFailedRequestBilling(c, &relaycommon.RelayInfo{Billing: billing, RetryIndex: test.retry, ChannelMeta: &relaycommon.ChannelMeta{ChannelId: 11}}, apiErr)
+			if test.refund {
+				assert.Equal(t, 1, billing.refunds)
+				assert.Empty(t, billing.settled)
+			} else {
+				assert.Zero(t, billing.refunds)
+				assert.Equal(t, []int{100}, billing.settled)
+			}
+		})
+	}
 }
 
 func (b *cancellationBilling) Settle(quota int) error   { b.charged = quota; return nil }
