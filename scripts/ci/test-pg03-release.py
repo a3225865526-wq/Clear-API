@@ -45,6 +45,31 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertNotIn('gh run cancel', self.workflow)
         self.assertEqual(hashlib.sha256((SCRIPTS / 'production-deploy-v2.sh').read_bytes()).hexdigest(), CONTROL.V2_SHA)
 
+    def test_rc_configures_and_verifies_the_actual_containerd_store(self):
+        workflow = (SCRIPTS.parent / '.github/workflows/release-pg03-gateway.yml').read_text()
+        block = workflow.split('      - name: Match production containerd image store\n', 1)[1].split('      - name:', 1)[0]
+        script = textwrap.dedent(block.split('        run: |\n', 1)[1])
+        for invalid_json, correct_store in ((False, True), (True, True), (False, False)):
+            with self.subTest(invalid_json=invalid_json, correct_store=correct_store), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                config = root / 'daemon.json'
+                config.write_text('invalid-json' if invalid_json else json.dumps({'features': {'other-feature': True}, 'debug': False}))
+                trace = root / 'restart'
+                (root / 'sudo').write_text('#!/bin/sh\nexec "$@"\n')
+                (root / 'systemctl').write_text('#!/bin/sh\nprintf restart > "$TEST_RESTART"\n')
+                status = [['driver-type', 'io.containerd.snapshotter.v1']] if correct_store else []
+                (root / 'docker').write_text('#!/bin/sh\nprintf \'%s\\n\' \'%s\'\n' % ('%s', json.dumps(status)))
+                for name in ('sudo', 'systemctl', 'docker'): (root / name).chmod(0o755)
+                invocation = script.replace('/etc/docker/daemon.json', str(config)).replace('/tmp/rc-image-store.json', str(root / 'store.json'))
+                result = subprocess.run(['bash', '-c', invocation], capture_output=True, text=True,
+                    env=dict(os.environ, PATH=str(root)+os.pathsep+os.environ['PATH'], TEST_RESTART=str(trace)))
+                self.assertEqual(result.returncode == 0, not invalid_json and correct_store)
+                if invalid_json:
+                    self.assertFalse(trace.exists(), 'invalid configuration must not restart Docker')
+                else:
+                    self.assertTrue(trace.exists())
+                    self.assertEqual(json.loads(config.read_text()), {'features': {'other-feature': True, 'containerd-snapshotter': True}, 'debug': False})
+
     def invoke(self, mode='pg03', failure='', transition='', confirmation='DEPLOY_PRODUCTION'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

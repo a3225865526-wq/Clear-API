@@ -94,17 +94,46 @@ jobs:
           [[ -z "$(git -C source status --porcelain --untracked-files=all)" ]]
           test ! -d source/web/dist
 
+      - name: Match production containerd image store
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Image IDs must have the same meaning during rehearsal and on the VPS.
+          # Change only this disposable runner; never reconfigure production Docker.
+          sudo python3 - <<'PY'
+          import json, pathlib
+          path = pathlib.Path('/etc/docker/daemon.json')
+          config = json.loads(path.read_text()) if path.exists() else {}
+          config.setdefault('features', {})['containerd-snapshotter'] = True
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(config) + '\n')
+          PY
+          sudo systemctl restart docker
+          docker info --format '{{json .DriverStatus}}' > /tmp/rc-image-store.json
+          python3 - <<'PY'
+          import json
+          assert ['driver-type', 'io.containerd.snapshotter.v1'] in json.load(open('/tmp/rc-image-store.json')), 'containerd image store required'
+          PY
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
 
+      - name: Login to GHCR
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build exact source once
+        id: gateway
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: ./source
           file: ./source/Dockerfile
           platforms: linux/amd64
-          load: true
-          push: false
+          load: false
+          push: true
           provenance: false
           sbom: false
           tags: ${{ env.LOCAL_TAG }}
@@ -118,6 +147,17 @@ jobs:
             org.opencontainers.image.source=https://github.com/a3225865526-wq/Clear-API
             org.opencontainers.image.version=pg03-rc-${{ env.SOURCE_COMMIT }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
+
+      - name: Pull registry candidate before identity and schema rehearsal
+        env:
+          CANDIDATE_DIGEST: ${{ steps.gateway.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          docker pull --platform linux/amd64 "$GHCR_IMAGE@$CANDIDATE_DIGEST"
+          docker tag "$GHCR_IMAGE@$CANDIDATE_DIGEST" "$LOCAL_TAG"
+          echo "IMAGE_DIGEST=$CANDIDATE_DIGEST" >> "$GITHUB_ENV"
 
       - name: Extract final binary identity without starting Gateway
         shell: bash
@@ -157,19 +197,12 @@ jobs:
             --commit "$SOURCE_COMMIT" --schema source/scripts/ci/fixtures/pg03-legacy-v5-schema.sql \
             --output release/schema-rehearsal.json
 
-      - name: Login to GHCR
-        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish the verified image and pull by digest
+      - name: Reverify exact published candidate by digest
         shell: bash
         run: |
           set -euo pipefail
-          docker push "$LOCAL_TAG"
           DIGEST=$(docker image inspect "$LOCAL_TAG" | python3 -c 'import json,os,re,sys; prefix=os.environ["GHCR_IMAGE"]+"@"; refs=json.load(sys.stdin)[0]["RepoDigests"]; ds={r[len(prefix):] for r in refs if r.startswith(prefix)}; assert len(ds)==1; d=ds.pop(); assert re.fullmatch("sha256:[0-9a-f]{64}",d); print(d)')
+          [[ "$DIGEST" == "$IMAGE_DIGEST" ]]
           echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
           docker pull --platform linux/amd64 "$GHCR_IMAGE@$DIGEST"
           docker image inspect "$GHCR_IMAGE@$DIGEST" > release/published-image.json
@@ -203,7 +236,7 @@ jobs:
               'image_repository':e['GHCR_IMAGE'],'image_digest':e['IMAGE_DIGEST'],
               'image_ref':e['GHCR_IMAGE']+'@'+e['IMAGE_DIGEST'],
               'oci_revision':labels['org.opencontainers.image.revision'],
-              'platform':'linux/amd64','new_api_image_id':published['Id'],
+              'platform':'linux/amd64','image_store':'containerd','new_api_image_id':published['Id'],
               'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip(),
               'legacy_retire_binary_sha256':hashlib.sha256(pathlib.Path('release/published-legacy-store-retire').read_bytes()).hexdigest(),
               'dockerfile_sha256':hashlib.sha256(pathlib.Path('source/Dockerfile').read_bytes()).hexdigest(),
