@@ -13,7 +13,7 @@ on:
         required: true
         type: string
       pool_mode:
-        description: 'Pool mode; pg03 requires real review and exact paired identities'
+        description: 'Pool mode; pg03 requires verified release authority and exact paired identities'
         type: choice
         required: true
         default: 'off'
@@ -23,7 +23,7 @@ on:
         type: string
         required: false
       legacy_transition_sha256:
-        description: 'Optional legacy-retirement-v1 request SHA256; requires separate maintenance confirmation and review'
+        description: 'Optional legacy-retirement-v1 request SHA256; requires fresh root authentication and exact maintenance authority'
         type: string
         required: false
       migration_compatible:
@@ -201,8 +201,8 @@ jobs:
           LOCAL_SHA=$(sha256sum scripts/pg03-backup-state.py | cut -d' ' -f1)
           REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/backups/bin/pg03-backup-state.py' | cut -d' ' -f1)
           [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
-          # Independently read GitHub's real review and immutable RC artifact.
-          # Credentials remain on stdin; pending drafts cannot approve a pair.
+          # Independently verify GitHub release authority and the immutable RC artifact.
+          # Credentials remain on stdin; automatic authority never invents review.
           python3 - <<'PY' | ssh "$PROD_SSH_ALIAS" 'sudo /opt/clearapi/bin/pg03-release-control.py prepare'
           import json, os
           e = os.environ

@@ -393,7 +393,10 @@ class Transition:
         authority = read_json(self.paths.authorization)
         if (request['schema_version'] != SCHEMA or authority['schema_version'] != SCHEMA
                 or authority['request_sha256'] != digest(raw) or authority['transition_id'] != request['transition_id']
-                or authority['approval_run'] != str(run) or authority['reviewers'] != [ACTOR]
+                or authority['approval_run'] != str(run)
+                or not (authority.get('reviewers') == [ACTOR]
+                    or (authority.get('reviewers') == [] and authority.get('authorization') == {
+                        'mode': 'owner-dispatch-v1', 'actor': ACTOR, 'run': str(run)}))
                 or request['candidate']['image_digest'] != image_digest or request['candidate']['commit'] != commit
                 or authority['candidate'] != request['candidate']
                 or request['old_runtime'] != {'http_status': 503, 'status': 'BLOCKED', 'code': 'APPROVAL_VIEW_INVALID'}

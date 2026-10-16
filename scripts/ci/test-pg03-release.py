@@ -188,6 +188,38 @@ class ReleaseApprovalTest(unittest.TestCase):
                 with self.subTest(field=field),self.assertRaises(ValueError):call()
             else:self.assertEqual(call()[0]['image_digest'],self.data['digest'])
 
+    def test_owner_dispatch_without_review_requires_the_actual_automatic_policy(self):
+        evidence = copy.deepcopy(self.evidence)
+        evidence['actions/runs/100/approvals'] = []
+        run = evidence['actions/runs/100']
+        run['actor'] = run['triggering_actor'] = {'login': 'a3225865526-wq'}
+        evidence['environments/production'] = {
+            'id': 23693288049, 'name': 'production',
+            'deployment_branch_policy': {'protected_branches': False, 'custom_branch_policies': True},
+            'protection_rules': [{'type': 'branch_policy'}]}
+        evidence['environments/production/deployment-branch-policies'] = {
+            'branch_policies': [{'name': 'main', 'type': 'branch'}]}
+        reviewers, _ = CONTROL.approved_run(self.data, evidence.__getitem__)
+        self.assertEqual(reviewers, [], 'automatic authority must not fabricate a reviewer')
+        cases = [
+            ('actions/runs/100', 'actor', {'login': 'other'}),
+            ('actions/runs/100', 'triggering_actor', {'login': 'other'}),
+            ('environments/production', 'id', 1),
+            ('environments/production', 'protection_rules', [{'type': 'required_reviewers'}]),
+            ('environments/production', 'protection_rules', [{'type': 'wait_timer'}]),
+            ('environments/production/deployment-branch-policies', 'branch_policies', [{'name': '*', 'type': 'branch'}]),
+            ('actions/runs/99', 'head_sha', 'c' * 40),
+            ('actions/runs/99', 'conclusion', 'failure'),
+        ]
+        for path, field, value in cases:
+            rejected = copy.deepcopy(evidence)
+            rejected[path][field] = value
+            with self.subTest(path=path, field=field), self.assertRaises(ValueError):
+                CONTROL.approved_run(self.data, rejected.__getitem__)
+        evidence['actions/runs/100/approvals'] = [{'state': 'rejected'}]
+        with self.assertRaises(ValueError):
+            CONTROL.approved_run(self.data, evidence.__getitem__)
+
     @unittest.skipUnless(os.geteuid()==0,'secure root file ownership requires isolated root runner')
     def test_existing_target_and_symlink_are_never_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
