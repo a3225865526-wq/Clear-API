@@ -6,9 +6,9 @@ umask 077
 
 TARGET=/opt/clearapi/bin/production-deploy.sh
 LOCK=/run/lock/clearapi-production-deploy.lock
-EXPECTED_SHA=0c52322e42e807a381cbb63baa335e733e62ef3c94beb56edd1c9607b6355263
+EXPECTED_SHA=7e281ee253c051120c76001787776e0269e6944ff0e367de31bc65b3fa375ab7
 EXPECTED_IDENTITY_SHA=afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e
-EXPECTED_LIST_SHA=913253d0e455c1af96be47e102e51a5e8a7c8970c5c9918e3bffee6f93eec1f4
+EXPECTED_LIST_SHA=488cd784e289d0e072fc8103f38b3495c5329871d2855db484250e77ed3868f5
 # Approval is pinned to bytes, not to an arbitrary caller-provided checksum.
 # The supplied release commit is recorded provenance, not a Git signature check.
 EXPECTED_COMMIT=${2:-}

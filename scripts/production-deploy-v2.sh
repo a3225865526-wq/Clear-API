@@ -611,7 +611,7 @@ PY
   log "Runtime Gate PASS (${phase})"
 }
 verify_launch_baseline() {
-  local actual approved other status ch expected_email_verification
+  local actual other status ch expected_email_verification
   if [ "$LAUNCH_BASELINE" = commercial ]; then
     expected_email_verification=true
   else
