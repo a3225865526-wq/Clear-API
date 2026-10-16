@@ -118,14 +118,22 @@ jobs:
       - name: Set up Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
 
+      - name: Login to GHCR
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build exact source once
+        id: gateway
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: ./source
           file: ./source/Dockerfile
           platforms: linux/amd64
-          load: true
-          push: false
+          load: false
+          push: true
           provenance: false
           sbom: false
           tags: ${{ env.LOCAL_TAG }}
@@ -139,6 +147,17 @@ jobs:
             org.opencontainers.image.source=https://github.com/a3225865526-wq/Clear-API
             org.opencontainers.image.version=pg03-rc-${{ env.SOURCE_COMMIT }}
             org.opencontainers.image.created=${{ env.BUILD_DATE }}
+
+      - name: Pull registry candidate before identity and schema rehearsal
+        env:
+          CANDIDATE_DIGEST: ${{ steps.gateway.outputs.digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$CANDIDATE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          docker pull --platform linux/amd64 "$GHCR_IMAGE@$CANDIDATE_DIGEST"
+          docker tag "$GHCR_IMAGE@$CANDIDATE_DIGEST" "$LOCAL_TAG"
+          echo "IMAGE_DIGEST=$CANDIDATE_DIGEST" >> "$GITHUB_ENV"
 
       - name: Extract final binary identity without starting Gateway
         shell: bash
@@ -178,19 +197,12 @@ jobs:
             --commit "$SOURCE_COMMIT" --schema source/scripts/ci/fixtures/pg03-legacy-v5-schema.sql \
             --output release/schema-rehearsal.json
 
-      - name: Login to GHCR
-        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Publish the verified image and pull by digest
+      - name: Reverify exact published candidate by digest
         shell: bash
         run: |
           set -euo pipefail
-          docker push "$LOCAL_TAG"
           DIGEST=$(docker image inspect "$LOCAL_TAG" | python3 -c 'import json,os,re,sys; prefix=os.environ["GHCR_IMAGE"]+"@"; refs=json.load(sys.stdin)[0]["RepoDigests"]; ds={r[len(prefix):] for r in refs if r.startswith(prefix)}; assert len(ds)==1; d=ds.pop(); assert re.fullmatch("sha256:[0-9a-f]{64}",d); print(d)')
+          [[ "$DIGEST" == "$IMAGE_DIGEST" ]]
           echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
           docker pull --platform linux/amd64 "$GHCR_IMAGE@$DIGEST"
           docker image inspect "$GHCR_IMAGE@$DIGEST" > release/published-image.json
