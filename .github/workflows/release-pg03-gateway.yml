@@ -94,6 +94,27 @@ jobs:
           [[ -z "$(git -C source status --porcelain --untracked-files=all)" ]]
           test ! -d source/web/dist
 
+      - name: Match production containerd image store
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Image IDs must have the same meaning during rehearsal and on the VPS.
+          # Change only this disposable runner; never reconfigure production Docker.
+          sudo python3 - <<'PY'
+          import json, pathlib
+          path = pathlib.Path('/etc/docker/daemon.json')
+          config = json.loads(path.read_text()) if path.exists() else {}
+          config.setdefault('features', {})['containerd-snapshotter'] = True
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(config) + '\n')
+          PY
+          sudo systemctl restart docker
+          docker info --format '{{json .DriverStatus}}' > /tmp/rc-image-store.json
+          python3 - <<'PY'
+          import json
+          assert ['driver-type', 'io.containerd.snapshotter.v1'] in json.load(open('/tmp/rc-image-store.json')), 'containerd image store required'
+          PY
+
       - name: Set up Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
 
@@ -203,7 +224,7 @@ jobs:
               'image_repository':e['GHCR_IMAGE'],'image_digest':e['IMAGE_DIGEST'],
               'image_ref':e['GHCR_IMAGE']+'@'+e['IMAGE_DIGEST'],
               'oci_revision':labels['org.opencontainers.image.revision'],
-              'platform':'linux/amd64','new_api_image_id':published['Id'],
+              'platform':'linux/amd64','image_store':'containerd','new_api_image_id':published['Id'],
               'binary_path':'/new-api','binary_sha256':pathlib.Path('release/binary.sha256').read_text().strip(),
               'legacy_retire_binary_sha256':hashlib.sha256(pathlib.Path('release/published-legacy-store-retire').read_bytes()).hexdigest(),
               'dockerfile_sha256':hashlib.sha256(pathlib.Path('source/Dockerfile').read_bytes()).hexdigest(),
