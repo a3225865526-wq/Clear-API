@@ -31,7 +31,6 @@ import { formatNumber } from '@/lib/format'
 import { getCatalog } from './api'
 import {
   creditProducts,
-  storePurchaseUrl,
   trustedPurchaseUrl,
   type CreditProduct,
 } from './catalog'
@@ -60,29 +59,6 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
         <p className='text-muted-foreground text-sm'>
           {t('Confirm purchase and fee arrangements with support first.')}
         </p>
-      </section>
-      <section className='space-y-3 rounded-xl border p-5'>
-        <h2 className='font-semibold'>
-          {t('ClearAPI API credit recharge code')}
-        </h2>
-        <p className='text-muted-foreground text-sm'>
-          {t(
-            'Existing purchase entry. Confirm the delivered API credit amount with the seller before purchasing.'
-          )}
-        </p>
-        <Button
-          role='link'
-          className='min-h-11'
-          render={
-            <a
-              href={storePurchaseUrl}
-              target='_blank'
-              rel='noopener noreferrer'
-            />
-          }
-        >
-          {t('View price and buy')}
-        </Button>
       </section>
       <div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
         {(props.products ?? creditProducts).map((product) => {

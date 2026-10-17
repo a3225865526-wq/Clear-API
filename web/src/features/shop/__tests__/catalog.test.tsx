@@ -68,18 +68,24 @@ afterEach(async () => {
 
 it('shows the official product and safe external link with no payment or redemption request', async () => {
   const post = vi.spyOn(api, 'post')
-  renderCatalog()
+  renderCatalog([
+    {
+      ...creditProducts[0],
+      published: true,
+      delivery_verified: true,
+      purchase_url: legacyPurchaseUrl,
+    },
+  ])
   expect(
-    await screen.findByRole('heading', {
-      name: 'ClearAPI API credit recharge code',
-    })
+    await screen.findByRole('heading', { name: creditProducts[0].name })
   ).toBeVisible()
-  const buy = screen.getByRole('link', { name: 'View price and buy' })
-  expect(buy).toHaveAttribute('href', 'https://catfk.com/shop/YPMYXR7N')
+  const buy = screen.getByRole('link', { name: 'Buy API credits' })
+  expect(buy).toHaveAttribute('href', 'https://catfk.com/item/qmcse2')
   expect(buy).toHaveAttribute('target', '_blank')
   expect(buy).toHaveAttribute('rel', 'noopener noreferrer')
-  expect(screen.queryByRole('article')).not.toBeInTheDocument()
-  expect(screen.queryByText(/Quota/)).not.toBeInTheDocument()
+  expect(
+    screen.queryByText(/Confirm the delivered API credit amount/)
+  ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('button', { name: 'Coming soon' })
   ).not.toBeInTheDocument()
@@ -143,9 +149,9 @@ it('keeps a single column on mobile and switches the purchase content to Chinese
     await i18next.changeLanguage('zhCN')
   })
   expect(screen.getByRole('heading', { name: '购买额度' })).toBeVisible()
-  expect(screen.getByRole('link', { name: '查看价格并购买' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: '购买 API 额度' })).toHaveAttribute(
     'href',
-    'https://catfk.com/shop/YPMYXR7N'
+    'https://catfk.com/item/qmcse2'
   )
 })
 
@@ -177,6 +183,6 @@ it('only enables verified published products with their own purchase links', asy
   ])
   expect(screen.queryByText(creditProducts[2].name)).not.toBeInTheDocument()
   expect(
-    screen.getByText(/Confirm the delivered API credit amount/)
-  ).toBeVisible()
+    screen.queryByText(/Confirm the delivered API credit amount/)
+  ).not.toBeInTheDocument()
 })
