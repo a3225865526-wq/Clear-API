@@ -124,17 +124,45 @@ def approved_rc(data, get):
             or get('git/ref/heads/main')['object']['sha'] != commit):
         raise ReleaseBlocked('RC must identify current main')
     rc = get('actions/runs/' + str(data['rc_run']))
-    if (rc['head_sha'] != commit or rc['head_branch'] != 'main'
-            or rc['event'] != 'workflow_dispatch' or rc['status'] != 'completed'
+    workflow = get('actions/workflows/release-pg03-gateway.yml')
+    if (str(rc['id']) != str(data['rc_run'])
+            or rc['head_sha'] != commit or rc['head_branch'] != 'main'
+            or rc['event'] not in ('workflow_dispatch', 'workflow_run') or rc['status'] != 'completed'
             or rc['conclusion'] != 'success'
             or rc['path'] != '.github/workflows/release-pg03-gateway.yml'
-            or rc['repository']['full_name'] != REPO):
+            or workflow['path'] != rc['path'] or workflow['state'] != 'active'
+            or rc['workflow_id'] != workflow['id']
+            or rc['repository']['full_name'] != REPO
+            or rc['head_repository']['full_name'] != REPO
+            or rc['head_repository']['id'] != rc['repository']['id']
+            or type(rc['run_attempt']) is not int or rc['run_attempt'] < 1):
         raise ReleaseBlocked('RC source or workflow mismatch')
-    ci = get('actions/workflows/ci.yml/runs?event=push&head_sha=' + commit + '&per_page=100')
-    if not any(r['head_sha'] == commit and r.get('head_branch') == 'main' and r['status'] == 'completed'
-               and r['conclusion'] == 'success' for r in ci['workflow_runs']):
+    latest = get('actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha='
+                 + commit + '&per_page=1')['workflow_runs']
+    if (not latest or latest[0]['id'] != rc['id']
+            or latest[0]['run_attempt'] != rc['run_attempt']):
+        raise ReleaseBlocked('superseded RC run or attempt')
+    runs = get('actions/workflows/ci.yml/runs?branch=main&event=push&head_sha='
+               + commit + '&per_page=1')['workflow_runs']
+    if not runs:
         raise ReleaseBlocked('same-source push CI required')
-    return rc
+    ci = get('actions/runs/' + str(runs[0]['id']))
+    ci_workflow = get('actions/workflows/ci.yml')
+    if (ci['id'] != runs[0]['id'] or ci['run_attempt'] != runs[0]['run_attempt']
+            or ci['head_sha'] != commit or ci['head_branch'] != 'main'
+            or ci['event'] != 'push' or ci['status'] != 'completed' or ci['conclusion'] != 'success'
+            or ci['repository']['full_name'] != REPO or ci['head_repository']['full_name'] != REPO
+            or ci['repository']['id'] != rc['repository']['id']
+            or ci['head_repository']['id'] != rc['repository']['id']
+            or ci['path'] != '.github/workflows/ci.yml' or ci_workflow['path'] != ci['path']
+            or ci_workflow['state'] != 'active' or ci['workflow_id'] != ci_workflow['id']):
+        raise ReleaseBlocked('latest same-source main push CI required')
+    for run in (rc, ci):
+        jobs = get(f"actions/runs/{run['id']}/attempts/{run['run_attempt']}/jobs?per_page=100")
+        if (not jobs['jobs'] or jobs['total_count'] != len(jobs['jobs'])
+                or any(j['status'] != 'completed' or j['conclusion'] != 'success' for j in jobs['jobs'])):
+            raise ReleaseBlocked('RC or source CI has missing, failed or skipped jobs')
+    return dict(rc, verified_source_ci=ci)
 
 
 def release_manifest(data, rc, artifacts, download):
@@ -142,26 +170,53 @@ def release_manifest(data, rc, artifacts, download):
     matches = [a for a in artifacts['artifacts'] if a['name'] == name and not a['expired']]
     if len(matches) != 1:
         raise ReleaseBlocked('exact RC artifact required')
-    with zipfile.ZipFile(io.BytesIO(download(matches[0]['id']))) as z:
-        entries = [i for i in z.infolist() if i.filename == 'gateway-image-release.json']
-        if len(entries) != 1 or entries[0].file_size > 131072:
+    artifact = matches[0]
+    producer = artifact['workflow_run']
+    if (producer['id'] != rc['id'] or producer['head_sha'] != data['commit']
+            or producer['head_branch'] != 'main'
+            or producer['repository_id'] != rc['repository']['id']
+            or producer['head_repository_id'] != rc['repository']['id']):
+        raise ReleaseBlocked('artifact producer does not identify this RC')
+    archive = download(artifact['id'])
+    if artifact['digest'] != 'sha256:' + hashlib.sha256(archive).hexdigest():
+        raise ReleaseBlocked('RC artifact archive digest mismatch')
+    files = {'gateway-image-release.json', 'binary-build-info.txt',
+             'schema-rehearsal.json', 'schema-rehearsal.target.sql'}
+    with zipfile.ZipFile(io.BytesIO(archive)) as z:
+        entries = z.infolist()
+        if (len(entries) != 5 or {i.filename for i in entries} != files | {'artifact-hashes.json'}
+                or any(i.file_size > 262144 for i in entries)
+                or sum(i.file_size for i in entries) > 1048576):
             raise ReleaseBlocked('invalid RC manifest archive')
-        raw = z.read(entries[0])
+        inventory = json.loads(z.read('artifact-hashes.json'), object_pairs_hook=unique)
+        if (set(inventory) != files
+                or any(hashlib.sha256(z.read(filename)).hexdigest() != inventory[filename] for filename in files)):
+            raise ReleaseBlocked('RC artifact inventory mismatch')
+        raw = z.read('gateway-image-release.json')
     m = json.loads(raw, object_pairs_hook=unique)
     required_checks = ('source_commit', 'targeted_accountpool_routechain_tests',
                        'deployment_binaries', 'platform', 'oci_revision',
                        'digest_pull', 'binary_roundtrip')
-    if (m['source_commit'] != data['commit'] or m['oci_revision'] != data['commit']
+    ci = rc['verified_source_ci']
+    if (m['source_commit'] != data['commit'] or m['candidate_commit'] != data['commit']
+            or m['oci_revision'] != data['commit']
             or m['workflow_commit'] != data['commit']
             or m['source_repository'] != 'https://github.com/' + REPO
+            or m['workflow_ref'] != REPO + '/.github/workflows/release-pg03-gateway.yml@refs/heads/main'
             or str(m['workflow_run']) != str(data['rc_run'])
             or str(m['workflow_run_attempt']) != str(rc['run_attempt'])
             or m['image_digest'] != data['digest']
+            or m['image_repository'] != IMAGE
             or m['image_ref'] != IMAGE + '@' + data['digest']
             or m['platform'] != 'linux/amd64' or m['deployment_compatible'] is not True
             or m['missing_deployment_binaries']
             or not re.fullmatch(r'sha256:[a-f0-9]{64}', m['new_api_image_id'])
             or not re.fullmatch(r'[a-f0-9]{64}', m['binary_sha256'])
+            or m['runtime_identity'] != {'image_id': m['new_api_image_id'],
+                'binary_path': '/new-api', 'binary_sha256': m['binary_sha256']}
+            or not any(r.get('databaseId') == ci['id'] and r.get('headSha') == data['commit']
+                       and r.get('status') == 'completed' and r.get('conclusion') == 'success'
+                       for r in m['source_ci_runs'])
             or any(m['verification'].get(k) != 'passed' for k in required_checks)):
         raise ReleaseBlocked('RC manifest does not identify this candidate')
     return m, hashlib.sha256(raw).hexdigest()

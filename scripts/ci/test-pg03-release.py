@@ -163,14 +163,26 @@ class ReleaseApprovalTest(unittest.TestCase):
         run = {'head_sha':'b'*40,'head_branch':'main','event':'workflow_dispatch',
                'status':'in_progress','path':'.github/workflows/deploy-production.yml',
                'repository':{'full_name':CONTROL.REPO}}
+        rc = dict(run, id=99, status='completed', conclusion='success', run_attempt=1,
+                  workflow_id=10, path='.github/workflows/release-pg03-gateway.yml',
+                  repository={'id': 7, 'full_name': CONTROL.REPO},
+                  head_repository={'id': 7, 'full_name': CONTROL.REPO})
+        ci = dict(rc, id=98, workflow_id=11, event='push', path='.github/workflows/ci.yml')
         self.evidence = {'actions/runs/100': run,
             'git/ref/heads/main': {'object':{'sha':'b'*40}},
             'actions/runs/100/approvals':[{'state':'approved','user':{'login':'a3225865526-wq'},
                 'environments':[{'id':23693288049,'name':'production'}]}],
-            'actions/runs/99':dict(run,status='completed',conclusion='success',run_attempt=1,
-                                 path='.github/workflows/release-pg03-gateway.yml'),
-            'actions/workflows/ci.yml/runs?event=push&head_sha='+'b'*40+'&per_page=100':
-                {'workflow_runs':[{'head_sha':'b'*40,'head_branch':'main','status':'completed','conclusion':'success'}]}}
+            'actions/runs/99': rc, 'actions/runs/98': ci,
+            'actions/workflows/release-pg03-gateway.yml': {
+                'id': 10, 'path': rc['path'], 'state': 'active'},
+            'actions/workflows/ci.yml': {'id': 11, 'path': ci['path'], 'state': 'active'},
+            'actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha='+'b'*40+'&per_page=1':
+                {'workflow_runs': [{'id': 99, 'run_attempt': 1}]},
+            'actions/workflows/ci.yml/runs?branch=main&event=push&head_sha='+'b'*40+'&per_page=1':
+                {'workflow_runs': [{'id': 98, 'run_attempt': 1}]}}
+        for ident in (98, 99):
+            self.evidence[f'actions/runs/{ident}/attempts/1/jobs?per_page=100'] = {
+                'total_count': 1, 'jobs': [{'status': 'completed', 'conclusion': 'success'}]}
 
     def test_only_real_same_source_production_review_approves(self):
         reviewers,_ = CONTROL.approved_run(self.data,self.evidence.__getitem__)
@@ -191,27 +203,129 @@ class ReleaseApprovalTest(unittest.TestCase):
             with self.subTest(reviews=reviews),self.assertRaises(ValueError):
                 CONTROL.approved_run(self.data,evidence.__getitem__)
 
-    def test_rc_artifact_digest_revision_and_attempt_must_match(self):
-        m={'source_commit':'b'*40,'oci_revision':'b'*40,'workflow_commit':'b'*40,
+    def manifest_fixture(self):
+        return {'source_commit':'b'*40,'candidate_commit':'b'*40,'oci_revision':'b'*40,'workflow_commit':'b'*40,
            'source_repository':'https://github.com/'+CONTROL.REPO,'workflow_run':'99',
+           'workflow_ref':CONTROL.REPO+'/.github/workflows/release-pg03-gateway.yml@refs/heads/main',
            'workflow_run_attempt':'1','image_digest':self.data['digest'],
+           'image_repository':CONTROL.IMAGE,
            'image_ref':CONTROL.IMAGE+'@'+self.data['digest'],'platform':'linux/amd64',
            'deployment_compatible':True,'missing_deployment_binaries':[],
            'new_api_image_id':'sha256:'+'c'*64,'binary_sha256':'d'*64,
+           'runtime_identity':{'image_id':'sha256:'+'c'*64,'binary_path':'/new-api','binary_sha256':'d'*64},
+           'source_ci_runs':[{'databaseId':98,'headSha':'b'*40,'status':'completed','conclusion':'success'}],
            'verification':{k:'passed' for k in ('source_commit','targeted_accountpool_routechain_tests',
                'deployment_binaries','platform','oci_revision','digest_pull','binary_roundtrip')}}
+
+    def artifact_fixture(self, manifest, corrupt_inventory=False):
+        files = {'gateway-image-release.json': json.dumps(manifest).encode(),
+                 'binary-build-info.txt': b'synthetic build info',
+                 'schema-rehearsal.json': b'{}', 'schema-rehearsal.target.sql': b'-- synthetic schema'}
+        inventory = {name: hashlib.sha256(raw).hexdigest() for name, raw in files.items()}
+        if corrupt_inventory:
+            inventory['gateway-image-release.json'] = '0' * 64
+        archive = io.BytesIO()
+        with zipfile.ZipFile(archive, 'w') as z:
+            for name, raw in files.items():
+                z.writestr(name, raw)
+            z.writestr('artifact-hashes.json', json.dumps(inventory))
+        raw = archive.getvalue()
+        artifact = {'name': 'pg03-gateway-release-99-1', 'expired': False, 'id': 123,
+                    'digest': 'sha256:' + hashlib.sha256(raw).hexdigest(),
+                    'workflow_run': {'id': 99, 'head_sha': 'b' * 40, 'head_branch': 'main',
+                                     'repository_id': 7, 'head_repository_id': 7}}
+        return artifact, raw
+
+    def test_rc_artifact_digest_revision_and_attempt_must_match(self):
         for field,value in [(None,None),('image_digest','sha256:'+'e'*64),
                             ('oci_revision','f'*40),('workflow_run_attempt','2'),
+                            ('workflow_run','100'), ('workflow_commit','f'*40),
+                            ('candidate_commit','f'*40), ('source_commit','f'*40),
+                            ('workflow_ref','foreign/workflow'), ('image_repository','foreign/image'),
+                            ('runtime_identity',{}), ('source_ci_runs',[]),
                             ('deployment_compatible',False)]:
-            fixture=dict(m)
+            fixture=self.manifest_fixture()
             if field: fixture[field]=value
-            archive=io.BytesIO()
-            with zipfile.ZipFile(archive,'w') as z:z.writestr('gateway-image-release.json',json.dumps(fixture))
-            call=lambda: CONTROL.release_manifest(self.data,{'run_attempt':1},
-                {'artifacts':[{'name':'pg03-gateway-release-99-1','expired':False,'id':123}]},lambda _:archive.getvalue())
+            artifact, raw = self.artifact_fixture(fixture)
+            rc = CONTROL.approved_rc(self.data, self.evidence.__getitem__)
+            call=lambda: CONTROL.release_manifest(self.data,rc,
+                {'artifacts':[artifact]},lambda _:raw)
             if field:
                 with self.subTest(field=field),self.assertRaises(ValueError):call()
             else:self.assertEqual(call()[0]['image_digest'],self.data['digest'])
+
+    def test_dispatch_and_automatic_rc_use_the_same_identity_and_artifact_checks(self):
+        for event in ('workflow_dispatch', 'workflow_run'):
+            with self.subTest(event=event):
+                self.evidence['actions/runs/99']['event'] = event
+                rc = CONTROL.approved_rc(self.data, self.evidence.__getitem__)
+                artifact, raw = self.artifact_fixture(self.manifest_fixture())
+                manifest, _ = CONTROL.release_manifest(self.data, rc, {'artifacts': [artifact]}, lambda _: raw)
+                self.assertEqual(manifest['image_digest'], self.data['digest'])
+
+    def test_untrusted_failed_stale_or_forged_rc_is_rejected(self):
+        cases = [('id', 101), ('event', 'pull_request'), ('head_branch', 'feature'),
+                 ('conclusion', 'failure'), ('conclusion', 'cancelled'), ('conclusion', 'skipped'),
+                 ('status', 'in_progress'), ('head_sha', 'f' * 40), ('workflow_id', 12),
+                 ('path', '.github/workflows/fake.yml'), ('run_attempt', 0),
+                 ('repository', {'id': 7, 'full_name': 'foreign/repo'}),
+                 ('head_repository', {'id': 8, 'full_name': CONTROL.REPO}),
+                 ('head_repository', {'id': 7, 'full_name': 'foreign/fork'})]
+        for event in ('workflow_dispatch', 'workflow_run'):
+            for field, value in cases:
+                rejected = copy.deepcopy(self.evidence)
+                rejected['actions/runs/99']['event'] = event
+                rejected['actions/runs/99'][field] = value
+                with self.subTest(event=event, field=field, value=value), self.assertRaises(ValueError):
+                    CONTROL.approved_rc(self.data, rejected.__getitem__)
+        for suffix, value in [('main', 'f' * 40), ('run', 101), ('attempt', 2)]:
+            rejected = copy.deepcopy(self.evidence)
+            if suffix == 'main':
+                rejected['git/ref/heads/main']['object']['sha'] = value
+            else:
+                latest = rejected['actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha='+'b'*40+'&per_page=1']['workflow_runs'][0]
+                latest['id' if suffix == 'run' else 'run_attempt'] = value
+            with self.subTest(stale=suffix), self.assertRaises(ValueError):
+                CONTROL.approved_rc(self.data, rejected.__getitem__)
+
+    def test_automatic_rc_requires_trusted_latest_push_ci_and_complete_jobs(self):
+        for field, value in [('event', 'pull_request'), ('head_branch', 'feature'),
+                             ('head_sha', 'f' * 40), ('status', 'in_progress'),
+                             ('conclusion', 'failure'), ('workflow_id', 12), ('run_attempt', 2),
+                             ('head_repository', {'id': 7, 'full_name': 'foreign/fork'})]:
+            rejected = copy.deepcopy(self.evidence)
+            rejected['actions/runs/99']['event'] = 'workflow_run'
+            rejected['actions/runs/98'][field] = value
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                CONTROL.approved_rc(self.data, rejected.__getitem__)
+        for ident in (98, 99):
+            for jobs in ({'total_count': 0, 'jobs': []}, {'total_count': 101, 'jobs': []},
+                         {'total_count': 1, 'jobs': [{'status': 'completed', 'conclusion': 'skipped'}]},
+                         {'total_count': 1, 'jobs': [{'status': 'completed', 'conclusion': 'failure'}]}):
+                rejected = copy.deepcopy(self.evidence)
+                rejected[f'actions/runs/{ident}/attempts/1/jobs?per_page=100'] = jobs
+                with self.subTest(ident=ident, jobs=jobs), self.assertRaises(ValueError):
+                    CONTROL.approved_rc(self.data, rejected.__getitem__)
+
+    def test_expired_foreign_duplicate_or_corrupt_artifact_is_rejected(self):
+        rc = CONTROL.approved_rc(self.data, self.evidence.__getitem__)
+        for change in ('expired', 'duplicate', 'producer', 'repository', 'source', 'digest', 'inventory', 'attempt', 'duplicate_entry'):
+            artifact, raw = self.artifact_fixture(self.manifest_fixture(), corrupt_inventory=change == 'inventory')
+            if change == 'expired': artifact['expired'] = True
+            if change == 'producer': artifact['workflow_run']['id'] = 101
+            if change == 'repository': artifact['workflow_run']['head_repository_id'] = 8
+            if change == 'source': artifact['workflow_run']['head_sha'] = 'f' * 40
+            if change == 'digest': artifact['digest'] = 'sha256:' + '0' * 64
+            if change == 'attempt': artifact['name'] = 'pg03-gateway-release-99-2'
+            if change == 'duplicate_entry':
+                stream = io.BytesIO(raw)
+                with zipfile.ZipFile(stream, 'a') as z:
+                    z.writestr('unexpected.json', '{}')
+                raw = stream.getvalue()
+                artifact['digest'] = 'sha256:' + hashlib.sha256(raw).hexdigest()
+            artifacts = [artifact, artifact] if change == 'duplicate' else [artifact]
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                CONTROL.release_manifest(self.data, rc, {'artifacts': artifacts}, lambda _: raw)
 
     def test_owner_dispatch_without_review_requires_the_actual_automatic_policy(self):
         evidence = copy.deepcopy(self.evidence)
