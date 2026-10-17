@@ -5,6 +5,8 @@ Root-owned, allowlisted entry point. Credentials arrive on stdin and are never
 logged or persisted. It cannot run deployment commands or write arbitrary paths.
 """
 import hashlib
+from contextlib import contextmanager
+import fcntl
 import io
 import importlib.util
 import json
@@ -31,6 +33,29 @@ TARGET = Path('/opt/clearapi/app/pg03-target-manifest.json')
 
 class ReleaseBlocked(ValueError):
     pass
+
+
+@contextmanager
+def deployment_lock(path=Path('/run/lock/clearapi-production-deploy.lock')):
+    # Coordinate review/reissue/prepare with the existing V2 deployment lock.
+    for parent in path.parents:
+        info = parent.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or (info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX)):
+            raise ReleaseBlocked('unsafe deployment lock directory')
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_gid != os.getegid() or info.st_nlink != 1 or info.st_mode & 0o022):
+            raise ReleaseBlocked('unsafe deployment lock')
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ReleaseBlocked('deployment lock held') from None
+        yield
+    finally:
+        os.close(fd)
 
 
 def unique(pairs):
@@ -298,6 +323,7 @@ def maintenance_authorization(data, manifest, manifest_sha, reviewers, get, path
     module = importlib.util.module_from_spec(location)
     location.loader.exec_module(module)
     paths = paths or module.Paths()
+    module.lifecycle_ready(paths)
     raw = module.read_file(paths.request)
     request = json.loads(raw, object_pairs_hook=unique)
     candidate = {'image_ref': manifest['image_ref'], 'image_digest': manifest['image_digest'],
@@ -318,9 +344,11 @@ def maintenance_authorization(data, manifest, manifest_sha, reviewers, get, path
     return {'schema_version': module.SCHEMA, 'request_sha256': data['transition_sha256']}
 
 
-def main():
-    if os.geteuid() != 0 or sys.argv[1:] != ['prepare']:
-        raise ReleaseBlocked('root prepare entry point required')
+def prepare():
+    transition_module = importlib.util.spec_from_file_location('maintenance_lifecycle', Path(__file__).with_name('pg03-legacy-transition.py'))
+    lifecycle = importlib.util.module_from_spec(transition_module)
+    transition_module.loader.exec_module(lifecycle)
+    lifecycle.lifecycle_ready(lifecycle.Paths())
     data = json.loads(sys.stdin.buffer.read(32769), object_pairs_hook=unique)
     token = data.pop('token')
     get = lambda path: api(path, token)
@@ -350,6 +378,13 @@ def main():
         target['legacy_transition'] = transition
     install_target(TARGET, (json.dumps(target, indent=2) + '\n').encode())
     print('PG03 exact target created from verified release authority and RC artifact')
+
+
+def main():
+    if os.geteuid() != 0 or sys.argv[1:] != ['prepare']:
+        raise ReleaseBlocked('root prepare entry point required')
+    with deployment_lock():
+        prepare()
 
 
 if __name__ == '__main__':

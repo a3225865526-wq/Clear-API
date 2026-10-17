@@ -137,7 +137,7 @@ class TransitionTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.paths = M.Paths(Path(self.temp.name))
         for p in (self.paths.app, self.paths.session.parent, self.paths.audit.parent,
-                  self.paths.backups / 'manifests', self.paths.pool):
+                  self.paths.backups / 'manifests', self.paths.pool, self.paths.lock.parent):
             p.mkdir(parents=True, exist_ok=True)
         self.now = int(time.time())
         self.io = FixtureIO()
@@ -156,11 +156,198 @@ class TransitionTest(unittest.TestCase):
             'schema_transition': self.io.schema_transition()}
         self.args = ('100', self.io.candidate_value['image_digest'], self.io.candidate_value['commit'])
 
-    def review(self):
+    def review(self, reissue=False):
         with patch.object(M.CONTROL, 'approved_rc', return_value={'run_attempt': 1}), \
                 patch.object(M.CONTROL, 'api', return_value={}), \
                 patch.object(M.CONTROL, 'release_manifest', return_value=(self.manifest, '8' * 64)):
-            return self.t.review(copy.deepcopy(self.data))
+            return self.t.review(copy.deepcopy(self.data), reissue=reissue)
+
+    def expired_review(self, target=False):
+        data = self.authorize()
+        previous = M.read_json(self.paths.request)
+        if target:
+            candidate = previous['candidate']
+            M.publish(self.paths.target, {'schema_version': 1, 'pool_mode': 'pg03',
+                'components': {'gateway': {'image_ref': candidate['image_ref'],
+                    'image_digest': candidate['image_digest'], 'image_id': candidate['image_id'],
+                    'oci_revision': candidate['commit'], 'binary_sha256': candidate['binary_sha256']}},
+                'validation': {'approval_run': '100', 'rc_run': candidate['rc_run'],
+                    'rc_manifest_sha256': candidate['rc_manifest_sha256']},
+                'legacy_transition': {'schema_version': M.SCHEMA, 'request_sha256': data['transition_sha256']}})
+        self.now += 601
+        claims = {'iat': self.now, 'exp': self.now + 900, 'sub': '1', 'token_use': 'access'}
+        payload = base64.urlsafe_b64encode(M.encoded(claims)).decode().rstrip('=')
+        self.io.token = 'fixture.' + payload + '.new-private-signature'
+        self.data['login_response']['data'].update(access_token=self.io.token, access_expires_at=self.now + 900)
+        self.data['previous_request_sha256'] = data['transition_sha256']
+        return previous
+
+    def test_reissue_archives_exact_expired_evidence_and_requires_new_authority(self):
+        previous = self.expired_review(target=True)
+        paths = (self.paths.request, self.paths.plan, self.paths.authorization, self.paths.target)
+        old = {p: p.read_bytes() for p in paths}
+        old_session = self.paths.session.read_bytes()
+        sha = self.review(reissue=True)
+        current = M.read_json(self.paths.request)
+        self.assertNotEqual(current['transition_id'], previous['transition_id'])
+        self.assertNotEqual(sha, self.data['previous_request_sha256'])
+        self.assertEqual(current['created_at'], self.now)
+        self.assertEqual(current['expires_at'], self.now + 600)
+        self.assertEqual(current['supersedes']['request_sha256'], self.data['previous_request_sha256'])
+        archive = self.paths.history / current['transition_id']
+        for p, raw in old.items():
+            self.assertEqual((archive / p.name).read_bytes(), raw)
+        self.assertFalse((archive / self.paths.session.name).exists())
+        self.assertNotEqual(self.paths.session.read_bytes(), old_session)
+        self.assertFalse(self.paths.authorization.exists())
+        self.assertFalse(self.paths.target.exists())
+        self.assertFalse(self.paths.state.exists())
+        self.assertFalse(self.paths.backup.exists())
+        self.assertEqual(self.io.events, [])
+        with self.assertRaises(OSError):
+            self.phase('preflight')
+        # Old authorization cannot be moved back to authorize a new UUID/hash.
+        M.publish(self.paths.authorization, json.loads(old[self.paths.authorization]))
+        with self.assertRaises(ValueError):
+            self.phase('preflight')
+        journal = self.paths.audit.read_text()
+        self.assertIn('EXPIRED_REQUEST_REVOKED', journal)
+        self.assertIn('NEW_REVIEW_REQUIRES_NEW_PRODUCTION_AUTHORIZATION', journal)
+        self.assertNotIn('private-signature', journal)
+        self.assertNotIn('private-github-token', journal)
+
+    def test_reissue_rejects_live_consumed_backup_and_wrong_cas_without_rotation(self):
+        for fault in ('live', 'state', 'backup', 'state-link', 'cas', 'target', 'permissions'):
+            with self.subTest(fault=fault):
+                case = TransitionTest()
+                case.setUp()
+                try:
+                    case.expired_review(target=fault == 'target')
+                    if fault == 'live': case.now -= 601
+                    elif fault == 'cas': case.data['previous_request_sha256'] = '0'*64
+                    elif fault == 'target':
+                        value = M.read_json(case.paths.target)
+                        value['legacy_transition']['request_sha256'] = '0'*64
+                        M.publish(case.paths.target, value, exclusive=False)
+                    elif fault == 'permissions': case.paths.plan.chmod(0o644)
+                    elif fault == 'state-link': case.paths.state.symlink_to(case.paths.app / 'missing')
+                    else: M.publish(getattr(case.paths, fault), {'stage': 'unknown'})
+                    before = {p: p.read_bytes() for p in (case.paths.request, case.paths.plan, case.paths.authorization, case.paths.session)}
+                    with case.assertRaises((ValueError, OSError)):
+                        case.review(reissue=True)
+                    for p, raw in before.items(): case.assertEqual(p.read_bytes(), raw)
+                    case.assertFalse(case.paths.reissue.exists())
+                    case.assertEqual(case.io.events, [])
+                finally:
+                    case.doCleanups()
+
+    def test_reissued_review_accepts_only_a_fresh_exact_production_approval(self):
+        self.expired_review(target=True)
+        old_sha = self.data['previous_request_sha256']
+        sha = self.review(reissue=True)
+        data = dict(self.data, run='101', transition_sha256=old_sha)
+        old_title = 'Deploy pg03 ' + data['digest'] + ' ' + old_sha
+        with self.assertRaises(ValueError):
+            M.CONTROL.maintenance_authorization(data, self.manifest, '8'*64,
+                [M.ACTOR], lambda _: {'display_title': old_title}, self.paths)
+        data['transition_sha256'] = sha
+        title = 'Deploy pg03 ' + data['digest'] + ' ' + sha
+        binding = M.CONTROL.maintenance_authorization(data, self.manifest, '8'*64,
+            [M.ACTOR], lambda _: {'display_title': title}, self.paths)
+        self.assertEqual(binding['request_sha256'], sha)
+        self.assertEqual(M.read_json(self.paths.authorization)['approval_run'], '101')
+        self.args = ('101', self.args[1], self.args[2])
+        self.assertEqual(self.phase('preflight'), 'preflight')
+        self.assertEqual(self.io.events, [])
+        self.assertFalse(self.paths.state.exists())
+
+    def test_reissue_revalidates_login_rc_and_schema_before_revocation(self):
+        for fault in ('401', '403', 'old-login', 'rc', 'schema', 'identity'):
+            with self.subTest(fault=fault):
+                case = TransitionTest()
+                case.setUp()
+                try:
+                    case.expired_review()
+                    if fault in ('401', '403'): case.io.auth_status = int(fault)
+                    elif fault == 'old-login':
+                        case.data['login_response']['data']['access_token'] = case.paths.session.read_text().strip()
+                        case.data['login_response']['data']['access_expires_at'] -= 601
+                    elif fault == 'rc': case.manifest['verification'] = {}
+                    elif fault == 'schema': case.manifest['schema_transition']['source_schema_sha256'] = '0'*64
+                    else: case.io.candidate_value['commit'] = '0'*40
+                    before = {p: p.read_bytes() for p in (case.paths.request, case.paths.plan, case.paths.authorization, case.paths.session)}
+                    with case.assertRaises(ValueError): case.review(reissue=True)
+                    for p, raw in before.items(): case.assertEqual(p.read_bytes(), raw)
+                    case.assertFalse(case.paths.reissue.exists())
+                    case.assertEqual(case.io.events, [])
+                finally:
+                    case.doCleanups()
+
+    def test_partial_reissue_is_durably_blocked_at_each_rotation_boundary(self):
+        for fault in ('rename-authorization', 'rename-target', 'rename-plan', 'rename-request', 'session', 'session-sync', 'plan', 'request', 'audit', 'complete'):
+            with self.subTest(fault=fault):
+                case = TransitionTest()
+                case.setUp()
+                try:
+                    case.expired_review(target=True)
+                    publish, rename, install, audit, fsync = M.publish, M.os.rename, M.PROBE.install, case.t.audit, M.os.fsync
+                    def fail_publish(path, value, exclusive=True):
+                        if ((fault == 'plan' and path == case.paths.plan)
+                                or (fault == 'request' and path == case.paths.request)
+                                or (fault == 'complete' and path == case.paths.reissue and value['status'] == 'completed')):
+                            raise SystemExit('simulated interruption')
+                        return publish(path, value, exclusive)
+                    def fail_rename(source, target):
+                        if fault == 'rename-' + next((name for name in ('authorization', 'target', 'plan', 'request') if source == getattr(case.paths, name)), ''):
+                            raise SystemExit('simulated interruption')
+                        return rename(source, target)
+                    def fail_install(path, token):
+                        if fault == 'session': raise SystemExit('simulated interruption')
+                        return install(path, token)
+                    def fail_audit(phase, *args, **kwargs):
+                        if fault == 'audit' and phase == 'reissue': raise SystemExit('simulated interruption')
+                        return audit(phase, *args, **kwargs)
+                    def fail_fsync(fd):
+                        if fault == 'session-sync' and os.readlink('/proc/self/fd/' + str(fd)) == str(case.paths.session.parent):
+                            raise SystemExit('simulated interruption')
+                        return fsync(fd)
+                    with patch.object(M, 'publish', side_effect=fail_publish), patch.object(M.os, 'rename', side_effect=fail_rename), \
+                            patch.object(M.PROBE, 'install', side_effect=fail_install), patch.object(case.t, 'audit', side_effect=fail_audit), \
+                            patch.object(M.os, 'fsync', side_effect=fail_fsync):
+                        with case.assertRaises(SystemExit): case.review(reissue=True)
+                    case.assertEqual(M.read_json(case.paths.reissue)['status'], 'pending')
+                    with case.assertRaises((ValueError, OSError)): M.lifecycle_ready(case.paths)
+                    with case.assertRaises((ValueError, OSError)): case.review()
+                    with case.assertRaises((ValueError, OSError)): case.review(reissue=True)
+                    with case.assertRaises((ValueError, OSError)): case.phase('fail')
+                    data = dict(case.data, run='100', transition_sha256=case.data['previous_request_sha256'])
+                    title = 'Deploy pg03 ' + data['digest'] + ' ' + data['transition_sha256']
+                    with case.assertRaises((ValueError, OSError)):
+                        M.CONTROL.maintenance_authorization(data, case.manifest, '8'*64,
+                            [M.ACTOR], lambda _: {'display_title': title}, case.paths)
+                    case.assertEqual(case.io.events, [])
+                    case.assertFalse(case.paths.state.exists())
+                    case.assertFalse(case.paths.backup.exists())
+                finally:
+                    case.doCleanups()
+
+    def test_reissue_and_prepare_share_v2_lock_and_reject_unsafe_locks(self):
+        self.expired_review()
+        with M.CONTROL.deployment_lock(self.paths.lock):
+            with self.assertRaises(ValueError): self.review(reissue=True)
+            result = subprocess.run(['flock', '-n', str(self.paths.lock), 'true'], capture_output=True)
+            self.assertNotEqual(result.returncode, 0)
+        self.paths.lock.chmod(0o666)
+        with self.assertRaises(ValueError): self.review(reissue=True)
+        self.assertFalse(self.paths.reissue.exists())
+        # Exercise both real root CLIs against the exact lock V2 uses.
+        with M.CONTROL.deployment_lock():
+            for script, command in (('pg03-release-control.py', 'prepare'), ('pg03-legacy-transition.py', 'reissue')):
+                result = subprocess.run(['python3', '-B', str(SCRIPTS / script), command],
+                    input=b'{"token":"synthetic-private"}', capture_output=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(b'BLOCKED', result.stderr)
+                self.assertNotIn(b'synthetic-private', result.stdout + result.stderr)
 
     def authorize(self):
         sha = self.review()

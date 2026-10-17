@@ -65,6 +65,10 @@ class Paths:
         self.backups = root / 'opt/clearapi/backups'
         self.dsn = root / 'opt/clearapi/secrets/sql_dsn'
         self.pool = root / 'data/clearapi/pool-executor/pool'
+        self.lock = root / 'run/lock/clearapi-production-deploy.lock'
+        self.target = self.app / 'pg03-target-manifest.json'
+        self.reissue = self.app / 'legacy-transition-reissue.json'
+        self.history = self.app / 'legacy-transition-history'
 
 
 def read_file(path, private=True, maximum=1048576):
@@ -118,6 +122,14 @@ def publish(path, value, exclusive=True):
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def lifecycle_ready(paths):
+    if paths.reissue.exists() or paths.reissue.is_symlink():
+        record = read_json(paths.reissue)
+        if (record.get('schema_version') != SCHEMA or record.get('status') != 'completed'
+                or record.get('new_request_sha256') != digest(read_file(paths.request))):
+            raise Blocked('incomplete or superseded maintenance review; preserve all evidence')
 
 
 class Production:
@@ -298,11 +310,11 @@ class Transition:
         self.io = io or Production(self.paths)
         self.now = now
 
-    def audit(self, phase, request, result):
+    def audit(self, phase, request, result, **details):
         # No raw HTTP body, credentials, exception text or business rows.
         row = {'schema_version': SCHEMA, 'transition_id': request['transition_id'],
             'ts': int(self.now()), 'phase': phase, 'result': result,
-            'request_sha256': digest(read_file(self.paths.request))}
+            'request_sha256': digest(read_file(self.paths.request)), **details}
         for parent in self.paths.audit.parents:
             s = parent.lstat()
             if (not stat.S_ISDIR(s.st_mode) or s.st_uid != os.geteuid()
@@ -317,10 +329,25 @@ class Transition:
             f.flush()
             os.fsync(f.fileno())
 
-    def review(self, data):
+    def review(self, data, reissue=False):
+        with CONTROL.deployment_lock(self.paths.lock):
+            try:
+                return self.review_locked(data, reissue)
+            except Exception:
+                if reissue:
+                    try:
+                        self.audit('reissue_rejected', read_json(self.paths.request), 'BLOCKED')
+                    except (OSError, ValueError, KeyError):
+                        # The durable pending latch still blocks partial reissue.
+                        pass
+                raise
+
+    def review_locked(self, data, reissue):
         # A successful RC and same-main CI establish executable provenance; they
         # do not authorize production retirement or claim an old Runtime PASS.
-        if any(p.exists() or p.is_symlink() for p in (self.paths.request, self.paths.authorization,
+        lifecycle_ready(self.paths)
+        previous = self.expired_review(data) if reissue else None
+        if not reissue and any(p.exists() or p.is_symlink() for p in (self.paths.request, self.paths.authorization,
                 self.paths.state, self.paths.plan, self.paths.session, self.paths.backup)):
             raise Blocked('preserve prior transition evidence before another review')
         token = data.pop('token')
@@ -338,6 +365,8 @@ class Transition:
             'rc_run': str(data['rc_run']), 'rc_manifest_sha256': manifest_sha}
         self.io.candidate(candidate)
         access = PROBE.login_access(encoded(data['login_response']), self.now())
+        if previous and digest(access.encode() + b'\n') == digest(read_file(self.paths.session)):
+            raise Blocked('a new official login is required for reissue')
         claims = json.loads(base64.urlsafe_b64decode(access.split('.')[1] + '=' * (-len(access.split('.')[1]) % 4)))
         if (type(claims.get('iat')) is not int or not -5 <= self.now() - claims['iat'] <= 120
                 or not re.fullmatch(r'[1-9][0-9]*', claims.get('sub', ''))
@@ -367,6 +396,11 @@ class Transition:
             'created_at': int(self.now()), 'expires_at': min(int(self.now()) + 600, claims['exp'] - 60),
             'source': source, 'edge': edge, 'candidate': candidate, 'review': review, 'invariants': business, 'schema_transition': schema_transition,
             'old_runtime': {'http_status': 503, 'status': 'BLOCKED', 'code': 'APPROVAL_VIEW_INVALID'}}
+        if previous:
+            request['supersedes'] = {'transition_id': previous['transition_id'],
+                'request_sha256': data['previous_request_sha256']}
+            self.replace_expired(previous, request, review, access, actor, data)
+            return digest(read_file(self.paths.request))
         # Each publication is exclusive. Partial preparation must be retained
         # for operator review; another request cannot silently replace it.
         publish(self.paths.plan, review)
@@ -374,6 +408,91 @@ class Transition:
         publish(self.paths.request, request)
         self.audit('review', request, 'OLD_RUNTIME_BLOCKED_NOT_PASS')
         return digest(read_file(self.paths.request))
+
+    def expired_review(self, data):
+        # Consumed or partially backed-up maintenance needs explicit recovery,
+        # never a replacement request. Broken links count as existing evidence.
+        if any(p.exists() or p.is_symlink() for p in (self.paths.state, self.paths.backup)):
+            raise Blocked('consumed maintenance or backup evidence cannot be reissued')
+        raw = read_file(self.paths.request)
+        previous = json.loads(raw, object_pairs_hook=CONTROL.unique)
+        if (not re.fullmatch(r'[a-f0-9]{64}', data.get('previous_request_sha256', ''))
+                or data['previous_request_sha256'] != digest(raw)
+                or previous['schema_version'] != SCHEMA
+                or type(previous['created_at']) is not int or type(previous['expires_at']) is not int
+                or not 0 < previous['expires_at'] - previous['created_at'] <= 600
+                or previous['created_at'] > self.now() or previous['expires_at'] > self.now()
+                or read_json(self.paths.plan) != previous['review']):
+            raise Blocked('only the exact expired review can be reissued')
+        uuid.UUID(previous['transition_id'])
+        read_file(self.paths.session)  # Validate ownership; never copy its bytes.
+        REHEARSAL.validate_receipt(previous['schema_transition'], previous['candidate'], previous['invariants']['schema_sha256'])
+        authority = None
+        if self.paths.authorization.exists() or self.paths.authorization.is_symlink():
+            authority = read_json(self.paths.authorization)
+            self.authorization(authority['approval_run'], previous['candidate']['image_digest'],
+                previous['candidate']['commit'], allow_expired=True)
+        if self.paths.target.exists() or self.paths.target.is_symlink():
+            target = read_json(self.paths.target)
+            candidate = previous['candidate']
+            gateway = {'image_ref': candidate['image_ref'], 'image_digest': candidate['image_digest'],
+                'image_id': candidate['image_id'], 'oci_revision': candidate['commit'],
+                'binary_sha256': candidate['binary_sha256']}
+            if (authority is None or target.get('schema_version') != 1 or target.get('pool_mode') != 'pg03'
+                    or target.get('legacy_transition') != {'schema_version': SCHEMA, 'request_sha256': digest(raw)}
+                    or target.get('components', {}).get('gateway') != gateway
+                    or target.get('validation', {}).get('approval_run') != authority['approval_run']
+                    or target['validation'].get('rc_run') != candidate['rc_run']
+                    or target['validation'].get('rc_manifest_sha256') != candidate['rc_manifest_sha256']):
+                raise Blocked('existing deployment target does not belong to the expired request')
+        return previous
+
+    def replace_expired(self, previous, request, review, access, actor, data):
+        # A durable latch precedes ALL active-file changes. No automatic retry
+        # or cleanup is safe after a partial rotation or an ambiguous fsync.
+        if digest(read_file(self.paths.request)) != data['previous_request_sha256']:
+            raise Blocked('expired request changed during reissue')
+        if self.paths.history.is_symlink():
+            raise Blocked('unsafe maintenance history')
+        self.paths.history.mkdir(mode=0o700, exist_ok=True)
+        info = self.paths.history.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_gid != os.getegid() or stat.S_IMODE(info.st_mode) != 0o700):
+            raise Blocked('unsafe maintenance history')
+        archive = self.paths.history / request['transition_id']
+        archive.mkdir(mode=0o700)
+        if self.paths.reissue.exists():
+            publish(archive / self.paths.reissue.name, read_json(self.paths.reissue))
+        record = {'schema_version': SCHEMA, 'status': 'pending', 'actor_id': actor,
+            'old_transition_id': previous['transition_id'], 'new_transition_id': request['transition_id'],
+            'old_request_sha256': data['previous_request_sha256'],
+            'new_request_sha256': digest(encoded(request) + b'\n'), 'created_at': int(self.now())}
+        publish(self.paths.reissue, record, exclusive=not self.paths.reissue.exists())
+        self.audit('reissue_started', previous, 'EXPIRED_REQUEST_REVOKED',
+            actor_id=actor, new_transition_id=request['transition_id'])
+        for path in (self.paths.authorization, self.paths.target, self.paths.plan, self.paths.request):
+            if path.exists() or path.is_symlink():
+                read_file(path)
+                os.rename(path, archive / path.name)
+        for directory in (archive, self.paths.history, self.paths.app):
+            fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+        # The old session is replaced with the newly authenticated one, never
+        # archived, extended or transferred to the new request.
+        PROBE.install(self.paths.session, access)
+        fd = os.open(self.paths.session.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        publish(self.paths.plan, review)
+        publish(self.paths.request, request)
+        self.audit('reissue', request, 'NEW_REVIEW_REQUIRES_NEW_PRODUCTION_AUTHORIZATION',
+            actor_id=actor, old_request_sha256=record['old_request_sha256'])
+        publish(self.paths.reissue, dict(record, status='completed'), exclusive=False)
 
     def validate_scope(self, plan, catalog):
         legacy = catalog.get('legacy_products', [])
@@ -388,6 +507,7 @@ class Transition:
             raise Blocked('outside the approved v5 legacy retirement scope')
 
     def authorization(self, run, image_digest, commit, allow_expired=False):
+        lifecycle_ready(self.paths)
         raw = read_file(self.paths.request)
         request = json.loads(raw, object_pairs_hook=CONTROL.unique)
         authority = read_json(self.paths.authorization)
@@ -601,7 +721,7 @@ def main():
     if os.geteuid() != 0:
         raise Blocked('root entry point required')
     transition = Transition()
-    if sys.argv[1:] == ['review', '--login']:
+    if sys.argv[1:] in (['review', '--login'], ['reissue', '--login']):
         if not sys.stdin.isatty():
             raise Blocked('private root terminal required')
         import getpass
@@ -609,17 +729,19 @@ def main():
         data = {k: input(label).strip() for k, label in (('commit', 'Reviewed main commit: '),
             ('digest', 'Exact candidate digest: '), ('rc_run', 'Successful same-main RC run: '),
             ('evidence_ref', 'Non-secret review evidence reference: '))}
+        if sys.argv[1] == 'reissue':
+            data['previous_request_sha256'] = input('Exact expired request SHA256: ').strip()
         data['token'] = getpass.getpass('GitHub read credential (not echoed): ')
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), PROBE.NoRedirect())
         data['login_response'] = json.loads(PROBE.interactive_login(opener), object_pairs_hook=CONTROL.unique)
-        print(transition.review(data))
+        print(transition.review(data, reissue=sys.argv[1] == 'reissue'))
         return
-    if sys.argv[1:] == ['review']:
+    if sys.argv[1:] in (['review'], ['reissue']):
         raw = sys.stdin.buffer.read(131073)
         if len(raw) > 131072:
             raise Blocked('oversized private review input')
         data = json.loads(raw, object_pairs_hook=CONTROL.unique)
-        print(transition.review(data))
+        print(transition.review(data, reissue=sys.argv[1] == 'reissue'))
         return
     if len(sys.argv) not in (6, 7) or sys.argv[1] != 'phase':
         raise Blocked('explicit review or V2 phase entry point required')
