@@ -860,9 +860,15 @@ try:
         validation = m.get('validation', {})
         autonomous = validation.get('authorization')
         if autonomous is not None:
-            if (validation.get('reviewers') != [] or autonomous != {
-                    'mode': 'owner-dispatch-v1', 'actor': 'a3225865526-wq',
-                    'run': validation.get('approval_run')}
+            owner_dispatch = autonomous == {
+                'mode': 'owner-dispatch-v1', 'actor': 'a3225865526-wq',
+                'run': validation.get('approval_run')}
+            automatic_proof = (isinstance(autonomous, dict)
+                and set(autonomous) == {'mode', 'run', 'rehearsal_run'}
+                and autonomous.get('mode') == 'automatic-proof-v1'
+                and autonomous.get('run') == validation.get('approval_run')
+                and re.fullmatch(r'[1-9][0-9]*', autonomous.get('rehearsal_run', '')))
+            if (validation.get('reviewers') != [] or not (owner_dispatch or automatic_proof)
                     or not re.fullmatch(r'[1-9][0-9]*', autonomous.get('run', ''))):
                 raise ValueError()
         elif validation.get('approval') != 'passed':
