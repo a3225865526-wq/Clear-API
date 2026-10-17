@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 
 
 GATES = {
@@ -42,8 +43,16 @@ def main():
             raise SystemExit(f"stale receipt source: {gate}")
         if receipt.get("gateway_digest") != manifest.get("image_digest"):
             raise SystemExit(f"stale receipt digest: {gate}")
+        if type(receipt.get("rc_run_id")) is not int or receipt["rc_run_id"] != int(manifest["workflow_run"]):
+            raise SystemExit(f"stale receipt RC run: {gate}")
+        if type(receipt.get("rc_run_attempt")) is not int or receipt["rc_run_attempt"] != int(manifest["workflow_run_attempt"]):
+            raise SystemExit(f"stale receipt RC attempt: {gate}")
         checks[gate] = {"conclusion": "success", "file": path.name,
                         "sha256": hashlib.sha256(raw).hexdigest()}
+    transition = manifest.get("schema_transition", {})
+    schema = transition.get("source_schema_sha256", "")
+    if not re.fullmatch(r"[0-9a-f]{64}", schema) or schema != transition.get("target_schema_sha256"):
+        raise SystemExit("no_schema_change contradicts the RC schema transition")
     proof = {
         "schema": "clearapi.automatic-release/v1",
         "source_commit": manifest["source_commit"],
