@@ -27,7 +27,7 @@ IMAGE = 'ghcr.io/a3225865526-wq/clearapi'
 EXECUTOR = 'ghcr.io/a3225865526-wq/clearapi-executor@sha256:0838072c3fd61165ba20f78084dafe678114dd5c8b19a1e8b4acd31eee2ad821'
 EXECUTOR_REVISION = 'e5f33dc6412d17bd058bd3de2e053c3b45b9a359'
 EXECUTOR_BINARY = '527b1814c7b4ef1ec52b2f416ec329192ffb50dc1e9b819763e7a82b0965c898'
-V2_SHA = '9804ff8a15a90d507ad02b42aa413489506deab2fc02c9b94ac447b5d14e492e'
+V2_SHA = '5fd2bc16a0f3291b98e42a854bed036b06a284962ecf587a43450efa198a9ee2'
 TARGET = Path('/opt/clearapi/app/pg03-target-manifest.json')
 
 
@@ -103,11 +103,17 @@ def approved_run(data, get):
         raise ReleaseBlocked('invalid release identity')
     run = get('actions/runs/' + str(data['run']))
     if (run['head_sha'] != commit or run['head_branch'] != 'main'
-            or run['event'] != 'workflow_dispatch' or run['status'] != 'in_progress'
-            or run['path'] != '.github/workflows/deploy-production.yml'
-            or run['repository']['full_name'] != REPO
+            or run['status'] != 'in_progress' or run['repository']['full_name'] != REPO
             or get('git/ref/heads/main')['object']['sha'] != commit):
         raise ReleaseBlocked('deployment is not running reviewed main')
+    if run['event'] == 'workflow_run':
+        if run['path'] != '.github/workflows/automatic-deploy.yml':
+            raise ReleaseBlocked('untrusted automatic deployment workflow')
+        automatic_release_authority(data, get)
+        return [], approved_rc(data, get)
+    if (run['event'] != 'workflow_dispatch'
+            or run['path'] != '.github/workflows/deploy-production.yml'):
+        raise ReleaseBlocked('untrusted deployment workflow')
     reviews = get('actions/runs/' + str(data['run']) + '/approvals')
     if any(r['state'] == 'rejected' for r in reviews):
         raise ReleaseBlocked('production review rejected')
@@ -139,6 +145,60 @@ def autonomous_authority(data, get):
     if len(policies) != 1 or policies[0].get('name') != 'main' or policies[0].get('type') != 'branch':
         raise ReleaseBlocked('production must allow only main')
     return {'mode': 'owner-dispatch-v1', 'actor': owner, 'run': str(data['run'])}
+
+
+def automatic_release_authority(data, get):
+    """Tie Deploy V2 to the completed proof-authorizing job in the trusted workflow."""
+    if (data.get('executor_repository', '') + '@' + data.get('executor_digest', '') != EXECUTOR
+            or data.get('executor_binary_sha256') != EXECUTOR_BINARY
+            or data.get('executor_source_commit') != EXECUTOR_REVISION):
+        raise ReleaseBlocked('Executor does not match the authenticated rehearsal proof')
+    run_id = str(data['run'])
+    run = get('actions/runs/' + run_id)
+    if (run['event'] != 'workflow_run' or run['path'] != '.github/workflows/automatic-deploy.yml'
+            or run['head_sha'] != data['commit'] or run['head_branch'] != 'main'
+            or run['status'] != 'in_progress' or run['repository']['full_name'] != REPO
+            or get('git/ref/heads/main')['object']['sha'] != data['commit']):
+        raise ReleaseBlocked('automatic release workflow identity mismatch')
+    workflow = get('actions/workflows/automatic-deploy.yml')
+    if workflow['path'] != run['path'] or workflow['state'] != 'active' or workflow['id'] != run['workflow_id']:
+        raise ReleaseBlocked('automatic release workflow is inactive or mismatched')
+    enabled = get('actions/variables/CLEARAPI_AUTO_PRODUCTION_ENABLED')
+    if enabled.get('name') != 'CLEARAPI_AUTO_PRODUCTION_ENABLED' or enabled.get('value') != 'true':
+        raise ReleaseBlocked('automatic production release is disabled')
+    environment = get('environments/production')
+    if (environment.get('id') != 23693288049 or environment.get('name') != 'production'
+            or environment.get('deployment_branch_policy') != {
+                'protected_branches': False, 'custom_branch_policies': True}
+            or any(r.get('type') != 'branch_policy'
+                   for r in environment.get('protection_rules', []))):
+        raise ReleaseBlocked('automatic production environment policy mismatch')
+    policies = get('environments/production/deployment-branch-policies')['branch_policies']
+    if len(policies) != 1 or policies[0].get('name') != 'main' or policies[0].get('type') != 'branch':
+        raise ReleaseBlocked('production must allow only main')
+    rehearsal_id = str(data.get('rehearsal_run', ''))
+    if not re.fullmatch(r'[1-9][0-9]*', rehearsal_id):
+        raise ReleaseBlocked('missing authenticated deployment rehearsal')
+    rehearsal = get('actions/runs/' + rehearsal_id)
+    if (rehearsal['path'] != '.github/workflows/deployment-rehearsal.yml'
+            or rehearsal['event'] != 'workflow_run' or rehearsal['head_sha'] != data['commit']
+            or rehearsal['head_branch'] != 'main' or rehearsal['status'] != 'completed'
+            or rehearsal['conclusion'] != 'success' or rehearsal['run_attempt'] != 1
+            or rehearsal['repository']['full_name'] != REPO
+            or rehearsal['head_repository']['full_name'] != REPO):
+        raise ReleaseBlocked('deployment rehearsal identity mismatch')
+    jobs = get('actions/runs/' + run_id + '/jobs?per_page=100')['jobs']
+    authorizers = [job for job in jobs
+                   if job['name'].endswith('Validate release authorization before production credentials')]
+    if len(authorizers) != 1:
+        raise ReleaseBlocked('automatic proof authorization job is missing or duplicated')
+    job = authorizers[0]
+    step = next((step for step in job.get('steps', [])
+                 if step['name'] == 'Authenticate automatic proof before production credentials'), None)
+    if (job['status'] != 'completed' or job['conclusion'] != 'success'
+            or step is None or step['status'] != 'completed' or step['conclusion'] != 'success'):
+        raise ReleaseBlocked('automatic proof authorization did not pass')
+    return {'mode': 'automatic-proof-v1', 'run': run_id, 'rehearsal_run': rehearsal_id}
 
 
 def approved_rc(data, get):
@@ -362,6 +422,15 @@ def prepare():
         return subprocess.run(['docker', *args], check=True, capture_output=True,
                               text=True, timeout=30).stdout.strip()
     e = executor_identity(docker)
+    if data.get('rehearsal_run'):
+        expected_executor = {
+            'image_ref': data.get('executor_repository', '') + '@' + data.get('executor_digest', ''),
+            'image_digest': data.get('executor_digest', ''),
+            'binary_sha256': data.get('executor_binary_sha256', ''),
+            'oci_revision': data.get('executor_source_commit', ''),
+        }
+        if any(expected_executor[key] != e[key] for key in expected_executor):
+            raise ReleaseBlocked('prepared Executor differs from authenticated rehearsal proof')
     transition = maintenance_authorization(data, m, manifest_sha, reviewers, get)
     target = {'schema_version': 1, 'pool_mode': 'pg03', 'components': {
         'gateway': {'image_ref': m['image_ref'], 'image_digest': m['image_digest'],
@@ -373,7 +442,9 @@ def prepare():
     if reviewers:
         target['validation']['approval'] = 'passed'
     else:
-        target['validation']['authorization'] = autonomous_authority(data, get)
+        target['validation']['authorization'] = (
+            automatic_release_authority(data, get) if data.get('rehearsal_run')
+            else autonomous_authority(data, get))
     if transition is not None:
         target['legacy_transition'] = transition
     install_target(TARGET, (json.dumps(target, indent=2) + '\n').encode())

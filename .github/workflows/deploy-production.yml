@@ -2,6 +2,13 @@ name: Deploy Production
 run-name: Deploy ${{ inputs.pool_mode }} ${{ inputs.image_digest }} ${{ inputs.legacy_transition_sha256 || 'normal' }}
 
 on:
+  workflow_call:
+    inputs:
+      rehearsal_run_id:
+        description: 'Successful authenticated deployment rehearsal run'
+        required: false
+        type: string
+        default: ''
   workflow_dispatch:
     inputs:
       image_digest:
@@ -45,13 +52,107 @@ permissions:
   # GHCR candidate on the VPS. It grants no write access to any package.
   packages: read
   actions: read
+  deployments: read
 
 concurrency:
   group: production
   cancel-in-progress: false
 
 jobs:
+  authorize:
+    name: Validate release authorization before production credentials
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+    outputs:
+      image_digest: ${{ steps.manual.outputs.image_digest || steps.release.outputs.image_digest }}
+      expected_commit: ${{ steps.manual.outputs.expected_commit || steps.release.outputs.expected_commit }}
+      migration_compatible: ${{ steps.manual.outputs.migration_compatible || steps.release.outputs.migration_compatible }}
+      previous_source_commit: ${{ steps.release.outputs.previous_source_commit }}
+      pool_mode: ${{ steps.manual.outputs.pool_mode || steps.release.outputs.pool_mode }}
+      rc_run_id: ${{ steps.manual.outputs.rc_run_id || steps.release.outputs.rc_run_id }}
+      legacy_transition_sha256: ${{ steps.manual.outputs.legacy_transition_sha256 || steps.release.outputs.legacy_transition_sha256 }}
+      rehearsal_run_id: ${{ steps.release.outputs.rehearsal_run_id }}
+      executor_image_repository: ${{ steps.release.outputs.executor_image_repository }}
+      executor_image_digest: ${{ steps.release.outputs.executor_image_digest }}
+      executor_binary_sha256: ${{ steps.release.outputs.executor_binary_sha256 }}
+      executor_source_commit: ${{ steps.release.outputs.executor_source_commit }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Validate manual gate inputs
+        if: github.event_name == 'workflow_dispatch'
+        id: manual
+        env:
+          INPUT_DIGEST: ${{ inputs.image_digest }}
+          INPUT_COMMIT: ${{ inputs.expected_commit }}
+          INPUT_POOL_MODE: ${{ inputs.pool_mode }}
+          INPUT_RC_RUN_ID: ${{ inputs.rc_run_id }}
+          INPUT_TRANSITION_SHA256: ${{ inputs.legacy_transition_sha256 }}
+          INPUT_MIGRATION: ${{ inputs.migration_compatible }}
+          INPUT_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = a3225865526-wq/Clear-API
+          test "$GITHUB_REF" = refs/heads/main
+          if [[ -n "$INPUT_TRANSITION_SHA256" ]]; then
+            [[ "$INPUT_TRANSITION_SHA256" =~ ^[a-f0-9]{64}$ ]]
+            [[ "$INPUT_CONFIRMATION" == DEPLOY_LEGACY_RETIREMENT_V1 && "$INPUT_POOL_MODE" == pg03 && "$INPUT_MIGRATION" == false ]]
+          else
+            [[ "$INPUT_CONFIRMATION" == DEPLOY_PRODUCTION ]]
+          fi
+          [[ "$INPUT_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$INPUT_COMMIT" == "$GITHUB_SHA" ]]
+          [[ "$INPUT_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+          case "$INPUT_MIGRATION" in true|false) ;; *) exit 1 ;; esac
+          case "$INPUT_POOL_MODE" in
+            off) ;;
+            pg03) [[ "$INPUT_RC_RUN_ID" =~ ^[1-9][0-9]*$ ]] ;;
+            *) exit 1 ;;
+          esac
+          {
+            echo "image_digest=$INPUT_DIGEST"
+            echo "expected_commit=$INPUT_COMMIT"
+            echo "migration_compatible=$INPUT_MIGRATION"
+            echo "pool_mode=$INPUT_POOL_MODE"
+            echo "rc_run_id=$INPUT_RC_RUN_ID"
+            echo "legacy_transition_sha256=$INPUT_TRANSITION_SHA256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate automatic proof before production credentials
+        if: github.event_name == 'workflow_run'
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
+          AUTO_ENABLED: ${{ vars.CLEARAPI_AUTO_PRODUCTION_ENABLED }}
+          REHEARSAL_RUN_ID: ${{ inputs.rehearsal_run_id }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = a3225865526-wq/Clear-API
+          test "$GITHUB_REF" = refs/heads/main
+          test "$AUTO_ENABLED" = true
+          [[ "$REHEARSAL_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          test "$REHEARSAL_RUN_ID" = "$TRIGGER_RUN_ID"
+          python3 scripts/ci/automatic-release.py authorize \
+            --destination "$RUNNER_TEMP/verified-release-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          {
+            echo "pool_mode=pg03"
+            echo "legacy_transition_sha256="
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Report blocked authorization
+        if: failure()
+        run: echo 'Release authorization failed. Production credentials were not requested.' >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
+    needs: authorize
     name: Controlled production deploy (exact digest)
     runs-on: ubuntu-latest
     environment: production
@@ -62,58 +163,66 @@ jobs:
       PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
       PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
       PROD_SSH_ALIAS: clearapi-vps
-      POOL_MODE: ${{ inputs.pool_mode }}
-      RC_RUN_ID: ${{ inputs.rc_run_id }}
-      EXPECTED_COMMIT: ${{ inputs.expected_commit }}
-      IMAGE_DIGEST: ${{ inputs.image_digest }}
-      CONFIRMATION: ${{ inputs.confirmation }}
-      MIGRATION_COMPATIBLE: ${{ inputs.migration_compatible }}
-      LEGACY_TRANSITION_SHA256: ${{ inputs.legacy_transition_sha256 }}
+      POOL_MODE: ${{ needs.authorize.outputs.pool_mode }}
+      RC_RUN_ID: ${{ needs.authorize.outputs.rc_run_id }}
+      EXPECTED_COMMIT: ${{ needs.authorize.outputs.expected_commit }}
+      IMAGE_DIGEST: ${{ needs.authorize.outputs.image_digest }}
+      MIGRATION_COMPATIBLE: ${{ needs.authorize.outputs.migration_compatible }}
+      LEGACY_TRANSITION_SHA256: ${{ needs.authorize.outputs.legacy_transition_sha256 }}
+      REHEARSAL_RUN_ID: ${{ needs.authorize.outputs.rehearsal_run_id }}
+      PREVIOUS_SOURCE_COMMIT: ${{ needs.authorize.outputs.previous_source_commit }}
+      EXPECTED_EXECUTOR_REPOSITORY: ${{ needs.authorize.outputs.executor_image_repository }}
+      EXPECTED_EXECUTOR_DIGEST: ${{ needs.authorize.outputs.executor_image_digest }}
+      EXPECTED_EXECUTOR_BINARY_SHA256: ${{ needs.authorize.outputs.executor_binary_sha256 }}
+      EXPECTED_EXECUTOR_SOURCE_COMMIT: ${{ needs.authorize.outputs.executor_source_commit }}
 
     steps:
       - name: Checkout deploy assets
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: ${{ needs.authorize.outputs.expected_commit }}
           persist-credentials: false
 
-      - name: Validate manual gate inputs
+      - name: Validate authorized release identity
         run: |
           set -euo pipefail
-          if [[ -n "${LEGACY_TRANSITION_SHA256:-}" ]]; then
-            [[ "$LEGACY_TRANSITION_SHA256" =~ ^[a-f0-9]{64}$ ]]
-            [[ "$CONFIRMATION" == DEPLOY_LEGACY_RETIREMENT_V1 && "$POOL_MODE" == pg03 && "$MIGRATION_COMPATIBLE" == false ]]
-          else
-            [[ "$CONFIRMATION" == DEPLOY_PRODUCTION ]]
-          fi
-          if [[ ! "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "expected_commit is not a full 40-hex commit SHA"
-            exit 1
-          fi
-          if [ "$EXPECTED_COMMIT" != "$GITHUB_SHA" ]; then
-            echo 'expected_commit does not match the workflow commit'
-            exit 1
-          fi
-          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
-            echo "image_digest must be an exact 'sha256:<64 hex>' digest — tags and 'latest' are forbidden"
-            exit 1
-          fi
+          [[ "$EXPECTED_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EXPECTED_COMMIT" == "$(git rev-parse HEAD)" ]]
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
           case "$MIGRATION_COMPATIBLE" in
             true|false) ;;
-            *) echo "migration_compatible must be true or false"; exit 1 ;;
+            *) exit 1 ;;
           esac
           case "$POOL_MODE" in
             off)
+              [[ -z "$REHEARSAL_RUN_ID" ]]
               echo 'DEPLOY_SOURCE=scripts/production-deploy.sh' >> "$GITHUB_ENV"
               echo 'DEPLOY_WRAPPER=/opt/clearapi/bin/production-deploy.sh' >> "$GITHUB_ENV"
               ;;
             pg03)
-              [[ "$GITHUB_REF" == refs/heads/main ]]
               [[ "$RC_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+              if [[ -n "$REHEARSAL_RUN_ID" ]]; then
+                [[ "$MIGRATION_COMPATIBLE" == false ]]
+                [[ "$PREVIOUS_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+                [[ "$EXPECTED_EXECUTOR_REPOSITORY" =~ ^ghcr\.io/a3225865526-wq/[a-z0-9._/-]+$ ]]
+                [[ "$EXPECTED_EXECUTOR_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
+                [[ "$EXPECTED_EXECUTOR_BINARY_SHA256" =~ ^[a-f0-9]{64}$ ]]
+                [[ "$EXPECTED_EXECUTOR_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+              fi
               echo 'DEPLOY_SOURCE=scripts/production-deploy-v2.sh' >> "$GITHUB_ENV"
               echo 'DEPLOY_WRAPPER=/opt/clearapi/bin/production-deploy-v2.sh' >> "$GITHUB_ENV"
               ;;
             *) echo 'Unsupported pool mode' >&2; exit 1 ;;
           esac
+
+      - name: Recheck main after the production environment queue
+        if: inputs.rehearsal_run_id != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)
+          test "$EXPECTED_COMMIT" = "$MAIN_SHA"
 
       - name: Set up SSH with pinned host key
         env:
@@ -147,6 +256,14 @@ jobs:
             echo "  BatchMode yes"
           } > ~/.ssh/config
           chmod 0600 ~/.ssh/config
+
+      - name: Verify exact rehearsed production predecessor
+        if: inputs.rehearsal_run_id != ''
+        run: |
+          set -euo pipefail
+          [[ "$PREVIOUS_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          CURRENT_COMMIT=$(ssh "$PROD_SSH_ALIAS" "sudo python3 -c 'import json; print(json.load(open(\"/opt/clearapi/app/release-manifest.json\"))[\"releases\"][\"current\"][\"candidate_commit\"])'")
+          test "$CURRENT_COMMIT" = "$PREVIOUS_SOURCE_COMMIT"
 
       - name: Verify installed deploy wrapper matches this commit
         # The wrapper on the VPS is the audited, version-controlled script that
@@ -209,7 +326,13 @@ jobs:
           print(json.dumps({'token': e['GH_TOKEN'], 'run': e['GITHUB_RUN_ID'],
                             'rc_run': e['RC_RUN_ID'], 'commit': e['EXPECTED_COMMIT'],
                             'digest': e['IMAGE_DIGEST'],
-                            'transition_sha256': e.get('LEGACY_TRANSITION_SHA256', '')}))
+                            'transition_sha256': e.get('LEGACY_TRANSITION_SHA256', ''),
+                            'rehearsal_run': e.get('REHEARSAL_RUN_ID', ''),
+                            'previous_source_commit': e.get('PREVIOUS_SOURCE_COMMIT', ''),
+                            'executor_repository': e.get('EXPECTED_EXECUTOR_REPOSITORY', ''),
+                            'executor_digest': e.get('EXPECTED_EXECUTOR_DIGEST', ''),
+                            'executor_binary_sha256': e.get('EXPECTED_EXECUTOR_BINARY_SHA256', ''),
+                            'executor_source_commit': e.get('EXPECTED_EXECUTOR_SOURCE_COMMIT', '')}))
           PY
 
       - name: Run controlled deploy on VPS
@@ -237,3 +360,8 @@ jobs:
       - name: Clear deploy key material
         if: always()
         run: rm -f ~/.ssh/ci_deploy_key ~/.ssh/ci_known_hosts ~/.ssh/config
+
+      - name: Report deployment failure
+        if: failure()
+        run: |
+          echo 'Production deployment failed. The automatic circuit remains closed; investigate the Deploy V2 audit before any new release.' >> "$GITHUB_STEP_SUMMARY"

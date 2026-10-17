@@ -24,6 +24,10 @@ PROOF_CHECKS = {
     "postgres_upgrade_idempotency", "gateway_executor_provider_usage_billing",
     "replay_and_duplicate_charge", "state_isolation", "safe_rollback",
 }
+RC_ARTIFACT_FILES = {
+    "gateway-image-release.json", "binary-build-info.txt",
+    "schema-rehearsal.json", "schema-rehearsal.target.sql",
+}
 
 
 def require(condition, message):
@@ -175,10 +179,29 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
         require(receipt["conclusion"] == "success", "raw evidence did not pass: " + name)
         require(receipt["source_commit"] == source and receipt["gateway_digest"] == manifest["image_digest"], "stale evidence: " + name)
     return {"image_digest": manifest["image_digest"], "expected_commit": source,
+            "rc_run_id": rc_run,
+            "executor_image_repository": executor["image_repository"],
+            "executor_image_digest": executor["image_digest"],
+            "executor_binary_sha256": executor["binary_sha256"],
+            "executor_source_commit": executor["source_commit"],
             # Legacy Deploy V2 does not classify rollback-safe failures versus
             # runtime/billing identity failures. Automatic callers must stop on
             # every failure until that distinction is independently verified.
             "previous_source_commit": proof["previous_source_commit"], "migration_compatible": "false"}
+
+
+def verify_rc_artifact(directory):
+    manifest = json.loads((directory / "gateway-image-release.json").read_text())
+    hashes = json.loads((directory / "artifact-hashes.json").read_text())
+    require(set(hashes) == RC_ARTIFACT_FILES, "RC artifact inventory mismatch")
+    for filename, expected_hash in hashes.items():
+        require(re.fullmatch(r"[0-9a-f]{64}", expected_hash) is not None, "invalid RC artifact hash")
+        path = directory / filename
+        require(path.is_file() and not path.is_symlink(), "missing or unsafe RC artifact file")
+        require(hashlib.sha256(path.read_bytes()).hexdigest() == expected_hash, "RC artifact hash mismatch")
+    rehearsal = json.loads((directory / "schema-rehearsal.json").read_text())
+    require(rehearsal == manifest["schema_transition"], "schema rehearsal and manifest mismatch")
+    return manifest
 
 
 def authorize_release(event, destination):
@@ -189,7 +212,7 @@ def authorize_release(event, destination):
     require(rehearsal["run_attempt"] == event["workflow_run"]["run_attempt"], "stale rehearsal attempt")
     require(api("git/ref/heads/main")["object"]["sha"] == source, "rehearsal source is no longer main")
     successful_jobs(rehearsal)
-    latest_main_ci(source)
+    source_ci = latest_main_ci(source)
     # A failed or cancelled automatic deployment is a durable circuit breaker.
     previous = [run for page in pages("actions/workflows/automatic-deploy.yml/runs?branch=main&per_page=100")
                 for run in page["workflow_runs"]]
@@ -212,21 +235,22 @@ def authorize_release(event, destination):
     successful_jobs(rc)
     gh("run", "download", str(rc["id"]), "--repo", REPOSITORY, "--name",
        f"pg03-gateway-release-{rc['id']}-{rc['run_attempt']}", "--dir", str(destination / "rc"))
-    manifest = json.loads((destination / "rc/gateway-image-release.json").read_text())
-    hashes = json.loads((destination / "rc/artifact-hashes.json").read_text())
-    for filename in ("gateway-image-release.json", "binary-build-info.txt"):
-        require(hashlib.sha256((destination / "rc" / filename).read_bytes()).hexdigest() == hashes[filename], "RC artifact hash mismatch")
+    manifest = verify_rc_artifact(destination / "rc")
     require(str(manifest["workflow_run"]) == str(rc["id"]), "manifest producer mismatch")
     require(str(manifest["workflow_run_attempt"]) == str(rc["run_attempt"]), "manifest attempt mismatch")
+    require(any(run["databaseId"] == source_ci["id"] and run["headSha"] == source
+                and run["status"] == "completed" and run["conclusion"] == "success"
+                for run in manifest.get("source_ci_runs", [])), "manifest source CI mismatch")
     result = validate_proof(manifest, proof, destination / "proof", source, rc["id"],
                             os.environ.get("CLEARAPI_EXECUTOR_IMAGE_REPOSITORY", ""))
     comparison = api(f"compare/{proof['previous_source_commit']}...{source}")
-    require(comparison["status"] in ("ahead", "identical"), "invalid deployment ancestry")
+    require(comparison["status"] == "ahead", "deployment source must advance the production predecessor")
     # GitHub caps compare files at 300. Never treat a truncated diff as safe.
     files = comparison.get("files", [])
     require(len(files) < 300, "deployment diff may be truncated")
     paths = [f["filename"] for f in files] + [f["previous_filename"] for f in files if "previous_filename" in f]
-    require(not low_risk_paths(paths), "release contains sensitive changes without stronger policy")
+    require(bool(paths), "deployment diff is empty")
+    result["rehearsal_run_id"] = str(rehearsal["id"])
     return result
 
 

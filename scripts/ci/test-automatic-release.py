@@ -27,6 +27,10 @@ class ReleaseProofTest(unittest.TestCase):
             "source_commit": SOURCE, "image_repository": policy.IMAGE,
             "image_digest": DIGEST, "image_ref": policy.IMAGE + "@" + DIGEST,
             "oci_revision": SOURCE, "platform": "linux/amd64", "binary_sha256": "c" * 64,
+            "schema_transition": {"schema_version": "pg03-schema-rehearsal-v1",
+                                  "source_commit": SOURCE, "startup_passes": 2},
+            "source_ci_runs": [{"databaseId": 96, "headSha": SOURCE,
+                                 "status": "completed", "conclusion": "success"}],
         }
         self.proof = {
             "schema": "clearapi.automatic-release/v1", "source_commit": SOURCE,
@@ -54,7 +58,35 @@ class ReleaseProofTest(unittest.TestCase):
         result = self.validate()
         self.assertEqual(result["image_digest"], DIGEST)
         self.assertEqual(result["expected_commit"], SOURCE)
+        self.assertEqual(result["rc_run_id"], 123)
+        self.assertEqual(result["executor_image_digest"], self.proof["executor"]["image_digest"])
         self.assertEqual(result["migration_compatible"], "false", "unclassified runtime failures must stop")
+
+    def test_rc_artifact_inventory_and_schema_receipt_are_bound_to_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = dict(self.manifest)
+            (root / "gateway-image-release.json").write_text(json.dumps(manifest))
+            (root / "binary-build-info.txt").write_text("build identity")
+            (root / "schema-rehearsal.json").write_text(json.dumps(manifest["schema_transition"]))
+            (root / "schema-rehearsal.target.sql").write_text("-- target schema")
+            files = [root / name for name in policy.RC_ARTIFACT_FILES]
+            inventory = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in files}
+            (root / "artifact-hashes.json").write_text(json.dumps(inventory))
+            self.assertEqual(policy.verify_rc_artifact(root), manifest)
+
+            (root / "schema-rehearsal.target.sql").unlink()
+            with self.assertRaisesRegex(ValueError, "missing or unsafe"):
+                policy.verify_rc_artifact(root)
+            (root / "schema-rehearsal.target.sql").write_text("-- target schema")
+
+            rehearsal = dict(manifest["schema_transition"], source_schema_sha256="0" * 64)
+            (root / "schema-rehearsal.json").write_text(json.dumps(rehearsal))
+            inventory["schema-rehearsal.json"] = hashlib.sha256(
+                (root / "schema-rehearsal.json").read_bytes()).hexdigest()
+            (root / "artifact-hashes.json").write_text(json.dumps(inventory))
+            with self.assertRaisesRegex(ValueError, "schema rehearsal and manifest mismatch"):
+                policy.verify_rc_artifact(root)
 
     def test_identity_contract_and_migration_fail_closed(self):
         cases = [
@@ -132,7 +164,7 @@ class ReleaseProofTest(unittest.TestCase):
                      "git/ref/heads/main": {"object": {"sha": SOURCE}},
                      f"actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha={SOURCE}&per_page=1": {"workflow_runs": [rc]},
                      f"actions/workflows/deployment-rehearsal.yml/runs?branch=main&head_sha={SOURCE}&per_page=1": {"workflow_runs": [rehearsal]},
-                     f"compare/{'d' * 40}...{SOURCE}": {"status": "ahead", "files": [{"filename": "web/src/components/help.tsx"}]}}
+                     f"compare/{'d' * 40}...{SOURCE}": {"status": "ahead", "files": [{"filename": "scripts/production-deploy-v2.sh"}]}}
 
         def download(*args):
             directory = Path(args[args.index("--dir") + 1])
@@ -145,18 +177,21 @@ class ReleaseProofTest(unittest.TestCase):
                 manifest = dict(self.manifest, workflow_run="123", workflow_run_attempt="1")
                 (directory / "gateway-image-release.json").write_text(json.dumps(manifest))
                 (directory / "binary-build-info.txt").write_text("unit-test-only")
+                (directory / "schema-rehearsal.json").write_text(json.dumps(manifest["schema_transition"]))
+                (directory / "schema-rehearsal.target.sql").write_text("-- synthetic schema")
                 hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in directory.iterdir()}
                 (directory / "artifact-hashes.json").write_text(json.dumps(hashes))
             return ""
 
         with patch.dict(os.environ, {"GITHUB_RUN_ID": "900", "GITHUB_RUN_ATTEMPT": "1", "CLEARAPI_EXECUTOR_IMAGE_REPOSITORY": EXECUTOR_IMAGE}), \
                 patch.object(policy, "api", side_effect=lambda path: deepcopy(responses[path])), \
-                patch.object(policy, "latest_main_ci"), patch.object(policy, "successful_jobs"), \
+                patch.object(policy, "latest_main_ci", return_value={"id": 96}), patch.object(policy, "successful_jobs"), \
                 patch.object(policy, "pages", return_value=[{"workflow_runs": []}]) as history, \
                 patch.object(policy, "gh", side_effect=download) as downloads:
             result = policy.authorize_release({"workflow_run": rehearsal}, self.root / "accepted")
             self.assertEqual(result["image_digest"], DIGEST)
             self.assertEqual(downloads.call_count, 2)
+            self.assertEqual(result["rehearsal_run_id"], "100")
             downloads.reset_mock()
             history.return_value = [{"workflow_runs": [{"id": 899, "conclusion": "failure"}]}]
             with self.assertRaisesRegex(ValueError, "circuit open"):
@@ -165,6 +200,9 @@ class ReleaseProofTest(unittest.TestCase):
             with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
                 with self.assertRaisesRegex(ValueError, "reruns"):
                     policy.authorize_release({"workflow_run": rehearsal}, self.root / "retry")
+            responses[f"compare/{'d' * 40}...{SOURCE}"]["files"] = []
+            with self.assertRaisesRegex(ValueError, "empty"):
+                policy.authorize_release({"workflow_run": rehearsal}, self.root / "empty-diff")
 
 
 class TrustPolicyTest(unittest.TestCase):

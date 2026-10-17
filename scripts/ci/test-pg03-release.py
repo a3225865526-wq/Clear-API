@@ -45,6 +45,26 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertNotIn('gh run cancel', self.workflow)
         self.assertEqual(hashlib.sha256((SCRIPTS / 'production-deploy-v2.sh').read_bytes()).hexdigest(), CONTROL.V2_SHA)
 
+    def test_automatic_call_requires_prior_proof_job_and_stays_on_v2(self):
+        self.assertIn('  workflow_call:\n', self.workflow)
+        self.assertIn('    needs: authorize\n', self.workflow)
+        self.assertIn('    environment: production\n', self.workflow)
+        authorize = self.workflow.split('  authorize:\n', 1)[1].split('\n  deploy:\n', 1)[0]
+        self.assertNotIn('environment: production', authorize)
+        self.assertIn('automatic-release.py authorize', authorize)
+        self.assertIn('AUTO_ENABLED: ${{ vars.CLEARAPI_AUTO_PRODUCTION_ENABLED }}', authorize)
+        self.assertIn("[[ \"$MIGRATION_COMPATIBLE\" == false ]]", self.workflow)
+        self.assertIn("DEPLOY_WRAPPER=/opt/clearapi/bin/production-deploy-v2.sh", self.workflow)
+        deploy_v2 = (SCRIPTS / 'production-deploy-v2.sh').read_text()
+        self.assertIn("'mode': 'automatic-proof-v1'", (SCRIPTS / 'pg03-release-control.py').read_text())
+        self.assertIn("autonomous.get('mode') == 'automatic-proof-v1'", deploy_v2)
+        self.assertIn("set(autonomous) == {'mode', 'run', 'rehearsal_run'}", deploy_v2)
+        automatic = (SCRIPTS.parent / '.github/workflows/automatic-deploy.yml').read_text()
+        self.assertIn('workflows: [Deployment rehearsal]', automatic)
+        self.assertIn("vars.CLEARAPI_AUTO_PRODUCTION_ENABLED == 'true'", automatic)
+        self.assertIn("github.event.workflow_run.head_branch == 'main'", automatic)
+        self.assertIn("uses: ./.github/workflows/deploy-production.yml", automatic)
+
     def test_rc_configures_and_verifies_the_actual_containerd_store(self):
         workflow = (SCRIPTS.parent / '.github/workflows/release-pg03-gateway.yml').read_text()
         block = workflow.split('      - name: Match production containerd image store\n', 1)[1].split('      - name:', 1)[0]
@@ -96,15 +116,28 @@ else:
     if os.environ['FAILURE'] in ('prepare','deploy') and (('prepare' in cmd)==(os.environ['FAILURE']=='prepare')): sys.exit(37)
 ''')
             ssh.chmod(0o755)
+            commit = 'b' * 40
+            git = root / 'git'
+            git.write_text('#!/usr/bin/env python3\nimport os,sys\nif sys.argv[1:] == ["rev-parse", "HEAD"]: print(os.environ["EXPECTED_COMMIT"])\nelse: sys.exit(2)\n')
+            git.chmod(0o755)
             env = dict(os.environ, PATH=str(root)+os.pathsep+os.environ['PATH'],
                        TRACE=str(trace), SCRIPTS=str(SCRIPTS), FAILURE=failure,
-                       GITHUB_ENV=str(root/'env'), GITHUB_SHA='b'*40,
-                       EXPECTED_COMMIT='b'*40, IMAGE_DIGEST='sha256:'+'a'*64,
+                       GITHUB_ENV=str(root/'env'), GITHUB_SHA=commit,
+                       GITHUB_OUTPUT=str(root/'output'),
+                       GITHUB_REPOSITORY='a3225865526-wq/Clear-API',
+                       EXPECTED_COMMIT=commit, IMAGE_DIGEST='sha256:'+'a'*64,
                        GITHUB_RUN_ID='100', GITHUB_REF='refs/heads/main',
                        CONFIRMATION=confirmation, MIGRATION_COMPATIBLE='false', LEGACY_TRANSITION_SHA256=transition,
+                       INPUT_DIGEST='sha256:'+'a'*64, INPUT_COMMIT=commit,
+                       INPUT_POOL_MODE=mode, INPUT_RC_RUN_ID='99',
+                       INPUT_TRANSITION_SHA256=transition, INPUT_MIGRATION='false',
+                       INPUT_CONFIRMATION=confirmation,
+                       REHEARSAL_RUN_ID='', PREVIOUS_SOURCE_COMMIT='', EXPECTED_EXECUTOR_REPOSITORY='',
+                       EXPECTED_EXECUTOR_DIGEST='', EXPECTED_EXECUTOR_BINARY_SHA256='', EXPECTED_EXECUTOR_SOURCE_COMMIT='',
                        POOL_MODE=mode, RC_RUN_ID='99', PROD_SSH_ALIAS='isolated-vps',
                        GH_TOKEN='synthetic-ci-token', GH_PULL_TOKEN='synthetic-ci-token')
-            selected = ['Validate manual gate inputs', 'Verify PG03 control tool and prepare approved pair',
+            selected = ['Validate manual gate inputs', 'Validate authorized release identity',
+                        'Verify PG03 control tool and prepare approved pair',
                         'Run controlled deploy on VPS']
             for name in selected:
                 if name.startswith('Verify PG03') and mode == 'off':
@@ -113,8 +146,9 @@ else:
                 result = subprocess.run(['bash','-c',script],env=env,capture_output=True,text=True)
                 self.assertNotIn('synthetic-ci-token', result.stdout+result.stderr)
                 if result.returncode:
-                    return result.returncode, trace.read_text() if trace.exists() else ''
-                if name == selected[0]:
+                    trace_text = trace.read_text() if trace.exists() else ''
+                    return result.returncode, trace_text + result.stderr
+                if name == 'Validate authorized release identity':
                     env.update(line.split('=',1) for line in (root/'env').read_text().splitlines())
             return result.returncode, trace.read_text()
 
@@ -358,6 +392,52 @@ class ReleaseApprovalTest(unittest.TestCase):
         evidence['actions/runs/100/approvals'] = [{'state': 'rejected'}]
         with self.assertRaises(ValueError):
             CONTROL.approved_run(self.data, evidence.__getitem__)
+
+    def test_automatic_workflow_requires_authenticated_job_and_paired_executor(self):
+        data = dict(self.data, rehearsal_run='101',
+            executor_repository=CONTROL.EXECUTOR.split('@', 1)[0],
+            executor_digest=CONTROL.EXECUTOR.split('@', 1)[1],
+            executor_binary_sha256=CONTROL.EXECUTOR_BINARY,
+            executor_source_commit=CONTROL.EXECUTOR_REVISION)
+        evidence = copy.deepcopy(self.evidence)
+        run = evidence['actions/runs/100']
+        run.update(event='workflow_run', path='.github/workflows/automatic-deploy.yml', workflow_id=12)
+        evidence['actions/workflows/automatic-deploy.yml'] = {
+            'id': 12, 'path': '.github/workflows/automatic-deploy.yml', 'state': 'active'}
+        evidence['actions/variables/CLEARAPI_AUTO_PRODUCTION_ENABLED'] = {
+            'name': 'CLEARAPI_AUTO_PRODUCTION_ENABLED', 'value': 'true'}
+        evidence['environments/production'] = {
+            'id': 23693288049, 'name': 'production',
+            'deployment_branch_policy': {'protected_branches': False, 'custom_branch_policies': True},
+            'protection_rules': [{'type': 'branch_policy'}]}
+        evidence['environments/production/deployment-branch-policies'] = {
+            'branch_policies': [{'name': 'main', 'type': 'branch'}]}
+        evidence['actions/runs/101'] = {
+            'id': 101, 'path': '.github/workflows/deployment-rehearsal.yml',
+            'event': 'workflow_run', 'head_sha': 'b' * 40, 'head_branch': 'main',
+            'status': 'completed', 'conclusion': 'success', 'run_attempt': 1,
+            'repository': {'full_name': CONTROL.REPO},
+            'head_repository': {'full_name': CONTROL.REPO}}
+        evidence['actions/runs/100/jobs?per_page=100'] = {'jobs': [{
+            'name': 'deploy / Validate release authorization before production credentials',
+            'status': 'completed', 'conclusion': 'success', 'steps': [{
+                'name': 'Authenticate automatic proof before production credentials',
+                'status': 'completed', 'conclusion': 'success'}]}]}
+        reviewers, _ = CONTROL.approved_run(data, evidence.__getitem__)
+        self.assertEqual(reviewers, [], 'proof authorization must not fabricate a reviewer')
+
+        for path, field, value in (
+            ('actions/variables/CLEARAPI_AUTO_PRODUCTION_ENABLED', 'value', 'false'),
+            ('actions/runs/101', 'conclusion', 'failure'),
+            ('actions/runs/100/jobs?per_page=100', 'jobs', []),
+        ):
+            rejected = copy.deepcopy(evidence)
+            rejected[path][field] = value
+            with self.subTest(path=path, field=field), self.assertRaises(ValueError):
+                CONTROL.approved_run(data, rejected.__getitem__)
+        rejected_data = dict(data, executor_digest='sha256:' + '0' * 64)
+        with self.assertRaisesRegex(ValueError, 'Executor'):
+            CONTROL.approved_run(rejected_data, evidence.__getitem__)
 
     @unittest.skipUnless(os.geteuid()==0,'secure root file ownership requires isolated root runner')
     def test_existing_target_and_symlink_are_never_overwritten(self):
