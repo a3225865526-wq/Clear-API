@@ -209,3 +209,51 @@ export function usePoolAccess() {
     allowed: Boolean(scope) && !denied && query.data?.can_access === true,
   }
 }
+
+// Multipart upload uses exactly the same owner scope, cancellation and
+// secret-free error boundary as poolRequest. No response body or token is
+// persisted; the caller may keep only non-secret stage results.
+export async function poolUpload<T>(
+  path: string,
+  form: FormData,
+  signal?: AbortSignal
+): Promise<T> {
+  const expected = generation
+  if (!scope || denied || signal?.aborted) throw new CanceledError()
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  signal?.addEventListener('abort', abort, { once: true })
+  requests.add(controller)
+  try {
+    const response = await api.request<{ success: boolean; data: T }>({
+      url: `/api/owner/pool${path}`,
+      method: 'POST',
+      data: form,
+      headers: { 'Content-Type': 'multipart/form-data' },
+      signal: controller.signal,
+      disableDuplicate: true,
+      skipAuthRefresh: true,
+      skipErrorHandler: true,
+    })
+    if (expected !== generation || controller.signal.aborted) {
+      throw new CanceledError()
+    }
+    if (!response.data.success) throw new Error('POOL_UNAVAILABLE')
+    return response.data.data
+  } catch (error) {
+    if (expected !== generation || controller.signal.aborted) {
+      throw new CanceledError()
+    }
+    if (isCancel(error)) throw error
+    if (
+      isAxiosError(error) &&
+      [401, 403].includes(error.response?.status ?? 0)
+    ) {
+      revoke()
+    }
+    throw poolError(error)
+  } finally {
+    requests.delete(controller)
+    signal?.removeEventListener('abort', abort)
+  }
+}

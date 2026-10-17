@@ -2,6 +2,7 @@ package accountpool
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,6 +46,19 @@ type ExecutorClient interface {
 	PauseCredential(ctx context.Context, credentialRef string) error
 	ResumeCredential(ctx context.Context, credentialRef string) error
 	CredentialStatus(ctx context.Context, credentialRef string) (ExecutorCredentialStatus, error)
+	ImportCredential(ctx context.Context, req CredentialImportRequest) (*CredentialImportResult, error)
+	DeleteImportedCredential(ctx context.Context, credentialRef string) error
+}
+
+type CredentialImportRequest struct {
+	FileName string
+	Raw      []byte
+}
+
+type CredentialImportResult struct {
+	CredentialRef    string
+	CredentialDigest string
+	Provider         string
 }
 
 type StartAuthRequest struct {
@@ -116,6 +130,27 @@ func CliproxyEndpointConfigured() bool {
 // has no management client yet and reports offline until it is adopted.
 var ExecutorFactory = defaultExecutorFactory
 
+// ExecutorClientFor exposes the same executor resolution to admission gates
+// and operator APIs without duplicating environment parsing.
+func ExecutorClientFor(id string) (ExecutorClient, error) {
+	return executorFor(id)
+}
+
+func SnapshotHasTrustedCapability(snapshot PoolExecutorModelSnapshot) bool {
+	trusted := map[string]bool{}
+	for _, identity := range snapshot.Identities {
+		if identity.AuthID != "" && identity.Provider != "" && identity.CredentialDigest != "" && identity.State == "trusted" {
+			trusted[identity.AuthID+`\x00`+identity.CredentialDigest] = true
+		}
+	}
+	for _, capability := range snapshot.Capabilities {
+		if capability.State == "verified" && capability.Model != "" && trusted[capability.AuthID+`\x00`+capability.CredentialDigest] {
+			return true
+		}
+	}
+	return false
+}
+
 func executorFor(id string) (ExecutorClient, error) {
 	return ExecutorFactory(id)
 }
@@ -156,6 +191,12 @@ func (offlineExecutor) DeleteCredential(context.Context, string) error {
 }
 func (offlineExecutor) PauseCredential(context.Context, string) error { return ErrPoolExecutorOffline }
 func (offlineExecutor) ResumeCredential(context.Context, string) error {
+	return ErrPoolExecutorOffline
+}
+func (offlineExecutor) ImportCredential(context.Context, CredentialImportRequest) (*CredentialImportResult, error) {
+	return nil, ErrPoolExecutorOffline
+}
+func (offlineExecutor) DeleteImportedCredential(context.Context, string) error {
 	return ErrPoolExecutorOffline
 }
 func (offlineExecutor) CredentialStatus(context.Context, string) (ExecutorCredentialStatus, error) {
@@ -259,6 +300,41 @@ func mapField[T any](decoded map[string]any, keys ...string) (T, bool) {
 		}
 	}
 	return zero, false
+}
+
+func (c *CliproxyClient) ImportCredential(ctx context.Context, req CredentialImportRequest) (*CredentialImportResult, error) {
+	if c == nil || len(req.Raw) == 0 || len(req.Raw) > ImportMaxFileBytes || !strings.HasSuffix(strings.ToLower(req.FileName), ".json") {
+		return nil, ErrPoolInvalid
+	}
+	payload, err := common.Marshal(map[string]any{"name": req.FileName, "content": base64.StdEncoding.EncodeToString(req.Raw)})
+	if err != nil {
+		return nil, ErrPoolExecutorFailed
+	}
+	status, decoded, err := c.do(ctx, http.MethodPost, "/v0/management/pool/import", string(payload))
+	if err != nil {
+		return nil, err
+	}
+	if status >= 500 {
+		return nil, ErrPoolExecutorOffline
+	}
+	if status >= 400 || decoded == nil {
+		return nil, ErrPoolExecutorFailed
+	}
+	result := &CredentialImportResult{}
+	result.CredentialRef, _ = decoded["credential_ref"].(string)
+	result.CredentialDigest, _ = decoded["credential_digest"].(string)
+	result.Provider, _ = decoded["provider"].(string)
+	if result.CredentialRef == "" || result.CredentialDigest == "" || result.Provider != "codex" {
+		return nil, ErrPoolExecutorFailed
+	}
+	return result, nil
+}
+
+func (c *CliproxyClient) DeleteImportedCredential(ctx context.Context, credentialRef string) error {
+	if strings.TrimSpace(credentialRef) == "" {
+		return nil
+	}
+	return c.DeleteCredential(ctx, credentialRef)
 }
 
 func (c *CliproxyClient) Health(ctx context.Context) error {

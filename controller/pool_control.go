@@ -1,16 +1,16 @@
 package controller
 
 import (
+	"context"
 	"fmt"
-	"net/http"
-	"strconv"
-	"strings"
-
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service/accountpool"
 	"github.com/gin-gonic/gin"
+	"net/http"
+	"strconv"
+	"strings"
 )
 
 // STEP 4 operator control plane endpoints. Every route here sits behind
@@ -35,6 +35,31 @@ func SetPoolMaster(c *gin.Context) {
 	if c.ShouldBindJSON(&input) != nil || input.Enabled == nil {
 		poolError(c, model.ErrPoolInvalid)
 		return
+	}
+	// Enabling is a production admission decision: schema, executor health,
+	// dedicated-instance attestation, trusted identity and a verified
+	// account×model capability must all be present.
+	if *input.Enabled {
+		if err := model.UpstreamPoolReady(model.DB); err != nil {
+			poolError(c, err)
+			return
+		}
+		if !common.PoolCliproxyDedicated() {
+			poolError(c, model.ErrPoolIsolationRequired)
+			return
+		}
+		executor, err := accountpool.ExecutorClientFor(accountpool.ExecutorCliproxyAPI)
+		if err != nil || executor.Health(c.Request.Context()) != nil {
+			poolError(c, model.ErrPoolExecutorOffline)
+			return
+		}
+		snapshot, err := executor.(interface {
+			PoolModelSnapshot(context.Context) (accountpool.PoolExecutorModelSnapshot, error)
+		}).PoolModelSnapshot(c.Request.Context())
+		if err != nil || !accountpool.SnapshotHasTrustedCapability(snapshot) {
+			poolError(c, model.ErrPoolNotAdmitted)
+			return
+		}
 	}
 	if err := model.SetPoolMasterEnabled(*input.Enabled); err != nil {
 		poolError(c, err)
@@ -152,7 +177,7 @@ func SetChannelPoolRouting(c *gin.Context) {
 	}
 	model.InitChannelCache()
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
-		"id":                  id,
+		"id":                   id,
 		"pool_routing_enabled": *input.Enabled,
 	}})
 }

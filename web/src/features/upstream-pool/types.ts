@@ -245,3 +245,25 @@ export type PoolChannelView = {
   models: string[]
   published_models: string[]
 }
+
+export type PoolImportStatus = 'imported' | 'duplicate' | 'rejected' | 'failed'
+
+export interface PoolImportResult {
+  file_name: string
+  status: PoolImportStatus
+  code?: string
+  account_id?: number
+  identity_masked?: string
+  format?: string
+  run_status?: PoolRunStatus
+  admission?: string
+  capability?: string
+  retryable: boolean
+}
+
+export interface PoolImportResponse {
+  results: PoolImportResult[]
+  imported: number
+  duplicate: number
+  rejected: number
+}
