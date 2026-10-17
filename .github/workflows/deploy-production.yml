@@ -125,14 +125,14 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Authenticate automatic proof before production credentials
-        if: github.event_name == 'workflow_run'
+        if: inputs.rehearsal_run_id != ''
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
           CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
           AUTO_ENABLED: ${{ vars.CLEARAPI_AUTO_PRODUCTION_ENABLED }}
           REHEARSAL_RUN_ID: ${{ inputs.rehearsal_run_id }}
-          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+          TRIGGER_RUN_ID: ${{ inputs.rehearsal_run_id }}
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = a3225865526-wq/Clear-API

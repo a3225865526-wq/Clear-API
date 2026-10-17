@@ -1,0 +1,167 @@
+name: Deployment rehearsal
+
+on:
+  workflow_run:
+    workflows: [PG03 reviewed main Gateway RC]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+concurrency:
+  group: deployment-rehearsal
+  cancel-in-progress: false
+
+env:
+  REPOSITORY: a3225865526-wq/Clear-API
+
+jobs:
+  rehearse:
+    if: >-
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.event.workflow_run.event == 'workflow_run' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    services:
+      mysql:
+        image: mysql:8.4.6@sha256:c296d65ee6ab3ce2f608c1d1b2bdd3c08b087a5834101d76a6db2e00875216cc
+        env:
+          MYSQL_ROOT_PASSWORD: clearapi_test
+          MYSQL_USER: clearapi
+          MYSQL_PASSWORD: clearapi_test
+          MYSQL_DATABASE: clearapi_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u clearapi -pclearapi_test"
+          --health-interval 10s --health-timeout 5s --health-retries 15
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: clearapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi -d clearapi_test"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        shell: bash
+    env:
+      TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
+      REHEARSAL_RC_RUN_ID: ${{ github.event.workflow_run.id }}
+      REHEARSAL_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+      CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
+      CLEARAPI_EXECUTOR_SOURCE_COMMIT: ${{ vars.CLEARAPI_EXECUTOR_SOURCE_COMMIT }}
+      CLEARAPI_EXECUTOR_IMAGE_DIGEST: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_DIGEST }}
+      CLEARAPI_EXECUTOR_BINARY_SHA256: ${{ vars.CLEARAPI_EXECUTOR_BINARY_SHA256 }}
+      CLEARAPI_EXECUTOR_PAIRED_GATEWAY_COMMIT: ${{ github.event.workflow_run.head_sha }}
+      CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE }}
+      CLEARAPI_REHEARSAL_BACKUP_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_BACKUP_EVIDENCE }}
+      CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Download exact RC manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p rc
+          gh run download "$REHEARSAL_RC_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --name "pg03-gateway-release-${REHEARSAL_RC_RUN_ID}-${{ github.event.workflow_run.run_attempt }}" --dir rc
+          python3 - <<'PY'
+          import json, os, re
+          m=json.load(open('rc/gateway-image-release.json'))
+          assert m['source_commit'] == os.environ['REHEARSAL_SOURCE_COMMIT']
+          assert m['workflow_run'] == os.environ['REHEARSAL_RC_RUN_ID']
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', m['image_digest'])
+          assert m['production_ready'] is False and m['production_acceptance'] == 'not_run'
+          print('RC manifest identity PASS')
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write('REHEARSAL_GATEWAY_DIGEST='+m['image_digest']+'\n')
+          PY
+
+      - name: Runtime integrity and Deploy V2 contracts
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate runtime_integrity --output receipts/runtime_integrity.json -- python3 scripts/ci/test-production-deploy.py
+
+      - name: Billing and duplicate settlement contracts
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate billing --output receipts/billing.json -- go test -count=1 ./model -run 'TestBillingReconciliationDatabase|TestCrashMatrix'
+
+      - name: Backup and restore evidence
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate backup_restore --output receipts/backup_restore.json -- python3 scripts/ci/verify-rehearsal-input.py --kind backup --manifest rc/gateway-image-release.json
+
+      - name: Executor pairing identity
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate executor_pairing --output receipts/executor_pairing.json -- python3 scripts/ci/verify-rehearsal-input.py --kind executor --manifest rc/gateway-image-release.json
+
+      - name: SQLite migration idempotency
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate sqlite_upgrade_idempotency --output receipts/sqlite_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=sqlite go test -count=1 ./cmd/production-bootstrap/bootstrap ./model -run "TestDuplicateMigrationsSafe|TestBillingReconciliationDatabase|TestCrashMatrix"'
+
+      - name: MySQL migration idempotency
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate mysql_upgrade_idempotency --output receipts/mysql_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=mysql TEST_BILLING_DSN="$TEST_MYSQL_DSN" go test -count=1 ./model -run "TestBillingReconciliationDatabase|TestCrashMatrix"'
+
+      - name: PostgreSQL migration idempotency
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate postgres_upgrade_idempotency --output receipts/postgres_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=postgres TEST_BILLING_DSN="$TEST_POSTGRES_DSN" go test -count=1 ./model -run "TestBillingReconciliationDatabase|TestCrashMatrix"'
+
+      - name: Provider usage and billing evidence
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate gateway_executor_provider_usage_billing --output receipts/gateway_executor_provider_usage_billing.json -- python3 scripts/ci/verify-rehearsal-input.py --kind provider --manifest rc/gateway-image-release.json
+
+      - name: Replay and duplicate charge contracts
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate replay_and_duplicate_charge --output receipts/replay_and_duplicate_charge.json -- go test -count=1 ./model -run 'TestCrashMatrixConcurrentSettleVsRefund|TestCrashMatrixCoversReserveAndCompletionBoundaries'
+
+      - name: State isolation contracts
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate state_isolation --output receipts/state_isolation.json -- go test -count=1 ./e2e/commercial -run TestCommercialLifecycle
+
+      - name: Safe rollback evidence
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --gate safe_rollback --output receipts/safe_rollback.json -- python3 scripts/ci/verify-rehearsal-input.py --kind rollback --manifest rc/gateway-image-release.json
+
+      - name: Assemble proof only after all gates pass
+        if: always()
+        env:
+          PREVIOUS_SOURCE_COMMIT: ${{ vars.CLEARAPI_PREVIOUS_SOURCE_COMMIT }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/assemble-release-proof.py --manifest rc/gateway-image-release.json --receipts receipts \
+            --output release-proof.json \
+            --executor-repository "$CLEARAPI_EXECUTOR_IMAGE_REPOSITORY" \
+            --executor-source-commit "$CLEARAPI_EXECUTOR_SOURCE_COMMIT" \
+            --executor-digest "$CLEARAPI_EXECUTOR_IMAGE_DIGEST" \
+            --executor-binary-sha256 "$CLEARAPI_EXECUTOR_BINARY_SHA256" \
+            --previous-source-commit "$PREVIOUS_SOURCE_COMMIT"
+
+      - name: Upload deployment proof and receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: deployment-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            release-proof.json
+            receipts/*.json
+          if-no-files-found: error
