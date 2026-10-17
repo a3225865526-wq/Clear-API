@@ -207,3 +207,4 @@ jobs:
           shellcheck --severity=warning scripts/production-backup.sh
           python3 scripts/ci/test-backup-identity.py
           python3 scripts/ci/test-automatic-release.py
+          python3 scripts/ci/test-rehearsal-producer.py

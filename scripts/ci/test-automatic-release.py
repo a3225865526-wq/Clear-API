@@ -28,7 +28,9 @@ class ReleaseProofTest(unittest.TestCase):
             "image_digest": DIGEST, "image_ref": policy.IMAGE + "@" + DIGEST,
             "oci_revision": SOURCE, "platform": "linux/amd64", "binary_sha256": "c" * 64,
             "schema_transition": {"schema_version": "pg03-schema-rehearsal-v1",
-                                  "source_commit": SOURCE, "startup_passes": 2},
+                                  "source_commit": SOURCE, "startup_passes": 2,
+                                  "source_schema_sha256": "2" * 64,
+                                  "target_schema_sha256": "2" * 64},
             "source_ci_runs": [{"databaseId": 96, "headSha": SOURCE,
                                  "status": "completed", "conclusion": "success"}],
         }
@@ -46,6 +48,7 @@ class ReleaseProofTest(unittest.TestCase):
         for name in policy.PROOF_CHECKS:
             raw = json.dumps({"schema": "clearapi.gate-evidence/v1", "gate": name,
                               "conclusion": "success", "source_commit": SOURCE, "gateway_digest": DIGEST,
+                              "rc_run_id": 123, "rc_run_attempt": 1,
                               "fixture": "unit-test-only"}).encode()
             (self.root / (name + ".json")).write_bytes(raw)
             self.proof["checks"][name] = {"conclusion": "success", "file": name + ".json",
@@ -130,6 +133,28 @@ class ReleaseProofTest(unittest.TestCase):
         self.proof["executor"]["paired_gateway_commit"] = "0" * 40
         with self.assertRaises(ValueError):
             self.validate()
+
+    def test_changed_or_missing_schema_is_not_no_schema_change(self):
+        for value in (None, "", "3" * 64):
+            with self.subTest(schema=value):
+                manifest = deepcopy(self.manifest)
+                manifest["schema_transition"]["target_schema_sha256"] = value
+                with self.assertRaisesRegex(ValueError, "RC schema transition"):
+                    self.validate(manifest=manifest)
+
+    def test_receipt_must_match_exact_rc_run(self):
+        path = self.root / "backup_restore.json"
+        for field, value in (("rc_run_id", None), ("rc_run_id", "123"), ("rc_run_id", 122),
+                             ("rc_run_attempt", None), ("rc_run_attempt", "1"), ("rc_run_attempt", 2)):
+            with self.subTest(field=field, value=value):
+                receipt = json.loads(path.read_text())
+                receipt.update(rc_run_id=123, rc_run_attempt=1)
+                receipt[field] = value
+                raw = json.dumps(receipt).encode()
+                path.write_bytes(raw)
+                self.proof["checks"]["backup_restore"]["sha256"] = hashlib.sha256(raw).hexdigest()
+                with self.assertRaisesRegex(ValueError, "RC (run|attempt)"):
+                    self.validate()
 
     def test_tampered_and_stale_evidence_is_rejected(self):
         name = "billing"

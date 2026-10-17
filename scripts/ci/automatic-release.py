@@ -163,6 +163,11 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
     require(re.fullmatch(r"[0-9a-f]{64}", executor["binary_sha256"]) is not None, "invalid executor binary")
     require(executor["paired_gateway_commit"] == source, "executor not paired with gateway")
     require(proof["migration"]["mode"] == "no_schema_change", "migration has no automated safety proof")
+    transition = manifest.get("schema_transition", {})
+    schema = transition.get("source_schema_sha256", "")
+    require(re.fullmatch(r"[0-9a-f]{64}", schema) is not None
+            and schema == transition.get("target_schema_sha256"),
+            "no_schema_change contradicts the RC schema transition")
     require(re.fullmatch(SHA, proof["previous_source_commit"]) is not None, "missing predecessor identity")
     require(set(proof["checks"]) == PROOF_CHECKS, "missing/unknown release evidence checks")
     for name, check in proof["checks"].items():
@@ -178,6 +183,11 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
                 "wrong gate evidence contract: " + name)
         require(receipt["conclusion"] == "success", "raw evidence did not pass: " + name)
         require(receipt["source_commit"] == source and receipt["gateway_digest"] == manifest["image_digest"], "stale evidence: " + name)
+        require(type(receipt.get("rc_run_id")) is int and receipt["rc_run_id"] == rc_run,
+                "stale evidence RC run: " + name)
+        require(type(receipt.get("rc_run_attempt")) is int
+                and receipt["rc_run_attempt"] == proof["rc_run_attempt"],
+                "stale evidence RC attempt: " + name)
     return {"image_digest": manifest["image_digest"], "expected_commit": source,
             "rc_run_id": rc_run,
             "executor_image_repository": executor["image_repository"],

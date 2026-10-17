@@ -2,6 +2,8 @@
 """Validate operator-supplied evidence without exposing secret values."""
 
 import argparse
+import ast
+import hashlib
 import json
 import os
 import re
@@ -36,6 +38,15 @@ def main():
         binary = require(os.environ.get("CLEARAPI_EXECUTOR_BINARY_SHA256"), "Executor binary identity is not configured")
         if not re.fullmatch(r"ghcr.io/a3225865526-wq/[a-z0-9._/-]+", repo) or not SHA.fullmatch(commit) or not DIGEST.fullmatch(image) or not HEX.fullmatch(binary):
             raise SystemExit("Executor identity is malformed")
+        # Reuse the formal release allowlist without importing its Linux-only CLI.
+        control = Path(__file__).resolve().parents[1] / "pg03-release-control.py"
+        approved = {node.targets[0].id: ast.literal_eval(node.value)
+                    for node in ast.parse(control.read_text()).body
+                    if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                    and node.targets[0].id in {"EXECUTOR", "EXECUTOR_REVISION", "EXECUTOR_BINARY"}}
+        if (repo + "@" + image != approved["EXECUTOR"] or commit != approved["EXECUTOR_REVISION"]
+                or binary != approved["EXECUTOR_BINARY"]):
+            raise SystemExit("Executor identity differs from the approved release contract")
         if os.environ.get("CLEARAPI_EXECUTOR_PAIRED_GATEWAY_COMMIT") != source:
             raise SystemExit("Executor is not paired with this Gateway source")
     else:
@@ -48,10 +59,25 @@ def main():
             if not path.is_file() or path.is_symlink():
                 raise SystemExit(f"{args.kind} rehearsal evidence is not JSON or a regular file")
             data = json.loads(path.read_text())
+        # This is a trusted operator input, not a cryptographically signed result.
         if data.get("schema") != "clearapi.rehearsal-evidence/v1" or data.get("conclusion") != "success":
-            raise SystemExit(f"{args.kind} rehearsal evidence is not a successful signed result")
+            raise SystemExit(f"{args.kind} rehearsal evidence is not a successful operator result")
         if data.get("source_commit") != source or data.get("gateway_digest") != digest:
             raise SystemExit(f"{args.kind} rehearsal evidence is stale")
+        if (data.get("kind") != args.kind or type(data.get("rc_run_id")) is not int
+                or data["rc_run_id"] != int(manifest["workflow_run"])
+                or type(data.get("rc_run_attempt")) is not int
+                or data["rc_run_attempt"] != int(manifest["workflow_run_attempt"])
+                or data.get("manifest_sha256") != hashlib.sha256(args.manifest.read_bytes()).hexdigest()):
+            raise SystemExit(f"{args.kind} rehearsal evidence RC binding mismatch")
+        transition = manifest.get("schema_transition", {})
+        for field in ("source_schema_sha256", "target_schema_sha256"):
+            expected = transition.get(field, "")
+            if not HEX.fullmatch(expected) or data.get(field) != expected:
+                raise SystemExit(f"{args.kind} rehearsal evidence schema binding mismatch")
+        target = require(os.environ.get("CLEARAPI_REHEARSAL_TARGET_ID"), "rehearsal target is not configured")
+        if data.get("target_id") != target:
+            raise SystemExit(f"{args.kind} rehearsal evidence target binding mismatch")
     print(f"{args.kind} rehearsal identity PASS for {source} {digest}")
 
 

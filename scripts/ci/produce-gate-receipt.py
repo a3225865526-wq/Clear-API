@@ -41,6 +41,7 @@ def main():
         source = required("REHEARSAL_SOURCE_COMMIT")
         digest = required("REHEARSAL_GATEWAY_DIGEST")
         rc_run = int(required("REHEARSAL_RC_RUN_ID"))
+        rc_attempt = int(required("REHEARSAL_RC_RUN_ATTEMPT"))
         result = subprocess.run(command, capture_output=True, text=True, timeout=900)
         stdout = result.stdout[-4000:]
         stderr = result.stderr[-4000:]
@@ -55,6 +56,10 @@ def main():
             rc_run = int(os.environ.get("REHEARSAL_RC_RUN_ID", "0"))
         except ValueError:
             rc_run = 0
+        try:
+            rc_attempt = int(os.environ.get("REHEARSAL_RC_RUN_ATTEMPT", "0"))
+        except ValueError:
+            rc_attempt = 0
 
     receipt = {
         "schema": "clearapi.gate-evidence/v1",
@@ -63,6 +68,7 @@ def main():
         "source_commit": source,
         "gateway_digest": digest,
         "rc_run_id": rc_run,
+        "rc_run_attempt": rc_attempt,
         "started_at": started,
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "command": command,

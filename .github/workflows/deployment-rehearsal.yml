@@ -63,11 +63,13 @@ jobs:
       TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
       TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
       REHEARSAL_RC_RUN_ID: ${{ github.event.workflow_run.id }}
+      REHEARSAL_RC_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
       REHEARSAL_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
       CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
       CLEARAPI_EXECUTOR_SOURCE_COMMIT: ${{ vars.CLEARAPI_EXECUTOR_SOURCE_COMMIT }}
       CLEARAPI_EXECUTOR_IMAGE_DIGEST: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_DIGEST }}
       CLEARAPI_EXECUTOR_BINARY_SHA256: ${{ vars.CLEARAPI_EXECUTOR_BINARY_SHA256 }}
+      CLEARAPI_REHEARSAL_TARGET_ID: ${{ vars.CLEARAPI_REHEARSAL_TARGET_ID }}
       CLEARAPI_EXECUTOR_PAIRED_GATEWAY_COMMIT: ${{ github.event.workflow_run.head_sha }}
       CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE }}
       CLEARAPI_REHEARSAL_BACKUP_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_BACKUP_EVIDENCE }}
