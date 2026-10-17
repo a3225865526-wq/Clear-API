@@ -68,7 +68,14 @@ afterEach(async () => {
 
 it('shows the official product and safe external link with no payment or redemption request', async () => {
   const post = vi.spyOn(api, 'post')
-  renderCatalog()
+  renderCatalog([
+    {
+      ...creditProducts[0],
+      published: true,
+      delivery_verified: true,
+      purchase_url: legacyPurchaseUrl,
+    },
+  ])
   expect(
     await screen.findByRole('heading', { name: creditProducts[0].name })
   ).toBeVisible()
