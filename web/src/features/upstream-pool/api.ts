@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { poolRequest } from './access'
+import { poolRequest, poolUpload } from './access'
 import type {
   CompletePoolAuthInput,
   CreatePoolAccountInput,
@@ -29,6 +29,7 @@ import type {
   PoolQuota,
   PoolChannelView,
   PoolModelRoute,
+  PoolImportResponse,
 } from './types'
 
 export function getPoolModelRoutes(signal?: AbortSignal) {
@@ -164,4 +165,13 @@ export function deletePoolAccount(id: number) {
 
 export function syncPoolAccount(id: number) {
   return poolRequest<PoolAccount>(`/accounts/${id}/sync`, { method: 'POST' })
+}
+
+export async function importPoolCredentials(
+  files: File[],
+  signal?: AbortSignal
+): Promise<PoolImportResponse> {
+  const form = new FormData()
+  for (const file of files) form.append('files', file, file.name)
+  return poolUpload<PoolImportResponse>('/accounts/import', form, signal)
 }

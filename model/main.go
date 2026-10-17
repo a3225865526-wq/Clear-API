@@ -345,6 +345,9 @@ func migrateDB() error {
 	if err := MigratePoolFallback(DB); err != nil {
 		return err
 	}
+	if err := MigrateUpstreamPool(DB); err != nil {
+		return err
+	}
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},

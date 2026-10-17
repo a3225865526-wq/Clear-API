@@ -2,8 +2,11 @@ package controller
 
 import (
 	"errors"
+	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -401,6 +404,71 @@ func DeletePoolAccount(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"deleted": true}})
+}
+
+// ImportPoolCredentials accepts JSON files, validates them, imports through
+// the dedicated executor, registers the pool account and returns per-file
+// stage status. Raw bytes are processed in memory only and never logged.
+func ImportPoolCredentials(c *gin.Context) {
+	if !poolReady(c) {
+		return
+	}
+	form, err := c.MultipartForm()
+	if err != nil || form == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "code": "IMPORT_FORM_INVALID"})
+		return
+	}
+	files := form.File["files"]
+	if len(files) == 0 {
+		files = form.File["file"]
+	}
+	if len(files) == 0 || len(files) > accountpool.ImportMaxFiles {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "code": "IMPORT_COUNT_INVALID"})
+		return
+	}
+	total := int64(0)
+	inputs := make([]accountpool.ImportFile, 0, len(files))
+	for _, header := range files {
+		if header == nil || !strings.HasSuffix(strings.ToLower(header.Filename), ".json") || header.Size <= 0 || header.Size > accountpool.ImportMaxFileBytes {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "code": "IMPORT_FILE_INVALID"})
+			return
+		}
+		total += header.Size
+		if total > accountpool.ImportMaxTotalBytes {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "code": "IMPORT_TOTAL_TOO_LARGE"})
+			return
+		}
+		src, openErr := header.Open()
+		if openErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "code": "IMPORT_FILE_INVALID"})
+			return
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(src, accountpool.ImportMaxFileBytes+1))
+		_ = src.Close()
+		if readErr != nil || len(raw) > accountpool.ImportMaxFileBytes {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "code": "IMPORT_FILE_INVALID"})
+			return
+		}
+		inputs = append(inputs, accountpool.ImportFile{Name: filepath.Base(header.Filename), Raw: raw})
+	}
+	results := accountpool.ImportCodexCredentials(c.Request.Context(), c.GetInt("id"), inputs)
+	imported, duplicate, rejected := 0, 0, 0
+	for _, result := range results {
+		switch result.Status {
+		case accountpool.ImportStatusImported:
+			imported++
+		case accountpool.ImportStatusDuplicate:
+			duplicate++
+		default:
+			rejected++
+		}
+	}
+	recordManageAudit(c, "pool.credentials_import", map[string]any{
+		"imported": imported, "duplicate": duplicate, "rejected": rejected, "files": len(results),
+	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		"results": results, "imported": imported, "duplicate": duplicate, "rejected": rejected,
+	}})
 }
 
 func SyncPoolAccount(c *gin.Context) {

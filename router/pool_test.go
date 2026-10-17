@@ -418,6 +418,16 @@ type mockPoolExecutor struct {
 	resumeCalls   []string
 }
 
+func (m *mockPoolExecutor) ImportCredential(context.Context, accountpool.CredentialImportRequest) (*accountpool.CredentialImportResult, error) {
+	return nil, accountpool.ErrPoolUnsupported
+}
+func (m *mockPoolExecutor) DeleteImportedCredential(context.Context, string) error { return nil }
+func (m *mockPoolExecutor) PoolModelSnapshot(context.Context) (accountpool.PoolExecutorModelSnapshot, error) {
+	return accountpool.PoolExecutorModelSnapshot{
+		Identities:   []accountpool.PoolExecutorTrustIdentity{{AuthID: "synthetic-auth.json", Provider: "codex", CredentialDigest: "synthetic-digest", State: "trusted"}},
+		Capabilities: []accountpool.PoolExecutorCapability{{AuthID: "synthetic-auth.json", Provider: "codex", CredentialDigest: "synthetic-digest", Model: "synthetic-pool-model", State: "verified"}},
+	}, nil
+}
 func (m *mockPoolExecutor) Health(context.Context) error { return m.healthErr }
 
 func (m *mockPoolExecutor) StartAuth(_ context.Context, req accountpool.StartAuthRequest) (accountpool.StartAuthResult, error) {
@@ -686,6 +696,7 @@ func TestPoolChannelServerGatePersistenceSelectionAndEnable(t *testing.T) {
 func TestPoolControlPlaneMasterChannelsAndAvailability(t *testing.T) {
 	setup := newPoolTestSetup(t, true)
 	require.NoError(t, setup.db.AutoMigrate(&model.Channel{}, &model.Option{}))
+	require.NoError(t, model.MigrateUpstreamPool(setup.db))
 	endpoint := "http://synthetic-pool.invalid:8317/v1"
 	t.Setenv("CLEARAPI_POOL_CLIPROXY_URL", endpoint)
 	channel := model.Channel{Type: 1, Name: "synthetic-pool", Status: common.ChannelStatusEnabled, BaseURL: &endpoint, OtherSettings: `{"upstream_pool":{}}`, Models: "synthetic-pool-model"}
