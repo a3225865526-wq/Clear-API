@@ -200,6 +200,7 @@ class ReleaseProofTest(unittest.TestCase):
             with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
                 with self.assertRaisesRegex(ValueError, "reruns"):
                     policy.authorize_release({"workflow_run": rehearsal}, self.root / "retry")
+            history.return_value = [{"workflow_runs": []}]
             responses[f"compare/{'d' * 40}...{SOURCE}"]["files"] = []
             with self.assertRaisesRegex(ValueError, "empty"):
                 policy.authorize_release({"workflow_run": rehearsal}, self.root / "empty-diff")
