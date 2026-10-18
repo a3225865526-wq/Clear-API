@@ -55,7 +55,7 @@
 | 自动部署 | `USER_CONFIRMED_COMPLETE` | `USER_CONFIRMED` | 用户已确认完成。**「自动化能力全链路已验证」未复核**，不可对外如此宣称。⚠️ 存在一项门禁缺陷（备份硬门禁误通过），当前 `CONFIRMED / DEFERRED`，**不作为当前主线阻塞**，见 6.1。 |
 | 商业化 MVP | `USER_CONFIRMED_COMPLETE` | `USER_CONFIRMED` | 用户已确认完成。不得重新列为 P0。真实 Provider 计费仍 `UNVERIFIED`。 |
 | **PG03 FINAL LAUNCH** | **`IN_PROGRESS`** | 已有真实请求证据 | **当前主线，未完成，未冻结。** 导入 + 真实请求 + 计费已走通；剩余可用性、双账号、提交/RC、正式发布。见第 4 节。 |
-| 五条并行工作线 | A 开发中；**B、C、D `PARTIAL`**；E 首轮完成 | — | 见第 5 节。B `030f7e7d`、C `f2878fe5`、D `9725fe43` 均已提交，均待真实验证。⚠️ A/B/D 存在 i18n 文件重叠，见 5.4。 |
+| 五条并行工作线 | **B `INTEGRATION_VALIDATED`**；C、D `PARTIAL`；A 开发中；E 首轮完成 | — | 见第 5 节。B 整合分支 `1b04b8bc` 已验证；C `f2878fe5`、D `9725fe43` 待真实验证。⚠️ A/B/D 存在 i18n 重叠，见 5.4。 |
 | 本地深度清理 | `DEFERRED` | — | 排在 PG03 部署与基础验证之后。 |
 
 ---
@@ -201,7 +201,7 @@ E 线审查确认「备份硬门禁误通过」路径（见 6.1）。该缺陷�
 | 是否修改总控文件 | **否**（已核实，符合规则） |
 | push / merge / deploy | **均未执行** |
 
-**状态：`PARTIAL`** — 实现与自动化测试通过；**真实浏览器 UI 验证待完成**。**未标记 fully accepted。**
+**状态：`INTEGRATION_VALIDATED`** — 整合验证与浏览器验证均已 PASS；**未合并、未部署**。
 
 **后续提交**：`f7b4884d` — `fix(i18n): nest announcement lifecycle keys inside the translation namespace`（7 个语言文件，+70 −70）。该修复印证了 5.4 所述的 i18n 键结构风险，B 已将公告生命周期键收进翻译命名空间。
 
@@ -211,19 +211,36 @@ E 线审查确认「备份硬门禁误通过」路径（见 6.1）。该缺陷�
 - 用户侧仅展示 published 状态。
 - 保留既有管理员权限限制。
 - 复用既有 option 存储与 API；**未新增数据库表，未新建通知子系统**。
-- 后端测试、前端类型检查、lint、格式化、定向测试均通过。
+- 后端测试/构建/vet、前端 typecheck、生命周期测试、定向 lint、生产前端构建均 PASS。
+- **真实浏览器生命周期验证 PASS**。
 
-待完成：
+仍待完成：
 
-- 真实浏览器生命周期验证。
 - 历史公告在代表性数据下的展示验证。
 - 生产部署验证。
 
-范围外既有失败（**不归属本工作线**）：`store-settings.test.tsx` 超时在**未改动基线上同样复现**。
+范围外既有失败（**不归属本工作线**）：`store-settings.test.tsx` 为 load-sensitive 测试，超时在未改动基线同样复现；**单独重跑通过**。
 
-集成评估：与 PG03 **直接冲突风险低**。已核实 B 的 15 个改动文件与总控文档提交**无文件重叠**，后续合并文件级无冲突。
+**延期 P2**：公告状态缓存失效（cache invalidation）—— 已知但暂不处理，不影响本次整合验证。
 
-**未决事项**：B 分支落后 3 个总控文档提交，需在其完成剩余验证后由协调负责人决定合并方式（不改写其历史）。
+#### 整合分支（已验证，须保留）
+
+| 项目 | 值 |
+| --- | --- |
+| 整合分支 | `integrate/clearapi-announcements` |
+| 整合 HEAD | `1b04b8bc0e2ad92d42e3bc7e6900a6692a31085f` |
+| 整合工作区 | `D:\AI\API\worktrees\clearapi-integration-b`（专用 `git -C`，勿与其他线混用） |
+| 基线 | `production/main` @ `353cd0a2`（已核实为其祖先） |
+| 整合提交 | 2 个：`7ead76ea` 生命周期 + `1b04b8bc` i18n 修正 |
+| 与原分支内容对比 | **等价**（`7ead76ea` 15 文件 = `030f7e7d` 15 文件；`1b04b8bc` 7 文件 = `f7b4884d` 7 文件） |
+| 与原分支树差异 | **仅** `CLEARAPI_MASTER_STATUS.md` 一个文件 |
+| 生产状态 | **NOT MERGED / NOT DEPLOYED** |
+
+**⚠️ 整合分支携带过期总控文件**：`1b04b8bc` 内的 `CLEARAPI_MASTER_STATUS.md` 为 **11,960 字节**（等同 `production/main` 旧版），权威版本现为 **28,745 字节**（`125008c4`）。**整合前必须用权威版本覆盖该文件**，否则会把总控状态回退到四轮之前。
+
+**集成评估**：与 PG03 **直接冲突风险低**。已核实 B 的 15 个改动文件与总控文档提交**无文件重叠**，差异仅限上述文档文件。
+
+**下一步**：保留该已验证整合分支；待其余工作线审查完成后，纳入统一发布整合。
 
 ### 5.2 C 线（五家上游 API）首轮结果
 
@@ -440,3 +457,4 @@ D:\AI\API                         外层协调仓库（无 remote：deploy/docs/
 | 2026-10-18 19:34 +08 | **登记 B 线首轮结果（`PARTIAL`）。** Commit `030f7e7d`，工作树 CLEAN，未修改总控文件。生命周期、用户侧过滤、权限保留、复用既有存储已交付；后端/前端检查与定向测试通过；**真实浏览器验证、历史数据展示验证、生产部署验证待完成**，未标记 fully accepted。核实其 15 个改动文件与总控文档提交无重叠，与 PG03 直接冲突风险低。`store-settings.test.tsx` 超时判定为基线既有问题，不归属 B。B 分支落后 3 个总控提交，合并方式待协调负责人决定，**不改写其历史**。仅改 Markdown，未动业务代码，未 push，未部署。 |
 | 2026-10-18 20:23 +08 | **登记 C 线首轮结果（`PARTIAL`）。** Commit `f2878fe5`，工作树 CLEAN，未修改总控文件。13 文件 / +522 −54，覆盖 `ali` / `deepseek` / `moonshot` / `zhipu` / `zhipu_4v` 与新增 `inbound_conversion.go`。代码已交付；**五家真实上游调用、真实流式/非流式、DeepSeek/Grok Responses 兼容性均未验证**，不得仅凭自动化测试标记 production-verified。已核实与 PG03 account-pool/Executor 及其总控文档无文件重叠。登记渠道策略：保留 Zhipu v3 兼容、新 GLM 优先 V4、**不自动迁移既有渠道**。**复核限制：本机无 Go 工具链，C 的构建/vet/测试/gofmt 结论无法独立复跑，按自报记录。** 仅改 Markdown，未动业务代码，未 push，未部署。 |
 | 2026-10-18 20:27 +08 | **登记 D 线首轮结果（`PARTIAL`）。** Commit `9725fe43`，工作树 CLEAN。18 文件 / +1494 −7，全部位于 `web/`，**已核实无后端计费、Executor、account-pool 改动**。生图入口与路由、模型选择、提交、展示、预览、下载已交付。**Agent 已独立复跑 `vitest run src/features/image-generation`：2 文件 / 22 测试全部通过**，与自报一致；类型检查、lint、构建未复跑。真实上游请求、生产计费一致性、真实浏览器点击流程均未验证；生图编辑入口属范围外。新增 **5.4 跨线集成风险**：已核实 A/B/D 均改 `en.json` 与 `zh.json`，B∩D 七个语言文件全部重叠，整合须解决重复 key 与译文冲突，并给出合并顺序建议。仅改 Markdown，未动业务代码，未 push，未部署。 |
+| 2026-10-18 22:10 +08 | **B 线升级为 `INTEGRATION_VALIDATED`。** 整合分支 `integrate/clearapi-announcements` @ `1b04b8bc`，基线 `353cd0a2`（已核实为祖先），整合工作区 `clearapi-integration-b`。已核实与原分支 `f7b4884d` **内容等价**（15 文件 + 7 文件逐提交对应），树差异**仅** `CLEARAPI_MASTER_STATUS.md`。后端测试/构建/vet、前端 typecheck、生命周期测试、定向 lint、生产前端构建 PASS；**浏览器验证 PASS**。登记延期 P2：公告状态缓存失效；`store-settings` 超时确认为 load-sensitive 既有问题（单独重跑通过）。**发现并登记风险：整合分支携带 11,960 字节过期总控文件（权威版 28,745），整合前必须以权威版覆盖。** 生产状态 NOT MERGED / NOT DEPLOYED。仅改 Markdown，未动业务代码，未 push，未部署。 |
