@@ -119,6 +119,53 @@ export async function previewModelPricing(request: {
   }
 }
 
+export type ModelPricingCleanupAction =
+  | 'keep'
+  | 'reset_to_defaults'
+  | 'use_builtin'
+
+export type ModelPricingCleanupRecord = {
+  model_name: string
+  billing_mode: string
+  version: string
+  configured: string[]
+  configured_expr?: string
+  built_in_expr?: string
+  built_in: boolean
+  action: ModelPricingCleanupAction
+  unpriced_after_reset?: boolean
+}
+
+export type ModelPricingCleanupPlan = ModelPricingCleanupRecord & {
+  pricing: PricingValues
+}
+
+export type ModelPricingCleanup = {
+  snapshot: string
+  records: ModelPricingCleanupRecord[]
+  plans: ModelPricingCleanupPlan[]
+  cleared?: string[]
+}
+
+export async function getModelPricingCleanup(): Promise<ModelPricingCleanup> {
+  const res = await api.get('/api/option/model_pricing/cleanup')
+  if (!res.data.success) {
+    throw createServerError(res.data, t('Failed to load model pricing records'))
+  }
+  return res.data.data
+}
+
+export async function applyModelPricingCleanup(request: {
+  snapshot: string
+  changes: ModelPricingChange[]
+}): Promise<ModelPricingCleanup> {
+  const res = await api.post('/api/option/model_pricing/cleanup', request)
+  if (!res.data.success) {
+    throw createServerError(res.data, t('Failed to clean up model pricing'))
+  }
+  return res.data.data
+}
+
 export function useCanEditModelPricing() {
   return useAuthStore((state) => state.auth.user?.role === ROLE.SUPER_ADMIN)
 }

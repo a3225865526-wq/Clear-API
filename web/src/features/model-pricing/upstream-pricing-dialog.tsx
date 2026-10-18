@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
@@ -37,6 +37,7 @@ import { formatNumber } from '@/lib/format'
 
 import { formatPricingAmount, USD_PRICING_CURRENCY } from './currency'
 import {
+  generatePriceTableFromExpression,
   generateUpstreamPricing,
   upstreamMultiplierSchema,
   type GeneratedPriceRow,
@@ -60,6 +61,8 @@ export function UpstreamPricingDialog(props: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onApply: (pricing: GeneratedUpstreamPricing) => boolean
+  /** Stored upstream cost prices for the model being edited, if any. */
+  initialModels?: { model: string; expression: string }[]
 }) {
   const { t, i18n } = useTranslation()
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
@@ -90,6 +93,27 @@ export function UpstreamPricingDialog(props: {
     resolver: zodResolver(schema),
     defaultValues: { table: '', upstream: '', sales: '', exchange: '1' },
   })
+  // Seed the table from the model's stored upstream cost so the administrator
+  // can generate a sales price without retyping prices already on record.
+  useEffect(() => {
+    if (!props.open) return
+    const seeded = (props.initialModels ?? []).flatMap((entry) => {
+      const table = generatePriceTableFromExpression(
+        entry.model,
+        entry.expression
+      )
+      return table ? table.models : []
+    })
+    if (!seeded.length) return
+    form.setValue(
+      'table',
+      JSON.stringify(
+        { currency: 'USD', token_unit: '1M', models: seeded },
+        null,
+        2
+      )
+    )
+  }, [props.open, props.initialModels, form])
   const values = form.watch()
   const fingerprint = JSON.stringify(values)
   const current = preview?.fingerprint === fingerprint ? preview.pricing : null

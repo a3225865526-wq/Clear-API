@@ -56,6 +56,37 @@ func PreviewModelPricing(c *gin.Context) {
 	})
 }
 
+func GetModelPricingCleanup(c *gin.Context) {
+	report, err := model.ModelPricingCleanupReport()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, report)
+}
+
+func ApplyModelPricingCleanup(c *gin.Context) {
+	var request struct {
+		Snapshot string                            `json:"snapshot"`
+		Changes  []model.ModelPricingCleanupChange `json:"changes"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	report, err := model.ApplyModelPricingCleanup(request.Snapshot, request.Changes)
+	if err != nil {
+		status := http.StatusBadRequest
+		if errors.Is(err, model.ErrModelPricingConflict) || errors.Is(err, model.ErrModelPricingStale) {
+			status = http.StatusConflict
+		}
+		c.JSON(status, gin.H{"success": false, "message": err.Error()})
+		return
+	}
+	recordManageAudit(c, "model.pricing.cleanup", map[string]any{"models": report.Cleared})
+	common.ApiSuccess(c, report)
+}
+
 func UpdateModelPricingConfig(c *gin.Context) {
 	var request struct {
 		Changes []model.ModelPricingChange `json:"changes"`
