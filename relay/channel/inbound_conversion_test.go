@@ -66,4 +66,41 @@ func TestNewUnsupportedEndpointErrorIsNonRetryableClientError(t *testing.T) {
 	assert.True(t, types.IsSkipRetryError(err))
 	assert.Contains(t, err.Error(), "/v1beta/models/qwen-plus:generateContent")
 	assert.Contains(t, err.Error(), "the legacy API accepts its own prompt format")
+	assert.Contains(t, err.Error(), "api type 4")
+}
+
+// The channel api type is promoted from ChannelMeta, so an attempt that has not
+// resolved its meta must still produce the documented client error rather than
+// panicking on the embedded pointer.
+func TestNewUnsupportedEndpointErrorMissingChannelMeta(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		info *relaycommon.RelayInfo
+	}{
+		{"nil info", nil},
+		{"nil channel meta", &relaycommon.RelayInfo{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NotPanics(t, func() {
+				err := NewUnsupportedEndpointError(newInboundContext(t), tc.info, "the legacy API accepts its own prompt format")
+
+				assert.Equal(t, http.StatusBadRequest, err.StatusCode)
+				assert.True(t, types.IsSkipRetryError(err))
+				assert.Contains(t, err.Error(), "api type -1", "missing meta reports the unknown api type")
+				assert.Contains(t, err.Error(), "/v1beta/models/qwen-plus:generateContent")
+				assert.Contains(t, err.Error(), "the legacy API accepts its own prompt format")
+			})
+		})
+	}
+}
+
+// A nil context must not drop the request path or change the error shape.
+func TestNewUnsupportedEndpointErrorWithoutContext(t *testing.T) {
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{ApiType: 4}}
+	err := NewUnsupportedEndpointError(nil, info, "no such endpoint")
+
+	assert.Equal(t, http.StatusBadRequest, err.StatusCode)
+	assert.True(t, types.IsSkipRetryError(err))
+	assert.Contains(t, err.Error(), "this endpoint")
+	assert.Contains(t, err.Error(), "api type 4")
 }

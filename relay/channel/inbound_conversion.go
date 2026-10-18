@@ -53,8 +53,11 @@ func NewUnsupportedEndpointError(c *gin.Context, info *relaycommon.RelayInfo, de
 	if c != nil && c.Request != nil && c.Request.URL != nil && c.Request.URL.Path != "" {
 		path = c.Request.URL.Path
 	}
+	// ApiType is promoted from the embedded ChannelMeta, so the relaying
+	// attempt must be checked before dereferencing it. A channel that has not
+	// resolved its meta yet reports the unknown api type instead of panicking.
 	apiType := -1
-	if info != nil {
+	if info != nil && info.ChannelMeta != nil {
 		apiType = info.ApiType
 	}
 	return types.NewErrorWithStatusCode(
