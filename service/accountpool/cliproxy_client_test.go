@@ -216,6 +216,20 @@ func TestCliproxyCompleteTerminalStatesAndTimeout(t *testing.T) {
 	assert.ErrorIs(t, stuck, ErrPoolAuthTimeout)
 }
 
+func TestCliproxyImportCredentialMapsDuplicateToConflict(t *testing.T) {
+	client, _ := newTestCliproxyClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodPost, r.Method)
+		assert.Equal(t, "/v0/management/pool/import", r.URL.Path)
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"error":"credential exists"}`))
+	})
+	_, err := client.ImportCredential(context.Background(), CredentialImportRequest{
+		FileName: "codex-account.json",
+		Raw:      []byte(`{"type":"codex","access_token":"x","refresh_token":"y","account_id":"a","email":"a@example.com"}`),
+	})
+	assert.ErrorIs(t, err, ErrPoolConflict)
+}
+
 func TestCliproxyListCredentialsParsesEntries(t *testing.T) {
 	// The pinned build serializes auth.UpdatedAt (time.Time) as an RFC3339
 	// string into both "modtime" and "updated_at", and omits both keys when

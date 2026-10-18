@@ -423,9 +423,14 @@ func (m *mockPoolExecutor) ImportCredential(context.Context, accountpool.Credent
 }
 func (m *mockPoolExecutor) DeleteImportedCredential(context.Context, string) error { return nil }
 func (m *mockPoolExecutor) PoolModelSnapshot(context.Context) (accountpool.PoolExecutorModelSnapshot, error) {
+	// Admission must be bound to a real policy revision, trust generation and
+	// capability generation; revision 0 is not evidence. The fixture therefore
+	// models one current revision whose trust and capability generations agree.
+	const revision, generation = 4, 2
 	return accountpool.PoolExecutorModelSnapshot{
-		Identities:   []accountpool.PoolExecutorTrustIdentity{{AuthID: "synthetic-auth.json", Provider: "codex", CredentialDigest: "synthetic-digest", State: "trusted"}},
-		Capabilities: []accountpool.PoolExecutorCapability{{AuthID: "synthetic-auth.json", Provider: "codex", CredentialDigest: "synthetic-digest", Model: "synthetic-pool-model", State: "verified"}},
+		Revision: revision, TrustRevision: revision,
+		Identities:   []accountpool.PoolExecutorTrustIdentity{{AuthID: "synthetic-auth.json", Provider: "codex", CredentialDigest: "synthetic-digest", State: "trusted", AuthorizationVersion: revision, Generation: generation}},
+		Capabilities: []accountpool.PoolExecutorCapability{{AuthID: "synthetic-auth.json", Provider: "codex", CredentialDigest: "synthetic-digest", Model: "synthetic-pool-model", State: "verified", Generation: generation}},
 	}, nil
 }
 func (m *mockPoolExecutor) Health(context.Context) error { return m.healthErr }

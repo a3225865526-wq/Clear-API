@@ -20,6 +20,8 @@ const (
 	ImportMaxFileBytes    = 256 * 1024
 	ImportMaxTotalBytes   = 1024 * 1024
 	ImportFormatCodexV1   = "codex-oauth-top-level-v1"
+	ImportFormatCodexCLI  = "codex-cli-nested-tokens-v1"
+	ImportFormatCPA       = "cpa-codex-v1"
 	ImportStatusImported  = "imported"
 	ImportStatusDuplicate = "duplicate"
 	ImportStatusRejected  = "rejected"
@@ -39,6 +41,7 @@ type CodexCredential struct {
 	Email        string
 	PlanType     string
 	Raw          []byte
+	ExecutorRaw  []byte
 	Digest       string
 	IdentityKey  string
 	IdentityMask string
@@ -58,9 +61,9 @@ type ImportResult struct {
 	Retryable    bool   `json:"retryable"`
 }
 
-// ValidateCodexCredential accepts only the documented top-level Codex OAuth
-// file. Duplicate keys, trailing data, nested collections, API keys and
-// missing token pairs are rejected before any executor mutation.
+// ValidateCodexCredential accepts both documented Codex OAuth JSON shapes:
+// the v8 top-level form and the Codex CLI auth.json form with nested "tokens".
+// Unknown, ambiguous and API-key shapes are rejected before executor mutation.
 func ValidateCodexCredential(raw []byte) (CodexCredential, error) {
 	result := CodexCredential{}
 	if len(raw) == 0 || len(raw) > ImportMaxFileBytes {
@@ -73,22 +76,32 @@ func ValidateCodexCredential(raw []byte) (CodexCredential, error) {
 	if err := json.Unmarshal(raw, &fields); err != nil || fields == nil {
 		return result, importFailure("JSON_INVALID")
 	}
-	if kind, _ := fields["type"].(string); kind != "codex" {
-		return result, importFailure("PROVIDER_UNSUPPORTED")
-	}
 	for _, key := range []string{"accounts", "auths", "credentials", "api_key", "apiKey"} {
 		if _, exists := fields[key]; exists {
 			return result, importFailure("CREDENTIAL_SHAPE_UNSUPPORTED")
 		}
 	}
+	format := ImportFormatCPA
+	tokenFields := fields
+	if nested, exists := fields["tokens"]; exists {
+		tokenMap, ok := nested.(map[string]any)
+		if !ok || len(tokenMap) == 0 {
+			return result, importFailure("CREDENTIAL_SHAPE_UNSUPPORTED")
+		}
+		format = ImportFormatCodexCLI
+		tokenFields = tokenMap
+	}
+	if kind, _ := fields["type"].(string); kind != "" && kind != "codex" {
+		return result, importFailure("PROVIDER_UNSUPPORTED")
+	}
 	for _, key := range []string{"access_token", "refresh_token"} {
-		value, ok := fields[key].(string)
+		value, ok := tokenFields[key].(string)
 		if !ok || strings.TrimSpace(value) == "" {
 			return result, importFailure("CREDENTIAL_MISSING_TOKEN")
 		}
 	}
-	accountID, _ := fields["account_id"].(string)
-	chatGPTAccountID, _ := fields["chatgpt_account_id"].(string)
+	accountID, _ := tokenFields["account_id"].(string)
+	chatGPTAccountID, _ := tokenFields["chatgpt_account_id"].(string)
 	accountID = strings.TrimSpace(accountID)
 	chatGPTAccountID = strings.TrimSpace(chatGPTAccountID)
 	if accountID == "" && chatGPTAccountID == "" {
@@ -100,14 +113,17 @@ func ValidateCodexCredential(raw []byte) (CodexCredential, error) {
 	if accountID == "" {
 		accountID = chatGPTAccountID
 	}
-	email, _ := fields["email"].(string)
+	email, _ := tokenFields["email"].(string)
+	if strings.TrimSpace(email) == "" {
+		email, _ = fields["email"].(string)
+	}
 	email = strings.TrimSpace(email)
 	if email == "" {
 		return result, importFailure("CREDENTIAL_MISSING_EMAIL")
 	}
 	planType, _ := fields["plan_type"].(string)
 	if planType == "" {
-		planType, _ = fields["chatgpt_plan_type"].(string)
+		planType, _ = tokenFields["chatgpt_plan_type"].(string)
 	}
 	sum := sha256.Sum256(raw)
 	result.AccountID = accountID
@@ -117,8 +133,47 @@ func ValidateCodexCredential(raw []byte) (CodexCredential, error) {
 	result.Digest = hex.EncodeToString(sum[:])
 	result.IdentityKey = "codex:" + accountID
 	result.IdentityMask = MaskIdentity(email)
-	result.Format = ImportFormatCodexV1
+	result.Format = format
+	executorRaw, err := executorCredentialJSON(fields, tokenFields, format, accountID, email)
+	if err != nil {
+		return CodexCredential{}, err
+	}
+	result.ExecutorRaw = executorRaw
 	return result, nil
+}
+
+// executorCredentialJSON converts validated input into the executor's native
+// top-level OAuth shape. The conversion preserves arbitrary non-sensitive
+// metadata, but never invents an API key or copies a token into one.
+func executorCredentialJSON(fields, tokenFields map[string]any, format, accountID, email string) ([]byte, error) {
+	out := make(map[string]any, len(fields)+8)
+	for key, value := range fields {
+		switch key {
+		case "tokens", "accounts", "auths", "credentials", "api_key", "apiKey", "OPENAI_API_KEY", "auth_mode":
+			continue
+		default:
+			out[key] = value
+		}
+	}
+	out["type"] = "codex"
+	for key, value := range tokenFields {
+		if key == "chatgpt_plan_type" {
+			continue
+		}
+		out[key] = value
+	}
+	out["account_id"] = accountID
+	if strings.TrimSpace(email) != "" {
+		out["email"] = email
+	}
+	if _, ok := out["chatgpt_account_id"]; !ok {
+		out["chatgpt_account_id"] = accountID
+	}
+	encoded, err := json.Marshal(out)
+	if err != nil {
+		return nil, importFailure("CREDENTIAL_SHAPE_UNSUPPORTED")
+	}
+	return encoded, nil
 }
 
 func validateUniqueJSON(raw []byte) error {
@@ -249,9 +304,13 @@ func importOne(ctx context.Context, ownerID int, credential CodexCredential) (Im
 		return result, nil
 	}
 
+	executorRaw := credential.ExecutorRaw
+	if len(executorRaw) == 0 {
+		executorRaw = credential.Raw
+	}
 	imported, err := uploader.ImportCredential(ctx, CredentialImportRequest{
 		FileName: "codex-" + credential.Digest + ".json",
-		Raw:      credential.Raw,
+		Raw:      executorRaw,
 	})
 	if err != nil {
 		_ = deleteUnclaimedImportAccount(account.Id)
