@@ -24,14 +24,30 @@ import (
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
+	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/imageexecution"
 	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
+
+// imageRequestDigest hashes the frozen client body for the idempotency binding.
+// The stored value is a digest only, never client text.
+func imageRequestDigest(c *gin.Context) string {
+	storage, err := common.GetBodyStorage(c)
+	if err != nil {
+		return ""
+	}
+	body, err := storage.Bytes()
+	if err != nil {
+		return ""
+	}
+	return imageexecution.BodyDigestOf(body)
+}
 
 func relayHandler(c *gin.Context, info *relaycommon.RelayInfo) *types.NewAPIError {
 	var err *types.NewAPIError
@@ -130,6 +146,20 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
+	}
+
+	// PG03 Images Contract v1: freeze the operator source policy and register
+	// the authoritative request identity before any reservation or dispatch.
+	// Returning nil keeps the legacy path byte for byte.
+	if imageRequest, ok := request.(*dto.ImageRequest); ok && imageexecution.ModeRequested() {
+		controlled, prepareErr := imageexecution.Prepare(c, relayInfo, imageRequest, imageRequestDigest(c))
+		if prepareErr != nil {
+			newAPIError = prepareErr
+			return
+		}
+		if controlled != nil {
+			defer imageexecution.FinishRequest(c, controlled, relayInfo)
+		}
 	}
 
 	// Stage 4 ledger: registered before the billing defer so it runs AFTER
@@ -258,6 +288,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		newAPIError = service.NormalizeViolationFeeError(newAPIError)
 		relayInfo.LastError = newAPIError
+
+		// A controlled image request leaves this loop after one dispatch unless
+		// the coordinator recorded a trusted zero-dispatch proof that arms a
+		// single handover. An attempt that may have reached a provider can never
+		// be followed by another dispatch, whatever the generic retry policy
+		// would otherwise decide.
+		if controlled := imageexecution.FromContext(c); controlled != nil && !controlled.HandoverArmed() {
+			break
+		}
 
 		var decision service.PolicyDecision
 		if chainState != nil {

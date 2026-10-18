@@ -23,6 +23,12 @@ func RegisterUpstreamPoolRoutes(api *gin.RouterGroup) {
 	pool.GET("/channels", controller.ListPoolChannels)
 	pool.PUT("/channels/:id/pool-routing", controller.SetChannelPoolRouting)
 	pool.GET("/model-availability", controller.GetPoolModelAvailability)
+	// Operator image source policy. This is the only place a user-visible image
+	// request may learn which source is allowed; ordinary users have no
+	// equivalent route and cannot influence it from the relay body.
+	pool.GET("/image-policies", controller.ListImageSourcePolicies)
+	pool.GET("/image-policy", controller.GetImageSourcePolicy)
+	pool.PUT("/image-policy", controller.SaveImageSourcePolicy)
 	pool.GET("/fallback-policy", controller.GetPoolFallbackPolicy)
 	pool.PUT("/fallback-policy", controller.SavePoolFallbackPolicy)
 	pool.GET("/accounts", controller.ListPoolAccounts)

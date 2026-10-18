@@ -20,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/accountpool"
+	"github.com/QuantumNous/new-api/service/imageexecution"
 	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
@@ -336,8 +337,21 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, err
 	}
 	applyHeaderOverrideToRequest(req, headerOverride)
+	// A controlled image attempt records its Gateway→Executor send boundary
+	// durably before the bytes leave this process. A failure here forbids the
+	// dispatch: an unwritten dedup record can never be treated as "not sent".
+	if controlled := imageexecution.FromContext(c); controlled != nil {
+		if apiErr := controlled.MarkDispatching(); apiErr != nil {
+			return nil, apiErr
+		}
+	}
 	if err := accountpool.ApplyPG03Policy(c, req); err != nil {
 		return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+	}
+	if controlled := imageexecution.FromContext(c); controlled != nil {
+		if err := controlled.SignOutbound(c, req, info.OriginModelName); err != nil {
+			return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		}
 	}
 	resp, err := doRequest(c, req, info)
 	if err != nil {

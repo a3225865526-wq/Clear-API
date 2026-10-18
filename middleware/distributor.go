@@ -20,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/imageexecution"
 	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
@@ -111,6 +112,10 @@ func Distribute() func(c *gin.Context) {
 				// exact target channel (Amendment 2 C2) and runs per-candidate
 				// admission; the weighted selection pool never runs.
 				common.SetContextKey(c, constant.ContextKeyRequestStartTime, time.Now())
+				if chainState.Snapshot != nil {
+					// Freeze the identity for the controlled image record only.
+					imageexecution.PublishChainIdentity(c, chainState.Snapshot.ChainId, chainState.Snapshot.Version, chainState.Snapshot.AllowCrossSource)
+				}
 				if chainErr := chainState.BindCandidate(c, SetupContextForSelectedChannel, service.RouteChainCandidateGroups(c), routechain.ChainFilters(service.GetChannelConstraints(c).Filters)); chainErr != nil {
 					// Stage 4: the request never reaches the relay loop, so its
 					// ledger row would stay unfinished — close it here.

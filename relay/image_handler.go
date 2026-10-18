@@ -16,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/imageexecution"
 	"github.com/QuantumNous/new-api/setting/model_setting"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +30,13 @@ func ImageHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *type
 	imageReq, ok := info.Request.(*dto.ImageRequest)
 	if !ok {
 		return types.NewErrorWithStatusCode(fmt.Errorf("invalid request type, expected dto.ImageRequest, got %T", info.Request), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+	}
+
+	// Controlled PG03 image execution is decided by the operator policy only.
+	// When it applies, this handler owns the lifecycle: one durable attempt,
+	// one reservation, one terminal and no automatic source switch.
+	if controlled := imageexecution.FromContext(c); controlled != nil {
+		return controlledImageHelper(c, info, imageReq, controlled)
 	}
 
 	request, err := common.DeepCopy(imageReq)
