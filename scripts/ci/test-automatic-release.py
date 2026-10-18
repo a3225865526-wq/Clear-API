@@ -142,6 +142,43 @@ class ReleaseProofTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "RC schema transition"):
                     self.validate(manifest=manifest)
 
+    def test_authentic_in_place_migration_is_accepted(self):
+        # PG03 forbids migration flags, so an upgrading candidate proves itself
+        # only through two idempotent startup passes on one database.
+        manifest = deepcopy(self.manifest)
+        manifest["schema_transition"].update(
+            source_schema_sha256="2" * 64, target_schema_sha256="3" * 64, startup_passes=2)
+        proof = deepcopy(self.proof)
+        proof["migration"] = {"mode": "in_place_startup_migration",
+                              "source_schema_sha256": "2" * 64,
+                              "target_schema_sha256": "3" * 64, "startup_passes": 2}
+        self.assertEqual(self.validate(manifest=manifest, proof=proof)["expected_commit"], SOURCE)
+
+    def test_in_place_migration_requires_two_passes_and_exact_binding(self):
+        manifest = deepcopy(self.manifest)
+        manifest["schema_transition"].update(
+            source_schema_sha256="2" * 64, target_schema_sha256="3" * 64, startup_passes=2)
+        good = deepcopy(self.proof)
+        good["migration"] = {"mode": "in_place_startup_migration",
+                             "source_schema_sha256": "2" * 64,
+                             "target_schema_sha256": "3" * 64, "startup_passes": 2}
+        self.validate(manifest=manifest, proof=good)
+        cases = [
+            ("passes", lambda m, p: m["schema_transition"].update(startup_passes=1)),
+            ("version", lambda m, p: m["schema_transition"].update(schema_version="other")),
+            ("binding", lambda m, p: m["schema_transition"].update(source_commit="9" * 40)),
+            ("mode", lambda m, p: p.update(migration={"mode": "no_schema_change"})),
+            ("src", lambda m, p: p["migration"].update(source_schema_sha256="1" * 64)),
+            ("tgt", lambda m, p: p["migration"].update(target_schema_sha256="1" * 64)),
+            ("omit", lambda m, p: p.update(migration={})),
+        ]
+        for label, mutate in cases:
+            with self.subTest(case=label):
+                m, p = deepcopy(manifest), deepcopy(good)
+                mutate(m, p)
+                with self.assertRaises(ValueError):
+                    self.validate(manifest=m, proof=p)
+
     def test_receipt_must_match_exact_rc_run(self):
         path = self.root / "backup_restore.json"
         for field, value in (("rc_run_id", None), ("rc_run_id", "123"), ("rc_run_id", 122),

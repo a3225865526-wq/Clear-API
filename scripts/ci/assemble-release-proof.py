@@ -50,9 +50,29 @@ def main():
         checks[gate] = {"conclusion": "success", "file": path.name,
                         "sha256": hashlib.sha256(raw).hexdigest()}
     transition = manifest.get("schema_transition", {})
-    schema = transition.get("source_schema_sha256", "")
-    if not re.fullmatch(r"[0-9a-f]{64}", schema) or schema != transition.get("target_schema_sha256"):
-        raise SystemExit("no_schema_change contradicts the RC schema transition")
+    source_schema = transition.get("source_schema_sha256", "")
+    target_schema = transition.get("target_schema_sha256", "")
+    if not re.fullmatch(r"[0-9a-f]{64}", source_schema) or not re.fullmatch(r"[0-9a-f]{64}", target_schema):
+        raise SystemExit("RC schema transition is missing or malformed")
+    if source_schema == target_schema:
+        migration = {"mode": "no_schema_change"}
+    else:
+        # PG03 forbids external migration flags: the candidate image applies its
+        # own additive migrations during startup. A real upgrade is therefore only
+        # provable when the RC rehearsal ran that startup twice on the same
+        # database and observed an idempotent, converged schema.
+        if transition.get("schema_version") != "pg03-schema-rehearsal-v1":
+            raise SystemExit("RC schema transition changed but is not a PG03 schema rehearsal")
+        if transition.get("startup_passes") != 2:
+            raise SystemExit("in-place migration requires two idempotent startup passes")
+        if transition.get("source_commit") != manifest.get("source_commit"):
+            raise SystemExit("in-place migration rehearsal does not bind this candidate")
+        migration = {
+            "mode": "in_place_startup_migration",
+            "source_schema_sha256": source_schema,
+            "target_schema_sha256": target_schema,
+            "startup_passes": 2,
+        }
     proof = {
         "schema": "clearapi.automatic-release/v1",
         "source_commit": manifest["source_commit"],
@@ -61,7 +81,7 @@ def main():
         "gateway_digest": manifest["image_digest"],
         "gateway_binary_sha256": manifest["binary_sha256"],
         "previous_source_commit": args.previous_source_commit,
-        "migration": {"mode": "no_schema_change"},
+        "migration": migration,
         "executor": {
             "image_repository": args.executor_repository,
             "source_repository": "https://github.com/a3225865526-wq/CLIProxyAPI",

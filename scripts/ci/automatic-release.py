@@ -162,12 +162,30 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
     require(re.fullmatch(DIGEST, executor["image_digest"]) is not None, "invalid executor digest")
     require(re.fullmatch(r"[0-9a-f]{64}", executor["binary_sha256"]) is not None, "invalid executor binary")
     require(executor["paired_gateway_commit"] == source, "executor not paired with gateway")
-    require(proof["migration"]["mode"] == "no_schema_change", "migration has no automated safety proof")
+    # The proof must state the migration mode that the RC actually rehearsed.
+    # PG03 forbids external migration flags, so an upgrading candidate proves
+    # itself only through two idempotent startup passes on the same database.
     transition = manifest.get("schema_transition", {})
-    schema = transition.get("source_schema_sha256", "")
-    require(re.fullmatch(r"[0-9a-f]{64}", schema) is not None
-            and schema == transition.get("target_schema_sha256"),
-            "no_schema_change contradicts the RC schema transition")
+    source_schema = transition.get("source_schema_sha256")
+    target_schema = transition.get("target_schema_sha256")
+    require(type(source_schema) is str and re.fullmatch(r"[0-9a-f]{64}", source_schema) is not None
+            and type(target_schema) is str and re.fullmatch(r"[0-9a-f]{64}", target_schema) is not None,
+            "RC schema transition is missing or malformed")
+    migration = proof["migration"]
+    if source_schema == target_schema:
+        require(migration.get("mode") == "no_schema_change",
+                "no_schema_change contradicts the RC schema transition")
+    else:
+        require(migration.get("mode") == "in_place_startup_migration",
+                "RC schema transition changed but the proof claims no migration")
+        require(migration.get("source_schema_sha256") == source_schema
+                and migration.get("target_schema_sha256") == target_schema,
+                "migration evidence contradicts the RC schema transition")
+        require(transition.get("schema_version") == "pg03-schema-rehearsal-v1"
+                and transition.get("startup_passes") == 2,
+                "in-place migration requires two idempotent startup passes")
+        require(transition.get("source_commit") == source,
+                "in-place migration rehearsal does not bind this candidate")
     require(re.fullmatch(SHA, proof["previous_source_commit"]) is not None, "missing predecessor identity")
     require(set(proof["checks"]) == PROOF_CHECKS, "missing/unknown release evidence checks")
     for name, check in proof["checks"].items():
