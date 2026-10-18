@@ -193,13 +193,30 @@ target_schema_sha256 = 3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf8
 
 - Gateway `service/accountpool`、`service/routechain`、`router`、`controller` 定向测试。
 - Gateway 全链路一次真实请求成功，含 Usage 解析、余额扣减、单次结算。
-- 失败请求不扣费、不写 consume log。
+- 失败请求不扣费、不写 consume log（**仅限非池通道**，见下方"新发现"）。
 - 双账号 fallback：A 被排除后 B 完成，无重复结算、无遗留租约。
 - Executor 重启后 revision / trust / capability / 栅栏全部保持。
 - 导入 quarantine 的显式恢复闭环（无隐式复活路径）。
 - Executor 导入路由在 service 角色下由 403 变为可达（新旧 RC 对照）。
 - Gateway Required CI 6/6 通过；正式 RC 构建成功且 manifest 身份自洽。
 - Rehearsal 中 8 个 gate 真实通过。
+
+### 新发现（本轮补充实测，属既有设计而非本轮引入）
+
+**池绑定通道的上游失败会保留预扣费、不退款。** 受控对照实验：
+
+```text
+池绑定通道 + 上游报错(400 unknown provider):
+  token remain 499991 -> 499989 , used 9 -> 11 , consume log 不变      (扣了 2，无日志)
+非池通道 + 上游不可达(400):
+  token remain 499989 -> 499989 , used 11 -> 11 , consume log 不变      (未扣费)
+```
+
+用户侧 `used_quota` 在这两次都没变，只有 token 余额被扣。日志显示预扣费发生后既没有"返还"也没有"结算"，即**预扣费悬空**。
+
+根因在 `relay/request_billing.go`（**本轮未改动此文件**，`git diff 353cd0a2..HEAD -- relay/` 为空）：早退退款分支带 `!channel.PoolChannelBound()` 条件，注释明确写着池/路由链要保留"保守核对路径"。所以这是**既有且有意的设计**，不是我的回归。
+
+但它与任务要求的"失败请求不会被错误记录为成功结算""没有重复结算"直接相关：对池通道而言，一次确定无用的失败仍会扣掉用户 token 余额，且不留 consume log 供对账。**上线前应明确这是否是期望行为**（§8 列为待决策项）。我在报告中没有把它算作"计费 PASS"。
 
 ### 仅静态审查
 
@@ -241,6 +258,7 @@ target_schema_sha256 = 3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf8
 3. **重新绑定并提供三份运营方证据**（仅 automatic 路径需要）：backup、rollback 针对新 RC `24f9bd48` 重做；provider 证据基于已完成的真实链路结果生成，并绑定到该 RC 的 run/attempt 与 manifest hash。
 4. **在 VPS 以 root 重装两个脚本**：把 `pg03-release-control.py`、`production-deploy-v2.sh` 的 Executor 常量从 `9ba0e5ff… / 228ecbaa` 改为 `722915a6… / a45358ed…`（并同步 `EXECUTOR_BINARY`），或提供一次授权的方式完成该重装。
 5. **提供可达的部署通道**：能通过 GitHub `production` environment 正常使用 `PROD_SSH_PRIVATE_KEY`（该链路本身可用，只是我这侧无凭据），或在受控窗口内提供一次性部署执行。
+6. **决策池通道失败计费语义**（新发现，见 §6）：当前池绑定通道在上游明确失败时会扣掉 token 余额且不写 consume log。若这是有意的"保守核对"，应把悬空预扣费做成可对账的显式记录；若非有意，应在 `relay/request_billing.go` 的早退退款分支另行处理。**这是上线前必须澄清的产品/财务口径问题**，不属于我能在无授权下自行改变的行为。
 
 **注意**：2 与 4 都必须在 VPS 上以 root 完成，而本环境对 `103.42.181.219` 无任何可用凭据（`clearapi-deploy` 与 `root` 均 `Permission denied (publickey)`）。因此在不引入人工介入的前提下，我无法推进到部署步骤——这正是我停在这里的原因，而不是缺少尝试。
 
@@ -276,7 +294,8 @@ target_schema_sha256 = 3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf8
 - PG03 代码修复与集成：**PASS**（已合并 `24f9bd48`，Required CI 6/6）
 - 完整链路真实验证：**PASS**（隔离环境、真实 OAuth、真实上游）
 - 双账号 / fallback / 无重复结算：**PASS**
-- 计费一致性（成功扣费、失败不扣费）：**PASS**
+- 计费一致性（成功请求按上游 usage 精确扣费、单次结算、无重复扣费）：**PASS**
+- 计费一致性（失败请求不扣费）：**PARTIAL** —— 非池通道 PASS（实测未扣费）；池绑定通道 **FAIL**（上游明确失败仍扣 token 余额且无 consume log，属既有设计，已列为待决策项）
 - 重启持久化：**PASS**（重启后 revision、trust、capability 代际、围栏与 eligibility 全部保持；**未发现重启缺陷**，先前声称的缺陷已撤回）
 - 导入 quarantine 恢复闭环：**PASS**
 - 正式 RC 产物身份：**PASS**（Gateway + Executor）
