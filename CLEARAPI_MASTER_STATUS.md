@@ -23,7 +23,7 @@
 | Backup / rollback evidence | actual encrypted backup `20261016T193254Z`, 75 tables, exact RC twice, 0 invariant failures | PASS ISOLATED |
 | Rehearsal | Run `39084286400` attempt 2: all non-Provider gates PASS; proof blocked on Provider | BLOCKED |
 | PG03 production enablement | Not executed | NOT RUN |
-| Post-main test branch | `codex/pg03-rehearsal-fix-20261018`; head `596ba153`; no production switch | NOT MERGED |
+| Post-main test branch | `codex/pg03-rehearsal-fix-20261018`; head `b19d7034`; no production switch | NOT MERGED |
 | 真实 Provider Usage/Billing | 尚未执行 | NOT RUN |
 | 熔断 / 双账号故障转移 | 尚未执行 | NOT RUN |
 
@@ -54,7 +54,7 @@
 - Rehearsal `39084286400` attempt 2 除 Provider 外全部 gate PASS；Assembler 拒绝生成 proof。
 - 两个上传账号均为 `free` 计划且未确认商业用途；不得作为已获准商业上游。
 - 自动部署 Run 因 proof 未生成而 skipped；PG03 生产 enablement、Route Chain 生产请求、Executor 部署、真实 Usage/Billing 均为 NOT RUN/UNVERIFIED。
-- 完整报告：`CLEARAPI_PG03_FULL_LAUNCH_FINAL_STATUS_20261018.md`。`CLEARAPI_MASTER_STATUS.md` 为工作区副本，已随 `596ba153` 推送。
+- 完整报告：`CLEARAPI_PG03_FULL_LAUNCH_FINAL_STATUS_20261018.md`。`CLEARAPI_MASTER_STATUS.md` 为工作区副本，已随 `b19d7034` 推送。
 - 证据：`D:/AI/API/evidence/pg03-full-launch-20261018/`。
 
 ### 历史记录
