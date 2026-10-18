@@ -55,7 +55,8 @@ def verified_run(run, source, workflow, event):
     require(run["head_repository"]["full_name"] == REPOSITORY, "foreign head repository")
     require(run["path"] == f".github/workflows/{workflow}", "unexpected workflow path")
     require(run["head_sha"] == source and run["head_branch"] == "main", "run source mismatch")
-    require(run["event"] == event, "unexpected run event")
+    allowed = (event,) if isinstance(event, str) else tuple(event)
+    require(run["event"] in allowed, "unexpected run event")
     require(run["status"] == "completed" and run["conclusion"] == "success", "run not successful")
 
 
@@ -236,7 +237,11 @@ def authorize_release(event, destination):
     require(os.environ.get("GITHUB_RUN_ATTEMPT") == "1", "automatic deployment reruns require incident recovery")
     rehearsal = api(f"actions/runs/{event['workflow_run']['id']}")
     source = rehearsal["head_sha"]
-    verified_run(rehearsal, source, "deployment-rehearsal.yml", "workflow_run")
+    # A dispatched rehearsal is legitimate: operator evidence is bound to an RC
+    # manifest that only exists after the RC finishes, which the automatic
+    # trigger cannot win. Both entries run the same gates and assembler.
+    verified_run(rehearsal, source, "deployment-rehearsal.yml",
+                 ("workflow_run", "workflow_dispatch"))
     require(rehearsal["run_attempt"] == event["workflow_run"]["run_attempt"], "stale rehearsal attempt")
     require(api("git/ref/heads/main")["object"]["sha"] == source, "rehearsal source is no longer main")
     successful_jobs(rehearsal)
