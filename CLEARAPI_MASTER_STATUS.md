@@ -2,7 +2,7 @@
 
 > **本文件是 ClearAPI 项目唯一权威总控文件。**
 > 位置：主产品仓库 `D:\AI\API\upstream\new-api` 根目录。
-> 最近更新：2026-10-18 19:34 +08（Asia/Shanghai）
+> 最近更新：2026-10-18 20:23 +08（Asia/Shanghai）
 > 维护人：**仅项目总协调负责人**。各功能开发 AI 不得修改本文件。
 
 ---
@@ -55,7 +55,7 @@
 | 自动部署 | `USER_CONFIRMED_COMPLETE` | `USER_CONFIRMED` | 用户已确认完成。**「自动化能力全链路已验证」未复核**，不可对外如此宣称。⚠️ 存在一项门禁缺陷（备份硬门禁误通过），当前 `CONFIRMED / DEFERRED`，**不作为当前主线阻塞**，见 6.1。 |
 | 商业化 MVP | `USER_CONFIRMED_COMPLETE` | `USER_CONFIRMED` | 用户已确认完成。不得重新列为 P0。真实 Provider 计费仍 `UNVERIFIED`。 |
 | **PG03 FINAL LAUNCH** | **`IN_PROGRESS`** | 已有真实请求证据 | **当前主线，未完成，未冻结。** 导入 + 真实请求 + 计费已走通；剩余可用性、双账号、提交/RC、正式发布。见第 4 节。 |
-| 五条并行工作线 | A/C/D 开发中；**B `PARTIAL`**；E 首轮完成 | — | 见第 5 节。B 已提交 `030f7e7d`，待真实浏览器验证。 |
+| 五条并行工作线 | A/D 开发中；**B、C `PARTIAL`**；E 首轮完成 | — | 见第 5 节。B `030f7e7d`、C `f2878fe5` 均已提交，均待真实验证。 |
 | 本地深度清理 | `DEFERRED` | — | 排在 PG03 部署与基础验证之后。 |
 
 ---
@@ -223,7 +223,53 @@ E 线审查确认「备份硬门禁误通过」路径（见 6.1）。该缺陷�
 
 **未决事项**：B 分支落后 3 个总控文档提交，需在其完成剩余验证后由协调负责人决定合并方式（不改写其历史）。
 
-### 5.2 E 线（门禁审查）首轮结果
+### 5.2 C 线（五家上游 API）首轮结果
+
+| 项目 | 值 |
+| --- | --- |
+| 工作区 | `D:\AI\API\worktrees\clearapi-providers` |
+| 分支 | `codex/clearapi-providers` |
+| Commit | `f2878fe59ec004518deb4de9436f0c4a7de7e1a4` |
+| 基线 | `353cd0a2`（C 线自报；已核实其提交位于 `a329e3f9` 之上） |
+| 工作树 | CLEAN |
+| 是否修改总控文件 | **否**（已核实） |
+| push / merge / deploy | **均未执行** |
+
+**状态：`PARTIAL`** — 代码已交付；**真实上游验证未完成**。**不得仅凭自动化测试将五家标记为 production-verified。**
+
+已完成（C 自报）：
+
+- 补齐 DeepSeek、Qwen、Kimi、GLM-4V 的 Gemini generateContent 协议缺口。
+- 新增共享 inbound 转换 helper。
+- 改进 Zhipu v3 不支持端点的处理与流式安全性。
+- 明确不支持端点的错误提示。
+- 构建、relay 测试、基线 CI、`go vet`、格式化检查通过。
+
+改动范围（已核实，13 文件 / +522 −54）：`ali`、`deepseek`、`moonshot`、`zhipu`、`zhipu_4v` 五个渠道适配器 + 新增 `relay/channel/inbound_conversion.go` 及其测试。
+
+未验证（C 自报）：
+
+- 五家真实上游 API 调用。
+- 真实流式与非流式行为。
+- DeepSeek / Grok 的 Responses 端点兼容性。
+
+**集成约束（已核实）**：
+
+- 与 PG03 的 account-pool / Executor **无文件重叠**。
+- 与总控文档提交**无文件重叠**。
+- 集成前须复核 `production/main` 当前 HEAD（现为 `353cd0a2`）并对照该基线审查分支 diff。
+
+**渠道策略（须遵守）**：
+
+- **保留现有 Zhipu v3 兼容性**。
+- 新 GLM 模型**优先使用 V4 渠道**，依据实际协议与能力支持决定。
+- **不得自动迁移既有渠道。**
+
+**⚠️ 复核限制**：本机**未安装 Go 工具链**，Agent **无法独立复跑** C 线声称的构建 / `go vet` / relay 测试 / gofmt 结论。上述「已完成」项均按 **C 自报**记录，未经独立验证。
+
+**下一步**：取得凭据后先做 **DeepSeek 流式 + 非流式最小冒烟测试**，再完成集成审查。
+
+### 5.3 E 线（门禁审查）首轮结果
 
 | 项目 | 值 |
 | --- | --- |
@@ -234,7 +280,6 @@ E 线审查确认「备份硬门禁误通过」路径（见 6.1）。该缺陷�
 | E 改动的业务/部署文件 | **无**（保持只读） |
 | push / merge / deploy | **均未执行** |
 
-E 线仍为只读，未见代码变更。E 的缺陷修复按决策**延期**，当前不进入实施。
 E 线仍为只读，未见代码变更。E 的缺陷修复按决策**延期**，当前不进入实施。
 
 ---
@@ -346,3 +391,4 @@ D:\AI\API                         外层协调仓库（无 remote：deploy/docs/
 | 2026-10-18 18:15 +08 | **写入 PG03 最新进度与 E 线审查结果。** PG03：网站 JSON 导入 PASS（2 个 CPA 文件、物理隔离写入、trust/capability 验证、模型注册恢复）；真实请求 PASS（Channel 测试、`/v1/models` 返回 `gpt-6-luna`、`/v1/responses` HTTP 200 返回 `GATEWAY`）；计费与日志一致（input 13 / output 7 / total 20、扣费 1013 quota、1 attempt 1 success、无重复派发结算）。新增 4 项剩余工作，**PG03 仍为 `IN_PROGRESS`，未标记上线**。E 线：登记 `CONFIRMED — FIX REQUIRED` 备份硬门禁误通过缺陷（已逐行核实代码，**该状态已于 18:26 改为 `CONFIRMED / DEFERRED`**），撤回 V2 SHA256 发现，保留九 helper 重复与 G42 单行阻断两项。**未修改业务代码，未 push，未部署。** |
 | 2026-10-18 18:26 +08 | **备份硬门禁缺陷改为 `CONFIRMED / DEFERRED`。** 依据决策：修复延期至 **PG03 正式生产上线之后**；当前**不作为开发主线阻塞**；PG03 FINAL LAUNCH 继续推进；E 线保持只读、不实施代码修复。上线注意事项已登记：使用该部署路径时须通过现有方式确认完整备份实际生成成功，**不得仅凭脚本退出码 0 认定成功**。后续由自动部署负责人定点修复、E 线复核。V2 SHA256 保持已关闭，不得重新列为待修复项。原有审计证据与历史报告**未删除、未覆盖**。仅改 Markdown，未动业务/部署代码，未 push，未部署。 |
 | 2026-10-18 19:34 +08 | **登记 B 线首轮结果（`PARTIAL`）。** Commit `030f7e7d`，工作树 CLEAN，未修改总控文件。生命周期、用户侧过滤、权限保留、复用既有存储已交付；后端/前端检查与定向测试通过；**真实浏览器验证、历史数据展示验证、生产部署验证待完成**，未标记 fully accepted。核实其 15 个改动文件与总控文档提交无重叠，与 PG03 直接冲突风险低。`store-settings.test.tsx` 超时判定为基线既有问题，不归属 B。B 分支落后 3 个总控提交，合并方式待协调负责人决定，**不改写其历史**。仅改 Markdown，未动业务代码，未 push，未部署。 |
+| 2026-10-18 20:23 +08 | **登记 C 线首轮结果（`PARTIAL`）。** Commit `f2878fe5`，工作树 CLEAN，未修改总控文件。13 文件 / +522 −54，覆盖 `ali` / `deepseek` / `moonshot` / `zhipu` / `zhipu_4v` 与新增 `inbound_conversion.go`。代码已交付；**五家真实上游调用、真实流式/非流式、DeepSeek/Grok Responses 兼容性均未验证**，不得仅凭自动化测试标记 production-verified。已核实与 PG03 account-pool/Executor 及其总控文档无文件重叠。登记渠道策略：保留 Zhipu v3 兼容、新 GLM 优先 V4、**不自动迁移既有渠道**。**复核限制：本机无 Go 工具链，C 的构建/vet/测试/gofmt 结论无法独立复跑，按自报记录。** 仅改 Markdown，未动业务代码，未 push，未部署。 |
