@@ -5,6 +5,18 @@ on:
     workflows: [PG03 reviewed main Gateway RC]
     branches: [main]
     types: [completed]
+  # Operator-supplied evidence is bound to an RC manifest, which only exists
+  # after the RC finished. The automatic trigger therefore always races the
+  # evidence upload: it runs before an operator can bind the new identity, and
+  # re-running it changes run_attempt, which the release control rejects.
+  # This entry re-runs the identical gates for an already built RC without
+  # producing a new artifact, so the evidence can be bound first.
+  workflow_dispatch:
+    inputs:
+      rc_run_id:
+        description: 'Completed successful PG03 RC run id to rehearse'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -22,10 +34,11 @@ jobs:
   rehearse:
     if: >-
       github.repository == 'a3225865526-wq/Clear-API' &&
-      github.event.workflow_run.event == 'workflow_run' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.event == 'workflow_run' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success'))
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
@@ -62,22 +75,52 @@ jobs:
     env:
       TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
       TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
-      REHEARSAL_RC_RUN_ID: ${{ github.event.workflow_run.id }}
-      REHEARSAL_RC_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
-      REHEARSAL_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha }}
+      REHEARSAL_RC_RUN_ID: ${{ github.event.workflow_run.id || inputs.rc_run_id }}
+      REHEARSAL_RC_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt || 1 }}
+      REHEARSAL_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
       CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
       CLEARAPI_EXECUTOR_SOURCE_COMMIT: ${{ vars.CLEARAPI_EXECUTOR_SOURCE_COMMIT }}
       CLEARAPI_EXECUTOR_IMAGE_DIGEST: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_DIGEST }}
       CLEARAPI_EXECUTOR_BINARY_SHA256: ${{ vars.CLEARAPI_EXECUTOR_BINARY_SHA256 }}
       CLEARAPI_REHEARSAL_TARGET_ID: ${{ vars.CLEARAPI_REHEARSAL_TARGET_ID }}
-      CLEARAPI_EXECUTOR_PAIRED_GATEWAY_COMMIT: ${{ github.event.workflow_run.head_sha }}
+      CLEARAPI_EXECUTOR_PAIRED_GATEWAY_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
       CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE }}
       CLEARAPI_REHEARSAL_BACKUP_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_BACKUP_EVIDENCE }}
       CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE }}
     steps:
+      - name: Resolve the reviewed RC identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # A dispatched run must name an already completed, successful RC for
+          # the current main. Nothing is taken on trust from the input.
+          test "$GITHUB_REF" = refs/heads/main
+          RC="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REHEARSAL_RC_RUN_ID")"
+          python3 - "$RC" <<'PY'
+          import json, os, re, sys
+          rc = json.loads(sys.argv[1])
+          repo = os.environ['GITHUB_REPOSITORY']
+          main = os.environ['GITHUB_SHA']
+          assert str(rc['id']) == os.environ['REHEARSAL_RC_RUN_ID'], 'RC run id mismatch'
+          assert rc['path'] == '.github/workflows/release-pg03-gateway.yml', 'wrong RC workflow'
+          assert rc['event'] in ('workflow_dispatch', 'workflow_run'), 'untrusted RC trigger'
+          assert rc['status'] == 'completed' and rc['conclusion'] == 'success', 'RC not successful'
+          assert rc['head_branch'] == 'main', 'RC not from main'
+          assert rc['head_sha'] == main, 'RC is not the current main source'
+          assert rc['head_repository']['full_name'] == repo, 'foreign RC repository'
+          assert rc['repository']['full_name'] == repo, 'foreign RC repository'
+          assert type(rc['run_attempt']) is int and rc['run_attempt'] == 1, 'RC must be attempt 1'
+          print('RC run identity PASS for', rc['head_sha'], 'attempt', rc['run_attempt'])
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write('REHEARSAL_RC_RUN_ATTEMPT=' + str(rc['run_attempt']) + '\n')
+              out.write('REHEARSAL_SOURCE_COMMIT=' + rc['head_sha'] + '\n')
+              out.write('CLEARAPI_EXECUTOR_PAIRED_GATEWAY_COMMIT=' + rc['head_sha'] + '\n')
+          PY
+
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ env.REHEARSAL_SOURCE_COMMIT || github.event.workflow_run.head_sha }}
           persist-credentials: false
 
       - name: Download exact RC manifest
@@ -87,7 +130,7 @@ jobs:
           set -euo pipefail
           mkdir -p rc
           gh run download "$REHEARSAL_RC_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name "pg03-gateway-release-${REHEARSAL_RC_RUN_ID}-${{ github.event.workflow_run.run_attempt }}" --dir rc
+            --name "pg03-gateway-release-${REHEARSAL_RC_RUN_ID}-${REHEARSAL_RC_RUN_ATTEMPT}" --dir rc
           python3 - <<'PY'
           import json, os, re
           m=json.load(open('rc/gateway-image-release.json'))
