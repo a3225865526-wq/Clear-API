@@ -195,13 +195,15 @@ E 线审查确认「备份硬门禁误通过」路径（见 6.1）。该缺陷�
 | --- | --- |
 | 工作区 | `D:\AI\API\worktrees\clearapi-announcements` |
 | 分支 | `codex/clearapi-announcements` |
-| Commit | `030f7e7d2adc333e70f9bb93b725bcac80d6e401` |
+| Commit | `030f7e7d2adc333e70f9bb93b725bcac80d6e401`（后续追加 `f7b4884d`） |
 | 父提交 | `7b9144df`（**未包含后续 3 个总控文档提交**） |
 | 工作树 | CLEAN |
 | 是否修改总控文件 | **否**（已核实，符合规则） |
 | push / merge / deploy | **均未执行** |
 
 **状态：`PARTIAL`** — 实现与自动化测试通过；**真实浏览器 UI 验证待完成**。**未标记 fully accepted。**
+
+**后续提交**：`f7b4884d` — `fix(i18n): nest announcement lifecycle keys inside the translation namespace`（7 个语言文件，+70 −70）。该修复印证了 5.4 所述的 i18n 键结构风险，B 已将公告生命周期键收进翻译命名空间。
 
 已完成：
 
