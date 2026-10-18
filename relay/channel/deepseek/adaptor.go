@@ -23,9 +23,16 @@ import (
 type Adaptor struct {
 }
 
-func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
-	//TODO implement me
-	return nil, errors.New("not implemented")
+// DeepSeek serves chat completions plus an Anthropic Messages compatibility
+// surface; it has no Gemini endpoint. A Gemini generateContent request is
+// therefore translated to chat first and then goes through the same provider
+// rules as a native chat request.
+func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeminiChatRequest) (any, error) {
+	chatRequest, err := channel.ConvertGeminiRequestToChat(c, info, request)
+	if err != nil {
+		return nil, err
+	}
+	return a.ConvertOpenAIRequest(c, info, chatRequest)
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, req *dto.ClaudeRequest) (any, error) {
@@ -45,13 +52,11 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayIn
 }
 
 func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.AudioRequest) (io.Reader, error) {
-	//TODO implement me
-	return nil, errors.New("not implemented")
+	return nil, errors.New("deepseek channel cannot serve audio requests")
 }
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
-	//TODO implement me
-	return nil, errors.New("not implemented")
+	return nil, errors.New("deepseek channel cannot serve image generation requests")
 }
 
 func (a *Adaptor) Init(info *relaycommon.RelayInfo) {
