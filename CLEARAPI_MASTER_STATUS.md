@@ -2,7 +2,7 @@
 
 > **本文件是 ClearAPI 项目唯一权威总控文件。**
 > 位置：主产品仓库 `D:\AI\API\upstream\new-api` 根目录。
-> 最近更新：2026-10-18 17:52 +08（Asia/Shanghai）
+> 最近更新：2026-10-18 18:15 +08（Asia/Shanghai）
 > 维护人：**仅项目总协调负责人**。各功能开发 AI 不得修改本文件。
 
 ---
@@ -52,10 +52,10 @@
 
 | 阶段 | 状态 | 证据口径 | 说明 |
 | --- | --- | --- | --- |
-| 自动部署 | `USER_CONFIRMED_COMPLETE` | `USER_CONFIRMED` | 用户已确认完成。**「自动化能力全链路已验证」未复核**，不可对外如此宣称。 |
+| 自动部署 | `USER_CONFIRMED_COMPLETE` | `USER_CONFIRMED` | 用户已确认完成。**「自动化能力全链路已验证」未复核**，不可对外如此宣称。⚠️ 存在一项门禁缺陷待修（备份硬门禁误通过），见 3.1 与 6.1。 |
 | 商业化 MVP | `USER_CONFIRMED_COMPLETE` | `USER_CONFIRMED` | 用户已确认完成。不得重新列为 P0。真实 Provider 计费仍 `UNVERIFIED`。 |
-| **PG03 FINAL LAUNCH** | **`IN_PROGRESS`** | 进行中 | **当前主线，未完成，未冻结。** 见第 4 节。 |
-| 五条并行工作线 | 工作区就绪，功能未开发 | — | 见第 5 节。 |
+| **PG03 FINAL LAUNCH** | **`IN_PROGRESS`** | 已有真实请求证据 | **当前主线，未完成，未冻结。** 导入 + 真实请求 + 计费已走通；剩余可用性、双账号、提交/RC、正式发布。见第 4 节。 |
+| 五条并行工作线 | 工作区就绪，功能未开发 | — | 见第 5 节。E 线已完成首轮审查并产出确认缺陷。 |
 | 本地深度清理 | `DEFERRED` | — | 排在 PG03 部署与基础验证之后。 |
 
 ---
@@ -70,6 +70,7 @@
   - 「自动部署机制已交付」= `USER_CONFIRMED_COMPLETE`
   - 「完全无人值守自动部署已逐项验证」= `UNVERIFIED`
 - 任何工作线**不得**以「自动部署未完成」为由阻塞自身任务。
+- ⚠️ **已知门禁缺陷（E 线审查确认，待修）**：备份硬门禁存在误通过路径 — 锁争用时 `production-backup.sh` 记录 SKIP 并 `exit 0`，部署脚本据 `ExecMainStatus=0` 判定成功，而新鲜度检查扫描整个 `BACKUP_DIR`（含 staging 文件）。详见 6.1。**该缺陷使「自动部署已完成」不能延伸解读为「自动部署门禁可靠」。** 发布前必须修复并验证。
 
 ### 3.2 商业化 MVP — `USER_CONFIRMED_COMPLETE`
 
@@ -103,18 +104,60 @@
 
 **硬约束：** 不得在 PG03 工作区内创建或执行其他开发任务；不得 reset / stash / checkout / 清理其未提交改动；不得删除或移动工作区。
 
-### 4.3 已完成部分（PG03 自报口径，本轮未复核）
+### 4.3 已完成部分（截至 2026-10-18 18:09）
 
-- 网站 JSON 导入：前端、Gateway API、Executor 原子导入已开发，multipart 路由测试 PASS；**生产未部署**。
+**证据来源：用户提供的 PG03 FINAL LAUNCH 进度截图（2026-10-18）。** 标 `用户截图` 的条目为截图陈述，本轮**未由 Agent 独立复核**生产侧。
+
+#### 网站 JSON 导入 — PASS
+
+- 两个 CPA 文件经 Gateway multipart API 导入。
+- Executor 物理隔离写入成功。
+- 凭证初始为 `pending_trust` / 未验证。
+- 正式 trust 与 capability 验证已完成。
+- 模型注册已恢复并验证。
+
+#### 真实请求链路 — PASS
+
+- Gateway Channel 测试通过。
+- Executor `/v1/models` 返回 `gpt-6-luna`。
+- 站点 API Key 请求 `/v1/responses` 返回 **HTTP 200**。
+- 响应内容：`GATEWAY`。
+
+#### Usage / Billing — 与日志一致
+
+- 上游 usage：input 13、output 7、total 20 tokens。
+- 站点日志与上报 usage 一致。
+- 实际扣费：**1013 quota**。
+- 请求记录：1 次 attempt、1 次 success。
+- 本请求未观察到重复派发或重复结算。
+
+#### 早前阶段（PG03 自报，未复核）
+
 - Gateway RC / Executor RC 身份、隔离备份恢复演练：报告为 PASS。
 - Rehearsal：除 Provider 外全部 gate PASS；assembler 拒绝生成 `release-proof.json`。
 
-### 4.4 已知阻塞（记录，不据此冻结）
+> ⚠️ **口径提醒**：以上「真实请求 + 计费」证明**单账号单请求链路可用**，**不等于**双账号调度与故障转移已验证，也不等于 PG03 已完成。
 
-- **真实 Provider usage/billing 证据缺失**：现有两个 OAuth 账号均为 `free` 计划、未确认商业用途。
-- 自动 proof 合同要求绑定精确 RC 的成功 Provider receipt；伪造 receipt 属违规。
+### 4.4 剩余工作（4 项，缺一不可标记上线）
 
-**处理原则：** 该阻塞影响「无人值守自动发布」，**不影响 PG03 继续推进 FINAL LAUNCH**。是否以受权手动 Deploy V2 推进由用户与总协调负责人决定。**不得因历史文档写着 PG03 FROZEN 而冻结当前 FINAL LAUNCH。**
+| # | 项目 | 状态 |
+| --- | --- | --- |
+| 1 | 验证 Gateway 账号可用性 | `NOT VERIFIED` |
+| 2 | 验证真实双账号调度与故障转移 | `NOT VERIFIED` |
+| 3 | 完成代码提交与 RC 验证 | `NOT RUN` |
+| 4 | 完成正式生产发布与部署后检查 | `NOT RUN` |
+
+**结论口径：在上述 4 项全部取得证据前，PG03 保持 `IN_PROGRESS`，不得标记为 fully launched。本轮未标记完成。**
+
+### 4.5 相关的独立部署缺陷
+
+E 线审查确认「备份硬门禁误通过」路径（见 6.1）。该缺陷影响**部署门禁可靠性**，与本轮 PG03 请求链路验证相互独立：
+
+- 发布前必须修复，并验证**只有完成且有效的备份及其 manifest** 才能满足门禁。
+- 修复责任归属：automatic-deployment / PG03 集成负责人。
+- 在该修复完成并验证前，不得依赖现有备份门禁作为发布放行依据。
+
+**处理原则：** PG03 的剩余工作不因历史阻塞项停滞；是否以受权手动 Deploy V2 推进由用户与总协调负责人决定。**不得因历史文档写着 PG03 FROZEN 而冻结当前 FINAL LAUNCH，也不得因链路已走通而提前标记上线。**
 
 ---
 
@@ -136,9 +179,22 @@
 - 完成后上报：分支、Commit SHA、修改文件清单、测试结果、剩余问题。
 - 未获指令不得 push、不得合并 PR、不得部署生产。
 
+### 5.1 E 线（门禁审查）首轮结果
+
+| 项目 | 值 |
+| --- | --- |
+| 工作区 | `D:\AI\API\worktrees\clearapi-gate-audit` |
+| 分支 | `codex/clearapi-gate-audit` |
+| 审查 HEAD | `7b9144df` |
+| 工作树 | CLEAN |
+| E 改动的业务/部署文件 | **无**（保持只读） |
+| push / merge / deploy | **均未执行** |
+
+E 线仍为只读，未见代码变更。
+
 ---
 
-## 6. 已核实事实快照（2026-10-18 17:47 +08）
+## 6. 已核实事实快照（2026-10-18 18:12 +08）
 
 | 项目 | 值 | 口径 |
 | --- | --- | --- |
@@ -150,9 +206,38 @@
 | 本地 `main` | `ad71806fd00518855d4f7d27d72c9d3f846e2cbb` | `VERIFIED`（**落后于 production/main，本轮未改动**） |
 | 外层仓库 | `D:\AI\API`，HEAD `82242b9cf`，**无任何 remote** | `VERIFIED`（**不是主产品仓库**） |
 | Executor 仓库 | `D:\AI\API\upstream\CLIProxyAPI` | `VERIFIED` |
-| 生产站点 | `https://www.clear999.com/api/status` → HTTP 200 | `VERIFIED`（本轮只读探测） |
+| 生产站点 | `https://www.clear999.com/api/status` → HTTP 200 | `VERIFIED`（2026-10-18 17:47 只读探测；18:12 未复测） |
 
 **历史发布（本轮未复核）：** 2026-10-18 03:48 曾记录一次生产发布完成（main `eb67c5f2`、RC `39060814419`、digest `sha256:51ddf6df…`）。此后 main 前进至 `353cd0a2`，PG03 FINAL LAUNCH 针对新候选继续推进。
+
+### 6.1 E 线确认缺陷 — 备份硬门禁误通过
+
+**状态：`CONFIRMED — FIX REQUIRED`（生产发布阻塞级）**
+
+E 线指出，Agent 本轮已逐行核实以下代码属实：
+
+| 位置 | 行为 |
+| --- | --- |
+| `scripts/production-backup.sh:22-25` | 锁争用时记录 `SKIP concurrent run detected` 并 **`exit 0`**（成功退出码） |
+| `scripts/production-deploy.sh:834-836` | `systemctl start` 后仅校验 `ExecMainStatus == 0`，因此**接受被跳过的调用** |
+| `scripts/production-deploy.sh:842-843` | 新鲜度检查 `find "$BACKUP_DIR" -newermt ... -size +0` 扫描**整个备份目录，含 staging 文件** |
+
+**风险：** 一个并发进行中、尚未完成的 staging dump 可能满足部署的备份新鲜度检查，使部署在**没有有效完成备份**的情况下放行。
+
+**要求的修复方向：** 只有**已完成且有效**的备份**及其必需的 manifest** 才能满足门禁；`SKIP` 退出必须与真实成功可区分；新鲜度检查不得把 staging 文件当作完成品。
+
+**归属：** 交由 automatic-deployment / PG03 集成负责人做**窄范围**修复。E 线继续保持只读。
+
+**验证要求：** 修复后必须验证「并发锁争用 → 部署被阻断」「半成品 staging 文件 → 不满足门禁」「真实完成备份 + manifest → 放行」三条路径，再接入发布流程。
+
+### 6.2 已撤回的发现（勿再作为缺陷处理）
+
+- **V2 header SHA256 不是缺陷。** 实际文件 SHA256 与 `scripts/pg03-release-control.py` 中的 `V2_SHA`（`f115059f07bf4a6dc669833e6680d29493931154bdfc2f4339a23bf81fb67262`）一致。无需处理。
+
+### 6.3 保留的其他发现
+
+- v1 与 v2 之间有**九个 helper 逐字节相同** — 精简候选，需评估合并风险。
+- **G42 可能因单行条件阻断整个发布** — 需单独评估，确认是否为过度严格规则。
 
 ---
 
@@ -166,6 +251,8 @@
 | 4 | 历史「个人 Codex OAuth 未确认商业用途前不得作为商业上游」 vs 当前目标含「个人 OAuth 账号接入」 | **待裁定**：需用户明确个人 OAuth 用于**自用/测试**还是**商业中转**。在此之前不得声称已获准商业上游。 |
 | 5 | 10-18 03:48「生产发布完成」 vs 09:44「生产未切换」 | **已解释**：前者为旧候选 `eb67c5f2`，后者针对新候选 `353cd0a2`，不矛盾。 |
 | 6 | 三份历史总控内容不一致（11.9 / 13.9 / 145.5 / 9.0 KB） | **已处理**：本文件为唯一权威；旧文件保留只读。 |
+| 7 | 链路已走通 vs 是否可标记上线 | **已裁定**：真实请求与计费 PASS 仅证明单账号单请求可用；4 项剩余工作未完成前保持 `IN_PROGRESS`。 |
+| 8 | 「自动部署已完成」 vs 备份门禁可被误通过 | **已裁定**：阶段状态不变（`USER_CONFIRMED_COMPLETE`），但新增独立缺陷记录，发布前必须修复验证。 |
 
 ---
 
@@ -209,3 +296,4 @@ D:\AI\API                         外层协调仓库（无 remote：deploy/docs/
 | 时间 | 变更 |
 | --- | --- |
 | 2026-10-18 17:52 +08 | **重写为唯一权威总控**（分支 `codex/clearapi-master-status-unification`，基线 `353cd0a2`）。原基线根目录已有 11.9 KB 旧版总控（内容为 PG03 `RESUMED` 段 + 2026-10-16 冻结历史），本次整体替换为精简权威版。统一三份互相冲突的历史总控；确认自动部署与商业化 MVP 为 `USER_CONFIRMED_COMPLETE`；确认 PG03 为 `IN_PROGRESS`；登记五条并行工作线及边界。**未修改任何业务代码，未 push，未部署。** |
+| 2026-10-18 18:15 +08 | **写入 PG03 最新进度与 E 线审查结果。** PG03：网站 JSON 导入 PASS（2 个 CPA 文件、物理隔离写入、trust/capability 验证、模型注册恢复）；真实请求 PASS（Channel 测试、`/v1/models` 返回 `gpt-6-luna`、`/v1/responses` HTTP 200 返回 `GATEWAY`）；计费与日志一致（input 13 / output 7 / total 20、扣费 1013 quota、1 attempt 1 success、无重复派发结算）。新增 4 项剩余工作，**PG03 仍为 `IN_PROGRESS`，未标记上线**。E 线：登记 `CONFIRMED — FIX REQUIRED` 备份硬门禁误通过缺陷（已逐行核实代码），撤回 V2 SHA256 发现，保留九 helper 重复与 G42 单行阻断两项。**未修改业务代码，未 push，未部署。** |
