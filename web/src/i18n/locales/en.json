@@ -8053,7 +8053,15 @@
     "Model Pinned To API Source": "Model Pinned To API Source",
     "Needs Review": "Needs Review",
     "Usage Unavailable": "Usage Unavailable",
-    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source."
+    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.",
+    "Ongoing": "Ongoing",
+    "Withdrawn": "Withdrawn",
+    "Publish": "Publish",
+    "Withdraw": "Withdraw",
+    "Select announcement status": "Select announcement status",
+    "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.",
+    "Announcement published. Click \"Save Settings\" to apply.": "Announcement published. Click \"Save Settings\" to apply.",
+    "Announcement withdrawn. Click \"Save Settings\" to apply.": "Announcement withdrawn. Click \"Save Settings\" to apply."
   },
   "CNY per USD": "CNY per USD",
   "Cache read price": "Cache read price",
@@ -8065,13 +8073,5 @@
   "Price per request": "Price per request",
   "Actions": "Actions",
   "User": "User",
-  "Unknown": "Unknown",
-  "Ongoing": "Ongoing",
-  "Withdrawn": "Withdrawn",
-  "Publish": "Publish",
-  "Withdraw": "Withdraw",
-  "Select announcement status": "Select announcement status",
-  "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.",
-  "Announcement published. Click \"Save Settings\" to apply.": "Announcement published. Click \"Save Settings\" to apply.",
-  "Announcement withdrawn. Click \"Save Settings\" to apply.": "Announcement withdrawn. Click \"Save Settings\" to apply."
+  "Unknown": "Unknown"
 }

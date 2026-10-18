@@ -8006,7 +8006,15 @@
     "Model Pinned To API Source": "Model Pinned To API Source",
     "Needs Review": "Needs Review",
     "Usage Unavailable": "Usage Unavailable",
-    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source."
+    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.",
+    "Ongoing": "進行中",
+    "Withdrawn": "取り下げ済み",
+    "Publish": "公開",
+    "Withdraw": "取り下げ",
+    "Select announcement status": "お知らせの状態を選択",
+    "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "ユーザーに表示されるのは公開済みのお知らせだけです。下書きと取り下げ済みのお知らせは管理者向けにここへ残ります。",
+    "Announcement published. Click \"Save Settings\" to apply.": "お知らせを公開しました。「設定を保存」をクリックすると反映されます。",
+    "Announcement withdrawn. Click \"Save Settings\" to apply.": "お知らせを取り下げました。「設定を保存」をクリックすると反映されます。"
   },
   "CNY per USD": "CNY per USD",
   "Cache read price": "Cache read price",
@@ -8018,13 +8026,5 @@
   "Price per request": "Price per request",
   "Actions": "Actions",
   "User": "User",
-  "Unknown": "Unknown",
-  "Ongoing": "進行中",
-  "Withdrawn": "取り下げ済み",
-  "Publish": "公開",
-  "Withdraw": "取り下げ",
-  "Select announcement status": "お知らせの状態を選択",
-  "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "ユーザーに表示されるのは公開済みのお知らせだけです。下書きと取り下げ済みのお知らせは管理者向けにここへ残ります。",
-  "Announcement published. Click \"Save Settings\" to apply.": "お知らせを公開しました。「設定を保存」をクリックすると反映されます。",
-  "Announcement withdrawn. Click \"Save Settings\" to apply.": "お知らせを取り下げました。「設定を保存」をクリックすると反映されます。"
+  "Unknown": "Unknown"
 }
