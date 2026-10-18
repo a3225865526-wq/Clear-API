@@ -923,6 +923,55 @@ import hashlib, json, os, pathlib, subprocess, sys
 name=pathlib.Path(sys.argv[0]).name; a=sys.argv[1:]; root=pathlib.Path(os.environ['TEST_ROOT'])
 def record(**more):
     with open(os.environ['TEST_TRACE'],'a') as f: f.write(json.dumps(dict(name=name,args=a,**more))+'\n')
+def publish_backup(base, fail):
+    """Mirror production-backup.sh: artifact first, manifest last."""
+    import datetime
+    base=pathlib.Path(base); (base/'manifests').mkdir(parents=True,exist_ok=True)
+    ident=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    blob=base/'encrypted'/ident/('clearapi-backup-'+ident+'.tar.gz.gpg')
+    blob.parent.mkdir(parents=True,exist_ok=True)
+    raw=b'non-secret encrypted fixture'
+    if fail=='backup-incomplete':
+        # Artifact exists but is truncated relative to the manifest digest.
+        blob.write_bytes(raw+b'')
+    else:
+        blob.write_bytes(raw)
+    manifest={'backup_schema_version':2,'backup_id':ident,
+              'created_at_utc':datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+              'backup_identity_schema_version':1,
+              'running_identity':{'oci_revision':'b'*40,'docker_image_id':'sha256:'+'d'*64,
+                                  'ghcr_repo_digest':'registry/example@sha256:'+'a'*64,'container_id':'c'*64},
+              'artifacts':{'database_dump':{'name':'dump','sha256':'e'*64}},
+              'encryption':{'encrypted_artifact':{
+                  'name':'clearapi-backup-'+ident+'.tar.gz.gpg',
+                  'bytes':len(raw) if fail!='backup-incomplete' else len(raw)+4096,
+                  'sha256':hashlib.sha256(raw).hexdigest() if fail!='backup-incomplete' else 'f'*64}}}
+    if fail=='backup-manifest-corrupt':
+        manifest['artifacts']={}          # no dump digest -> incomplete record
+    target=base/'manifests'/(ident+'.json')
+    target.write_text(json.dumps(manifest)); target.chmod(0o640)
+    if fail=='backup-staging-only':
+        # Only staging debris; the published manifest must not exist.
+        (base/'staging'/ident).mkdir(parents=True,exist_ok=True)
+        (base/'staging'/ident/('clearapi-pg-dump-'+ident+'.dump')).write_bytes(b'partial dump')
+        target.unlink()
+        for leftover in list((base/'encrypted'/ident).glob('*')): leftover.unlink()
+        (base/'encrypted'/ident).rmdir()
+    if fail=='backup-old-only':        # A stale, older recovery point exists but this deploy produced nothing.
+        target.unlink()
+        for leftover in list((base/'encrypted'/ident).glob('*')): leftover.unlink()
+        (base/'encrypted'/ident).rmdir()
+        old=base/'manifests'/'20260101T000000Z.json'
+        old.write_text(json.dumps({'backup_schema_version':2,'backup_id':'20260101T000000Z',
+            'created_at_utc':'2026-01-01T00:00:00Z','backup_identity_schema_version':1,
+            'running_identity':{'oci_revision':'b'*40,'docker_image_id':'sha256:'+'d'*64,
+                                'ghcr_repo_digest':'registry/example@sha256:'+'a'*64,'container_id':'c'*64},
+            'artifacts':{'database_dump':{'name':'dump','sha256':'e'*64}},
+            'encryption':{'encrypted_artifact':{'name':'clearapi-backup-20260101T000000Z.tar.gz.gpg',
+                                                'bytes':1,'sha256':'e'*64}}})); old.chmod(0o640)
+        oldblob=base/'encrypted'/'20260101T000000Z'/'clearapi-backup-20260101T000000Z.tar.gz.gpg'
+        oldblob.parent.mkdir(parents=True,exist_ok=True); oldblob.write_bytes(b'x')
+    return ident
 if name=='ssh':
     record()
     # SSH preserves stdin but does not forward the runner's token environment.
@@ -942,10 +991,30 @@ record(stdin_length=len(data))
 if data: sys.exit('Non-login command consumed shared stdin')
 fail=os.environ['TEST_FAILURE']
 if name=='systemctl':
+    # The deploy gate reads ActiveState (pre-flight) and Result/ExecMainStatus
+    # (post-run) and only accepts a completed unit plus a published manifest.
+    state=os.environ.get('BACKUP_UNIT_STATE','inactive')
+    if a[0]=='is-active':
+        # The gate asks is-active about the TIMER (must be healthy) and then
+        # reads ActiveState about the SERVICE (must be idle) before starting it.
+        sys.exit(0 if 'timer' in ' '.join(a) else (0 if state=='active' else 1))
     if a[0]=='start':
         if fail=='backup': sys.exit(1)
-        (root/'backup'/'encrypted-fixture').write_text('non-secret artifact')
-    elif a[0]=='show': print('0')
+        if fail=='backup-contended':
+            # Lock contention: systemd reports a clean start but EX_TEMPFAIL.
+            (root/'backup-status').write_text('75'); (root/'backup-result').write_text('exit-code')
+            sys.exit(0)
+        if fail=='backup-unknown':
+            # Unit never really ran: no manifest, no artifact, result unknown.
+            (root/'backup-status').write_text('0'); (root/'backup-result').write_text('')
+            sys.exit(0)
+        publish_backup(root/'backup', fail)
+        (root/'backup-status').write_text('0'); (root/'backup-result').write_text('success')
+    elif a[0]=='show':
+        prop=a[a.index('-p')+1]
+        name2={'ExecMainStatus':'backup-status','Result':'backup-result','ActiveState':'backup-state'}.get(prop)
+        path2=root/name2 if name2 else None
+        print(path2.read_text() if path2 and path2.exists() else (state if prop=='ActiveState' else ''))
     sys.exit(0)
 if name=='curl':
     body=json.dumps({'success':True,'data':{'register_enabled':True,'password_login_enabled':True,'password_register_enabled':True,'email_verification':True}})
@@ -1196,6 +1265,66 @@ else: sys.exit('Forbidden docker operation')
         overrides = [next(a for a in x["args"] if a.endswith("compose-jobs.yaml")) for x in jobs]
         self.assertEqual(overrides[0], overrides[1])
         self.assertTrue(all("--no-deps" in x["args"] and "never" in x["args"] for x in jobs))
+
+    def test_completed_backup_is_required_before_any_pull_or_replace(self):
+        result, trace, logins = self.run_chain()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("step 4: pre-deploy backup command completed", result.stderr)
+        self.assertIn("step 5: backup", result.stderr)
+        names = [x["args"][0] for x in trace if x["name"] == "docker"]
+        self.assertIn("pull", names)
+        self.assertNotIn("up", [x["args"][0] for x in trace if x["name"] == "docker" and "up" in x["args"]])
+        self.assertTrue((self.root / "replaced").exists())
+
+    def test_only_staging_files_do_not_satisfy_the_backup_gate(self):
+        result, trace, logins = self.run_chain(failure="backup-staging-only")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("no verified completed backup", result.stderr)
+        self.assertFalse(logins)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_incomplete_encrypted_artifact_blocks_the_deploy(self):
+        result, trace, logins = self.run_chain(failure="backup-incomplete")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("no verified completed backup", result.stderr)
+        self.assertFalse(logins)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_manifest_without_integrity_fields_blocks_the_deploy(self):
+        result, trace, logins = self.run_chain(failure="backup-manifest-corrupt")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("no verified completed backup", result.stderr)
+        self.assertFalse(logins)
+
+    def test_older_completed_backup_does_not_authorize_this_deploy(self):
+        result, trace, logins = self.run_chain(failure="backup-old-only")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("no verified completed backup", result.stderr)
+        self.assertFalse(logins)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_lock_contention_is_not_reported_as_success(self):
+        result, trace, logins = self.run_chain(failure="backup-contended")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("ExecMainStatus=75", result.stderr)
+        self.assertIn("lock contention", result.stderr)
+        self.assertFalse(logins)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_unknown_backup_state_blocks_before_the_deploy_runs(self):
+        result, trace, logins = self.run_chain(failure="backup-unknown")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("is not a completed backup", result.stderr)
+        self.assertFalse(logins)
+        self.assertFalse((self.root / "replaced").exists())
+
+    def test_in_flight_backup_unit_blocks_the_deploy(self):
+        self.env["BACKUP_UNIT_STATE"] = "activating"
+        result, trace, logins = self.run_chain()
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn("backup result is UNKNOWN", result.stderr)
+        self.assertFalse(logins)
+        self.assertFalse((self.root / "replaced").exists())
 
 
 
