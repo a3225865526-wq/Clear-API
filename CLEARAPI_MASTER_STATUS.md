@@ -22,7 +22,8 @@
 | Gateway RC | Run `39083968671`, digest `sha256:bfdf5b842f9a9344cfb1eff1186be4962520bfbaceec72b5bd547432a3ac374d`, Manifest SHA `896c8c2731fe43a4b3068ec7d656a06975c4c9ecdd602ee86a7ad4b4b602a02d` | SUCCESS |
 | Backup / rollback evidence | actual encrypted backup `20261016T193254Z`, 75 tables, exact RC twice, 0 invariant failures | PASS ISOLATED |
 | Rehearsal | Run `39084286400` attempt 2: all non-Provider gates PASS; proof blocked on Provider | BLOCKED |
-| PG03 production enablement | Not executed | NOT RUN |`r`n| Post-main test branch | `codex/pg03-rehearsal-fix-20261018`; head `e3b1fed4`; no production switch | NOT MERGED |
+| PG03 production enablement | Not executed | NOT RUN |
+| Post-main test branch | `codex/pg03-rehearsal-fix-20261018`; head `a80add70`; no production switch | NOT MERGED |
 | 真实 Provider Usage/Billing | 尚未执行 | NOT RUN |
 | 熔断 / 双账号故障转移 | 尚未执行 | NOT RUN |
 
@@ -53,7 +54,7 @@
 - Rehearsal `39084286400` attempt 2 除 Provider 外全部 gate PASS；Assembler 拒绝生成 proof。
 - 两个上传账号均为 `free` 计划且未确认商业用途；不得作为已获准商业上游。
 - 自动部署 Run 因 proof 未生成而 skipped；PG03 生产 enablement、Route Chain 生产请求、Executor 部署、真实 Usage/Billing 均为 NOT RUN/UNVERIFIED。
-- 完整报告：`CLEARAPI_PG03_FULL_LAUNCH_FINAL_STATUS_20261018.md`。`CLEARAPI_MASTER_STATUS.md` 为工作区副本，已随 `e3b1fed4` 推送。
+- 完整报告：`CLEARAPI_PG03_FULL_LAUNCH_FINAL_STATUS_20261018.md`。`CLEARAPI_MASTER_STATUS.md` 为工作区副本，已随 `a80add70` 推送。
 - 证据：`D:/AI/API/evidence/pg03-full-launch-20261018/`。
 
 ### 历史记录
