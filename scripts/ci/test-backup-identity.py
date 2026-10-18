@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import tarfile
 import tempfile
+import time
 import unittest
 
 
@@ -317,6 +318,63 @@ class BackupIdentityTest(unittest.TestCase):
         point = manifest["database_recovery_point"]
         self.assertEqual(point["dump_sha256"], manifest["artifacts"]["database_dump"]["sha256"])
         self.assertLessEqual(point["dump_started_at_utc"], point["dump_completed_at_utc"])
+
+    def test_lock_contention_never_publishes_a_backup(self):
+        """A skipped run must be a failure, never a silent success."""
+        base = self.root / "opt/clearapi/backups"
+        (base / "manifests").mkdir(parents=True)
+        (base / "bin").mkdir()
+        (self.root / "log").mkdir()
+        lock = self.root / "backup.lock"
+        source = (SCRIPTS / "production-backup.sh").read_text()
+        source = source.replace("/opt/clearapi", str(self.root / "opt/clearapi"))
+        source = source.replace("/data/clearapi", str(self.root / "data/clearapi"))
+        source = source.replace("/var/log/clearapi", str(self.root / "log"))
+        source = source.replace("/run/lock/clearapi-backup.lock", str(lock))
+        script = self.root / "backup.sh"
+        script.write_text(source)
+        holder = subprocess.Popen(
+            ["flock", str(lock), "sleep", "20"], stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+        self.addCleanup(holder.kill)
+        for _ in range(100):
+            if lock.exists():
+                break
+            time.sleep(0.05)
+        result = subprocess.run(["bash", str(script)], env=self.env, capture_output=True,
+                                text=True, timeout=30)
+        holder.kill()
+        self.assertEqual(result.returncode, 75,
+                         "lock contention must exit EX_TEMPFAIL, not 0: " + result.stderr)
+        # backup.sh logs to the operator log, not stderr.
+        self.assertIn("no backup was produced",
+                      (self.root / "log/backup.log").read_text())
+        self.assertEqual(list((base / "manifests").glob("*.json")), [],
+                         "a skipped run must never publish a completion marker")
+
+    def test_two_concurrent_runs_publish_at_most_one_backup(self):
+        """Exactly one exclusive holder; the loser produces no marker."""
+        base = self.root / "opt/clearapi/backups"
+        (base / "manifests").mkdir(parents=True)
+        (base / "bin").mkdir()
+        (self.root / "log").mkdir()
+        lock = self.root / "backup.lock"
+        source = (SCRIPTS / "production-backup.sh").read_text()
+        source = source.replace("/opt/clearapi", str(self.root / "opt/clearapi"))
+        source = source.replace("/data/clearapi", str(self.root / "data/clearapi"))
+        source = source.replace("/var/log/clearapi", str(self.root / "log"))
+        source = source.replace("/run/lock/clearapi-backup.lock", str(lock))
+        script = self.root / "backup.sh"
+        script.write_text(source)
+        # Both racers fail later on the absent fixtures; the only observable
+        # difference is that neither reports a skipped run as success.
+        racers = [subprocess.Popen(["bash", str(script)], env=self.env,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                  for _ in range(2)]
+        results = [racer.communicate(timeout=60) for racer in racers]
+        codes = sorted(racer.returncode for racer in racers)
+        self.assertNotIn(0, codes, "no racer may report a completed backup")
+        self.assertEqual(list((base / "manifests").glob("*.json")), [])
 
     def test_full_encrypted_backup_offsite_and_legacy_restore_reader(self):
         self.full_backup()

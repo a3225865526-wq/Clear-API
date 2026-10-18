@@ -795,9 +795,14 @@ if name=='systemctl':
   now=datetime.datetime.now(datetime.timezone.utc); ident=now.strftime('%Y%m%dT%H%M%SZ')
   target=root/'opt/clearapi/backups'; path=target/'encrypted'/ident;path.mkdir(parents=True)
   raw=b'explicit synthetic backup transport fixture';artifact=path/('clearapi-backup-'+ident+'.tar.gz.gpg');artifact.write_bytes(raw);artifact.chmod(0o600)
-  m={'backup_identity_schema_version':1,'backup_id':ident,'created_at_utc':now.isoformat(),'running_identity':{k:v for k,v in old.items() if k not in ('started_at','binary_sha256','process_started_ticks','restart_policy')},'pg03_recovery':{'consistency':'unchanged_across_dump_and_bundle','scope':['compose-pg03.yaml','config/pg03','pool-executor/auths','pool-executor/pool','pool-executor/receipts']},'artifacts':{k:{'sha256':'a'*64} for k in ('database_dump','pg03_state_archive','pg03_state_snapshot')},'encryption':{'encrypted_artifact':{'name':artifact.name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}}}
-  manifest=target/'manifests'/(ident+'.json');manifest.write_text(json.dumps(m));manifest.chmod(0o600)
- elif a[0]=='show':print('0')
+  m={'backup_schema_version':2,'backup_identity_schema_version':1,'backup_id':ident,'created_at_utc':now.strftime('%Y-%m-%dT%H:%M:%SZ'),'running_identity':{k:v for k,v in old.items() if k not in ('started_at','binary_sha256','process_started_ticks','restart_policy')},'pg03_recovery':{'consistency':'unchanged_across_dump_and_bundle','scope':['compose-pg03.yaml','config/pg03','pool-executor/auths','pool-executor/pool','pool-executor/receipts']},'artifacts':{k:{'sha256':'a'*64} for k in ('database_dump','pg03_state_archive','pg03_state_snapshot')},'encryption':{'encrypted_artifact':{'name':artifact.name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}}}
+  manifest=target/'manifests'/(ident+'.json');manifest.parent.mkdir(parents=True,exist_ok=True);manifest.write_text(json.dumps(m));manifest.chmod(0o640)
+ elif a[0]=='is-active':sys.exit(0)
+ else:
+  prop=a[a.index('-p')+1] if '-p' in a else ''
+  if prop=='ActiveState':print('inactive')
+  elif prop=='Result':print('success')
+  elif prop=='ExecMainStatus':print('0')
  sys.exit(0)
 if name=='sleep':sys.exit(0)
 if name=='curl' and any(x.startswith('https://') for x in a) and (data['edge']['paused'] or fail=='public-health'):sys.exit(1)

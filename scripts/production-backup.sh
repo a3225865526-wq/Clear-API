@@ -19,9 +19,13 @@ esac
 log() { echo "$(date -u +%FT%TZ) $*" >> /var/log/clearapi/backup.log; }
 
 exec 200>/run/lock/clearapi-backup.lock
+# Lock contention is NOT a completed backup. Exiting 0 here made a skipped run
+# indistinguishable from a successful one, so the deploy gate could accept it.
+# EX_TEMPFAIL tells systemd and the deploy wrapper that no recovery point was
+# produced and the run must be retried, never recorded as success.
 if ! flock -n 200; then
-  log "SKIP concurrent run detected"
-  exit 0
+  log "FAIL concurrent run detected; no backup was produced by this invocation"
+  exit 75
 fi
 
 cleanup() {
@@ -174,8 +178,6 @@ path.write_text(json.dumps(manifest, indent=2) + '\n')
 PYPG03
 fi
 python3 -m json.tool "$STAGE/manifest.json" > /dev/null
-mv "$STAGE/manifest.json" "$BASE/manifests/$TS.json"
-chmod 640 "$BASE/manifests/$TS.json"
 
 # 7. offsite push hook (disabled until a push-capable destination exists;
 #    current offsite is workstation-pull based)
@@ -192,7 +194,34 @@ if [ -f "$OFFSITE_CONF" ]; then
   fi
 fi
 
-# 8. retention: keep last 14 daily + last 6 monthly (01-MM), prune only on success
+# 8. publish the completion marker LAST.
+# The manifest under manifests/ is the only signal that a backup finished. It is
+# written and fsynced in staging, then linked into place atomically, so a reader
+# can never observe a manifest whose encrypted artifact, offsite copy and
+# retention step have not all completed. Staging files are never accepted as a
+# completed backup by the deploy gate.
+python3 - "$STAGE/manifest.json" "$BASE/manifests/$TS.json" <<'PYCOMMIT'
+import os, pathlib, sys
+source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+target.parent.mkdir(parents=True, exist_ok=True)
+fd = os.open(source, os.O_RDONLY | os.O_NOFOLLOW)
+try:
+    os.fsync(fd)
+finally:
+    os.close(fd)
+# link() refuses to replace an existing marker, so a duplicate backup_id can
+# never overwrite an already published recovery point.
+os.link(source, target)
+directory = os.open(target.parent, os.O_RDONLY)
+try:
+    os.fsync(directory)
+finally:
+    os.close(directory)
+os.unlink(source)
+PYCOMMIT
+chmod 640 "$BASE/manifests/$TS.json"
+
+# 9. retention: keep last 14 daily + last 6 monthly (01-MM), prune only on success
 python3 - "$BASE" "$KEEP_DAILY" "$KEEP_MONTHLY" "${CLEARAPI_BACKUP_PRESERVE_EXISTING:-false}" <<'PYEOF'
 import os, re, shutil, sys
 base, kd, km = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])

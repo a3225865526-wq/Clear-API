@@ -830,19 +830,131 @@ fi
 # 4. encrypted pre-deploy backup (hard gate)
 # ===========================================================================
 systemctl is-active --quiet "$BACKUP_TIMER" || die "step 4: ${BACKUP_TIMER} is not active; backup subsystem is not trusted"
-BACKUP_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%S)"
+# A run that is already in flight cannot be attributed to this deploy: its
+# outcome is unknown at gate time. Refuse instead of racing it.
+BACKUP_ACTIVE="$(systemctl show -p ActiveState --value "$BACKUP_SERVICE" 2>/dev/null || true)"
+case "$BACKUP_ACTIVE" in
+  inactive|failed) ;;
+  activating|active|reloading|deactivating|'')
+    die "step 4: ${BACKUP_SERVICE} is '${BACKUP_ACTIVE:-unknown}' (a backup is in flight or its state is unreadable); backup result is UNKNOWN — deployment BLOCKED" ;;
+  *) die "step 4: ${BACKUP_SERVICE} reported unexpected state '${BACKUP_ACTIVE}'; deployment BLOCKED" ;;
+esac
+BACKUP_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 systemctl start "$BACKUP_SERVICE" || die "step 4: ${BACKUP_SERVICE} did not exit 0; deployment BLOCKED"
 BACKUP_STATUS="$(systemctl show -p ExecMainStatus --value "$BACKUP_SERVICE")"
-[ "$BACKUP_STATUS" = "0" ] || die "step 4: backup ExecMainStatus=${BACKUP_STATUS}; deployment BLOCKED"
-log "step 4: pre-deploy backup completed"
+BACKUP_RESULT="$(systemctl show -p Result --value "$BACKUP_SERVICE")"
+[ "$BACKUP_STATUS" = "0" ] || die "step 4: backup ExecMainStatus=${BACKUP_STATUS}; deployment BLOCKED (75 = lock contention / concurrent run, no backup produced)"
+# ExecMainStatus alone cannot distinguish success from a unit that never ran.
+[ "$BACKUP_RESULT" = "success" ] || die "step 4: backup unit Result='${BACKUP_RESULT:-unknown}' is not a completed backup; deployment BLOCKED"
+log "step 4: pre-deploy backup command completed"
 
 # ===========================================================================
-# 5. verify backup success
+# 5. verify backup completion (published manifest, not staging presence)
 # ===========================================================================
-NEW_ARTIFACTS="$(find "$BACKUP_DIR" -type f -newermt "$BACKUP_STARTED_AT" -size +0 2>/dev/null | head -5)"
-[ -n "$NEW_ARTIFACTS" ] || die "step 5: no new non-empty backup artifact under ${BACKUP_DIR} since ${BACKUP_STARTED_AT}; deployment BLOCKED"
-log "step 5: backup artifacts verified"
-printf '    %s\n' $NEW_ARTIFACTS >&2
+# Only a manifest that production-backup.sh published terminator-style, whose
+# encrypted artifact exists at the recorded size and SHA256 and whose running
+# identity was frozen, satisfies this gate. Staging files, half-written bundles
+# and stale older backups can never satisfy it.
+BACKUP_MANIFEST="$(python3 - "$BACKUP_DIR" "$BACKUP_STARTED_AT" <<'PY'
+import datetime, hashlib, json, pathlib, re, stat, sys
+
+base = pathlib.Path(sys.argv[1])
+started_text = sys.argv[2]
+# backup.sh stamps UTC; accept both "Z" and offset-free forms.
+started = datetime.datetime.fromisoformat(
+    started_text.replace('Z', '+00:00') if started_text.endswith('Z') else started_text + '+00:00')
+if started.tzinfo is None:
+    started = started.replace(tzinfo=datetime.timezone.utc)
+started_epoch = started.timestamp()
+
+manifests = base / 'manifests'
+if not manifests.is_dir():
+    sys.exit('no manifest directory: no backup can be considered complete')
+
+candidates = []
+for path in sorted(manifests.iterdir()):
+    if path.is_symlink() or not path.is_file():
+        continue
+    if not re.fullmatch(r'\d{8}T\d{6}Z\.json', path.name):
+        continue
+    info = path.stat()
+    # Published manifests are root:root 0640; group read is expected. Any
+    # world access means the file was not written by the backup pipeline.
+    if stat.S_IMODE(info.st_mode) & 0o007:
+        sys.exit('unsafe manifest permissions: ' + path.name)
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, ValueError):
+        # A manifest that cannot be parsed is not evidence of a completed backup.
+        continue
+    if not isinstance(manifest, dict):
+        continue
+    created = manifest.get('created_at_utc', '')
+    try:
+        created_epoch = datetime.datetime.fromisoformat(created.replace('Z', '+00:00')).timestamp()
+    except (AttributeError, ValueError):
+        continue
+    if created_epoch < started_epoch:
+        continue
+    candidates.append((path, manifest, created_epoch))
+
+if len(candidates) != 1:
+    sys.exit('expected exactly one backup completed by this deploy, found %d' % len(candidates))
+
+path, manifest, _ = candidates[0]
+ident = manifest.get('backup_id')
+if manifest.get('backup_schema_version') != 2 or not isinstance(ident, str) or path.name != ident + '.json':
+    sys.exit('manifest is not a complete backup record: ' + path.name)
+if not re.fullmatch(r'\d{8}T\d{6}Z', ident):
+    sys.exit('invalid backup identity: ' + str(ident))
+
+# The frozen running identity proves the backup captured a real running release.
+identity = manifest.get('running_identity')
+if manifest.get('backup_identity_schema_version') != 1 or not isinstance(identity, dict):
+    sys.exit('backup does not record a frozen running identity')
+for key in ('oci_revision', 'docker_image_id', 'ghcr_repo_digest', 'container_id'):
+    if not isinstance(identity.get(key), str) or not identity[key]:
+        sys.exit('backup running identity is incomplete: ' + key)
+
+artifacts = manifest.get('artifacts')
+if not isinstance(artifacts, dict) or 'database_dump' not in artifacts:
+    sys.exit('backup does not record a database dump artifact')
+for name, item in artifacts.items():
+    if not isinstance(item, dict) or not re.fullmatch(r'[0-9a-f]{64}', str(item.get('sha256', ''))):
+        sys.exit('backup artifact ' + str(name) + ' has no integrity digest')
+
+encryption = manifest.get('encryption')
+if not isinstance(encryption, dict):
+    sys.exit('backup does not record an encrypted artifact')
+encrypted = encryption.get('encrypted_artifact')
+if not isinstance(encrypted, dict):
+    sys.exit('backup does not record an encrypted artifact')
+expected_name = 'clearapi-backup-' + ident + '.tar.gz.gpg'
+if encrypted.get('name') != expected_name:
+    sys.exit('encrypted artifact name does not match the backup identity')
+size, sha = encrypted.get('bytes'), encrypted.get('sha256')
+if type(size) is not int or size <= 0 or not re.fullmatch(r'[0-9a-f]{64}', str(sha or '')):
+    sys.exit('encrypted artifact has no recorded size/digest')
+
+blob = base / 'encrypted' / ident / expected_name
+if blob.is_symlink() or not blob.is_file():
+    sys.exit('encrypted artifact is missing; the backup is incomplete')
+info = blob.stat()
+if info.st_size != size:
+    sys.exit('encrypted artifact size %d does not match the manifest (%d)' % (info.st_size, size))
+digest = hashlib.sha256()
+with blob.open('rb') as handle:
+    for chunk in iter(lambda: handle.read(1024 * 1024), b''):
+        digest.update(chunk)
+if digest.hexdigest() != sha:
+    sys.exit('encrypted artifact digest does not match the manifest')
+
+print(json.dumps({'backup_id': ident, 'manifest': str(path),
+                  'manifest_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                  'encrypted_sha256': sha, 'encrypted_bytes': size}, sort_keys=True))
+PY
+)" || die "step 5: no verified completed backup for this deployment; deployment BLOCKED (staging files and older backups never satisfy this gate)"
+log "step 5: backup ${BACKUP_MANIFEST}"
 
 # ===========================================================================
 # 6. pull exact digest
