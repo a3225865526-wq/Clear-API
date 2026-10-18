@@ -21,7 +21,7 @@
 | Gateway 正式 RC | run `39150754912`，success | 实测 |
 | Gateway image digest | `sha256:2e730c638a0d32215de0616b04d8c20a609cc9bd0610cdd14d5443cfaada2c21` | 实测 |
 | Gateway 二进制 SHA256 | `003cfd5da46f8a0776c4b718c75d2bc84768f912bc117d59dd0603399127a0e4` | RC manifest 声明 |
-| Executor 源码提交 | `a45358ed…`（导入隔离+路由放行）/ `6a85ae78…`（重启发布修复） | 已推送 |
+| Executor 源码提交 | `a45358ed…`（导入隔离 + 路由放行）；分支 tip `945fc3ee` 内容与之完全相同（见 §2 更正） | 已推送 |
 | Executor 正式 RC | run `39143951438`，digest `sha256:722915a6…a4f8`，binary `b9222051…18f5` | 实测（本地按 digest 拉取并校验） |
 | 部署时间 | 无 | 未发生 |
 
@@ -42,7 +42,23 @@ Gateway RC manifest 的 `source_commit`、`candidate_commit`、`oci_revision`、
 
 1. **`/v0/management/pool/import` 不在 service 角色白名单内。** 用有效 management key 实测：旧 RC `9ba0e5ff…` 返回 `403 pool_service_management_restricted`；新 RC `722915a6…` 返回 `400 incomplete credential`（说明请求已进入 handler）。仅此一项就使网页导入功能在 service 角色下完全不可用。
 2. **导入的凭证落盘时没有写管理隔离栅栏。** 只有内存记录被标记 disabled，文件仍是原始字节，重启后可能重新引入未标记的可调度账号。现在先改写文件再登记记录。
-3. **重启后 Executor 不再发布任何池模型。** service 角色的池只从 trust/capability 提交处发布模型，启动时没有任何路径重建发布状态，导致重启后 `GET /v1/models` 为空、Gateway 报 `unknown provider`，直到运维再改一次策略。已加启动时重新推导（只读已提交状态，不提升信任、不授予能力）。
+3. **（已撤回，见下方更正）** 我曾声称"重启后 Executor 不再发布任何池模型"并加了启动时重新推导。**该诊断是错误的，改动已 revert**。真实结论是：启动时认证加载路径本来就会为每个已启用凭证调用 `registerModelsForAuth` → `PublishPoolModels`，重启后发布状态正常。详见 §2 的更正说明。
+
+### 关于第 3 项与"`PoolDispatchFencing` 未转发"的更正
+
+本轮我提出过两个后来被自己推翻的判断，均已在仓库中留痕、未用于任何结论：
+
+- **`poolExecutor` 未转发 `PoolDispatchFencing` 导致派发被拒**：错误。`begin()` 断言的是内层 `ProviderExecutor`，它早已实现该方法。保留的转发方法无害，但不是解开 PG03 的关键。
+- **重启后池模型不发布**：错误。在**同一份全新状态、同一份已围栏凭证、同一条运维序列**（发布策略 → promote → 授予模型 → 显式 enable）下做 A/B，然后重启同一容器：
+
+  ```text
+  带启动重新推导   : eligible=1, verified capabilities=[gpt-6-luna]
+  不带该调用       : eligible=1, verified capabilities=[gpt-6-luna]
+  ```
+
+  两者完全一致。此前的"空注册表"证据无效，因为那次夹具里的凭证处于 disabled 状态，任何变体都只会返回空表，被误读成了缺陷。该提交已 revert，分支 tip `945fc3ee` 与已发布 RC 的源码 `a45358ed` **内容完全相同**（`git diff --stat` 为空），因此 RC `722915a6…` 仍是正确的配对产物。
+
+  排查过程中还澄清了两个约束（都是我的测试脚本写错，不是产品缺陷）：`matchPoolGrantReason` 要求 `expires_at <= now+1800`，我最初用了 3600；promote 需要带上 pending 记录的 `generation`。
 
 ### 需要明确纠正的一点
 
@@ -239,7 +255,7 @@ target_schema_sha256 = 3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf8
 - 完整链路真实验证：**PASS**（隔离环境、真实 OAuth、真实上游）
 - 双账号 / fallback / 无重复结算：**PASS**
 - 计费一致性（成功扣费、失败不扣费）：**PASS**
-- 重启持久化：**PASS**（并修复了一个真实重启缺陷）
+- 重启持久化：**PASS**（重启后 revision、trust、capability 代际、围栏与 eligibility 全部保持；**未发现重启缺陷**，先前声称的缺陷已撤回）
 - 导入 quarantine 恢复闭环：**PASS**
 - 正式 RC 产物身份：**PASS**（Gateway + Executor）
 - Rehearsal：**FAIL**（11 个 gate 中 8 通过、3 失败）
