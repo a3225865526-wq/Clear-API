@@ -152,7 +152,24 @@ target_schema_sha256 = 3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf8
 
 这意味着：**即使我把 backup、rollback、provider 三份证据全部补齐，proof 仍然无法生成**——因为 schema 断言先一步失败。这个门禁在设计上把"存在真实迁移"和"必须无 schema 变更"同时要求了。
 
+这一点还有独立的实证支撑：真实备份恢复证据 `recovery-39083968671/real-backup-restore-execution.json` 显示，生产备份的 `source_schema_sha256` 就是 `8922081b…`，而精确 RC 启动两次后达到 `3c1c77f3…`。也就是说**生产确实需要这次迁移**，`no_schema_change` 与事实不符，而不是我的环境配置不当。
+
 此外，backup/rollback 两份证据现在是 `stale`：它们绑定的是旧 RC `353cd0a2`，而本轮 RC 是 `24f9bd48`。这是正常的重绑定需求，不是缺陷。
+
+### 4.1 第二条独立阻塞：Runtime Integrity 探针（manual 路径同样被挡住）
+
+`assemble-release-proof.py` 只被 **automatic**（`workflow_run`）路径消费。理论上手动 `workflow_dispatch`（`pool_mode=pg03` + `DEPLOY_PRODUCTION`）不经过 proof。但实测最近 4 次手动部署：
+
+| Run | 结果 |
+| --- | --- |
+| `39051474037` | `Runtime Gate {"status":"BLOCKED","code":"PROBE_UNAVAILABLE"}` → `FAIL: Runtime Integrity Gate BLOCKED before deployment` |
+| `39050053489` | 同上 `PROBE_UNAVAILABLE` |
+| `39044452129` | 同上 `PROBE_UNAVAILABLE` |
+| `39043761386` | `FAIL: launch baseline: missing or invalid commercial pricing` |
+
+`verify_runtime_gate` 需要 `/opt/clearapi/secrets/runtime-probe-session`，该文件只能由 `runtime-probe-session.py` 在 VPS 上以 root、通过**真实交互式 root 登录 + MFA** 生成（脚本强制 `os.geteuid()==0` 且 `sys.stdin.isatty()`）。因此手动路径同样需要 VPS root 交互，我无法在本环境完成。
+
+**结论：两条发布路径各自被一个独立的、都需要 VPS root 交互的阻塞挡住，且 automatic 路径还额外被 schema 断言挡住。**
 
 ---
 
@@ -214,15 +231,20 @@ target_schema_sha256 = 3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf8
 
 ## 8. 解除阻塞所需的最小动作（需人工决策/授权）
 
-1. **决策 schema 闸门语义**（二选一，均需改动 `scripts/ci/` 的发布契约）：
-   - 允许 `migration.mode` 表达真实 schema 迁移并配套回滚证据；或
-   - 让 RC 排练在"无 schema 变更"候选上运行。
-   在此之前，任何 PG03 候选都无法产出 proof。
-2. **重新绑定并提供三份运营方证据**：backup、rollback 针对新 RC `24f9bd48` 重做；provider 证据基于已完成的真实链路结果生成并绑定到该 RC 的 run/attempt 与 manifest hash。
-3. **在 VPS 以 root 重装两个脚本**：把 `pg03-release-control.py`、`production-deploy-v2.sh` 的 Executor 常量从 `9ba0e5ff… / 228ecbaa` 改为 `722915a6… / a45358ed…`（并同步 `EXECUTOR_BINARY`），或提供一次授权的方式完成该重装。
-4. **提供可达的部署通道**：能通过 GitHub `production` environment 正常使用 `PROD_SSH_PRIVATE_KEY`（该链路本身可用，只是我这侧无凭据），或在受控窗口内提供一次性部署执行。
+按**依赖顺序**排列。注意 1 和 2 是两个**互相独立**的阻塞，两者都必须解除：automatic 路径需要 1+2，manual 路径也需要 2（外加 3）。
 
-完成 1–3 后，`Automatic production release` 即可在门禁真实通过的前提下继续，随后才可能进入线上验收。
+1. **决策 schema 闸门语义**（需改动 `scripts/ci/` 发布契约，属策略决策）：
+   - 允许 `migration.mode` 表达真实 schema 迁移并配套回滚证据；或
+   - 让 RC 排练在真正"无 schema 变更"的候选上运行。
+   在此之前，automatic 路径的任何 PG03 候选都无法产出 proof。已实测证明：`assemble-release-proof.py` 与 `automatic-release.py` 各自独立断言了这一对互相冲突的条件。
+2. **在 VPS 生成 Runtime Integrity 探针会话**：以 root 通过官方交互式登录 + MFA 运行 `runtime-probe-session.py`，写入 `/opt/clearapi/secrets/runtime-probe-session`。这是 manual 与 automatic 两条路径共同的硬前置；最近 4 次手动部署全部停在 `PROBE_UNAVAILABLE`。
+3. **重新绑定并提供三份运营方证据**（仅 automatic 路径需要）：backup、rollback 针对新 RC `24f9bd48` 重做；provider 证据基于已完成的真实链路结果生成，并绑定到该 RC 的 run/attempt 与 manifest hash。
+4. **在 VPS 以 root 重装两个脚本**：把 `pg03-release-control.py`、`production-deploy-v2.sh` 的 Executor 常量从 `9ba0e5ff… / 228ecbaa` 改为 `722915a6… / a45358ed…`（并同步 `EXECUTOR_BINARY`），或提供一次授权的方式完成该重装。
+5. **提供可达的部署通道**：能通过 GitHub `production` environment 正常使用 `PROD_SSH_PRIVATE_KEY`（该链路本身可用，只是我这侧无凭据），或在受控窗口内提供一次性部署执行。
+
+**注意**：2 与 4 都必须在 VPS 上以 root 完成，而本环境对 `103.42.181.219` 无任何可用凭据（`clearapi-deploy` 与 `root` 均 `Permission denied (publickey)`）。因此在不引入人工介入的前提下，我无法推进到部署步骤——这正是我停在这里的原因，而不是缺少尝试。
+
+完成 1–5 后，自动发布可在门禁**真实**通过的前提下继续，随后才可能进入线上验收。
 
 ---
 
