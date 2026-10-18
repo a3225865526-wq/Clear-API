@@ -29,6 +29,10 @@ func RegisterUpstreamPoolRoutes(api *gin.RouterGroup) {
 	pool.GET("/image-policies", controller.ListImageSourcePolicies)
 	pool.GET("/image-policy", controller.GetImageSourcePolicy)
 	pool.PUT("/image-policy", controller.SaveImageSourcePolicy)
+	// Reconciliation view for controlled image requests that still own an open
+	// reservation (UNKNOWN, or terminated after a possibly-real send). Read-only:
+	// it lists state and never releases, retries or settles anything by itself.
+	pool.GET("/image-executions", controller.ListPendingImageExecutions)
 	pool.GET("/fallback-policy", controller.GetPoolFallbackPolicy)
 	pool.PUT("/fallback-policy", controller.SavePoolFallbackPolicy)
 	pool.GET("/accounts", controller.ListPoolAccounts)

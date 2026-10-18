@@ -163,3 +163,40 @@ func TestImageSourcePolicyRejectsClientOverride(t *testing.T) {
 	require.NotNil(t, stored)
 	require.Equal(t, model.ImageSourceAPIOnly, stored.Strategy)
 }
+
+// TestImageReconciliationSurfaceIsOwnerOnly proves the reconciliation view is
+// owner-only and read-only: an UNKNOWN request stays UNKNOWN with its hold
+// intact after being listed, so reading it can never release a reservation.
+func TestImageReconciliationSurfaceIsOwnerOnly(t *testing.T) {
+	setup := newPoolTestSetup(t, true)
+	require.NoError(t, setup.db.AutoMigrate(&model.Option{}))
+	require.NoError(t, model.MigrateImageExecutions(setup.db))
+
+	entry := &model.ImageExecution{
+		RequestID: "req-reconcile", UserID: 8, TokenID: 8,
+		BodyDigest: model.ImageRequestBodyDigest([]byte(`{}`)), Operation: model.ImageRequestOperation,
+		Model: "gpt-image-2", RequestedCount: 1, SourceStrategy: model.ImageSourcePoolFirst,
+	}
+	require.NoError(t, model.CreateImageExecutionRequest(entry))
+	require.NoError(t, model.AdvanceImageExecution("req-reconcile", model.ImageRequestCreated, model.ImageRequestReserved, nil))
+	require.NoError(t, model.BillingHoldImageExecution("req-reconcile"))
+
+	// Ordinary users and a non-owner root cannot read it.
+	for _, token := range []string{"synthetic-user-pat", "synthetic-admin-pat", "synthetic-other-root-pat"} {
+		denied := setup.request("GET", "/api/owner/pool/image-executions", token, nil)
+		require.Equal(t, http.StatusForbidden, denied.Code, denied.Body.String())
+	}
+
+	allowed := setup.request("GET", "/api/owner/pool/image-executions", "synthetic-owner-pat", nil)
+	require.Equal(t, http.StatusOK, allowed.Code, allowed.Body.String())
+	require.Contains(t, allowed.Body.String(), "req-reconcile")
+	require.Contains(t, allowed.Body.String(), `"billing_state":"held_unknown"`)
+	// No prompt, credential or image payload is exposed.
+	require.NotContains(t, allowed.Body.String(), "images-account")
+
+	// Listing must not resolve the hold.
+	held, err := model.LoadImageExecution("req-reconcile")
+	require.NoError(t, err)
+	require.Equal(t, model.ImageRequestUnknown, held.State)
+	require.Equal(t, "held_unknown", held.BillingState)
+}

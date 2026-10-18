@@ -57,12 +57,16 @@ type ImageExecution struct {
 	UserID    int    `gorm:"index:idx_image_execution_user"`
 	TokenID   int
 	// IdempotencyScope and IdempotencyKeyDigest form the durable dedup identity.
-	// An empty scope means the client supplied no key.
-	IdempotencyScope     string `gorm:"type:varchar(64);uniqueIndex:idx_image_execution_idempotency,priority:1"`
-	IdempotencyKeyDigest string `gorm:"type:varchar(64);uniqueIndex:idx_image_execution_idempotency,priority:2"`
-	BodyDigest           string `gorm:"type:varchar(64)"`
-	Operation            string `gorm:"type:varchar(32)"`
-	Model                string `gorm:"type:varchar(128)"`
+	// A keyless request stores NULL in both columns: a SQL unique index treats
+	// NULLs as distinct, so independent keyless requests never collide, while a
+	// real key keeps the original (scope, digest) uniqueness. The columns are
+	// nullable pointers for exactly that reason; do not switch them back to
+	// plain strings, which collapses every keyless row onto (\"\", \"\").
+	IdempotencyScope     *string `gorm:"type:varchar(64);uniqueIndex:idx_image_execution_idempotency,priority:1"`
+	IdempotencyKeyDigest *string `gorm:"type:varchar(64);uniqueIndex:idx_image_execution_idempotency,priority:2"`
+	BodyDigest           string  `gorm:"type:varchar(64)"`
+	Operation            string  `gorm:"type:varchar(32)"`
+	Model                string  `gorm:"type:varchar(128)"`
 	RequestedCount       int
 	// SourceStrategy is the frozen admin policy (pool_first/api_first/pool_only/api_only).
 	SourceStrategy     string `gorm:"type:varchar(24)"`
@@ -140,9 +144,9 @@ func CreateImageExecutionRequest(entry *ImageExecution) error {
 	entry.State = ImageRequestCreated
 	entry.CreatedTime, entry.UpdatedTime = now, now
 	return DB.Transaction(func(tx *gorm.DB) error {
-		if entry.IdempotencyScope != "" && entry.IdempotencyKeyDigest != "" {
+		if hasIdempotencyIdentity(entry) {
 			var existing ImageExecution
-			err := tx.Where("idempotency_scope = ? AND idempotency_key_digest = ?", entry.IdempotencyScope, entry.IdempotencyKeyDigest).First(&existing).Error
+			err := tx.Where("idempotency_scope = ? AND idempotency_key_digest = ?", *entry.IdempotencyScope, *entry.IdempotencyKeyDigest).First(&existing).Error
 			if err == nil {
 				if existing.BodyDigest != entry.BodyDigest {
 					return ErrImageExecutionIdempotent
@@ -159,7 +163,16 @@ func CreateImageExecutionRequest(entry *ImageExecution) error {
 	})
 }
 
-// LoadImageExecutionByIdempotency resolves a repeated client request.
+// hasIdempotencyIdentity reports whether this request carries a real client
+// idempotency key. A keyless request has no dedup identity at all, so it must
+// neither match nor collide with another one.
+func hasIdempotencyIdentity(entry *ImageExecution) bool {
+	return entry != nil && entry.IdempotencyScope != nil && entry.IdempotencyKeyDigest != nil &&
+		*entry.IdempotencyScope != "" && *entry.IdempotencyKeyDigest != ""
+}
+
+// LoadImageExecutionByIdempotency resolves a repeated client request. An empty
+// scope or digest means the caller supplied no key, so nothing may match.
 func LoadImageExecutionByIdempotency(scope, digest string) (*ImageExecution, error) {
 	if scope == "" || digest == "" {
 		return nil, ErrImageExecutionNotFound

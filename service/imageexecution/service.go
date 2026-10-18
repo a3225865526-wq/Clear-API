@@ -73,14 +73,18 @@ type SourcePolicy struct {
 }
 
 // ResolvePolicy reads the operator decision for the requested model. A missing
-// policy returns (nil, nil): the request keeps legacy routing. A corrupt policy
-// fails closed; controlled execution never silently degrades.
+// or disabled policy returns (nil, nil): the request keeps legacy routing. A
+// corrupt policy fails closed; controlled execution never silently degrades.
+//
+// The enabled flag is authoritative: an operator who disables a model must get
+// exactly the pre-existing image routing back, not a refused request and not a
+// controlled execution. No client field can influence this decision.
 func ResolvePolicy(c *gin.Context, modelName string) (*SourcePolicy, error) {
 	policy, err := model.GetImageSourcePolicy(modelName)
 	if err != nil {
 		return nil, ErrControlledRefused
 	}
-	if policy == nil {
+	if policy == nil || !policy.Enabled {
 		return nil, nil
 	}
 	resolved := &SourcePolicy{Strategy: policy.Strategy, Policy: policy}
@@ -143,17 +147,22 @@ func Begin(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ImageReques
 	if len(idempotencyKey) > 256 {
 		return nil, types.NewError(ErrIdempotencyConflict, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
-	scope := ""
+	// A keyless request stores NULL in both idempotency columns so it neither
+	// matches nor collides with another keyless request (SQL unique indexes
+	// treat NULLs as distinct). Only a real key yields a dedup identity.
+	var scope, keyDigest *string
 	if idempotencyKey != "" {
 		// Scope by user+token so one tenant's key can never collide with another.
-		scope = "u" + strconv.Itoa(info.UserId) + ":t" + strconv.Itoa(info.TokenId)
+		scoped := "u" + strconv.Itoa(info.UserId) + ":t" + strconv.Itoa(info.TokenId)
+		digest := model.ImageRequestIdempotencyDigest(idempotencyKey)
+		scope, keyDigest = &scoped, &digest
 	}
 	entry := &model.ImageExecution{
 		RequestID:            info.RequestId,
 		UserID:               info.UserId,
 		TokenID:              info.TokenId,
 		IdempotencyScope:     scope,
-		IdempotencyKeyDigest: model.ImageRequestIdempotencyDigest(idempotencyKey),
+		IdempotencyKeyDigest: keyDigest,
 		BodyDigest:           bodyDigest,
 		Operation:            ImagesOperation,
 		Model:                request.Model,

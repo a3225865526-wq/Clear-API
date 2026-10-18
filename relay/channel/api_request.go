@@ -337,20 +337,26 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, err
 	}
 	applyHeaderOverrideToRequest(req, headerOverride)
-	// A controlled image attempt records its Gateway→Executor send boundary
-	// durably before the bytes leave this process. A failure here forbids the
-	// dispatch: an unwritten dedup record can never be treated as "not sent".
-	if controlled := imageexecution.FromContext(c); controlled != nil {
-		if apiErr := controlled.MarkDispatching(); apiErr != nil {
-			return nil, apiErr
-		}
-	}
 	if err := accountpool.ApplyPG03Policy(c, req); err != nil {
 		return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 	}
+	// Every fallible outbound-preparation step runs BEFORE the send intent is
+	// committed. Signing only reads the final bytes and the attempt identity, so
+	// moving it ahead of MarkDispatching cannot weaken the signature: the body is
+	// already frozen at this point. Doing it the other way round used to leave a
+	// durable DISPATCHING row for a request that never left the process, which
+	// pins the reservation forever and cannot be distinguished from a real
+	// in-flight send.
 	if controlled := imageexecution.FromContext(c); controlled != nil {
 		if err := controlled.SignOutbound(c, req, info.OriginModelName); err != nil {
+			controlled.FailTrusted("outbound_signing_failed")
 			return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		}
+		// A controlled image attempt records its Gateway→Executor send boundary
+		// durably before the bytes leave this process. A failure here forbids the
+		// dispatch: an unwritten dedup record can never be treated as "not sent".
+		if apiErr := controlled.MarkDispatching(); apiErr != nil {
+			return nil, apiErr
 		}
 	}
 	resp, err := doRequest(c, req, info)

@@ -111,3 +111,26 @@ func GetImageRequestStatus(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": view})
 }
+
+// ListPendingImageExecutions is the owner-only reconciliation view for requests
+// that still own an open reservation. It is deliberately read-only: resolving an
+// UNKNOWN requires an explicit, audited decision, so this endpoint never
+// refunds, retries, settles or re-dispatches anything. It exposes request
+// identity, state and billing markers only — never prompts or image bytes.
+func ListPendingImageExecutions(c *gin.Context) {
+	items, err := model.ImageExecutionsPending(200)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "code": "IMAGE_RECONCILIATION_UNAVAILABLE"})
+		return
+	}
+	views := make([]model.ImageExecutionJSON, 0, len(items))
+	for i := range items {
+		attempts, attemptErr := model.ListImageExecutionAttempts(items[i].RequestID)
+		if attemptErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"success": false, "code": "IMAGE_RECONCILIATION_UNAVAILABLE"})
+			return
+		}
+		views = append(views, model.ProjectImageExecution(&items[i], attempts))
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": views})
+}

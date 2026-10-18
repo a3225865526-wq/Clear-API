@@ -84,6 +84,21 @@ func Prepare(c *gin.Context, info *relaycommon.RelayInfo, request *dto.ImageRequ
 	if policy == nil {
 		return nil, nil
 	}
+	// Controlled image execution spends the site owner's account pool, so it is
+	// reserved to the site owner regardless of which token called the endpoint.
+	// The decision is server-side only: it reads the authenticated user identity
+	// that TokenAuth established and offers no client-influenced alternative.
+	// A non-owner keeps the ordinary routing they had before, which is why this
+	// refuses the controlled path rather than failing the request outright.
+	//
+	// Identity is checked directly rather than through common.IsPoolOwner because
+	// that helper also requires the pool master switch: an `api_only` policy must
+	// still be owner-only even while the account pool is switched off.
+	// The relay (token) auth path does not publish a role on the context, so the
+	// fixed owner user ID is the authoritative claim available here.
+	if info.UserId != common.PoolOwnerUserID {
+		return nil, nil
+	}
 	// A client may never supply reserved trust headers.
 	StripClientControlledHeaders(c)
 

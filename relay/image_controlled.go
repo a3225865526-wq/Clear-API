@@ -151,10 +151,21 @@ func controlledSettleAndPublish(c *gin.Context, info *relaycommon.RelayInfo, con
 			controlled.RefuseUnknown("billable_count_not_one")
 			return unknownImageError(c, controlled)
 		}
+		// Retrieve and verify the payload BEFORE the single reservation is
+		// settled. If the bytes cannot be fetched the request is UNKNOWN with the
+		// reservation still held, instead of a charged request whose image the
+		// client can never receive.
+		body, fetchErr := imageexecution.FetchResult(c.Request.Context(), controlled.Execution.RequestID(), controlled.AttemptID())
+		if fetchErr != nil {
+			controlled.RefuseUnknown("result_fetch_failed")
+			return unknownImageError(c, controlled)
+		}
 		if apiErr := controlled.SettleAndCommit(result, info); apiErr != nil {
 			return unknownImageError(c, controlled)
 		}
-		return writeControlledImageResponse(c, controlled)
+		controlled.AttachToResponse(c)
+		c.Data(http.StatusOK, "application/json", body)
+		return nil
 	case "FAILED":
 		controlled.FailTrusted(record.EndReason)
 		if record.Executed {
@@ -204,23 +215,11 @@ func controlledFinalizeUnknown(c *gin.Context, controlled *imageexecution.Contro
 	return unknownImageError(c, controlled)
 }
 
+// unknownImageError builds the client-facing UNKNOWN envelope and marks the
+// response with the durable request identity.
 func unknownImageError(c *gin.Context, controlled *imageexecution.Controlled) *types.NewAPIError {
 	controlled.AttachToResponse(c)
 	return imageexecution.UnknownAPIError(c, controlled.Execution.RequestID())
-}
-
-// writeControlledImageResponse returns the persisted image exactly once. If the
-// payload cannot be retrieved, the outcome stays UNKNOWN — a success terminal is
-// never fabricated.
-func writeControlledImageResponse(c *gin.Context, controlled *imageexecution.Controlled) *types.NewAPIError {
-	body, err := imageexecution.FetchResult(c.Request.Context(), controlled.Execution.RequestID(), controlled.AttemptID())
-	if err != nil {
-		controlled.RefuseUnknown("result_fetch_failed")
-		return unknownImageError(c, controlled)
-	}
-	controlled.AttachToResponse(c)
-	c.Data(http.StatusOK, "application/json", body)
-	return nil
 }
 
 // controlledImageReplay returns the durable state of an already accepted

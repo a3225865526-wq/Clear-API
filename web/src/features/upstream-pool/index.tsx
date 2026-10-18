@@ -32,6 +32,7 @@ import { AccountsTable } from './components/accounts-table'
 import { CreateAccountDialog } from './components/create-account-dialog'
 import { CredentialImportPanel } from './components/credential-import-panel'
 import { ReleaseControls } from './components/release-controls'
+import { ImageSourcePolicyPanel } from './components/image-source-policy'
 import { SourceRouting } from './components/source-routing'
 import { POOL_QUERY_KEY } from './constants'
 
@@ -85,6 +86,7 @@ export function PoolAccounts() {
         <div className='space-y-4'>
           {access.allowed ? <CredentialImportPanel /> : null}`r`n{' '}
           {access.allowed ? <ReleaseControls /> : null}
+          {access.allowed ? <ImageSourcePolicyPanel /> : null}
           {access.allowed ? <SourceRouting /> : null}
           {content}
         </div>

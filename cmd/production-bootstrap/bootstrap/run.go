@@ -111,16 +111,17 @@ func RunDryRun(cfg *Config) int {
 			"task_settlement":      snapshot.SettlementReady,
 			"task_settlement_logs": snapshot.SettlementLogsReady,
 			"token_encryption":     snapshot.TokenEncryptionReady,
+			"image_executions":     snapshot.ImageExecutionsReady,
 		},
 		"pending": map[string]bool{
 			"base_and_finance_and_billing_migrations": !(snapshot.FinanceSchemaPresent && snapshot.FinanceSchemaVersion == 9 &&
 				snapshot.ReservationsReady && snapshot.OutboxReady && snapshot.ReconciliationReady &&
 				snapshot.SettlementReady && snapshot.SettlementLogsReady),
-			"admin_creation": needAdmin,
-			"legal_write":    needLegal,
+			"admin_creation":    needAdmin,
+			"legal_write":       needLegal,
 			"completion_marker": true,
 		},
-		"missing_inputs":      missingInputs,
+		"missing_inputs":       missingInputs,
 		"environment_findings": environmentIssueMap(envIssues),
 	}
 	Emit("dry_run", plan)
@@ -561,6 +562,10 @@ func billingMigrationSteps() []billingStep {
 		{"token-encryption-v1", func() error { return model.MigrateTokenEncryption(model.DB) }},
 		{"billing-outbox-v1", func() error { return model.MigrateBillingCompletionOutbox(model.DB) }},
 		{"billing-receipts-v1", func() error { return model.MigrateBillingCompletionReceipts(model.DB) }},
+		// PG03 Images Contract v1. Controlled image execution fails closed
+		// without these tables, so an enabled deployment must migrate them
+		// explicitly; they are never created by an implicit startup AutoMigrate.
+		{"image-executions-v1", func() error { return model.MigrateImageExecutions(model.DB) }},
 	}
 }
 

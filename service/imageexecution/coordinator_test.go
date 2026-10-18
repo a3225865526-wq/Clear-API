@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -20,6 +21,11 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+// ownerUserID is the fixed site-owner identity the controlled image path
+// requires. Fixtures use it so they exercise the admitted path; any other ID
+// must fall back to legacy routing.
+const ownerUserID = common.PoolOwnerUserID
 
 // TestPrepareFreezesOperatorPolicy proves the request binding: the operator
 // preset is frozen, a client-supplied source or reserved header cannot change
@@ -54,7 +60,7 @@ func TestPrepareFreezesOperatorPolicy(t *testing.T) {
 	// A client body claiming a different source must not be trusted; the frozen
 	// operator preset wins and the request is recorded with it.
 	c, _ := newImageContext(t, `{"model":"gpt-image-2","prompt":"cat","n":1,"source":"api","account_id":"attacker"}`)
-	info := &relaycommon.RelayInfo{RequestId: "req-freeze", UserId: 11, TokenId: 12, RelayMode: 5}
+	info := &relaycommon.RelayInfo{RequestId: "req-freeze", UserId: ownerUserID, TokenId: 12, RelayMode: 5}
 	request := &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}
 	controlled, apiErr := Prepare(c, info, request, BodyDigestOf([]byte(`{"model":"gpt-image-2","prompt":"cat","n":1}`)))
 	require.Nil(t, apiErr)
@@ -72,19 +78,19 @@ func TestPrepareFreezesOperatorPolicy(t *testing.T) {
 
 	// The same idempotency key and body resolve to the stored request.
 	c2, _ := newImageContextWithKey(t, `{"model":"gpt-image-2","prompt":"cat","n":1}`, "client-key-1")
-	replay, apiErr := Prepare(c2, &relaycommon.RelayInfo{RequestId: "req-freeze-2", UserId: 11, TokenId: 12, RelayMode: 5}, request, BodyDigestOf([]byte(`{"model":"gpt-image-2","prompt":"cat","n":1}`)))
+	replay, apiErr := Prepare(c2, &relaycommon.RelayInfo{RequestId: "req-freeze-2", UserId: ownerUserID, TokenId: 12, RelayMode: 5}, request, BodyDigestOf([]byte(`{"model":"gpt-image-2","prompt":"cat","n":1}`)))
 	require.Nil(t, apiErr)
 	require.NotNil(t, replay)
 
 	// A different body under the same key is refused with 409.
 	c3, _ := newImageContextWithKey(t, `{"model":"gpt-image-2","prompt":"dog","n":1}`, "client-key-1")
-	_, apiErr = Prepare(c3, &relaycommon.RelayInfo{RequestId: "req-freeze-3", UserId: 11, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-image-2", Prompt: "dog"}, BodyDigestOf([]byte(`{"model":"gpt-image-2","prompt":"dog","n":1}`)))
+	_, apiErr = Prepare(c3, &relaycommon.RelayInfo{RequestId: "req-freeze-3", UserId: ownerUserID, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-image-2", Prompt: "dog"}, BodyDigestOf([]byte(`{"model":"gpt-image-2","prompt":"dog","n":1}`)))
 	require.NotNil(t, apiErr)
 	require.Equal(t, http.StatusConflict, apiErr.StatusCode)
 
 	// A model without an operator policy keeps legacy routing untouched.
 	c4, _ := newImageContext(t, `{"model":"gpt-other","prompt":"cat"}`)
-	legacy, apiErr := Prepare(c4, &relaycommon.RelayInfo{RequestId: "req-legacy", UserId: 11, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-other", Prompt: "cat"}, BodyDigestOf([]byte(`{}`)))
+	legacy, apiErr := Prepare(c4, &relaycommon.RelayInfo{RequestId: "req-legacy", UserId: ownerUserID, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-other", Prompt: "cat"}, BodyDigestOf([]byte(`{}`)))
 	require.Nil(t, apiErr)
 	require.Nil(t, legacy)
 
@@ -93,9 +99,116 @@ func TestPrepareFreezesOperatorPolicy(t *testing.T) {
 	common.OptionMap[model.ImageSourcePolicyOptionKey("gpt-image-2")] = "{broken"
 	common.OptionMapRWMutex.Unlock()
 	c5, _ := newImageContext(t, `{"model":"gpt-image-2","prompt":"cat"}`)
-	_, apiErr = Prepare(c5, &relaycommon.RelayInfo{RequestId: "req-corrupt", UserId: 11, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}, BodyDigestOf([]byte(`{}`)))
+	_, apiErr = Prepare(c5, &relaycommon.RelayInfo{RequestId: "req-corrupt", UserId: ownerUserID, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}, BodyDigestOf([]byte(`{}`)))
 	require.NotNil(t, apiErr)
 	require.Equal(t, http.StatusServiceUnavailable, apiErr.StatusCode)
+}
+
+// TestDisabledPolicyReturnsToLegacyRouting proves the operator's enabled flag is
+// authoritative: disabling a model must restore the pre-existing image routing
+// instead of either refusing the request or keeping it inside the controlled
+// path. A client cannot influence the decision either way.
+func TestDisabledPolicyReturnsToLegacyRouting(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fixture := newExecutionFixture(t)
+	previousDB := model.DB
+	model.DB = fixture.db
+	previousOptions := common.OptionMap
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap = map[string]string{}
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() {
+		model.DB = previousDB
+		common.OptionMapRWMutex.Lock()
+		common.OptionMap = previousOptions
+		common.OptionMapRWMutex.Unlock()
+	})
+
+	t.Setenv(imagesModeEnv, "true")
+	t.Setenv(imagesBaseModelEnv, "gpt-5.4-mini")
+	t.Setenv(imagesPoolIDEnv, "synthetic-pool")
+	seedImagePoolOrder(t, fixture.db)
+
+	body := `{"model":"gpt-image-2","prompt":"cat","n":1}`
+	info := func(requestID string) *relaycommon.RelayInfo {
+		return &relaycommon.RelayInfo{RequestId: requestID, UserId: ownerUserID, TokenId: 12, RelayMode: 5}
+	}
+
+	// Enabled: the request is controlled.
+	_, err := model.SaveImageSourcePolicy(model.ImageSourcePolicy{Model: "gpt-image-2", Strategy: model.ImageSourcePoolFirst, Enabled: true}, 0)
+	require.NoError(t, err)
+	cEnabled, _ := newImageContext(t, body)
+	enabled, apiErr := Prepare(cEnabled, info("req-enabled"), &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}, BodyDigestOf([]byte(body)))
+	require.Nil(t, apiErr)
+	require.NotNil(t, enabled)
+
+	// Disabled: the very same request must fall back to legacy routing.
+	stored, err := model.GetImageSourcePolicy("gpt-image-2")
+	require.NoError(t, err)
+	disabledPolicy := *stored
+	disabledPolicy.Enabled = false
+	_, err = model.SaveImageSourcePolicy(disabledPolicy, stored.Version)
+	require.NoError(t, err)
+
+	cDisabled, _ := newImageContext(t, body)
+	disabled, apiErr := Prepare(cDisabled, info("req-disabled"), &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}, BodyDigestOf([]byte(body)))
+	require.Nil(t, apiErr, "a disabled policy must not fail the request")
+	require.Nil(t, disabled, "a disabled policy must leave the request on the legacy path")
+
+	// A client cannot re-enable it: a forged reserved header finds no policy to
+	// override, so the request stays on the legacy path.
+	cHeader, _ := newImageContext(t, body)
+	cHeader.Request.Header.Set(PolicyHeader, "forged")
+	cHeader.Request.Header.Set(RequestHeader, "forged-request")
+	stillDisabled, apiErr := Prepare(cHeader, info("req-disabled-header"), &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}, BodyDigestOf([]byte(body)))
+	require.Nil(t, apiErr)
+	require.Nil(t, stillDisabled)
+}
+
+// TestNonOwnerNeverEntersControlledPath proves the owner-only boundary on the
+// real image endpoint: an ordinary user holding a valid token keeps the legacy
+// routing no matter what they send, so the site owner's account pool and its
+// cost can never be reached through a public image request.
+func TestNonOwnerNeverEntersControlledPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	fixture := newExecutionFixture(t)
+	previousDB := model.DB
+	model.DB = fixture.db
+	previousOptions := common.OptionMap
+	common.OptionMapRWMutex.Lock()
+	common.OptionMap = map[string]string{}
+	common.OptionMapRWMutex.Unlock()
+	t.Cleanup(func() {
+		model.DB = previousDB
+		common.OptionMapRWMutex.Lock()
+		common.OptionMap = previousOptions
+		common.OptionMapRWMutex.Unlock()
+	})
+
+	t.Setenv(imagesModeEnv, "true")
+	t.Setenv(imagesBaseModelEnv, "gpt-5.4-mini")
+	t.Setenv(imagesPoolIDEnv, "synthetic-pool")
+	seedImagePoolOrder(t, fixture.db)
+	_, err := model.SaveImageSourcePolicy(model.ImageSourcePolicy{Model: "gpt-image-2", Strategy: model.ImageSourcePoolFirst, Enabled: true}, 0)
+	require.NoError(t, err)
+
+	body := `{"model":"gpt-image-2","prompt":"cat","n":1}`
+
+	// The owner is admitted.
+	cOwner, _ := newImageContext(t, body)
+	owner, apiErr := Prepare(cOwner, &relaycommon.RelayInfo{RequestId: "req-owner", UserId: ownerUserID, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}, BodyDigestOf([]byte(body)))
+	require.Nil(t, apiErr)
+	require.NotNil(t, owner, "the site owner must be admitted")
+
+	// Any other authenticated user is not, and is never charged or errored for it.
+	for _, userID := range []int{2, 7, 11, 20} {
+		cUser, _ := newImageContext(t, body)
+		// A forged owner claim in a header must not help either.
+		cUser.Request.Header.Set("X-User-Id", strconv.Itoa(ownerUserID))
+		controlled, apiErr := Prepare(cUser, &relaycommon.RelayInfo{RequestId: "req-user-" + strconv.Itoa(userID), UserId: userID, TokenId: 12, RelayMode: 5}, &dto.ImageRequest{Model: "gpt-image-2", Prompt: "cat"}, BodyDigestOf([]byte(body)))
+		require.Nil(t, apiErr, "a non-owner must keep legacy routing, not fail")
+		require.Nil(t, controlled, "user %d must never enter the controlled path", userID)
+	}
 }
 
 // TestSourceStrategyControlsDispatch proves the four presets: the *_only
@@ -158,7 +271,7 @@ func TestUnknownKeepsReservationAndNeverSettles(t *testing.T) {
 	t.Cleanup(func() { model.DB = previousDB })
 
 	entry := &model.ImageExecution{
-		RequestID: "req-unknown", UserID: 11, TokenID: 12,
+		RequestID: "req-unknown", UserID: ownerUserID, TokenID: 12,
 		BodyDigest: model.ImageRequestBodyDigest([]byte(`{}`)), Operation: model.ImageRequestOperation,
 		Model: "gpt-image-2", RequestedCount: 1, SourceStrategy: model.ImageSourcePoolFirst,
 	}
