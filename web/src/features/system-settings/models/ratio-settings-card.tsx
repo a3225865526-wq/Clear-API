@@ -561,7 +561,7 @@ export function RatioSettingsCard({
               onClick={() => setCleanupOpen(true)}
               disabled={savePricing.isPending || resetMutation.isPending}
             >
-              {t('Clean up model pricing')}
+              {t('Clear model pricing')}
             </Button>
           </div>
           {savePricing.isError && (

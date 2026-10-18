@@ -119,21 +119,20 @@ export async function previewModelPricing(request: {
   }
 }
 
-export type ModelPricingCleanupAction =
-  | 'keep'
-  | 'reset_to_defaults'
-  | 'use_builtin'
+export type ModelPricingCleanupAction = 'keep' | 'clear'
 
 export type ModelPricingCleanupRecord = {
   model_name: string
   billing_mode: string
   version: string
-  configured: string[]
-  configured_expr?: string
-  built_in_expr?: string
-  built_in: boolean
   action: ModelPricingCleanupAction
-  unpriced_after_reset?: boolean
+  /** Stored sales-price options that cleanup removes. */
+  configured: string[]
+  /** Number of stored entries cleanup removes. */
+  clear_count: number
+  /** The engine has a built-in expression; cleanup never persists it. */
+  built_in: boolean
+  built_in_expr?: string
 }
 
 export type ModelPricingCleanupPlan = ModelPricingCleanupRecord & {

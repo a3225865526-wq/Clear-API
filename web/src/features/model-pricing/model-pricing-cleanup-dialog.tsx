@@ -41,12 +41,6 @@ import {
   type ModelPricingCleanupRecord,
 } from './api'
 
-const ACTION_LABELS: Record<ModelPricingCleanupRecord['action'], string> = {
-  keep: 'No cleanup needed',
-  reset_to_defaults: 'Restore built-in price',
-  use_builtin: 'Use built-in upstream price',
-}
-
 export function ModelPricingCleanupDialog(props: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -76,21 +70,21 @@ export function ModelPricingCleanupDialog(props: {
       setPlan(report)
       setSelected([])
       toast.success(
-        t('Cleaned up pricing for {{count}} models', {
+        t('Cleared pricing for {{count}} models', {
           count: report.cleared?.length ?? 0,
         })
       )
       await invalidateModelPricing(queryClient)
-      await queryClient.invalidateQueries({ queryKey: ['model-pricing-cleanup'] })
+      await queryClient.invalidateQueries({
+        queryKey: ['model-pricing-cleanup'],
+      })
     },
     onError: (error: Error) =>
       handleServerError(error, t('Failed to clean up model pricing')),
   })
 
-  const selectable = (record: ModelPricingCleanupRecord) =>
-    record.action !== 'keep'
   const records = plan?.records ?? []
-  const candidates = records.filter(selectable)
+  const candidates = records.filter((record) => record.action === 'clear')
   const allSelected =
     candidates.length > 0 &&
     candidates.every((record) => selected.includes(record.model_name))
@@ -101,16 +95,18 @@ export function ModelPricingCleanupDialog(props: {
       header: (
         <Checkbox
           checked={allSelected}
-          aria-label={t('Select all models with pricing to clean up')}
+          aria-label={t('Select all models with pricing to clear')}
           onCheckedChange={(checked) =>
-            setSelected(checked === true ? candidates.map((r) => r.model_name) : [])
+            setSelected(
+              checked === true ? candidates.map((r) => r.model_name) : []
+            )
           }
         />
       ),
       cell: (record) => (
         <Checkbox
           checked={selected.includes(record.model_name)}
-          disabled={!selectable(record)}
+          disabled={record.action !== 'clear'}
           aria-label={t('Select {{model}}', { model: record.model_name })}
           onCheckedChange={(checked) =>
             setSelected((previous) =>
@@ -130,10 +126,10 @@ export function ModelPricingCleanupDialog(props: {
           <p className='truncate font-medium'>{record.model_name}</p>
           <p className='text-muted-foreground text-xs'>
             {record.configured.length
-              ? t('Site pricing: {{fields}}', {
+              ? t('Stored pricing: {{fields}}', {
                   fields: record.configured.join(', '),
                 })
-              : t('No site pricing stored')}
+              : t('No stored pricing')}
           </p>
         </div>
       ),
@@ -143,10 +139,16 @@ export function ModelPricingCleanupDialog(props: {
       header: t('Cleanup'),
       cell: (record) => (
         <div className='space-y-1 text-xs'>
-          <p>{t(ACTION_LABELS[record.action])}</p>
-          {record.unpriced_after_reset && (
-            <p role='status' className='text-amber-600 dark:text-amber-400'>
-              {t('No built-in price. This model becomes unpriced after reset.')}
+          <p>
+            {record.action === 'clear'
+              ? t('Clear stored pricing')
+              : t('Already clear')}
+          </p>
+          {record.action === 'clear' && record.built_in && (
+            <p className='text-muted-foreground'>
+              {t(
+                'The built-in upstream price is not written back; the engine resolves it at billing time.'
+              )}
             </p>
           )}
         </div>
@@ -179,8 +181,8 @@ export function ModelPricingCleanupDialog(props: {
         disabled={!selected.length || apply.isPending}
       >
         {apply.isPending
-          ? t('Cleaning up...')
-          : t('Clean up {{count}} models', { count: selected.length })}
+          ? t('Clearing...')
+          : t('Clear {{count}} models', { count: selected.length })}
       </Button>
     </>
   )
@@ -190,7 +192,7 @@ export function ModelPricingCleanupDialog(props: {
       <Dialog
         open={props.open}
         onOpenChange={props.onOpenChange}
-        title={t('Clean up model pricing')}
+        title={t('Clear model pricing')}
       >
         <ErrorState
           description={query.error.message}
@@ -204,9 +206,9 @@ export function ModelPricingCleanupDialog(props: {
     <Dialog
       open={props.open}
       onOpenChange={props.onOpenChange}
-      title={t('Clean up model pricing')}
+      title={t('Clear model pricing')}
       description={t(
-        'Remove site pricing records so the built-in price applies. Model definitions, channels, groups, API keys, users and usage history are not affected.'
+        'Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.'
       )}
       contentClassName='sm:max-w-4xl'
       contentHeight='min(70vh, 720px)'
@@ -222,13 +224,13 @@ export function ModelPricingCleanupDialog(props: {
               <p>{apply.error.message}</p>
               <p className='mt-1'>
                 {t(
-                  'Pricing changed since this plan was prepared. Reload before cleaning up.'
+                  'Pricing changed since this plan was prepared. Reload before clearing.'
                 )}
               </p>
             </div>
           )}
           <p className='text-muted-foreground text-sm' role='status'>
-            {t('{{count}} models have site pricing to clean up', {
+            {t('{{count}} models have stored pricing to clear', {
               count: candidates.length,
             })}
           </p>
@@ -237,7 +239,7 @@ export function ModelPricingCleanupDialog(props: {
             data={records}
             getRowKey={(record) => record.model_name}
             tableProps={{ 'aria-label': t('Model pricing cleanup') }}
-            emptyContent={t('No enabled models were found')}
+            emptyContent={t('No model pricing records were found')}
           />
         </div>
       )}

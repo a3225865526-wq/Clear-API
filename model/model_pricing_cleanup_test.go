@@ -30,6 +30,16 @@ func seedModelPricingOverrides(t *testing.T, overrides map[string]string) {
 	require.NoError(t, UpdateModelPricingOptions(overrides))
 }
 
+func storedOptionEntries(t *testing.T, key string) map[string]any {
+	t.Helper()
+	var row Option
+	err := DB.Where(commonKeyCol+" = ?", key).First(&row).Error
+	require.NoError(t, err)
+	var entries map[string]any
+	require.NoError(t, common.UnmarshalJsonStr(row.Value, &entries))
+	return entries
+}
+
 func cleanupRecordByName(t *testing.T, report *ModelPricingCleanup, name string) ModelPricingRecord {
 	t.Helper()
 	for _, record := range report.Records {
@@ -41,85 +51,57 @@ func cleanupRecordByName(t *testing.T, report *ModelPricingCleanup, name string)
 	return ModelPricingRecord{}
 }
 
-func cleanupPlanByName(t *testing.T, report *ModelPricingCleanup, name string) ModelPricingCleanupPlan {
-	t.Helper()
-	for _, plan := range report.Plans {
-		if plan.ModelName == name {
-			return plan
-		}
-	}
-	require.Failf(t, "missing cleanup plan", "model %s is not planned", name)
-	return ModelPricingCleanupPlan{}
-}
-
-// The cleanup list must describe where each price record lives, distinguish an
-// inherited default from this site's own override, and plan a reset that keeps
-// models priced when a built-in upstream price exists.
-func TestModelPricingCleanupReportPlansResetWithoutTouchingOtherRecords(t *testing.T) {
+// The cleanup list must describe the stored records it will remove, and must not
+// treat an inherited engine default as a stored site price.
+func TestModelPricingCleanupReportDescribesStoredRecordsOnly(t *testing.T) {
 	resetModelPricingCleanupTestTables(t)
 	insertPricingEndpointChannel(t, 501, 1, pricingEndpointAdvancedCustomConfig())
-	for _, name := range []string{"gpt-4", "legacy-request-model", "clean-model"} {
+	for _, name := range []string{"gpt-4", "clean-model"} {
 		insertPricingEndpointAbility(t, 501, name)
 	}
 	builtInName := "gpt-6-astra"
 	insertPricingEndpointAbility(t, 501, builtInName)
-	builtInExpr, hasBuiltIn := billing_setting.GetBuiltinBillingExpr(builtInName)
+	_, hasBuiltIn := billing_setting.GetBuiltinBillingExpr(builtInName)
 	require.True(t, hasBuiltIn, "the test needs a model with a built-in upstream price")
 
 	seedModelPricingOverrides(t, map[string]string{
 		"ModelRatio":                   `{"gpt-4":0.5,"gpt-6-astra":0.75}`,
-		"ModelPrice":                   `{"legacy-request-model":0.02}`,
 		"CompletionRatio":              `{"gpt-4":4}`,
 		"billing_setting.billing_mode": `{"gpt-4":"ratio"}`,
+		"billing_setting.billing_expr": `{"gpt-4":"tier(\"base\", p * 1)"}`,
 	})
 
 	report, err := ModelPricingCleanupReport()
 	require.NoError(t, err)
 
 	ratioRecord := cleanupRecordByName(t, report, "gpt-4")
-	assert.Equal(t, ModelPricingCleanupReset, ratioRecord.Action)
-	assert.Equal(t, billing_setting.BillingModeRatio, ratioRecord.BillingMode)
-	assert.ElementsMatch(t, []string{"ModelRatio", "CompletionRatio", "billing_setting.billing_mode"}, ratioRecord.Configured)
-	assert.False(t, ratioRecord.UnpricedAfterReset, "a built-in default ratio keeps the model priced")
-	assert.Equal(t, 15.0, cleanupPlanByName(t, report, "gpt-4").Pricing["ModelRatio"],
-		"reset must restore the built-in ratio instead of dropping the price")
+	assert.Equal(t, ModelPricingCleanupClear, ratioRecord.Action)
+	assert.Subset(t, ratioRecord.Configured,
+		[]string{"ModelRatio", "CompletionRatio", "billing_setting.billing_mode", "billing_setting.billing_expr"})
+	// The shared pricing write path materializes engine defaults into storage,
+	// so cleanup may also find such a key stored for the model; it clears it
+	// rather than leaving it behind.
+	for _, key := range ratioRecord.Configured {
+		assert.Contains(t, modelPricingSalesKeys, key)
+	}
+	assert.Equal(t, len(ratioRecord.Configured), ratioRecord.ClearCount)
 
-	requestRecord := cleanupRecordByName(t, report, "legacy-request-model")
-	assert.Equal(t, ModelPricingCleanupReset, requestRecord.Action)
-	assert.Contains(t, requestRecord.Configured, "ModelPrice")
-
-	// A model with a built-in upstream price is realigned to that cost price
-	// instead of being left with a stale ratio override.
-	builtInRecord := cleanupRecordByName(t, report, builtInName)
-	assert.Equal(t, ModelPricingCleanupBuiltIn, builtInRecord.Action)
-	assert.Equal(t, builtInExpr, builtInRecord.BuiltInExpr)
-	assert.Equal(t, PricingValues{
-		"billing_setting.billing_mode": billing_setting.BillingModeTieredExpr,
-		"billing_setting.billing_expr": builtInExpr,
-	}, cleanupPlanByName(t, report, builtInName).Pricing)
-
+	// A model with no stored record is already clear even though the engine
+	// would resolve a default price for it.
 	assert.Equal(t, ModelPricingCleanupKeep, cleanupRecordByName(t, report, "clean-model").Action)
+	assert.Zero(t, cleanupRecordByName(t, report, "clean-model").ClearCount)
+
+	// A built-in expression is not a stored record: cleanup must not report it
+	// as something to remove, and never writes it into storage.
+	builtInRecord := cleanupRecordByName(t, report, builtInName)
+	assert.True(t, builtInRecord.BuiltIn)
+	assert.Equal(t, ModelPricingCleanupClear, builtInRecord.Action)
+	assert.NotContains(t, builtInRecord.Configured, "billing_setting.billing_expr")
 }
 
-func TestModelPricingCleanupFlagsUnpricedModelWithoutBlocking(t *testing.T) {
-	resetModelPricingCleanupTestTables(t)
-	insertPricingEndpointChannel(t, 502, 1, pricingEndpointAdvancedCustomConfig())
-	insertPricingEndpointAbility(t, 502, "no-default-model")
-	seedModelPricingOverrides(t, map[string]string{
-		"ModelRatio": `{"no-default-model":0.25}`,
-	})
-
-	report, err := ModelPricingCleanupReport()
-	require.NoError(t, err)
-
-	record := cleanupRecordByName(t, report, "no-default-model")
-	assert.Equal(t, ModelPricingCleanupReset, record.Action)
-	assert.True(t, record.UnpricedAfterReset, "resetting an unpriced model is a warning, not a blocker")
-}
-
-// Cleanup must remove only the selected pricing records and must preserve model
-// definitions, channels, groups, keys, users and historical usage.
-func TestApplyModelPricingCleanupClearsOnlySelectedPricing(t *testing.T) {
+// Cleanup must empty the stored sales-price record rather than restoring the
+// built-in or default client price.
+func TestApplyModelPricingCleanupEmptiesStoredPricesInsteadOfRestoringDefaults(t *testing.T) {
 	resetModelPricingCleanupTestTables(t)
 	insertPricingEndpointChannel(t, 503, 1, pricingEndpointAdvancedCustomConfig())
 	for _, name := range []string{"cleanup-me", "keep-me"} {
@@ -136,12 +118,10 @@ func TestApplyModelPricingCleanupClearsOnlySelectedPricing(t *testing.T) {
 	for _, entry := range before.Entries {
 		beforeEntry[entry.ModelName] = entry
 	}
-	require.Contains(t, beforeEntry["cleanup-me"].Configured, "ModelRatio")
+	require.Contains(t, storedOptionEntries(t, "ModelRatio"), "cleanup-me")
 
 	report, err := ModelPricingCleanupReport()
 	require.NoError(t, err)
-	require.NotEmpty(t, report.Snapshot)
-
 	applied, err := ApplyModelPricingCleanup(report.Snapshot, []ModelPricingCleanupChange{{
 		ModelName:       "cleanup-me",
 		ExpectedVersion: beforeEntry["cleanup-me"].Version,
@@ -149,6 +129,15 @@ func TestApplyModelPricingCleanupClearsOnlySelectedPricing(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"cleanup-me"}, applied.Cleared)
 
+	// The stored maps no longer hold the cleared model, and no default was
+	// written back in its place.
+	storedRatio := storedOptionEntries(t, "ModelRatio")
+	assert.NotContains(t, storedRatio, "cleanup-me", "the cleared price must not be restored")
+	assert.NotContains(t, storedOptionEntries(t, "CompletionRatio"), "cleanup-me")
+	assert.Equal(t, 0.6, storedRatio["keep-me"], "unselected pricing must be untouched")
+
+	// The engine still resolves a built-in default for display, which is the
+	// pre-existing fallback rather than a restored record.
 	after, err := GetModelPricingSnapshot([]string{"cleanup-me", "keep-me"})
 	require.NoError(t, err)
 	afterEntry := make(map[string]ModelPricingEntry, len(after.Entries))
@@ -156,23 +145,100 @@ func TestApplyModelPricingCleanupClearsOnlySelectedPricing(t *testing.T) {
 		afterEntry[entry.ModelName] = entry
 	}
 	assert.Empty(t, afterEntry["cleanup-me"].Configured, "the selected model must lose its own pricing")
-	assert.Equal(t, beforeEntry["keep-me"].Version, afterEntry["keep-me"].Version, "unselected pricing must be untouched")
-	assert.Equal(t, beforeEntry["keep-me"].Configured, afterEntry["keep-me"].Configured)
+	assert.Equal(t, beforeEntry["keep-me"].Version, afterEntry["keep-me"].Version)
 
-	// Channels, abilities and model definitions are not pricing rows: they must
-	// survive the cleanup untouched.
+	// Channels and abilities are not pricing rows and must survive untouched.
 	var channels, abilities int64
 	require.NoError(t, DB.Model(&Channel{}).Count(&channels).Error)
 	require.NoError(t, DB.Model(&Ability{}).Count(&abilities).Error)
 	assert.EqualValues(t, 1, channels)
 	assert.EqualValues(t, 2, abilities)
 
-	// Re-running the same plan is stale, and a keep record cannot be cleared.
+	// Replaying the same plan is stale: cleanup is a one-shot action.
 	_, err = ApplyModelPricingCleanup(report.Snapshot, []ModelPricingCleanupChange{{
 		ModelName:       "keep-me",
 		ExpectedVersion: beforeEntry["keep-me"].Version,
 	}})
 	require.ErrorIs(t, err, ErrModelPricingStale, "a cleanup plan must not be replayed after the state changed")
+}
+
+// Clearing must survive a process restart: startup reloads the stored options,
+// which must not reinstate a cleared price.
+func TestClearedModelPricingStaysClearedAfterReload(t *testing.T) {
+	resetModelPricingCleanupTestTables(t)
+	insertPricingEndpointChannel(t, 505, 1, pricingEndpointAdvancedCustomConfig())
+	insertPricingEndpointAbility(t, 505, "restart-model")
+	seedModelPricingOverrides(t, map[string]string{"ModelRatio": `{"restart-model":0.35}`})
+
+	snapshot, err := GetModelPricingSnapshot([]string{"restart-model"})
+	require.NoError(t, err)
+	report, err := ModelPricingCleanupReport()
+	require.NoError(t, err)
+	_, err = ApplyModelPricingCleanup(report.Snapshot, []ModelPricingCleanupChange{{
+		ModelName:       "restart-model",
+		ExpectedVersion: snapshot.Entries[0].Version,
+	}})
+	require.NoError(t, err)
+
+	// Simulate startup: defaults are installed, then options are reloaded.
+	ratio_setting.InitRatioSettings()
+	initCol()
+	reloaded, err := storedPricingMaps(DB)
+	require.NoError(t, err)
+	assert.Empty(t, modelPricingValues(reloaded, "restart-model"),
+		"a cleared price must not reappear after reloading stored options")
+}
+
+// Cleanup must not refill the pricing list: the shared write path materializes
+// engine defaults on save, so cleanup has to persist only the surviving stored
+// rows.
+func TestApplyModelPricingCleanupDoesNotMaterializeDefaultsForOtherModels(t *testing.T) {
+	resetModelPricingCleanupTestTables(t)
+	insertPricingEndpointChannel(t, 506, 1, pricingEndpointAdvancedCustomConfig())
+	insertPricingEndpointAbility(t, 506, "target-model")
+	insertPricingEndpointAbility(t, 506, "bystander-model")
+	seedModelPricingOverrides(t, map[string]string{"ModelRatio": `{"target-model":0.4}`})
+
+	before, err := GetModelPricingSnapshot([]string{"target-model", "bystander-model"})
+	require.NoError(t, err)
+	targetVersion := ""
+	for _, entry := range before.Entries {
+		if entry.ModelName == "target-model" {
+			targetVersion = entry.Version
+		}
+	}
+	require.NotEmpty(t, targetVersion)
+
+	// Scale the concern up: a default-heavy option must not gain records.
+	seedStored := len(storedOptionEntries(t, "CompletionRatio"))
+	require.Positive(t, seedStored)
+
+	report, err := ModelPricingCleanupReport()
+	require.NoError(t, err)
+	_, err = ApplyModelPricingCleanup(report.Snapshot, []ModelPricingCleanupChange{{
+		ModelName:       "target-model",
+		ExpectedVersion: targetVersion,
+	}})
+	require.NoError(t, err)
+
+	stored, err := storedPricingMaps(DB)
+	require.NoError(t, err)
+	assert.Empty(t, modelPricingValues(stored, "target-model"), "the cleared model must stay empty")
+	assert.Empty(t, modelPricingValues(stored, "bystander-model"),
+		"an untouched model must not gain a stored default record")
+	assert.Len(t, stored["CompletionRatio"], seedStored,
+		"cleanup must not expand the stored pricing list")
+
+	// A second pass cannot loop on the models this cleanup cleared.
+	second, err := ModelPricingCleanupReport()
+	require.NoError(t, err)
+	for _, record := range second.Records {
+		if record.ModelName != "target-model" && record.ModelName != "bystander-model" {
+			continue
+		}
+		assert.Equal(t, ModelPricingCleanupKeep, record.Action,
+			"%s must not be clearable twice", record.ModelName)
+	}
 }
 
 func TestApplyModelPricingCleanupRejectsUnreviewedState(t *testing.T) {

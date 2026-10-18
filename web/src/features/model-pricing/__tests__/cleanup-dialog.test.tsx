@@ -32,18 +32,28 @@ const cleanupReport = {
       model_name: 'gpt-4',
       billing_mode: 'ratio',
       version: 'v-ratio',
-      configured: ['ModelRatio'],
+      action: 'clear',
+      configured: ['ModelRatio', 'CompletionRatio'],
+      clear_count: 2,
       built_in: false,
-      action: 'reset_to_defaults',
-      unpriced_after_reset: true,
+    },
+    {
+      model_name: 'gpt-6-astra',
+      billing_mode: 'ratio',
+      version: 'v-builtin',
+      action: 'clear',
+      configured: ['ModelRatio'],
+      clear_count: 1,
+      built_in: true,
     },
     {
       model_name: 'clean-model',
       billing_mode: 'ratio',
       version: 'v-clean',
-      configured: [],
-      built_in: false,
       action: 'keep',
+      configured: [],
+      clear_count: 0,
+      built_in: false,
     },
   ],
   plans: [
@@ -51,19 +61,30 @@ const cleanupReport = {
       model_name: 'gpt-4',
       billing_mode: 'ratio',
       version: 'v-ratio',
-      configured: ['ModelRatio'],
+      action: 'clear',
+      configured: ['ModelRatio', 'CompletionRatio'],
+      clear_count: 2,
       built_in: false,
-      action: 'reset_to_defaults',
-      unpriced_after_reset: true,
-      pricing: { ModelRatio: 15 },
+      pricing: {},
+    },
+    {
+      model_name: 'gpt-6-astra',
+      billing_mode: 'ratio',
+      version: 'v-builtin',
+      action: 'clear',
+      configured: ['ModelRatio'],
+      clear_count: 1,
+      built_in: true,
+      pricing: {},
     },
     {
       model_name: 'clean-model',
       billing_mode: 'ratio',
       version: 'v-clean',
-      configured: [],
-      built_in: false,
       action: 'keep',
+      configured: [],
+      clear_count: 0,
+      built_in: false,
       pricing: {},
     },
   ],
@@ -88,7 +109,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-it('lists where each site price record lives and applies only the reviewed selection', async () => {
+it('submits an empty draft for the reviewed selection so nothing is restored', async () => {
   vi.spyOn(api, 'get').mockResolvedValue({
     data: { success: true, data: cleanupReport },
   })
@@ -103,18 +124,15 @@ it('lists where each site price record lives and applies only the reviewed selec
   })
   expect(within(table).getByText('gpt-4')).toBeVisible()
   expect(
-    within(table).getByText('Site pricing: ModelRatio')
+    within(table).getByText('Stored pricing: ModelRatio, CompletionRatio')
   ).toBeVisible()
 
-  const submit = screen.getByRole('button', { name: 'Clean up 0 models' })
-  expect(submit).toBeDisabled()
+  expect(
+    screen.getByRole('button', { name: 'Clear 0 models' })
+  ).toBeDisabled()
 
-  await user.click(
-    screen.getByRole('checkbox', { name: 'Select gpt-4' })
-  )
-  await user.click(
-    screen.getByRole('button', { name: 'Clean up 1 models' })
-  )
+  await user.click(screen.getByRole('checkbox', { name: 'Select gpt-4' }))
+  await user.click(screen.getByRole('button', { name: 'Clear 1 models' }))
 
   await waitFor(() => expect(post).toHaveBeenCalledOnce())
   expect(post.mock.calls[0]).toEqual([
@@ -122,13 +140,14 @@ it('lists where each site price record lives and applies only the reviewed selec
     {
       snapshot: 'snapshot-1',
       changes: [
-        { model_name: 'gpt-4', expected_version: 'v-ratio', pricing: { ModelRatio: 15 } },
+        // An empty draft means "remove every stored price", never "restore".
+        { model_name: 'gpt-4', expected_version: 'v-ratio', pricing: {} },
       ],
     },
   ])
 })
 
-it('keeps models without site pricing unselectable and warns about an unpriced reset', async () => {
+it('keeps already-clear models unselectable and explains the built-in fallback', async () => {
   vi.spyOn(api, 'get').mockResolvedValue({
     data: { success: true, data: cleanupReport },
   })
@@ -138,9 +157,10 @@ it('keeps models without site pricing unselectable and warns about an unpriced r
   expect(
     screen.getByRole('checkbox', { name: 'Select clean-model' })
   ).toHaveAttribute('aria-disabled', 'true')
+  expect(screen.getByText('Already clear')).toBeVisible()
   expect(
     screen.getByText(
-      'No built-in price. This model becomes unpriced after reset.'
+      'The built-in upstream price is not written back; the engine resolves it at billing time.'
     )
   ).toBeVisible()
 })

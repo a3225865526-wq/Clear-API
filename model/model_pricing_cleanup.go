@@ -4,61 +4,98 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
-	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"gorm.io/gorm"
 )
 
-// Pricing cleanup is a one-shot, administrator-approved operation over the
-// existing pricing options. It never touches model definitions, channels,
+// Model pricing cleanup is a one-shot, administrator-approved operation over
+// the existing pricing options. It removes the site's stored model price
+// records so the list is empty, and never touches model definitions, channels,
 // groups, API keys, users, usage logs or bills. It is not part of startup
 // AutoMigrate and never runs automatically when the application starts.
+//
+// Clearing a record removes stored keys only. The engine's built-in defaults
+// are never written back: they are applied at read time by
+// effectiveModelPricing, so persisting them would make "cleared" mean
+// "restored to the client sales price" instead of "empty".
 
 // ErrModelPricingStale is returned when the reviewed cleanup plan no longer
 // matches the stored pricing state, so a new plan must be prepared and reviewed.
 var ErrModelPricingStale = errors.New("model pricing changed since this cleanup plan was prepared")
 
+// modelPricingSalesKeys are the options that store this site's model sales
+// prices. They are removed by cleanup. billing_setting.billing_mode is included
+// because a stored mode is what keeps a model on an expression or a ratio once
+// its prices are gone.
+var modelPricingSalesKeys = []string{
+	"ModelPrice", "ModelRatio", "CompletionRatio", "CacheRatio",
+	"CreateCacheRatio", "ImageRatio", "AudioRatio", "AudioCompletionRatio",
+	"billing_setting.billing_mode", "billing_setting.billing_expr",
+	billing_setting.PluginBillingExprOption,
+}
+
+// storedPricingMaps reads the pricing options exactly as persisted, without
+// merging engine defaults, so cleanup can distinguish "no stored record" from
+// "stored value happens to equal the default".
+func storedPricingMaps(db *gorm.DB) (map[string]map[string]any, error) {
+	var rows []Option
+	if err := db.Where(commonKeyCol+" IN ?", modelPricingOptionKeys).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	values := make(map[string]map[string]any, len(modelPricingOptionKeys))
+	for _, key := range modelPricingOptionKeys {
+		values[key] = make(map[string]any)
+	}
+	for _, row := range rows {
+		var entries map[string]any
+		if err := common.UnmarshalJsonStr(row.Value, &entries); err != nil {
+			return nil, fmt.Errorf("%s: %w", row.Key, err)
+		}
+		if entries == nil {
+			return nil, fmt.Errorf("%s must be a JSON object", row.Key)
+		}
+		values[row.Key] = entries
+	}
+	return values, nil
+}
+
+// ModelPricingCleanupAction describes the only two outcomes cleanup produces:
+// the stored record is emptied, or there was nothing stored to empty.
 type ModelPricingCleanupAction string
 
 const (
-	// ModelPricingCleanupKeep leaves an already clean record untouched.
-	ModelPricingCleanupKeep ModelPricingCleanupAction = "keep"
-	// ModelPricingCleanupReset removes this site's own pricing so the built-in
-	// or engine default pricing applies again.
-	ModelPricingCleanupReset ModelPricingCleanupAction = "reset_to_defaults"
-	// ModelPricingCleanupBuiltIn replaces this site's own pricing with the
-	// built-in upstream cost expression, keeping the model priced while its
-	// sales price is reviewed.
-	ModelPricingCleanupBuiltIn ModelPricingCleanupAction = "use_builtin"
+	ModelPricingCleanupKeep  ModelPricingCleanupAction = "keep"
+	ModelPricingCleanupClear ModelPricingCleanupAction = "clear"
 )
 
 type ModelPricingRecord struct {
 	ModelName string `json:"model_name"`
-	// BillingMode is the effective mode, so the administrator can see whether
-	// the record currently charges a ratio, a per-request price or an expression.
-	BillingMode string `json:"billing_mode"`
+	// BillingMode is the current effective mode for display only; it is not a
+	// value cleanup preserves.
+	BillingMode string                    `json:"billing_mode"`
+	Action      ModelPricingCleanupAction `json:"action"`
 	// Version is the stored pricing version the administrator reviews; cleanup
 	// is rejected if the record changed after this plan was prepared.
-	Version        string                    `json:"version"`
-	Configured     []string                  `json:"configured"`
-	ConfiguredExpr string                    `json:"configured_expr,omitempty"`
-	BuiltInExpr    string                    `json:"built_in_expr,omitempty"`
-	BuiltIn        bool                      `json:"built_in"`
-	Action         ModelPricingCleanupAction `json:"action"`
-	// UnpricedAfterReset warns that the reset model has no built-in and no
-	// default price, so it becomes unpriced until the administrator sets a
-	// sales price. It is a warning, never a blocker.
-	UnpricedAfterReset bool `json:"unpriced_after_reset,omitempty"`
+	Version string `json:"version"`
+	// Configured lists the stored sales-price options that cleanup removes.
+	Configured []string `json:"configured"`
+	// BuiltInExpr reports that the engine has a built-in upstream expression
+	// for this model. Cleanup never persists it; it only documents which price
+	// the engine falls back to at read time.
+	BuiltInExpr string `json:"built_in_expr,omitempty"`
+	BuiltIn     bool   `json:"built_in"`
+	// ClearCount is the number of stored entries cleanup removes for this model.
+	ClearCount int `json:"clear_count"`
 }
 
 type ModelPricingCleanupPlan struct {
 	ModelPricingRecord
-	// Pricing is the complete replacement draft for the existing versioned
-	// pricing transaction. An empty draft means "no override".
+	// Pricing is the replacement draft handed to the existing versioned pricing
+	// transaction. Cleanup always submits an empty draft: every stored sales
+	// price is removed and nothing is restored.
 	Pricing PricingValues `json:"pricing"`
 }
 
@@ -74,116 +111,94 @@ type ModelPricingCleanupChange struct {
 	ExpectedVersion string `json:"expected_version"`
 }
 
-// ModelPricingCleanupReport describes every enabled model's current pricing and
-// what a cleanup would do to it. It has no write side effects.
+// ModelPricingCleanupReport describes every enabled model's stored pricing and
+// what a cleanup removes. It has no write side effects.
 func ModelPricingCleanupReport() (*ModelPricingCleanup, error) {
-	values, _, _, err := readModelPricingMaps(DB)
+	stored, err := storedPricingMaps(DB)
 	if err != nil {
 		return nil, err
 	}
-	return buildModelPricingCleanup(DB, values)
+	return buildModelPricingCleanup(DB, stored)
 }
 
-func buildModelPricingCleanup(db *gorm.DB, values map[string]map[string]any) (*ModelPricingCleanup, error) {
-	var names []string
-	if err := db.Model(&Ability{}).Where("enabled = ?", true).Distinct().Pluck("model", &names).Error; err != nil {
+func buildModelPricingCleanup(db *gorm.DB, stored map[string]map[string]any) (*ModelPricingCleanup, error) {
+	// The administrator sees the pricing list built from the stored option
+	// maps, so cleanup must cover those names. Enabled abilities are included
+	// too, so a routed model with no stored price is visible as already clear.
+	var enabled []string
+	if err := db.Model(&Ability{}).Where("enabled = ?", true).Distinct().Pluck("model", &enabled).Error; err != nil {
 		return nil, err
+	}
+	nameSet := make(map[string]bool, len(enabled))
+	for _, name := range enabled {
+		nameSet[name] = true
+	}
+	for _, key := range modelPricingSalesKeys {
+		if key == billing_setting.PluginBillingExprOption {
+			continue
+		}
+		for name := range stored[key] {
+			nameSet[name] = true
+		}
+	}
+	for variant := range stored[billing_setting.PluginBillingExprOption] {
+		if _, name, ok := billing_setting.SplitPluginBillingExprKey(variant); ok {
+			nameSet[name] = true
+		}
+	}
+	names := make([]string, 0, len(nameSet))
+	for name := range nameSet {
+		names = append(names, name)
 	}
 	slices.Sort(names)
 	report := &ModelPricingCleanup{
-		Snapshot: pricingMapsVersion(values),
+		Snapshot: pricingMapsVersion(stored),
 		Records:  make([]ModelPricingRecord, 0, len(names)),
 		Plans:    make([]ModelPricingCleanupPlan, 0, len(names)),
 	}
 	for _, name := range names {
-		plan := planModelPricingCleanup(values, name)
+		plan := planModelPricingCleanup(stored, name)
 		report.Records = append(report.Records, plan.ModelPricingRecord)
 		report.Plans = append(report.Plans, plan)
 	}
 	return report, nil
 }
 
-func planModelPricingCleanup(values map[string]map[string]any, name string) ModelPricingCleanupPlan {
-	configured := modelPricingValues(values, name)
-	defaults := modelPricingValues(defaultPricingMaps(), name)
+func planModelPricingCleanup(stored map[string]map[string]any, name string) ModelPricingCleanupPlan {
+	// Only keys actually present in storage count: an absent key is already
+	// cleared even though the engine would resolve a default for it.
+	configured := modelPricingValues(stored, name)
 	record := ModelPricingRecord{
 		ModelName:   name,
 		BillingMode: billing_setting.BillingModeRatio,
 		Version:     ModelPricingVersion(configured),
-		Configured:  modelPricingOverrides(configured, defaults),
+		Configured:  make([]string, 0, len(configured)),
+	}
+	for _, key := range modelPricingSalesKeys {
+		value, exists := configured[key]
+		if !exists {
+			continue
+		}
+		// A plugin map keeps only this model's variants; an empty map is no
+		// stored record for this model.
+		if key == billing_setting.PluginBillingExprOption {
+			variants, _ := value.(map[string]any)
+			if len(variants) == 0 {
+				continue
+			}
+		}
+		record.Configured = append(record.Configured, key)
 	}
 	if mode, ok := configured["billing_setting.billing_mode"].(string); ok && mode != "" {
 		record.BillingMode = mode
 	}
-	record.ConfiguredExpr, _ = configured["billing_setting.billing_expr"].(string)
 	record.BuiltInExpr, record.BuiltIn = billing_setting.GetBuiltinBillingExpr(name)
-	record.Action, record.UnpricedAfterReset = modelPricingCleanupAction(values, record)
-	plan := ModelPricingCleanupPlan{ModelPricingRecord: record, Pricing: defaults}
-	if record.Action == ModelPricingCleanupBuiltIn {
-		plan.Pricing = PricingValues{
-			"billing_setting.billing_mode": billing_setting.BillingModeTieredExpr,
-			"billing_setting.billing_expr": record.BuiltInExpr,
-		}
+	record.ClearCount = len(record.Configured)
+	record.Action = ModelPricingCleanupKeep
+	if record.ClearCount > 0 {
+		record.Action = ModelPricingCleanupClear
 	}
-	return plan
-}
-
-// modelPricingOverrides lists the option keys whose stored value differs from
-// the engine default. The pricing maps are read as defaults merged with stored
-// rows, so an equal value means no administrator override is stored.
-func modelPricingOverrides(configured, defaults PricingValues) []string {
-	keys := make([]string, 0, len(configured))
-	for _, key := range modelPricingOptionKeys {
-		stored, exists := configured[key]
-		fallback, hasFallback := defaults[key]
-		if exists && (!hasFallback || stored != fallback) {
-			keys = append(keys, key)
-		}
-	}
-	return keys
-}
-
-func modelPricingCleanupAction(values map[string]map[string]any, record ModelPricingRecord) (ModelPricingCleanupAction, bool) {
-	if !needsModelPricingCleanup(record) {
-		return ModelPricingCleanupKeep, false
-	}
-	if record.BuiltIn {
-		return ModelPricingCleanupBuiltIn, false
-	}
-	// Simulate the reset on a copy so the warning describes what the
-	// administrator will actually get, not the current override.
-	simulated := make(map[string]map[string]any, len(values))
-	for key, entries := range values {
-		simulated[key] = maps.Clone(entries)
-	}
-	replaceModelPricing(simulated, record.ModelName, modelPricingValues(defaultPricingMaps(), record.ModelName))
-	return ModelPricingCleanupReset, effectiveModelPricingIsUnpriced(simulated, record.ModelName)
-}
-
-// needsModelPricingCleanup reports whether a record still carries this site's
-// own pricing instead of inheriting built-in or engine default pricing.
-func needsModelPricingCleanup(record ModelPricingRecord) bool {
-	if len(record.Configured) > 0 || strings.TrimSpace(record.ConfiguredExpr) != "" {
-		return true
-	}
-	// A model with a built-in upstream price but a legacy ratio/per-request
-	// mode has not applied the upstream cost price yet.
-	return record.BuiltIn && record.BillingMode != billing_setting.BillingModeTieredExpr
-}
-
-// effectiveModelPricingIsUnpriced reports whether a model would settle with no
-// price at all: no fixed request price, no ratio and no expression.
-func effectiveModelPricingIsUnpriced(values map[string]map[string]any, name string) bool {
-	effective := effectiveModelPricing(values, name)
-	if effective["billing_setting.billing_mode"] == billing_setting.BillingModeTieredExpr {
-		expression, _ := effective["billing_setting.billing_expr"].(string)
-		return strings.TrimSpace(expression) == ""
-	}
-	if _, priced := effective["ModelPrice"]; priced {
-		return false
-	}
-	_, priced := effective["ModelRatio"]
-	return !priced
+	return ModelPricingCleanupPlan{ModelPricingRecord: record, Pricing: PricingValues{}}
 }
 
 func pricingMapsVersion(values map[string]map[string]any) string {
@@ -194,10 +209,11 @@ func pricingMapsVersion(values map[string]map[string]any) string {
 	return fmt.Sprintf("%x", sha256.Sum256(encoded))
 }
 
-// ApplyModelPricingCleanup removes the selected models' pricing records through
+// ApplyModelPricingCleanup removes the selected models' stored pricing through
 // the same locked, versioned transaction used by the pricing editor. Every
 // model must still match the version the administrator reviewed, and the plan
-// must match the snapshot it was prepared from.
+// must match the snapshot it was prepared from. The submitted draft is always
+// empty: nothing is restored to a default sales price.
 func ApplyModelPricingCleanup(snapshot string, changes []ModelPricingCleanupChange) (*ModelPricingCleanup, error) {
 	if snapshot == "" {
 		return nil, fmt.Errorf("%w: a prepared cleanup plan is required", ErrModelPricingStale)
@@ -217,7 +233,14 @@ func ApplyModelPricingCleanup(snapshot string, changes []ModelPricingCleanupChan
 	}
 	var plan *ModelPricingCleanup
 	err := mutateModelPricingOptions(func(tx *gorm.DB, values map[string]map[string]any) error {
-		current, err := buildModelPricingCleanup(tx, values)
+		// The transaction hands back the stored maps merged with engine
+		// defaults. Re-read the stored rows so plan review and clearing use the
+		// same basis; otherwise a default would look like a stored record.
+		stored, err := storedPricingMaps(tx)
+		if err != nil {
+			return err
+		}
+		current, err := buildModelPricingCleanup(tx, stored)
 		if err != nil {
 			return err
 		}
@@ -230,22 +253,29 @@ func ApplyModelPricingCleanup(snapshot string, changes []ModelPricingCleanupChan
 		}
 		cleared := make([]string, 0, len(changes))
 		for _, change := range changes {
-			previous := modelPricingValues(values, change.ModelName)
+			if _, exists := plans[change.ModelName]; !exists {
+				return fmt.Errorf("%w: %s is not an enabled model", ErrModelPricingStale, change.ModelName)
+			}
+			previous := modelPricingValues(stored, change.ModelName)
 			if ModelPricingVersion(previous) != change.ExpectedVersion {
 				return fmt.Errorf("%w: %s", ErrModelPricingConflict, change.ModelName)
 			}
-			entry, exists := plans[change.ModelName]
-			if !exists {
-				return fmt.Errorf("%w: %s is not an enabled model", ErrModelPricingStale, change.ModelName)
-			}
-			if entry.Action == ModelPricingCleanupKeep {
-				return fmt.Errorf("%w: %s has no model pricing to clean up", ErrModelPricingStale, change.ModelName)
+			entry := plans[change.ModelName]
+			if entry.ClearCount == 0 {
+				return fmt.Errorf("%w: %s has no stored model pricing to clean up", ErrModelPricingStale, change.ModelName)
 			}
 			if err := validateModelPricing(change.ModelName, entry.Pricing, previous); err != nil {
 				return err
 			}
-			replaceModelPricing(values, change.ModelName, entry.Pricing)
+			replaceModelPricing(stored, change.ModelName, entry.Pricing)
 			cleared = append(cleared, change.ModelName)
+		}
+		// Persist exactly the surviving stored rows. Writing the merged maps
+		// back would re-materialize every engine default as a stored record,
+		// which would refill the pricing list instead of emptying the cleared
+		// models.
+		for key := range values {
+			values[key] = stored[key]
 		}
 		plan = current
 		plan.Cleared = cleared

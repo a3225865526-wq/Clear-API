@@ -73,7 +73,7 @@ export function ModelsPrimaryButtons() {
             variant='outline'
             size='sm'
           >
-            {t('Clean up model pricing')}
+            {t('Clear model pricing')}
           </Button>
         </>
       )}
