@@ -27,9 +27,27 @@ not prove a new Gateway has connected to the live Executor; the existing
 deployment Runtime Gate still verifies the actual pair.
 
 Receipts are bound to the RC run and attempt at both assembly and consumption.
-The automatic contract supports only `migration.mode=no_schema_change`; both
-ends reject differing or missing Manifest source/target schema hashes. A
-successful forward restore of a changed-schema candidate cannot authorize this
-automatic route. `migration_compatible=false` remains mandatory. Broader real
-Provider acceptance may be deferred, but missing required real Provider
-evidence must remain a failed gate under the current release contract.
+Both ends require a well-formed Manifest source/target schema pair and derive
+the migration mode from it; a missing or malformed pair fails closed.
+
+Two modes are supported, and the proof must state the one the RC actually
+rehearsed:
+
+- `no_schema_change` — used only when `source_schema_sha256` equals
+  `target_schema_sha256`.
+- `in_place_startup_migration` — used when they differ. PG03 forbids external
+  migration flags (`DEPLOY_MIGRATION_FLAGS` must be empty), so the candidate
+  image applies its own additive migrations during startup. This mode is
+  accepted only when the Manifest also proves the PG03 schema rehearsal
+  contract: `schema_version=pg03-schema-rehearsal-v1`, `startup_passes=2`
+  (idempotent across two startups on the same database), and
+  `source_commit` equal to the candidate commit. The proof must additionally
+  reproduce the Manifest's exact source and target hashes.
+
+A proof that claims `no_schema_change` while the Manifest hashes differ is
+rejected, and so is an upgrading Manifest with a proof that omits the
+migration block, states the wrong mode, or quotes different hashes.
+Successful forward restore alone still cannot authorize this route.
+`migration_compatible=false` remains mandatory. Broader real Provider
+acceptance may be deferred, but missing required real Provider evidence must
+remain a failed gate under the current release contract.
