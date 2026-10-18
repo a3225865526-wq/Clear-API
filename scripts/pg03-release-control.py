@@ -180,8 +180,13 @@ def automatic_release_authority(data, get):
     if not re.fullmatch(r'[1-9][0-9]*', rehearsal_id):
         raise ReleaseBlocked('missing authenticated deployment rehearsal')
     rehearsal = get('actions/runs/' + rehearsal_id)
+    # A dispatched rehearsal exists because operator evidence is bound to an RC
+    # manifest that only exists after that RC finished, which the automatic
+    # trigger cannot win. Both entries run the same gates and assembler, so
+    # both are equally acceptable here; every other identity check stands.
     if (rehearsal['path'] != '.github/workflows/deployment-rehearsal.yml'
-            or rehearsal['event'] != 'workflow_run' or rehearsal['head_sha'] != data['commit']
+            or rehearsal['event'] not in ('workflow_run', 'workflow_dispatch')
+            or rehearsal['head_sha'] != data['commit']
             or rehearsal['head_branch'] != 'main' or rehearsal['status'] != 'completed'
             or rehearsal['conclusion'] != 'success' or rehearsal['run_attempt'] != 1
             or rehearsal['repository']['full_name'] != REPO
