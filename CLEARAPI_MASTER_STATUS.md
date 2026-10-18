@@ -9,15 +9,20 @@
 | 项目 | 当前值 | 状态 |
 | --- | --- | --- |
 | 生产域名 | `https://www.clear999.com` | HTTP 200（本轮公网只读核对） |
-| 远端 main（历史生产基线） | `eb67c5f21639716eed7489d32ca322c249e5fdf3` | VERIFIED |
+| 远端 main（最新） | `353cd0a23b723f86c6b21e759a6d691ce1ba5457` | VERIFIED |
 | Gateway 工作树 | `D:/AI/API/worktrees/clearapi-pg03-full-launch` | ACTIVE |
-| Gateway 分支 | `codex/pg03-full-launch-20261018` | LOCAL / NOT YET PUSHED |
+| Gateway branch commits | PR #52 `1c2c555a`, PR #53 `fe3cf9cb` + integration test `f235c089` | MERGED/PUSHED |
 | Executor 工作树 | `D:/AI/API/worktrees/pg03-executor-mvp` | ACTIVE |
 | Executor 分支 / commit | `codex/pg03-executor-mvp` / `228ecbaa6f71ade146be789c9a3c42522a7f92a8` | PUSHED |
-| Executor RC | Run `39079462722` | IN PROGRESS |
-| 自动部署 | `CLEARAPI_AUTO_PRODUCTION_ENABLED` 未核实为启用；主 main 上 Automatic production release 为 skipped | BLOCKED / NOT READY |
-| 网站 JSON 导入 | 前端、Gateway API、Executor 原子导入已开发；未部署 | LOCAL PASS / PRODUCTION NOT RUN |
-| PG03 生产启用 | 尚未执行生产切换 | NOT RUN |
+| Executor RC | Run `39079462722` | SUCCESS |
+| Executor digest | `sha256:9ba0e5ffb0ccbcf4f1f23d272e4c1b7bb0fe86af93429c823928358ff99d34e5` | VERIFIED |
+| Executor binary SHA256 | `6dff0b07e6b231abbe5a4845f2f4e588d9b3252c3d84b33f75b3ed79d336240b` | VERIFIED |
+| 自动部署 | final main `353cd0a2`; Rehearsal attempt 2 blocked only on Provider evidence; AUTO variable absent | BLOCKED / NOT READY |
+| 网站 JSON 导入 | 前端、Gateway API、Executor 原子导入已开发；multipart route test PASS；未部署 | LOCAL PASS / PRODUCTION NOT RUN |
+| Gateway RC | Run `39083968671`, digest `sha256:bfdf5b842f9a9344cfb1eff1186be4962520bfbaceec72b5bd547432a3ac374d`, Manifest SHA `896c8c2731fe43a4b3068ec7d656a06975c4c9ecdd602ee86a7ad4b4b602a02d` | SUCCESS |
+| Backup / rollback evidence | actual encrypted backup `20261016T193254Z`, 75 tables, exact RC twice, 0 invariant failures | PASS ISOLATED |
+| Rehearsal | Run `39084286400` attempt 2: all non-Provider gates PASS; proof blocked on Provider | BLOCKED |
+| PG03 production enablement | Not executed | NOT RUN |
 | 真实 Provider Usage/Billing | 尚未执行 | NOT RUN |
 | 熔断 / 双账号故障转移 | 尚未执行 | NOT RUN |
 
@@ -31,10 +36,10 @@
 
 ### 当前待完成顺序
 
-1. 等待 Executor RC `39079462722` 完成并记录 digest / binary SHA256 / manifest。
-2. 完成 Gateway 代码审查与 Required CI，提交并推送 `codex/pg03-full-launch-20261018`。
-3. 合并至最新 main，运行正式 CI 与新的 PG03 Gateway RC。
-4. 按正式 Deploy V2 完成备份、身份验证、生产切换、健康检查、Runtime/Billing/Backup Gate。
+1. Executor RC `39079462722` 与 digest/binary/manifest 已完成并写入上方。
+2. Gateway PR #52、#53 已完成 Required CI 并合并；额外 multipart route 测试在修正分支 `f235c089`。
+3. main `353cd0a2` Required CI `39083507403` PASS；正式 Gateway RC `39083968671` PASS。
+4. Rehearsal backup/rollback/executor/migration/contracts PASS；自动 proof 仍缺真实 Provider evidence，Deploy V2 尚未执行。
 5. 使用获准测试凭据完成网站导入、Pool、Route Chain、Executor、Usage/Billing 生产验收；个人 Codex OAuth 未被确认可用于商业中转时不得作为商业上游启用。
 6. 无法确认商业用途或缺少第二个合格账号时，记录为 BLOCKED，不得伪造全通。
 
