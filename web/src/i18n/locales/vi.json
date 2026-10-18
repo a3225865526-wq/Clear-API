@@ -8018,5 +8018,13 @@
   "Price per request": "Price per request",
   "Actions": "Actions",
   "User": "User",
-  "Unknown": "Unknown"
+  "Unknown": "Unknown",
+  "Ongoing": "Đang diễn ra",
+  "Withdrawn": "Đã thu hồi",
+  "Publish": "Xuất bản",
+  "Withdraw": "Thu hồi",
+  "Select announcement status": "Chọn trạng thái thông báo",
+  "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Chỉ thông báo đã xuất bản mới hiển thị với người dùng. Bản nháp và thông báo đã thu hồi vẫn ở đây cho quản trị viên.",
+  "Announcement published. Click \"Save Settings\" to apply.": "Đã xuất bản thông báo. Nhấn \"Lưu cài đặt\" để áp dụng.",
+  "Announcement withdrawn. Click \"Save Settings\" to apply.": "Đã thu hồi thông báo. Nhấn \"Lưu cài đặt\" để áp dụng."
 }

@@ -8065,5 +8065,13 @@
   "Price per request": "Price per request",
   "Actions": "Actions",
   "User": "User",
-  "Unknown": "Unknown"
+  "Unknown": "Unknown",
+  "Ongoing": "Ongoing",
+  "Withdrawn": "Withdrawn",
+  "Publish": "Publish",
+  "Withdraw": "Withdraw",
+  "Select announcement status": "Select announcement status",
+  "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.",
+  "Announcement published. Click \"Save Settings\" to apply.": "Announcement published. Click \"Save Settings\" to apply.",
+  "Announcement withdrawn. Click \"Save Settings\" to apply.": "Announcement withdrawn. Click \"Save Settings\" to apply."
 }

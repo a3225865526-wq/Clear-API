@@ -8065,5 +8065,13 @@
   "Price per request": "每次请求单价",
   "Actions": "操作",
   "User": "用户",
-  "Unknown": "未知"
+  "Unknown": "未知",
+  "Ongoing": "进行中",
+  "Withdrawn": "已撤回",
+  "Publish": "发布",
+  "Withdraw": "撤回",
+  "Select announcement status": "选择公告状态",
+  "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "只有已发布的公告会展示给用户；草稿和已撤回的公告仅保留在管理员这里。",
+  "Announcement published. Click \"Save Settings\" to apply.": "公告已发布。点击「保存设置」生效。",
+  "Announcement withdrawn. Click \"Save Settings\" to apply.": "公告已撤回。点击「保存设置」生效。"
 }

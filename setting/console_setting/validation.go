@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 	"unicode/utf16"
@@ -178,6 +177,12 @@ func validateAnnouncements(announcementsStr string) error {
 				}
 			}
 		}
+		if status, exists := ann["status"]; exists {
+			statusStr, ok := status.(string)
+			if !ok || !announcementStatuses[statusStr] {
+				return fmt.Errorf("第%d个公告的发布状态值不合法", i+1)
+			}
+		}
 		if exceedsMaxCharacters(content, 500) {
 			return fmt.Errorf("第%d个公告的内容长度不能超过500字符", i+1)
 		}
@@ -215,25 +220,6 @@ func validateFAQ(faqStr string) error {
 		}
 	}
 	return nil
-}
-
-func getPublishTime(item map[string]interface{}) time.Time {
-	if v, ok := item["publishDate"]; ok {
-		if s, ok2 := v.(string); ok2 {
-			if t, err := time.Parse(time.RFC3339, s); err == nil {
-				return t
-			}
-		}
-	}
-	return time.Time{}
-}
-
-func GetAnnouncements() []map[string]interface{} {
-	list := getJSONList(GetConsoleSetting().Announcements)
-	sort.SliceStable(list, func(i, j int) bool {
-		return getPublishTime(list[i]).After(getPublishTime(list[j]))
-	})
-	return list
 }
 
 func GetFAQ() []map[string]interface{} {

@@ -8018,5 +8018,13 @@
   "Price per request": "Price per request",
   "Actions": "Actions",
   "User": "User",
-  "Unknown": "Unknown"
+  "Unknown": "Unknown",
+  "Ongoing": "В процессе",
+  "Withdrawn": "Отозвано",
+  "Publish": "Опубликовать",
+  "Withdraw": "Отозвать",
+  "Select announcement status": "Выберите статус объявления",
+  "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Пользователям показываются только опубликованные объявления. Черновики и отозванные объявления остаются здесь для администраторов.",
+  "Announcement published. Click \"Save Settings\" to apply.": "Объявление опубликовано. Нажмите «Сохранить настройки», чтобы применить.",
+  "Announcement withdrawn. Click \"Save Settings\" to apply.": "Объявление отозвано. Нажмите «Сохранить настройки», чтобы применить."
 }

@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Pencil, Trash2 } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -32,6 +33,8 @@ type StaticRowActionsProps = {
   menuLabel: string
   onEdit: () => void
   onDelete: () => void
+  /** Extra menu entries rendered above Delete, e.g. a record's lifecycle actions. */
+  extraMenuItems?: ReactNode
   editDisabled?: boolean
   deleteDisabled?: boolean
 }
@@ -49,6 +52,7 @@ export function StaticRowActions(props: StaticRowActionsProps) {
         <Pencil />
       </Button>
       <DataTableRowActionMenu ariaLabel={props.menuLabel}>
+        {props.extraMenuItems}
         <DropdownMenuItem
           onClick={props.onDelete}
           disabled={props.deleteDisabled}

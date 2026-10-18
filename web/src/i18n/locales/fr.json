@@ -8018,5 +8018,13 @@
   "Price per request": "Price per request",
   "Actions": "Actions",
   "User": "User",
-  "Unknown": "Unknown"
+  "Unknown": "Unknown",
+  "Ongoing": "En cours",
+  "Withdrawn": "Retirée",
+  "Publish": "Publier",
+  "Withdraw": "Retirer",
+  "Select announcement status": "Sélectionner le statut de l'annonce",
+  "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Seules les annonces publiées sont affichées aux utilisateurs. Les brouillons et les annonces retirées restent ici pour les administrateurs.",
+  "Announcement published. Click \"Save Settings\" to apply.": "Annonce publiée. Cliquez sur « Enregistrer les paramètres » pour appliquer.",
+  "Announcement withdrawn. Click \"Save Settings\" to apply.": "Annonce retirée. Cliquez sur « Enregistrer les paramètres » pour appliquer."
 }
