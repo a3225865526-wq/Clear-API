@@ -59,3 +59,39 @@ func TestPoolModelAvailabilityExecutorOfflineFailsClosed(t *testing.T) {
 		t.Fatal("executor failure must surface, not report zero availability")
 	}
 }
+
+func TestSnapshotAdmissionBindsRevisionDigestProviderAndGeneration(t *testing.T) {
+	const revision = uint64(21)
+	base := PoolExecutorModelSnapshot{
+		Revision: revision, TrustRevision: revision,
+		Identities:   []PoolExecutorTrustIdentity{{AuthID: "auth-a", Provider: "codex", CredentialDigest: "digest-a", State: "trusted", AuthorizationVersion: revision, Generation: 19}},
+		Capabilities: []PoolExecutorCapability{{AuthID: "auth-a", Provider: "codex", CredentialDigest: "digest-a", Model: "model-live", State: "verified", Generation: 19}},
+	}
+	if !SnapshotHasTrustedCapability(base) || !SnapshotAccountAdmitted(base, "auth-a", "codex") {
+		t.Fatal("current trust/capability binding rejected")
+	}
+	if SnapshotAccountAdmitted(base, "auth-b", "codex") {
+		t.Fatal("account filter ignored")
+	}
+	if SnapshotAccountAdmitted(base, "auth-a", "claude") {
+		t.Fatal("provider filter ignored")
+	}
+	for _, mutate := range []func(*PoolExecutorModelSnapshot){
+		func(s *PoolExecutorModelSnapshot) { s.Revision++ },
+		func(s *PoolExecutorModelSnapshot) { s.Identities[0].AuthorizationVersion-- },
+		func(s *PoolExecutorModelSnapshot) { s.Identities[0].CredentialDigest = "other" },
+		func(s *PoolExecutorModelSnapshot) { s.Identities[0].Provider = "claude" },
+		func(s *PoolExecutorModelSnapshot) { s.Identities[0].Generation++ },
+		func(s *PoolExecutorModelSnapshot) { s.Capabilities[0].Generation++ },
+		func(s *PoolExecutorModelSnapshot) { s.Capabilities[0].State = "revoked" },
+		func(s *PoolExecutorModelSnapshot) { s.Capabilities[0].Model = "" },
+	} {
+		candidate := base
+		candidate.Identities = append([]PoolExecutorTrustIdentity(nil), base.Identities...)
+		candidate.Capabilities = append([]PoolExecutorCapability(nil), base.Capabilities...)
+		mutate(&candidate)
+		if SnapshotHasTrustedCapability(candidate) {
+			t.Fatalf("stale or malformed admission accepted: %+v", candidate)
+		}
+	}
+}

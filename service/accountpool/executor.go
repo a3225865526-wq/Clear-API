@@ -136,21 +136,36 @@ func ExecutorClientFor(id string) (ExecutorClient, error) {
 	return executorFor(id)
 }
 
+// SnapshotHasTrustedCapability reports whether the ledger contains at least one
+// trusted identity whose verified capability is bound to the current policy
+// revision and trust generation. Revision, digest, provider and generation are
+// all part of the admission identity; a stale record is never permission.
 func SnapshotHasTrustedCapability(snapshot PoolExecutorModelSnapshot) bool {
-	trusted := map[string]bool{}
-	for _, identity := range snapshot.Identities {
-		if identity.AuthID != "" && identity.Provider != "" && identity.CredentialDigest != "" && identity.State == "trusted" {
-			trusted[identity.AuthID+`\x00`+identity.CredentialDigest] = true
-		}
+	return SnapshotAccountAdmitted(snapshot, "", "")
+}
+
+// SnapshotAccountAdmitted applies the same trust/capability binding for one
+// executor credential reference. Empty identity filters mean "any account".
+func SnapshotAccountAdmitted(snapshot PoolExecutorModelSnapshot, authID, provider string) bool {
+	if snapshot.Revision == 0 || (snapshot.TrustRevision != 0 && snapshot.TrustRevision != snapshot.Revision) {
+		return false
 	}
-	for _, capability := range snapshot.Capabilities {
-		if capability.State == "verified" && capability.Model != "" && trusted[capability.AuthID+`\x00`+capability.CredentialDigest] {
-			return true
+	for _, identity := range snapshot.Identities {
+		if identity.AuthID == "" || identity.Provider == "" || identity.CredentialDigest == "" ||
+			identity.State != "trusted" || identity.AuthorizationVersion != snapshot.Revision || identity.Generation == 0 ||
+			(authID != "" && identity.AuthID != authID) || (provider != "" && identity.Provider != provider) {
+			continue
+		}
+		for _, capability := range snapshot.Capabilities {
+			if capability.State == "verified" && capability.Model != "" && capability.Generation == identity.Generation &&
+				capability.AuthID == identity.AuthID && capability.Provider == identity.Provider &&
+				capability.CredentialDigest == identity.CredentialDigest {
+				return true
+			}
 		}
 	}
 	return false
 }
-
 func executorFor(id string) (ExecutorClient, error) {
 	return ExecutorFactory(id)
 }
@@ -316,6 +331,9 @@ func (c *CliproxyClient) ImportCredential(ctx context.Context, req CredentialImp
 	}
 	if status >= 500 {
 		return nil, ErrPoolExecutorOffline
+	}
+	if status == http.StatusConflict {
+		return nil, ErrPoolConflict
 	}
 	if status >= 400 || decoded == nil {
 		return nil, ErrPoolExecutorFailed

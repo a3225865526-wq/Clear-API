@@ -797,12 +797,11 @@ func ResumeAccount(ownerID, accountID, expectedVersion int) (*model.UpstreamPool
 	return setAdminStatus(accountID, expectedVersion, model.PoolAdminStatusEnabled)
 }
 
-// admitted reports whether the account passed capability admission. Phase two
-// has no admission path, so only the reserved "available" run status counts.
+// admitted only trusts the durable run-status projection produced by
+// SyncAccount from the executor's current trust/capability ledger. It never
+// treats an optimistic admin flag as capability evidence.
 func admitted(account *model.UpstreamPoolAccount) bool {
-	// No executor currently enforces account/model admission continuously.
-	// A mutable status or DEDICATED declaration cannot enable scheduling.
-	return false
+	return account != nil && account.RunStatus == model.PoolRunStatusAvailable && account.CredentialRef != ""
 }
 
 func setAdminStatus(accountID, expectedVersion int, status string) (*model.UpstreamPoolAccount, error) {
@@ -893,7 +892,9 @@ func DeleteAccount(ownerID, accountID int) error {
 		if err := tx.Where("account_id = ?", accountID).Delete(&model.UpstreamPoolAuthTask{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("account_id = ?", accountID).Delete(&model.UpstreamPoolQuotaSnapshot{}).Error; err != nil { return err }
+		if err := tx.Where("account_id = ?", accountID).Delete(&model.UpstreamPoolQuotaSnapshot{}).Error; err != nil {
+			return err
+		}
 		deleted := tx.Where("id = ? AND version = ?", account.Id, account.Version).Delete(&model.UpstreamPoolAccount{})
 		if deleted.Error != nil {
 			return deleted.Error
@@ -945,9 +946,21 @@ func SyncAccount(ownerID, accountID int) (*model.UpstreamPoolAccount, error) {
 			columns["last_error"] = ""
 			switch status.State {
 			case CredentialStateActive, CredentialStateDisabled:
-				// Active or parked-by-admission credentials are both valid;
-				// admission (phase 3) is still pending.
+				// The executor remains the authority for account×model
+				// admission. Project "available" only when the exact imported
+				// credential is currently trusted and has a verified capability
+				// at the same policy revision and trust generation.
 				columns["run_status"] = model.PoolRunStatusNotAdmitted
+				if status.State == CredentialStateActive {
+					if snapshotter, ok := executor.(interface {
+						PoolModelSnapshot(context.Context) (PoolExecutorModelSnapshot, error)
+					}); ok {
+						if snapshot, snapErr := snapshotter.PoolModelSnapshot(context.Background()); snapErr == nil &&
+							SnapshotAccountAdmitted(snapshot, account.CredentialRef, account.Platform) {
+							columns["run_status"] = model.PoolRunStatusAvailable
+						}
+					}
+				}
 			case CredentialStateInvalid:
 				columns["run_status"] = model.PoolRunStatusReauthRequired
 			case CredentialStateCooldown:
