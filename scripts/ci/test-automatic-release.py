@@ -1,6 +1,7 @@
 """Offline policy regression tests. Synthetic receipts are never production evidence."""
 
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib.util
 import json
@@ -221,7 +222,7 @@ class ReleaseProofTest(unittest.TestCase):
                "head_sha": SOURCE, "head_branch": "main", "event": "workflow_run",
                "status": "completed", "conclusion": "success", "run_attempt": 1}
         rehearsal = dict(run, id=100, path=".github/workflows/deployment-rehearsal.yml")
-        rc = dict(run, id=123, path=".github/workflows/release-pg03-gateway.yml")
+        rc = dict(run, id=123, path=".github/workflows/release-pg03-gateway.yml", event="workflow_dispatch")
         responses = {"actions/runs/100": rehearsal, "actions/runs/123": rc,
                      "git/ref/heads/main": {"object": {"sha": SOURCE}},
                      f"actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha={SOURCE}&per_page=1": {"workflow_runs": [rc]},
@@ -256,9 +257,16 @@ class ReleaseProofTest(unittest.TestCase):
             self.assertEqual(result["rehearsal_run_id"], "100")
             downloads.reset_mock()
             history.return_value = [{"workflow_runs": [{"id": 899, "conclusion": "failure"}]}]
-            with self.assertRaisesRegex(ValueError, "circuit open"):
+            with patch.object(policy, "RECOVERY_RECORD", self.root / "missing-investigation.json"), \
+                    self.assertRaisesRegex(ValueError, "circuit open"):
                 policy.authorize_release({"workflow_run": rehearsal}, self.root / "rejected")
             downloads.assert_not_called()
+            with patch.object(policy, "verify_circuit_recovery", return_value={"fixture": "unit-only"}):
+                policy.authorize_release({"workflow_run": rehearsal}, self.root / "recovered")
+                audit = json.loads((self.root / "recovered/recovery-audit.json").read_text())
+                self.assertEqual(audit["rc_run_id"], 123)
+                self.assertEqual(audit["rehearsal_run_id"], 100)
+                self.assertEqual(audit["gateway_digest"], DIGEST)
             with patch.dict(os.environ, {"GITHUB_RUN_ATTEMPT": "2"}):
                 with self.assertRaisesRegex(ValueError, "reruns"):
                     policy.authorize_release({"workflow_run": rehearsal}, self.root / "retry")
@@ -266,6 +274,148 @@ class ReleaseProofTest(unittest.TestCase):
             responses[f"compare/{'d' * 40}...{SOURCE}"]["files"] = []
             with self.assertRaisesRegex(ValueError, "empty"):
                 policy.authorize_release({"workflow_run": rehearsal}, self.root / "empty-diff")
+
+
+class CircuitRecoveryTest(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.record_path = Path(directory.name) / "investigation.json"
+        now = datetime.now(timezone.utc)
+        self.log = "2026-10-19T00:00:00.0000000Z RELEASE BLOCKED: unexpected run event\n"
+        self.record = {
+            "schema": "clearapi.authorization-circuit-recovery/v1", "baseline_commit": "d" * 40,
+            "investigated_at": (now - timedelta(minutes=1)).isoformat(),
+            "expires_at": (now + timedelta(hours=1)).isoformat(),
+            "failures": [{"run_id": 899, "source_commit": "e" * 40, "run_attempt": 1,
+                          "created_at": "2026-10-19T00:00:00Z", "authorization_job_id": 10,
+                          "deployment_job_id": 11, "reason": "unexpected run event",
+                          "authorization_log_sha256": hashlib.sha256(self.log.rstrip("\n").encode()).hexdigest()}],
+        }
+        self.run = {"id": 899, "path": ".github/workflows/automatic-deploy.yml", "event": "workflow_run",
+                    "head_branch": "main", "repository": {"full_name": policy.REPOSITORY},
+                    "head_repository": {"full_name": policy.REPOSITORY}, "head_sha": "e" * 40,
+                    "created_at": "2026-10-19T00:00:00Z", "run_attempt": 1,
+                    "status": "completed", "conclusion": "failure"}
+        self.jobs = [
+            {"id": 10, "name": "deploy / Validate release authorization before production credentials",
+             "status": "completed", "conclusion": "failure", "steps": [
+                 {"name": "Authenticate automatic proof before production credentials", "conclusion": "failure"}]},
+            {"id": 11, "name": "deploy / Controlled production deploy (exact digest)",
+             "status": "completed", "conclusion": "skipped", "steps": None},
+        ]
+        self.manual = []
+        self.deployments = []
+        self.previous = [self.run]
+        self.comparison = {"status": "ahead", "merge_base_commit": {"sha": "d" * 40}}
+
+    def verify(self):
+        self.record_path.write_text(json.dumps(self.record))
+
+        def api(path):
+            if path == "actions/runs/899":
+                return self.run
+            if path == f"compare/{'d' * 40}...{SOURCE}":
+                return self.comparison
+            raise AssertionError(path)
+
+        def pages(path):
+            if path == "actions/runs/899/attempts/1/jobs?per_page=100":
+                return [{"jobs": self.jobs}]
+            if path == "actions/workflows/deploy-production.yml/runs?per_page=100":
+                return [{"workflow_runs": self.manual}]
+            if path == "deployments?environment=production&per_page=100":
+                return [self.deployments]
+            raise AssertionError(path)
+
+        with patch.object(policy, "RECOVERY_RECORD", self.record_path), \
+                patch.object(policy, "api", side_effect=api), patch.object(policy, "pages", side_effect=pages), \
+                patch.object(policy, "gh", return_value=self.log), patch.dict(os.environ, {"GITHUB_RUN_ID": "900"}):
+            return policy.verify_circuit_recovery(self.previous, SOURCE)
+
+    def test_exact_investigation_is_revalidated_and_produces_only_recovery_audit(self):
+        result = self.verify()
+        self.assertEqual(result["failures"][0]["run_id"], 899)
+        self.assertEqual(result["deployment_run_id"], "900")
+        self.assertEqual(result["production_deployments_since_incident"], 0)
+        self.assertNotIn("success", result)
+        self.assertEqual(result["investigation_sha256"], hashlib.sha256(self.record_path.read_bytes()).hexdigest())
+
+    def test_any_production_entry_or_unknown_job_is_unrecoverable(self):
+        original = deepcopy(self.jobs)
+        for change in (
+            {"conclusion": "failure"}, {"status": "in_progress"},
+            {"steps": [{"name": "Set up SSH", "conclusion": "success"}]},
+            {"name": "unclassified production job"},
+        ):
+            with self.subTest(change=change):
+                self.jobs = deepcopy(original)
+                self.jobs[1].update(change)
+                with self.assertRaises(ValueError):
+                    self.verify()
+        self.jobs = original + [{"id": 12}]
+        with self.assertRaises(ValueError):
+            self.verify()
+
+    def test_new_failed_active_cancelled_or_retried_run_is_not_covered(self):
+        for status, conclusion in (("completed", "failure"), ("in_progress", None),
+                                   ("completed", "cancelled")):
+            with self.subTest(conclusion=conclusion):
+                self.previous = [{"id": 901, "status": status, "conclusion": conclusion}, self.run]
+                with self.assertRaises(ValueError):
+                    self.verify()
+        self.previous = [self.run]
+        self.run["run_attempt"] = 2
+        with self.assertRaises(ValueError):
+            self.verify()
+
+    def test_changed_identity_log_authorization_step_and_ancestry_fail_closed(self):
+        for field, value in (("head_sha", "0" * 40), ("event", "workflow_dispatch"),
+                             ("head_repository", {"full_name": "attacker/fork"}),
+                             ("created_at", "2026-10-19T01:00:00Z")):
+            with self.subTest(field=field):
+                original = self.run[field]
+                self.run[field] = value
+                with self.assertRaises(ValueError):
+                    self.verify()
+                self.run[field] = original
+        self.log += "changed log\n"
+        with self.assertRaisesRegex(ValueError, "log changed"):
+            self.verify()
+        self.log = self.log.removesuffix("changed log\n")
+        self.jobs[0]["steps"][0]["name"] = "Checkout"
+        with self.assertRaises(ValueError):
+            self.verify()
+        self.jobs[0]["steps"][0]["name"] = "Authenticate automatic proof before production credentials"
+        self.comparison["merge_base_commit"]["sha"] = "0" * 40
+        with self.assertRaises(ValueError):
+            self.verify()
+
+    def test_manual_runs_and_production_records_require_separate_investigation(self):
+        for run in ({"status": "in_progress", "created_at": "2026-10-18T00:00:00Z"},
+                    {"status": "completed", "created_at": "2026-10-19T00:00:00Z"}):
+            with self.subTest(run=run):
+                self.manual = [run]
+                with self.assertRaises(ValueError):
+                    self.verify()
+        self.manual = []
+        self.deployments = [{"created_at": "2026-10-19T00:00:00Z"}]
+        with self.assertRaises(ValueError):
+            self.verify()
+
+    def test_expired_future_overlong_and_missing_investigation_fail_closed(self):
+        original = deepcopy(self.record)
+        now = datetime.now(timezone.utc)
+        for issued, expires in ((now - timedelta(days=2), now - timedelta(days=1)),
+                               (now + timedelta(minutes=1), now + timedelta(hours=1)),
+                               (now - timedelta(minutes=1), now + timedelta(days=2))):
+            self.record = deepcopy(original)
+            self.record.update(investigated_at=issued.isoformat(), expires_at=expires.isoformat())
+            with self.assertRaises(ValueError):
+                self.verify()
+        with patch.object(policy, "RECOVERY_RECORD", self.record_path.parent / "missing.json"):
+            with self.assertRaisesRegex(ValueError, "missing reviewed"):
+                policy.verify_circuit_recovery(self.previous, SOURCE)
 
 
 class TrustPolicyTest(unittest.TestCase):

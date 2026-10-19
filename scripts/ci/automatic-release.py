@@ -2,6 +2,7 @@
 """Fail-closed release policy. Only GitHub-verified main artifacts can authorize CD."""
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -28,6 +29,7 @@ RC_ARTIFACT_FILES = {
     "gateway-image-release.json", "binary-build-info.txt",
     "schema-rehearsal.json", "schema-rehearsal.target.sql",
 }
+RECOVERY_RECORD = Path(__file__).resolve().parents[2] / ".github/release-circuit-recovery.json"
 
 
 def require(condition, message):
@@ -233,6 +235,96 @@ def verify_rc_artifact(directory):
     return manifest
 
 
+def verify_circuit_recovery(previous, source):
+    """A merged investigation may recover only the exact authorization-only failures.
+
+    GitHub history remains the circuit's state. This never rewrites a failed run,
+    permits a retry, or recovers a failure that reached production credentials.
+    """
+    require(RECOVERY_RECORD.is_file() and not RECOVERY_RECORD.is_symlink(),
+            "release circuit open; missing reviewed recovery investigation")
+    raw = RECOVERY_RECORD.read_bytes()
+    record = json.loads(raw)
+    require(record["schema"] == "clearapi.authorization-circuit-recovery/v1",
+            "invalid circuit recovery contract")
+    issued = datetime.fromisoformat(record["investigated_at"].replace("Z", "+00:00"))
+    expires = datetime.fromisoformat(record["expires_at"].replace("Z", "+00:00"))
+    require(issued.tzinfo is not None and expires.tzinfo is not None
+            and issued <= datetime.now(timezone.utc) < expires
+            and 0 < (expires - issued).total_seconds() <= 86400,
+            "release circuit recovery expired or invalid")
+    require(re.fullmatch(SHA, record["baseline_commit"]) is not None,
+            "invalid recovery baseline")
+    comparison = api(f"compare/{record['baseline_commit']}...{source}")
+    require(comparison["status"] == "ahead"
+            and comparison["merge_base_commit"]["sha"] == record["baseline_commit"],
+            "recovery is not descended from investigated main")
+    failures = []
+    for run in previous:
+        if run["conclusion"] == "success":
+            break
+        require(run.get("status") == "completed" and run["conclusion"] == "failure",
+                "release circuit open; unfinished or unclassified production run")
+        failures.append(run)
+    entries = record["failures"]
+    require(bool(entries) and len(entries) == len(failures)
+            and len({e["run_id"] for e in entries}) == len(entries)
+            and {e["run_id"] for e in entries} == {r["id"] for r in failures},
+            "release circuit open; investigation does not cover exact failure history")
+    evidence = []
+    for entry in entries:
+        run = api(f"actions/runs/{entry['run_id']}")
+        require(run["path"] == ".github/workflows/automatic-deploy.yml"
+                and run["event"] == "workflow_run" and run["head_branch"] == "main"
+                and run["repository"]["full_name"] == REPOSITORY
+                and run["head_repository"]["full_name"] == REPOSITORY
+                and run["head_sha"] == entry["source_commit"]
+                and run["created_at"] == entry["created_at"]
+                and run["run_attempt"] == entry["run_attempt"] == 1
+                and run["status"] == "completed" and run["conclusion"] == "failure",
+                "investigated run identity changed")
+        jobs = [j for page in pages(
+            f"actions/runs/{run['id']}/attempts/1/jobs?per_page=100") for j in page["jobs"]]
+        require(len(jobs) == 2 and {j["id"] for j in jobs}
+                == {entry["authorization_job_id"], entry["deployment_job_id"]},
+                "investigated job inventory changed")
+        auth = next(j for j in jobs if j["id"] == entry["authorization_job_id"])
+        deploy = next(j for j in jobs if j["id"] == entry["deployment_job_id"])
+        require(auth["name"] == "deploy / Validate release authorization before production credentials"
+                and auth["status"] == "completed" and auth["conclusion"] == "failure"
+                and deploy["name"] == "deploy / Controlled production deploy (exact digest)"
+                and deploy["status"] == "completed" and deploy["conclusion"] == "skipped"
+                and not deploy.get("steps"), "investigated failure reached production")
+        failed = [s for s in auth["steps"] if s["conclusion"] == "failure"]
+        require(len(failed) == 1 and failed[0]["name"]
+                == "Authenticate automatic proof before production credentials",
+                "investigated failure is not authorization-only")
+        log = gh("api", f"repos/{REPOSITORY}/actions/jobs/{auth['id']}/logs")
+        log_hash = hashlib.sha256("\n".join(log.lstrip("\ufeff").splitlines()).encode()).hexdigest()
+        require(re.fullmatch(r"[a-f0-9]{64}", entry["authorization_log_sha256"]) is not None
+                and log_hash == entry["authorization_log_sha256"]
+                and entry["reason"] in (
+                    "unexpected run event",
+                    "release circuit open; investigate prior deployment before resuming")
+                and any(line.endswith("Z RELEASE BLOCKED: " + entry["reason"])
+                        for line in log.splitlines()), "investigated authorization log changed")
+        evidence.append({"run_id": run["id"], "authorization_log_sha256": log_hash,
+                         "production_job": "skipped"})
+    cutoff = min(e["created_at"] for e in entries)
+    # Fail closed if another formal path operated on production during the incident.
+    manual = [r for page in pages("actions/workflows/deploy-production.yml/runs?per_page=100")
+              for r in page["workflow_runs"]]
+    require(not any(r["status"] != "completed" or r["created_at"] >= cutoff for r in manual),
+            "release circuit open; concurrent or intervening manual deployment")
+    deployments = [d for page in pages("deployments?environment=production&per_page=100") for d in page]
+    require(not any(d["created_at"] >= cutoff for d in deployments),
+            "release circuit open; production deployment record requires investigation")
+    return {"schema": record["schema"], "investigation_sha256": hashlib.sha256(raw).hexdigest(),
+            "source_commit": source, "deployment_run_id": os.environ["GITHUB_RUN_ID"],
+            "verified_at": datetime.now(timezone.utc).isoformat(), "failures": evidence,
+            "production_deployments_since_incident": 0, "intervening_manual_runs": 0}
+
+
 def authorize_release(event, destination):
     require(os.environ.get("GITHUB_RUN_ATTEMPT") == "1", "automatic deployment reruns require incident recovery")
     rehearsal = api(f"actions/runs/{event['workflow_run']['id']}")
@@ -251,15 +343,16 @@ def authorize_release(event, destination):
                 for run in page["workflow_runs"]]
     previous = [r for r in previous if str(r["id"]) != os.environ["GITHUB_RUN_ID"]
                 and r["conclusion"] != "skipped"]
-    if previous:
-        require(previous[0]["conclusion"] == "success", "release circuit open; investigate prior deployment before resuming")
+    recovery = None
+    if previous and previous[0]["conclusion"] != "success":
+        recovery = verify_circuit_recovery(previous, source)
     destination.mkdir(parents=True, exist_ok=False)
     gh("run", "download", str(rehearsal["id"]), "--repo", REPOSITORY, "--name",
        f"deployment-proof-{rehearsal['id']}-{rehearsal['run_attempt']}", "--dir", str(destination / "proof"))
     proof = json.loads((destination / "proof/release-proof.json").read_text())
     require(type(proof["rc_run_id"]) is int and proof["rc_run_id"] > 0, "invalid proof RC run ID")
     rc = api(f"actions/runs/{proof['rc_run_id']}")
-    verified_run(rc, source, "release-pg03-gateway.yml", "workflow_run")
+    verified_run(rc, source, "release-pg03-gateway.yml", ("workflow_run", "workflow_dispatch"))
     require(proof["rc_run_attempt"] == rc["run_attempt"], "stale RC attempt")
     latest_rc = api(f"actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha={source}&per_page=1")["workflow_runs"]
     require(bool(latest_rc) and latest_rc[0]["id"] == rc["id"], "superseded RC run")
@@ -284,6 +377,12 @@ def authorize_release(event, destination):
     paths = [f["filename"] for f in files] + [f["previous_filename"] for f in files if "previous_filename" in f]
     require(bool(paths), "deployment diff is empty")
     result["rehearsal_run_id"] = str(rehearsal["id"])
+    if recovery is not None:
+        # Only a fully authenticated current proof may emit the recovery receipt.
+        recovery.update(rc_run_id=rc["id"], rehearsal_run_id=rehearsal["id"],
+                        gateway_digest=result["image_digest"])
+        (destination / "recovery-audit.json").write_text(json.dumps(recovery, indent=2) + "\n")
+        print("Verified authorization-only circuit recovery: " + json.dumps(recovery, sort_keys=True))
     return result
 
 
