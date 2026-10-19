@@ -3,13 +3,18 @@ name: GHCR Pull Rehearsal
 on:
   workflow_dispatch:
     inputs:
+      inspection_only:
+        description: 'Read-only SSH/sudo/asset/Runtime verification; never pulls or deploys'
+        required: true
+        type: boolean
+        default: true
       image_digest:
         description: 'Exact image digest (sha256:<64 hex>) to rehearse pulling'
-        required: true
+        required: false
         type: string
       expected_commit:
         description: 'Expected source commit (full 40 hex) of the image'
-        required: true
+        required: false
         type: string
 
 permissions:
@@ -22,7 +27,7 @@ concurrency:
 
 jobs:
   rehearse:
-    name: Exact-digest pull rehearsal on VPS
+    name: VPS authorization inspection or exact-digest pull rehearsal
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15
@@ -40,9 +45,15 @@ jobs:
           persist-credentials: false
 
       - name: Validate rehearsal inputs
+        env:
+          INSPECTION_ONLY: ${{ inputs.inspection_only }}
+          INPUT_COMMIT: ${{ inputs.expected_commit }}
+          INPUT_DIGEST: ${{ inputs.image_digest }}
         run: |
           set -euo pipefail
-          if [ ! "${{ inputs.expected_commit }}" =~ ^[0-9a-f]{40}$ ]; then
+          test "$GITHUB_REF" = refs/heads/main
+          if [[ "$INSPECTION_ONLY" == true ]]; then exit 0; fi
+          if [[ ! "$INPUT_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
             echo "expected_commit is not a full 40-hex commit SHA"
             exit 1
           fi
@@ -54,7 +65,7 @@ jobs:
           # wrapper: the exact digest uniquely identifies the image, and the
           # wrapper fails unless that image's OCI revision label equals
           # expected_commit. A tampered image would have a different digest.
-          if [ ! "${{ inputs.image_digest }}" =~ ^sha256:[a-f0-9]{64}$ ]; then
+          if [[ ! "$INPUT_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
             echo "image_digest must be an exact 'sha256:<64 hex>' digest — tags and 'latest' are forbidden"
             exit 1
           fi
@@ -92,7 +103,20 @@ jobs:
           } > ~/.ssh/config
           chmod 0600 ~/.ssh/config
 
+      - name: Inspect existing VPS authorization without deployment
+        if: inputs.inspection_only
+        run: python3 scripts/ci/inspect-vps-authorization.py --output "$RUNNER_TEMP/vps-authorization-inspection.json"
+
+      - name: Upload read-only authorization inspection
+        if: always() && inputs.inspection_only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: vps-authorization-inspection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/vps-authorization-inspection.json
+          if-no-files-found: error
+
       - name: Verify installed rehearsal wrapper matches this commit
+        if: ${{ !inputs.inspection_only }}
         # Same integrity model as the deploy wrapper: the copy on the VPS is
         # installed out-of-band as root-owned 0750; this job only proves it is
         # byte-identical to the script in this exact commit. No upload.
@@ -110,8 +134,11 @@ jobs:
           echo "rehearsal wrapper integrity PASS: $LOCAL_SHA"
 
       - name: Run pull rehearsal on VPS
+        if: ${{ !inputs.inspection_only }}
         env:
           GH_PULL_TOKEN: ${{ github.token }}
+          INPUT_DIGEST: ${{ inputs.image_digest }}
+          INPUT_COMMIT: ${{ inputs.expected_commit }}
         run: |
           set -euo pipefail
           # Short-lived job token piped over stdin; the wrapper logs into a
@@ -119,8 +146,8 @@ jobs:
           # revision label, logs out and removes the config. Nothing persists.
           printf '%s' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
             "sudo /opt/clearapi/bin/ghcr-pull-rehearsal.sh \
-              --digest '${{ inputs.image_digest }}' \
-              --expected-commit '${{ inputs.expected_commit }}'"
+              --digest '$INPUT_DIGEST' \
+              --expected-commit '$INPUT_COMMIT'"
 
       - name: Clear deploy key material
         if: always()
