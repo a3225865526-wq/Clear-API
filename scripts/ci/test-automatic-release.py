@@ -144,6 +144,27 @@ class ReleaseProofTest(unittest.TestCase):
         self.assertEqual(result["executor_image_digest"], self.proof["executor"]["image_digest"])
         self.assertEqual(result["migration_compatible"], "false", "unclassified runtime failures must stop")
 
+    def test_uploaded_receipts_directory_preserves_scope_and_rejects_ambiguous_files(self):
+        receipts = self.root / 'receipts'
+        receipts.mkdir()
+        for gate in policy.PROOF_CHECKS:
+            path = self.root / (gate + '.json')
+            path.rename(receipts / path.name)
+        self.assertEqual(self.validate()['image_digest'], DIGEST)
+        self.proof.update(schema='clearapi.controlled-release/v1', public_traffic='blocked',
+                          provider_acceptance='deferred_to_owner_after_deployment')
+        self.proof['checks'].pop('gateway_executor_provider_usage_billing')
+        self.assertEqual(policy.validate_proof(self.manifest, self.proof, self.root, SOURCE, 123,
+                                               EXECUTOR_IMAGE, controlled=True)['release_stage'], 'controlled')
+        (self.root / 'billing.json').write_bytes((receipts / 'billing.json').read_bytes())
+        with self.assertRaisesRegex(ValueError, 'ambiguous evidence layout'):
+            policy.validate_proof(self.manifest, self.proof, self.root, SOURCE, 123, EXECUTOR_IMAGE, controlled=True)
+
+    def test_receipts_directory_symlink_cannot_redirect_valid_hashed_evidence(self):
+        (self.root / 'receipts').symlink_to(self.root, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, 'unsafe evidence directory'):
+            self.validate()
+
     def test_controlled_scope_cannot_be_used_for_commercial_release(self):
         self.proof.update(schema='clearapi.controlled-release/v1', public_traffic='blocked',
                           provider_acceptance='deferred_to_owner_after_deployment')

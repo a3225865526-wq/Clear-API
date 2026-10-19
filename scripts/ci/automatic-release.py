@@ -198,11 +198,20 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
     require(re.fullmatch(SHA, proof["previous_source_commit"]) is not None, "missing predecessor identity")
     required_checks = PROOF_CHECKS - {"gateway_executor_provider_usage_billing"} if controlled else PROOF_CHECKS
     require(set(proof["checks"]) == required_checks, "missing/unknown release evidence checks")
+    receipt_dir = evidence_dir / "receipts"
+    require(not receipt_dir.is_symlink(), "unsafe evidence directory")
+    if receipt_dir.exists():
+        require(receipt_dir.is_dir(), "unsafe evidence directory")
+        for name in required_checks:
+            flat = evidence_dir / (name + ".json")
+            require(not flat.exists() and not flat.is_symlink(), "ambiguous evidence layout")
+    else:
+        receipt_dir = evidence_dir
     for name, check in proof["checks"].items():
         require(check["conclusion"] == "success", "gate failed: " + name)
         filename = check["file"]
         require(filename == name + ".json", "invalid evidence filename")
-        path = evidence_dir / filename
+        path = receipt_dir / filename
         require(not path.is_symlink() and path.is_file(), "missing evidence: " + name)
         data = path.read_bytes()
         require(hashlib.sha256(data).hexdigest() == check["sha256"], "evidence hash mismatch: " + name)

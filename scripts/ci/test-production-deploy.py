@@ -1132,6 +1132,7 @@ else: sys.exit('Forbidden docker operation')
         env = dict(self.env, TEST_ROOT=str(self.root), TEST_FAILURE=failure,
                    GH_PULL_TOKEN=payload, PROD_SSH_ALIAS="fixture-vps",
                    POOL_MODE="off", DEPLOY_WRAPPER="/opt/clearapi/bin/production-deploy.sh",
+                   RELEASE_STAGE="commercial",
                    IMAGE_DIGEST=DIGEST, EXPECTED_COMMIT=COMMIT, GITHUB_RUN_ID="123",
                    MIGRATION_COMPATIBLE="true" if compatible else "false",
                    GHCR_PULL_TOKEN="must-not-be-exported",
@@ -1164,6 +1165,13 @@ else: sys.exit('Forbidden docker operation')
         self.assertTrue(any("SELECT status FROM channels WHERE id=2" in q for q in queries))
         self.assertFalse(any("SELECT status FROM channels WHERE id=1;" in q for q in queries))
         self.assertTrue(any(x["args"][-5:] == ["up","-d","--timeout","150","new-api"] for x in trace))
+
+    def test_inherited_controlled_stage_does_not_change_commercial_fixture(self):
+        self.env['RELEASE_STAGE'] = 'controlled'
+        result, trace, logins = self.run_chain()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('DEPLOYMENT SUCCESS', result.stderr)
+        self.assertEqual(len(logins), 1)
 
     def test_runtime_blocks_prevent_migration_replace_and_success(self):
         cases = [('probe-unavailable','PROBE_UNAVAILABLE'),
