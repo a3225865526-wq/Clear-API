@@ -1,8 +1,40 @@
 # ClearAPI — Master Status
 
-## 2026-10-18 — RESUMED — FULL PG03 PRODUCTION LAUNCH
+## 2026-10-19 — PG03 发布链：门禁全绿，仅剩 VPS root 前置
 
-**PG03 = RESUMED — FULL PG03 PRODUCTION LAUNCH.** 本节为最新状态，优先于下方 2026-10-16 冻结记录；历史正文原样保留。
+**PG03 = 门禁全部真实通过；生产部署未执行。** 本节为最新状态，优先于下方 2026-10-18 与 2026-10-16 记录；历史正文原样保留。
+
+### 本次执行身份
+
+| 项目 | 当前值 | 状态 |
+| --- | --- | --- |
+| 生产域名 | `https://www.clear999.com` | HTTP 200（全程未被触碰） |
+| **远端 main（最新）** | **`fd8f27641d49f6c5a5b5b6c30fac230d3c074cd1`** | VERIFIED |
+| 本轮合并 PR | #59 schema 契约、#60 Executor 重钉、#61/#62 链路触发、#63 manual rehearsal、#64/#65 event 授权 | MERGED |
+| **最终 Gateway RC** | Run `39177706410`, digest `sha256:9606af0f5c7e8b002cd80f4f7f108992304abbe663af89eb9e363114d054d6d0`, Manifest SHA `e6aa32f5b760f476b2d377583aafbacfb420cf70b937cf4f95a921dacf3b4b70` | SUCCESS |
+| **Rehearsal** | Run `39189031358`：**11/11 gate success，release-proof.json 已生成** | PASS |
+| schema 发布契约 | 改为从 manifest 推导 `in_place_startup_migration`；10 个负向用例仍全部拒绝 | FIXED |
+| 三份运营方证据 | backup / rollback / provider，均先过真实 verifier 再安装；绑定 RC `39177706410` | PASS |
+| Executor 分支 / commit | `codex/pg03-executor-mvp` / `a45358edf1f440b51fb613d82b044456199c38e1`（tip `945fc3ee` 内容相同） | PUSHED |
+| Executor digest | `sha256:722915a67271b8404ae6411c5763d3ff6a4f5bcadee1a14025e888441f03a4f8` | VERIFIED |
+| Executor binary SHA256 | `b9222051f1275d0da003c04dfe20f9cc38180273d69d4ff1c0715cb4e05218f5` | VERIFIED |
+| 自动发布熔断器 | `39176488931` / `39189520883` 两次 failure（均在授权步骤，部署步骤 skipped）后**持久打开** | BLOCKED |
+| VPS 已安装脚本 | 与当前 commit **不一致**（本轮改过 `production-deploy-v2.sh` / `pg03-release-control.py`） | NEEDS ROOT REINSTALL |
+| PG03 生产启用 | 未执行 | NOT RUN |
+| 线上验收 | 未执行 | NOT RUN |
+| 熔断 / 双账号故障转移 | 隔离环境实测通过（本轮及上轮） | PASS (ISOLATED) |
+
+### 剩余阻塞（均需 VPS root）
+
+1. 重装 `production-deploy-v2.sh`（`b03679284eac818dd69ef50a537277939435fb06016546fff734b91161b19c72`）与 `pg03-release-control.py`（`b3389dc40d66fedb287d56304260178035ee817660d8af61d00aec84a50e0a07`）到 `/opt/clearapi/bin/`，root 属主、`0750`。
+2. 以 root 经真实交互式登录 + MFA 生成 `/opt/clearapi/secrets/runtime-probe-session`。
+3. （仅自动路径额外需要）确认无影响后恢复发布熔断器。
+
+详见 `CLEARAPI_PG03_PRODUCTION_LAUNCH_FINAL_20261019.md` §4.4 与 §8。
+
+## 2026-10-18 — RESUMED — FULL PG03 PRODUCTION LAUNCH（历史）
+
+**PG03 = RESUMED — FULL PG03 PRODUCTION LAUNCH.** 本节为 2026-10-19 之前的状态，历史正文原样保留。
 
 ### 本次执行身份
 
