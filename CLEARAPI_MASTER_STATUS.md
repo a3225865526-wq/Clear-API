@@ -1,8 +1,83 @@
 # ClearAPI — Master Status
 
-## 2026-10-19 — PG03 发布链：门禁全绿，仅剩 VPS root 前置
+## 2026-10-19 — MOBILE COORDINATION：BLOCKED，剩余不止 VPS root 安装
 
-**PG03 = 门禁全部真实通过；生产部署未执行。** 本节为最新状态，优先于下方 2026-10-18 与 2026-10-16 记录；历史正文原样保留。
+**本节取代下方所有“门禁全绿 / 仅剩 VPS root”结论。生产部署与线上验收均未取得完成证据。**
+本次修改在 `codex/pg03-predecessor-compat-20261019` 审阅分支；未将修复分支当作已部署源码，未触发新 RC 或 Rehearsal。
+
+### 当前已核实候选
+
+| 项目 | 身份 / 真实结果 |
+| --- | --- |
+| main（本次查询） | `d0c20d6c46d86845805e4a9d35b067b0f6b20be4` |
+| main CI | [39204691662](https://github.com/a3225865526-wq/Clear-API/actions/runs/39204691662) SUCCESS |
+| 当前已构建 RC | [39205228315](https://github.com/a3225865526-wq/Clear-API/actions/runs/39205228315) SUCCESS；不重复构建 |
+| Gateway 候选 digest | `sha256:98e615c08fd0697506340c2150c6e2a7e5aa53c543741ce61ebe4a190424ca65` |
+| Executor 正式配对 digest | `sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58`；不代表本次已核实生产运行值 |
+| Rehearsal | [39205679007](https://github.com/a3225865526-wq/Clear-API/actions/runs/39205679007) FAILURE；未生成可用全绿 proof |
+| 自动发布 | [39206211930](https://github.com/a3225865526-wq/Clear-API/actions/runs/39206211930) SKIPPED |
+| VPS 只读检查 | [39203542451](https://github.com/a3225865526-wq/Clear-API/actions/runs/39203542451)：SSH 成功；两份脚本哈希不符；Runtime 未执行 |
+| 实际生产 SHA / 镜像 / PG03 状态 | 本轮未取得完整运行证据，UNVERIFIED；历史旧版本健康不作为当前验收 |
+
+### 三份 stale 证据：身份不匹配，不是时间过期
+
+用户已取得原始 Artifact `deployment-proof-39205679007-1` 并提供三份真实 stderr；本轮已对照 verifier 的错误分支：
+
+- backup_restore：`backup rehearsal evidence is stale`
+- gateway_executor_provider_usage_billing：`provider rehearsal evidence is stale`
+- safe_rollback：`rollback rehearsal evidence is stale`
+
+`scripts/ci/verify-rehearsal-input.py` 只有在证据 `source_commit` 或 `gateway_digest` 不等于 RC manifest 时报告该 stale。该结果不是 Runtime、Provider 或备份操作本身失败的证明，也不是它们对新候选已通过的证明。
+
+**当前三份 Secrets 的实际身份与来源引用：尚未取得可回读的非敏感元数据，UNKNOWN。** GitHub Secrets 不支持读取明文；不得从 stale 推断究竟哪个字段不符，也不得假定 Secrets 从上一次验收后从未更改。需要运营方提供各证据的 source_commit、gateway_digest、rc_run_id/attempt、manifest_sha256、schema 指纹、target_id 及原始结果引用；不需要私钥、密码、会话或 Provider token。
+
+现有历史来源（不是当前 Secrets 的独立实测）：
+
+- 仓库 `CLEARAPI_PG03_PRODUCTION_LAUNCH_FINAL_20261019.md` 记录三份证据曾绑定 `9a3e6585737d823896137346faf94c2e1f4d1b04` / RC `39193373708` / Gateway `sha256:95f7e50f1894171aef3eaf5c94b9e123491430c8f17d4caab3c107aa0ae79b6c`，manifest SHA `898b7b15648799b7d1b2f5e168526eb0e905c93066343e37eb05ca59517061e4`。
+- 详细来源记录：备份 `20261016T193254Z` 的隔离解密/恢复；75 张表与 schema/不变量核验；候选二进制双启动；真实 Provider 链路的 usage、钱包/token 与消费日志一致性。原始文件位于 Windows `D:/AI/API/runtime/pg03-rebind-20261019/`，其中 `ev6/`、`provider-measurement.json`；当前 Cloud 无法读取该本地目录和离线解密身份。
+- 后续 `cd6f719e79de432de6219561b04502784cb58930` / RC `39197505434` / Gateway `sha256:bdbb535b8826aa243eee7922a7a5e2d0fb8646f69a34653b4251ca60c488fdc6` 的 Rehearsal `39198350006` 曾成功；这是那次运行的验收，不是对现在 Secrets 或新 RC 的许可。
+- 历史 rollback 记录明确 `rollback_proven=false`、`production_restore_executed=false`；不得改写为生产恢复/回滚已实测。
+
+重新签发条件：先固定最终 main/RC/manifest；取得原始结果及可验证来源，判定与新候选的适用范围。可复用真实备份文件、已验证的固定 Executor 和无关测试结果；对受源码/二进制/schema/运行目标变化影响的验证，只补必要项目。rollback 的精确候选双启动和 Provider 当前候选真实请求结果不能仅靠替换身份字段得到。重新签发必须记录真实操作、来源和判断依据，精确绑定 source/digest/run/attempt/manifest/schema/target，并通过现有 verifier；不修改 verifier，不编造成功，不无条件复制旧 JSON。
+
+### 前驱身份读取：修复已准备，尚未安装或合并为 main
+
+现场 clearapi-deploy 的 sudo allowlist 不允许通用 `sudo python3 -c`。旧 workflow 在读取生产前驱 SHA 时使用了该命令，是独立权限兼容缺陷。
+
+本审阅分支将 PG03 的相同前驱校验移到已有 allowlist 的 `pg03-release-control.py prepare`：main() 持现有部署锁，在发布任何目标/维护授权文件前，使用既有安全 reader 读取固定 root-owned manifest（拒绝 symlink、非安全属主/权限和 duplicate JSON），要求精确 40 位前驱 SHA，并拒绝 pending/failed 状态。保留原有 GitHub 授权与 RC 校验；没有新增 sudo 权限、任意路径参数或通用 root 命令。非 PG03 路径不受本修复影响。
+
+新增回归覆盖身份错误/缺失、未知 manifest、pending/failed、固定读取路径及失败时禁止准备写入。实际本地：PG03 28 tests（26 PASS / 2 root-only skipped），automatic-release 24 PASS；完整 PR CI 另行记录，不能将本地跳过项写成通过。
+
+### Release circuit：保持 BLOCKED
+
+- 原始失败 `39176488931` 为 `unexpected run event`：历史策略仅接收 workflow_run，而实际手动 Rehearsal 是 workflow_dispatch。后续 `39189520883`、`39195457908`、`39198826181` 被持久失败历史拦截。
+- 四份原始授权日志已复核，规范化 SHA256 全部与 `.github/release-circuit-recovery.json` 相符；四个部署 job 全部 skipped。因此可确认这四次运行没有进入生产部署 job，不能据此声称整个 VPS 无其他操作。
+- PR #69 已提供受审计恢复：精确失败列表、原日志、job inventory、main 祖先关系、24 小时时效、无插入手动部署、无待调查 production deployment record；仅在当前全部 proof/RC/CI 校验完成后产出恢复审计。未删除状态、重写失败或执行恢复。
+- 当前连接器拒绝 deployments API，公开网页查询也未得到记录；实际 production records 与未决操作仍 UNKNOWN。只读检查使用 production environment，其可能产生的记录也必须核查分类，不能直接豁免或当成业务部署。
+- 恢复记录有效至 **2026-10-20 04:22 UTC / 12:22 Asia/Shanghai**；过期必须重新调查，不修改时间伪造新调查。
+
+### VPS root：单独待办，不阻止上述 Cloud 工作
+
+实际只读检查已确认两个文件不匹配：V2 为 `10d12caa...0e45d`、release-control 为 `bf6bc8cb...3189d`；其余四份资产匹配。部署账号没有安装权限，Cloud 没有其他已授权 root 身份，不能访问 Windows 本地密钥；不扩大 sudoers，不绕过 MFA。
+
+PR #70 安装方案对当前 main d0c20d6c 的两份文件仍适用（V2 `490af9ab...18468fe`；control `e24259b8...abcb7`）。**本次修复会改变 control 哈希，故旧方案不能当作修复后最终候选的安装清单。** 最终代码冻结、审阅通过后一次性更新正式安装 pin/hash；然后由正式管理员/Server.HK 支持代装并保留备份/审计。官方工单草稿已在 PR #70，尚未提交；不假设支持方一定可代装或免费。
+
+安装后重跑原只读 inspection 读取真实哈希和 Runtime 结果。Runtime 当前 UNKNOWN，不预先断言需要新登录；如实际 PROBE_UNAVAILABLE，仅走官方管理员交互登录/MFA。命令执行成功不等于探针 PASS。
+
+### 最小剩余阻塞与执行顺序
+
+1. 取得三份运营方证据的非敏感历史身份、原始验收记录与重新签发依据；只补真正受影响的验收。
+2. 完成本分支前驱权限修复的必需 CI/审阅；同时取得并调查 production records。未知状态继续 BLOCKED，不提前放开熔断。
+3. 一次性确定最终源码与正式资产哈希；只有最终代码改变候选身份时才产生一个必要的新 RC。现有成功 RC 保留，不能作为修复后源码的候选，也不重建相同 RC。
+4. 三份真实证据绑定最终 RC 后，按既有入口验证；不无变化重复 Rehearsal、不 rerun 旧 attempt、不复用不同 source/digest 的全绿 proof。
+5. root 两份资产安装、真实 Runtime/运行身份验证与熔断恢复核验分别完成；全部门禁通过后才继续正式部署。
+6. 实测生产 SHA、Gateway/Executor digest、PG03 启用、真实请求/切账号/fallback、usage/钱包/token/消费日志、失败请求退款或待核对闭环、健康与回滚能力。历史隔离失败请求待核对/退款结果不等于当前生产闭环。
+
+**最终状态：BLOCKED。没有脚本安装、Runtime PASS 或生产已部署的新增证据。**
+
+## 2026-10-19 — 历史快照（已被上方协调状态取代）
+
+**以下仅为历史候选记录，不能作为当前 main/RC 的验收结论。** 其中“仅剩 root”“均需 root”已失效，以本文顶部协调状态为准。
 
 ### 本次执行身份
 
