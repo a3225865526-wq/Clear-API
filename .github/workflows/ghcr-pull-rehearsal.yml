@@ -196,3 +196,122 @@ jobs:
       - name: Clear deploy key material
         if: always()
         run: rm -f ~/.ssh/ci_deploy_key ~/.ssh/ci_known_hosts ~/.ssh/config
+
+  export_candidate:
+    name: Export existing immutable RC for local verification (no production access)
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.release_audit_only &&
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+      github.ref == 'refs/heads/codex/clearapi-rc-image-export-20261020'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RC_RUN_ID: ${{ inputs.audit_rc_run_id }}
+      EXPECTED_MAIN: 0848ce7a4ac157cc2ac8411b617bceeba55366ad
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: 0848ce7a4ac157cc2ac8411b617bceeba55366ad
+          persist-credentials: false
+
+      - name: Authenticate existing main RC and its source CI
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RC_RUN_ID" = 39334166644
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RC_RUN_ID" > rc-run.json
+          python3 - <<'PY'
+          import importlib.util, json, os
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('policy', Path('scripts/ci/automatic-release.py'))
+          policy=importlib.util.module_from_spec(spec);spec.loader.exec_module(policy)
+          run=json.load(open('rc-run.json'))
+          policy.verified_run(run, os.environ['EXPECTED_MAIN'], 'release-pg03-gateway.yml', 'workflow_dispatch')
+          assert run['run_attempt']==1 and str(run['id'])==os.environ['RC_RUN_ID']
+          assert policy.api('git/ref/heads/main')['object']['sha']==os.environ['EXPECTED_MAIN']
+          ci=policy.latest_main_ci(os.environ['EXPECTED_MAIN'])
+          assert ci['id']==39333198873
+          PY
+          mkdir rc
+          gh run download "$RC_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "pg03-gateway-release-$RC_RUN_ID-1" --dir rc
+          python3 - <<'PY'
+          import importlib.util, json, os
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('policy', Path('scripts/ci/automatic-release.py'))
+          policy=importlib.util.module_from_spec(spec);spec.loader.exec_module(policy)
+          m=policy.verify_rc_artifact(Path('rc'))
+          assert m['source_commit']==m['oci_revision']==os.environ['EXPECTED_MAIN']
+          assert m['image_ref']=='ghcr.io/a3225865526-wq/clearapi@sha256:84f69ec152aed7f820b610fcf65f2b8adbea80e89c4539b6d8911bda46cac5f1'
+          assert m['binary_sha256']=='40ebc70665bf7f45c7a201c4fdd82a90913a1873b2c7ca0debda1829983eee4b'
+          assert str(m['workflow_run'])==os.environ['RC_RUN_ID'] and str(m['workflow_run_attempt'])=='1'
+          assert m['production_ready'] is False and m['production_acceptance']=='not_run'
+          with open(os.environ['GITHUB_ENV'],'a') as out:
+              out.write('IMAGE_REF='+m['image_ref']+'\n')
+          PY
+
+      - name: Enable containerd only on the disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('/etc/docker/daemon.json')
+          c=json.loads(p.read_text()) if p.exists() else {}
+          c.setdefault('features',{})['containerd-snapshotter']=True
+          p.write_text(json.dumps(c))
+          PY
+          sudo systemctl restart docker
+
+      - name: Authenticate package read with the short-lived Actions credential
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export the exact candidate without starting the application
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform linux/amd64 "$IMAGE_REF"
+          docker image inspect "$IMAGE_REF" > image.json
+          docker run --rm --network none --read-only --entrypoint sha256sum "$IMAGE_REF" /new-api > binary.sha256
+          docker image save --platform linux/amd64 "$IMAGE_REF" | gzip -1 -n > candidate-image.tar.gz
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          m=json.load(open('rc/gateway-image-release.json'));i=json.load(open('image.json'))[0]
+          assert i['Id']==m['new_api_image_id'] and m['image_ref'] in i['RepoDigests']
+          assert i['Config']['Labels']['org.opencontainers.image.revision']==m['source_commit']
+          assert i['Os']=='linux' and i['Architecture']=='amd64'
+          assert Path('binary.sha256').read_text().strip()==m['binary_sha256']+'  /new-api'
+          archive=Path('candidate-image.tar.gz');h=hashlib.sha256()
+          with archive.open('rb') as f:
+              for chunk in iter(lambda:f.read(1048576),b''):h.update(chunk)
+          r={'schema':'clearapi.rc-image-transfer/v1','rc_run_id':int(os.environ['RC_RUN_ID']),
+             'rc_run_attempt':1,'source_commit':m['source_commit'],'image_ref':m['image_ref'],
+             'image_id':i['Id'],'binary_sha256':m['binary_sha256'],
+             'manifest_sha256':hashlib.sha256(Path('rc/gateway-image-release.json').read_bytes()).hexdigest(),
+             'archive_sha256':h.hexdigest(),'archive_bytes':archive.stat().st_size,
+             'export_run_id':int(os.environ['GITHUB_RUN_ID']),'export_run_attempt':1,
+             'application_started':False,'production_access':False,'rc_rebuilt':False}
+          Path('export-receipt.json').write_text(json.dumps(r,indent=2)+'\n')
+          PY
+
+      - name: Preserve the authenticated image transfer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: rc-image-transfer-39334166644-${{ github.run_id }}-1
+          path: |
+            candidate-image.tar.gz
+            export-receipt.json
+          if-no-files-found: error
+          retention-days: 1
