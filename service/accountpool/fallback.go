@@ -91,3 +91,37 @@ func SaveFallbackPolicy(ctx context.Context, input FallbackPolicyInput) (*model.
 	})
 	return (model.PoolFallbackRepository{DB: db()}).Replace(ctx, policy)
 }
+
+// ImagesPolicyOrder returns the frozen account order and policy revision for a
+// controlled image request. It refuses an empty, disabled or out-of-range
+// policy: an images request is never dispatched against an unverified order.
+func ImagesPolicyOrder(ctx context.Context, poolID, modelName string) ([]string, int, error) {
+	policy, err := GetFallbackPolicy(ctx, poolID, modelName)
+	if err != nil {
+		return nil, 0, err
+	}
+	if policy == nil || !policy.Enabled || policy.MaxFallbackCount < 0 || policy.MaxFallbackCount > model.MaxPoolFallbackCount {
+		return nil, 0, ErrPoolNotAdmitted
+	}
+	order := make([]string, 0, len(policy.Members))
+	seen := make(map[string]bool, len(policy.Members))
+	for _, member := range policy.Members {
+		if !member.Enabled {
+			continue
+		}
+		var account model.UpstreamPoolAccount
+		if err := db().WithContext(ctx).First(&account, member.AccountId).Error; err != nil {
+			return nil, 0, ErrPoolInvalid
+		}
+		ref := account.CredentialRef
+		if account.Platform != "codex" || account.ExecutorId != ExecutorCliproxyAPI || ref == "" || ref != strings.TrimSpace(ref) || seen[ref] {
+			return nil, 0, ErrPoolInvalid
+		}
+		seen[ref] = true
+		order = append(order, ref)
+	}
+	if len(order) == 0 || len(order) > model.MaxPoolFallbackCount+1 {
+		return nil, 0, ErrPoolNotAdmitted
+	}
+	return order, policy.Id, nil
+}

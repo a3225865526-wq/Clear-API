@@ -18,9 +18,9 @@ type Snapshot struct {
 	FinanceSchemaPresent bool
 	FinanceSchemaVersion int
 
-	State        *model.BootstrapState
-	StateCorrupt bool
-	Marker       *model.BootstrapCompletionMarker
+	State         *model.BootstrapState
+	StateCorrupt  bool
+	Marker        *model.BootstrapCompletionMarker
 	MarkerCorrupt bool
 
 	LegalUserAgreementPresent bool
@@ -35,6 +35,7 @@ type Snapshot struct {
 	SettlementReady      bool
 	SettlementLogsReady  bool
 	TokenEncryptionReady bool
+	ImageExecutionsReady bool
 }
 
 // OpenReadonly initializes the DB/LOG_DB globals without running any
@@ -98,6 +99,7 @@ func TakeSnapshot() *Snapshot {
 		snapshot.SettlementLogsReady = probe(func() error { return model.TaskSettlementLogsReady(model.LOG_DB) })
 	}
 	snapshot.TokenEncryptionReady = probe(func() error { return model.TokenEncryptionReady(db) })
+	snapshot.ImageExecutionsReady = probe(func() error { return model.ImageExecutionsReady(db) })
 	return snapshot
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/service/imageexecution"
 	"github.com/QuantumNous/new-api/service/routechain"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
@@ -76,6 +77,16 @@ func RefundFailedRequestBilling(c *gin.Context, info *relaycommon.RelayInfo, api
 		return nil
 	}
 	apiErr = service.NormalizeViolationFeeError(apiErr)
+	// Controlled images own their terminal. An UNKNOWN outcome must keep its
+	// active reservation for reconciliation and must never be refunded into a
+	// replayable request, and a committed success must not be refunded by the
+	// generic failure path either.
+	if controlled := imageexecution.FromContext(c); controlled != nil {
+		if controlled.Unknown || imageexecution.Settled(controlled) {
+			service.ChargeViolationFeeIfNeeded(c, info, apiErr)
+			return apiErr
+		}
+	}
 	if info.Billing != nil {
 		upstream := apiErr.ToOpenAIError()
 		code, _ := upstream.Code.(string)

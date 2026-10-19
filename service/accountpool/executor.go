@@ -730,3 +730,108 @@ func (c *CliproxyClient) PoolModelSnapshot(ctx context.Context) (PoolExecutorMod
 }
 
 var _ ExecutorClient = (*CliproxyClient)(nil)
+
+// ---------------------------------------------------------------------------
+// Controlled image execution (PG03 Images Contract v1)
+// ---------------------------------------------------------------------------
+
+// ExecutorImagesExecution is the Executor's durable answer for one attempt.
+type ExecutorImagesExecution struct {
+	Found              bool   `json:"found"`
+	State              string `json:"state"`
+	ResultState        string `json:"result_state"`
+	ReceiptID          string `json:"receipt_id"`
+	ResultCount        int    `json:"result_count"`
+	BillableImageCount int    `json:"billable_image_count"`
+	ResultRef          string `json:"result_ref"`
+	ResultSHA256       string `json:"result_sha256"`
+	EndReason          string `json:"end_reason"`
+}
+
+// ImagesExecutionQuerier is implemented by an executor client that can answer
+// the durable state of a controlled image attempt.
+type ImagesExecutionQuerier interface {
+	ImagesExecution(ctx context.Context, requestID, attemptID string) (ExecutorImagesExecution, error)
+}
+
+// ImagesExecution reads GET /v0/management/pool/images/:request/attempts/:attempt.
+// Any shape mismatch fails closed with a fixed error; the body never reaches a
+// caller verbatim.
+func (c *CliproxyClient) ImagesExecution(ctx context.Context, requestID, attemptID string) (ExecutorImagesExecution, error) {
+	result := ExecutorImagesExecution{}
+	if !validPoolReference(requestID) || !validPoolReference(attemptID) {
+		return result, ErrPoolInvalid
+	}
+	status, decoded, err := c.do(ctx, http.MethodGet, "/v0/management/pool/images/"+requestID+"/attempts/"+attemptID, "")
+	if err != nil {
+		return result, err
+	}
+	if status != http.StatusOK || decoded == nil {
+		return result, ErrPoolExecutorFailed
+	}
+	found, _ := decoded["found"].(bool)
+	result.Found = found
+	result.State, _ = decoded["state"].(string)
+	result.ResultState, _ = decoded["result_state"].(string)
+	result.ReceiptID, _ = decoded["receipt_id"].(string)
+	result.ResultRef, _ = decoded["result_ref"].(string)
+	result.ResultSHA256, _ = decoded["result_sha256"].(string)
+	result.EndReason, _ = decoded["end_reason"].(string)
+	result.ResultCount = int(snapshotU64(decoded, "result_count"))
+	result.BillableImageCount = int(snapshotU64(decoded, "billable_image_count"))
+	if decoded["found"] == nil || decoded["state"] == nil {
+		return ExecutorImagesExecution{}, ErrPoolExecutorFailed
+	}
+	return result, nil
+}
+
+func validPoolReference(value string) bool {
+	if value == "" || len(value) > 160 {
+		return false
+	}
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' || r == '.' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// ImagesResultLoader is implemented by an executor client that can return the
+// persisted payload of a controlled image attempt.
+type ImagesResultLoader interface {
+	ImagesResult(ctx context.Context, requestID, attemptID string) ([]byte, error)
+}
+
+// ImagesResult reads GET /v0/management/pool/images/:request/attempts/:attempt/result.
+// The caller must already have a trusted COMPLETED receipt; this method only
+// transports the verified bytes.
+func (c *CliproxyClient) ImagesResult(ctx context.Context, requestID, attemptID string) ([]byte, error) {
+	if !validPoolReference(requestID) || !validPoolReference(attemptID) {
+		return nil, ErrPoolInvalid
+	}
+	if c.baseURL == "" {
+		return nil, ErrPoolExecutorOffline
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v0/management/pool/images/"+requestID+"/attempts/"+attemptID+"/result", nil)
+	if err != nil {
+		return nil, ErrPoolExecutorFailed
+	}
+	if c.key != "" {
+		request.Header.Set("X-Management-Key", c.key)
+	}
+	response, err := c.http.Do(request)
+	if err != nil {
+		return nil, ErrPoolExecutorOffline
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, ErrPoolExecutorFailed
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, 32*1024*1024))
+	if err != nil || len(body) == 0 {
+		return nil, ErrPoolExecutorFailed
+	}
+	return body, nil
+}

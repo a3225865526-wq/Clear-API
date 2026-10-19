@@ -20,6 +20,8 @@ import { poolRequest, poolUpload } from './access'
 import type {
   CompletePoolAuthInput,
   CreatePoolAccountInput,
+  ImageSourcePolicy,
+  ImageSourcePolicyInput,
   PoolAccount,
   PoolAccountCapabilities,
   PoolAccountDetail,
@@ -174,4 +176,22 @@ export async function importPoolCredentials(
   const form = new FormData()
   for (const file of files) form.append('files', file, file.name)
   return poolUpload<PoolImportResponse>('/accounts/import', form, signal)
+}
+
+export function getImageSourcePolicies(signal?: AbortSignal) {
+  return poolRequest<ImageSourcePolicy[]>('/image-policies', { signal })
+}
+
+export function getImageSourcePolicy(model: string, signal?: AbortSignal) {
+  return poolRequest<{ policy: ImageSourcePolicy | null }>('/image-policy', {
+    params: { model },
+    signal,
+  })
+}
+
+export function saveImageSourcePolicy(input: ImageSourcePolicyInput) {
+  return poolRequest<ImageSourcePolicy>('/image-policy', {
+    method: 'PUT',
+    body: input,
+  })
 }

@@ -82,6 +82,13 @@ func SetRelayRouter(router *gin.Engine) {
 	}
 	relayV1Router.Use(middleware.ModelRequestRateLimit())
 	{
+		// Controlled image request status. It authenticates with the same token
+		// as generation and returns only the caller's own request; it never
+		// dispatches upstream work and needs no channel selection.
+		imageStatusRouter := relayV1Router.Group("/images/requests")
+		imageStatusRouter.GET("/:request", controller.GetImageRequestStatus)
+	}
+	{
 		// WebSocket 路由（统一到 Relay）
 		wsRouter := relayV1Router.Group("")
 		wsRouter.Use(middleware.Distribute())

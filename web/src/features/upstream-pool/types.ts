@@ -267,3 +267,26 @@ export interface PoolImportResponse {
   duplicate: number
   rejected: number
 }
+
+export type ImageSourceStrategy =
+  | 'pool_first'
+  | 'api_first'
+  | 'pool_only'
+  | 'api_only'
+
+export interface ImageSourcePolicy {
+  model: string
+  strategy: ImageSourceStrategy
+  group: string
+  enabled: boolean
+  version: number
+  updated_at: number
+}
+
+export interface ImageSourcePolicyInput {
+  model: string
+  strategy: ImageSourceStrategy
+  group?: string
+  enabled: boolean
+  expected_version: number
+}
