@@ -1,11 +1,11 @@
 # ClearAPI — Master Status
 
-## 2026-10-19 — READ-ONLY AUDIT CHANNEL PREPARED（最新阶段）
+## 2026-10-19 — READ-ONLY AUDIT COMPLETE / RELEASE BLOCKED（最新阶段）
 
-- **CURRENT STATUS:** BLOCKED。main 仍为 `d0c20d6c46d86845805e4a9d35b067b0f6b20be4`；RC `39205228315` 保留。本轮无新 RC、Rehearsal、VPS 操作或熔断恢复。
-- **CURRENT BLOCKER:** 自动审计已取得三份真实绑定关系，但原始验收来源尚未验证；production records 已可读，审计遇到未识别的 deployment status，完整调查尚未完成。未知状态保持 BLOCKED。Cloud 直接 gh 的 Forbidden 不能等同于仓库 scope 缺失，Actions 只读身份现已实际可用。
-- **CURRENT PRIORITY:** 使用现有 Actions 的短期只读身份，在不接触 SSH/root/production environment 的 job 中读取 RC、证据发布身份和部署记录，收敛 PR #72 的最终修复范围。
-- **NEXT MINIMUM ACTION:** Cloud 先通过已有仓库写入授权，在限定审阅分支自动执行独立的只读 push audit，取得真实结果；暂无需用户操作。仅若该正式通道确实不可用，才使用 owner 手机单次分支审计作为 fallback（既有 GHCR Pull Rehearsal，branch=`codex/pg03-predecessor-compat-20261019`，`release_audit_only=true`，`audit_rc_run_id=39205228315`）。无需 Windows、VNC、root 或新凭据。工具没有 workflow_dispatch，重跑旧事件也不能替代新增模式；但不能据此跳过仍可尝试的受约束只读 push 通道。
+- **CURRENT STATUS:** BLOCKED；GitHub 只读调查已完成。main 仍为 `d0c20d6c46d86845805e4a9d35b067b0f6b20be4`；RC `39205228315` 保留。本轮无新 RC、Rehearsal、VPS 操作或熔断恢复。
+- **CURRENT BLOCKER:** 原始运营验收材料尚未独立取得；VPS 当前未决操作、Runtime/商业基线未现场确认；现有熔断规则仍拒绝已识别的只读 environment record。不是读取权限缺失，也不再是 production records 不可读。
+- **CURRENT PRIORITY:** 固定已取得的证据绑定和事故记录调查，确认原始验收适用范围，并限定后续恢复机制仅能分类精确、经审计的只读记录；未知 VPS 状态继续阻止恢复。PR #72 保持 Draft，避免在范围尚未收敛时产生新候选。
+- **NEXT MINIMUM ACTION:** Cloud 完成当前必要 CI 与本阶段状态归档；后续需取得原始验收材料及真实服务器状态，才可最终冻结源码、一次生成必要 RC、重新签发真实证据并恢复发布。现在不需要用户操作手机/VNC或提供凭据；自动只读 push 通道已成功，无需手机 fallback。root 安装仍独立待管理员通道具备后执行，不能照搬旧清单。
 
 ### 阶段 1：已有授权通道核查完成，读取边界明确
 
@@ -36,7 +36,38 @@ PR #72 原 head `33bea6ce40d7b27c18133624e9b4430ae81e4b82` 的 CI `39207544711` 
 
 先读取真实报告并关联原始验收来源，逐项调查 production records；未知/失败维持 BLOCKED。调查收敛后才决定 PR #72 合并及一次必要的新 RC，按最终 manifest 重新取得真实证据。VPS 安装仍独立待办，control 待审阅哈希 `2c3b1d22e4109aef1a075a46e42b127830515ab3f3161830f91df114d5948422` 未改变；旧 PR #70 清单不能用于修复后的候选。
 
-## 2026-10-19 — MOBILE COORDINATION：BLOCKED，剩余不止 VPS root 安装
+### 阶段 4：自动调查实际完成（2026-10-19 06:36 UTC）
+
+[只读审计 39210813131](https://github.com/a3225865526-wq/Clear-API/actions/runs/39210813131) SUCCESS，job `117923538503`、源码 `62cd14181ae967edb3137157a153847713a07aa3`。`audit_complete=1` 仅表示读取完成；报告始终 BLOCKED / not_release_evidence。Artifact `12167820751`，`release-state-audit-39210813131-1`，SHA256 `56590c3e2acee912fa26e7a6e4199f3e770ae83e93028d2b6bd453141621329a`。无需用户触发、无需 root、无生产 environment；没有新增高权限凭据。
+
+该代码 head 的必需 CI [39210818694](https://github.com/a3225865526-wq/Clear-API/actions/runs/39210818694) 六项全部 SUCCESS；之后仅归档本总控的实际调查结论，不改变审计、控制脚本或生产逻辑。归档后的 head CI 以 PR #72 实际结果为准，不将旧 head 的检查冒充新 head 检查。
+
+三份当前 Secrets 都匹配已知公开历史 cd6 / RC39197505434 / bdbb digest，与当前 RC 的四项不匹配仍如上。受检的标准来源引用字段均未发现引用（`source_reference_present=0`），`original_acceptance_verified=0`；这不能扩展为“JSON 中绝对没有任何其他来源字段”，更不能把历史文档当作独立验收原件。Windows 原始测量与备份恢复材料仍是待取得项，未改写 Secrets。
+
+GitHub production records 全量盘点 **29 条**；正式生产 workflow 的跨分支运行历史中，事故起点之后只有四次已完成的自动授权失败，无未完成的正式生产 workflow，也无插入手动部署运行。**GitHub 无运行中任务不等于 VPS 没有未决操作。**
+
+事故起点 `2026-10-18T23:25:57Z` 之后只有 deployment **7166252463**：source=`29b6e6ff1b0d1d380b0b8940b1ac4104808f0904`，created=`2026-10-19T05:14:53Z`，所有 status 的 Actions 链接均为只读 inspection **39203542451**。API 按新到旧的状态为 `failure,in_progress,queued,queued,waiting`；waiting 是历史队列状态，不能当成当前仍在等待管理员。原 job 已 completed/failure，pull 两步 skipped，失败点为资产身份不匹配的只读 inspection。
+
+该记录已人工逻辑核查对应源代码和原始日志（未改任何记录）：
+
+- run attempt=1，workflow_dispatch，main，actor/triggering_actor 均为仓库 owner；唯一 job `117901393251`。
+- 原日志规范化 SHA256：`d896e78cca99cb9c980d0f71214335ade746138f1053e3a0a8dc68fd6052ce23`。
+- 原 inspection 源码 SHA256：`70d2f048f6f61dbc63af5b8111030c6be6f5acb60ef3714d0a175a5a3e3d17bc`；原 GHCR workflow SHA256：`afeed524d4ee00d202b513393c670e87426f2ad682f425d8770693aa16618907`。
+- 已确认仅 SSH 身份/sudo list/固定资产 hash 读取；资产不匹配后未执行 Runtime/V2、安装、拉取或部署。不能将其记为“生产部署成功”，也没有删除/重写 failed record。
+
+还复核了事故前较近的失败记录，不能把它们误写成“全部只在授权阶段”：
+
+| 运行 | 实际失败边界（原始日志） |
+| --- | --- |
+| `39051474037` / `39050053489` / `39044452129` | 已进入 VPS wrapper，step 3 后 Runtime `PROBE_UNAVAILABLE`，`BLOCKED before deployment`；未到备份/切换/迁移步骤 |
+| `39043761386` | wrapper 的 launch baseline 拒绝 `missing or invalid commercial pricing`，在备份/切换前停止 |
+| `38911511937` | wrapper 的 launch baseline 拒绝 `unapproved enabled abilities`，在备份/切换前停止 |
+
+这些是历史结论，不证明当前 Runtime、商品计费配置或渠道基线已经修复。历史日志观察到旧镜像 `sha256:3fbbd768...a8f8`，不能作为今天实际运行 digest。
+
+**恢复机制边界已明确：** `.github/release-circuit-recovery.json` 的四次授权失败调查仍有效至原截止时间；但现有规则要求事故后完全没有 production record，因此会继续被只读记录 7166252463 拦截。后续如实现精确的只读记录分类，必须同时核对上述 record/run/job/源码/日志/状态链并拒绝任何新增或变化记录，保留真实数量和失败历史；不得将该记录伪装成 success 或无条件忽略所有 inspection。还必须确认 VPS 当前状态及其他门禁。本轮未修改恢复规则、未产出恢复许可、未清除熔断。
+
+## 2026-10-19 — MOBILE COORDINATION（上一阶段记录，以顶部实际审计结论为准）
 
 **本节取代下方所有“门禁全绿 / 仅剩 VPS root”结论。生产部署与线上验收均未取得完成证据。**
 本次修改在 `codex/pg03-predecessor-compat-20261019` 审阅分支；未将修复分支当作已部署源码，未触发新 RC 或 Rehearsal。
