@@ -78,6 +78,11 @@ def main():
         target = require(os.environ.get("CLEARAPI_REHEARSAL_TARGET_ID"), "rehearsal target is not configured")
         if data.get("target_id") != target:
             raise SystemExit(f"{args.kind} rehearsal evidence target binding mismatch")
+        # Candidate startup/idempotency proves an upgrade, not recovery of the
+        # previous release after failure. Never turn that narrower result into
+        # a safe_rollback receipt, even when its identity and conclusion match.
+        if args.kind == "rollback" and data.get("rollback_proven") is not True:
+            raise SystemExit("rollback rehearsal evidence does not prove rollback recovery")
     print(f"{args.kind} rehearsal identity PASS for {source} {digest}")
 
 

@@ -1,3 +1,29 @@
+# ClearAPI — 权威总控（MASTER STATUS）
+
+## 2026-10-19 — 统一整合 A/B/C/E + PG03
+
+- **CURRENT STATUS: PARTIAL / RELEASE BLOCKED。** 用户已授权全部正式门禁通过后自动生产部署，D 继续暂缓；此前冻结约束已被本次任务替代。尚未执行最终生产部署或线上计费验收。
+- **基线：** `production/main=d0c20d6c46d86845805e4a9d35b067b0f6b20be4`（本轮 ls-remote/fetch）；工作区 `D:/AI/API/worktrees/clearapi-unified-integration`，初始干净 HEAD `64aaa5ed8755ccac7cdd72a5eab5cb853efcbbc8`。
+- **整合：** A/B 保留既有合并；修复 A 三处格式；C 的 `f2878fe59`/`88e935b93` 已按共同祖先核对后选择性整合；E `33fcb21d5` 已整合，冲突保留最新 Executor 身份并重新计算 V2 固定哈希；PR #72 审阅分支已合入统一分支（尚未合并到远端 main）。
+- **有效验证：** A 前端 7 文件/88 tests PASS；完整 TypeScript PASS（复用现有依赖）；定价清理真实 SQLite/MySQL 8.4/PostgreSQL 17.6 PASS；C 六包测试 PASS；PG03 root 测试 28 PASS。V1、identity refresh、清单及安装器三项固定哈希 MATCH；V2 `be01cd79e22e0e68f10253edce7520606751fe65cac526ca1e6d007282c5e549` 与 control MATCH。
+- **检查边界：** 全仓格式检查 FAIL（包含既有问题）；本次 A 三处已定向修复。全仓 lint 178 errors/64 warnings，全部位于本次 main 差异以外，不能称全仓 PASS。锁定依赖 CI、统一构建与其余门禁仍待完成。
+- **CURRENT BLOCKER：** 最终源码/RC/镜像证据尚未生成；历史三份证据不适用于最终候选；原始验收适用范围、VPS root 安装与 Runtime/MFA、当前未决操作、熔断恢复及池失败账务处理仍待核实。现有 RC 39205228315 仅历史候选，不作当前发布凭证。
+- **NEXT MINIMUM ACTION：** 完成 E/PR72 回归、池失败账务结论、当前授权/原始证据只读核验，再执行统一 Required CI。仅在外部硬依赖可闭环后冻结最终 RC、正式 Rehearsal、生产部署与线上验收。
+- **证据索引：** `D:/AI/API/runtime/clearapi-unified-final-20261019/`；历史总控 `D:/AI/API/worktrees/clearapi-master-status-unification/CLEARAPI_MASTER_STATUS.md` 保留只读。
+
+### 当前增量（统一 CI 前）
+
+- E/PG03 回归：V1 89 tests（88 PASS，1 real producer artifact 未提供而 SKIP）；backup identity 22 PASS；PG03 root 28 PASS；legacy transition 25 PASS；automatic release 28 PASS；producer 6 PASS（新增缺失/false/字符串/整数 rollback_proven 拒绝与失败 receipt 断言）。V2 同路径测试仍运行中。
+- 新增必要修复：正式 rollback verifier 必须 `rollback_proven is True`。原始 evFinal/RC39197505434 材料在身份完全匹配时被明确拒绝；其仅证明双启动幂等，不是安全回滚，历史“11 gates 全绿”不能作本次放行依据。
+- 原始 provider / restore measurement 已能独立读取；仅支持旧候选的有限结论，无最终源码绑定；未改写证据或 Secret。
+- 池失败账务：relay/service/model 定向 PASS，真实 SQLite/MySQL 8.4.11/PostgreSQL 17.6 的 reconciliation 用例 PASS，覆盖 unknown marker、pending 查询、幂等退款、钱包/token 一致及审计回滚。非 durable 保守路径仍不能保证消费日志；最终生产必须核实 durable wallet + reconciliation schema/单实例/无 Redis/无批更新 + 运营审计承接，否则保持 BLOCKED。本轮未将未知 usage 伪装为零并退款。
+- 当前环境最小阻塞：正式检查器的 `clearapi-vps` 无法解析，本机无 SSH config；未获取 VPS 身份、root 安装或 Runtime/MFA 结果。保留既有 GitHub 授权边界，不创建高权限凭据。
+- 本次 24 个前端差异文件定向格式 PASS；全仓 lint 178 errors / 64 warnings 均在差异外。MySQL 初次检查的 DSN 缺 parseTime 导致时间字段读取失败，补为工作流原有 DSN 并用全新隔离 DB 后 PASS；两次失败记录保留。
+
+---
+
+以下为历史记录，不代表当前发布授权或候选状态。
+
 # ClearAPI — Master Status
 
 ## 2026-10-19 — READ-ONLY AUDIT COMPLETE / RELEASE BLOCKED（最新阶段）
