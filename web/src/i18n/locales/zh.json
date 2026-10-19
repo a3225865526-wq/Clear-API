@@ -8090,7 +8090,15 @@
     "Cleared pricing for {{count}} models": "已清空 {{count}} 个模型的定价",
     "Select all models with pricing to clear": "选择所有需要清空定价的模型",
     "Pricing changed since this plan was prepared. Reload before clearing.": "定价在生成该方案后已发生变化，请重新加载后再清空。",
-    "No model pricing records were found": "未找到模型定价记录"
+    "No model pricing records were found": "未找到模型定价记录",
+    "Ongoing": "进行中",
+    "Withdrawn": "已撤回",
+    "Publish": "发布",
+    "Withdraw": "撤回",
+    "Select announcement status": "选择公告状态",
+    "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "只有已发布的公告会展示给用户；草稿和已撤回的公告仅保留在管理员这里。",
+    "Announcement published. Click \"Save Settings\" to apply.": "公告已发布。点击「保存设置」生效。",
+    "Announcement withdrawn. Click \"Save Settings\" to apply.": "公告已撤回。点击「保存设置」生效。"
   },
   "CNY per USD": "人民币兑美元换算（1 美元 = 多少人民币）",
   "Cache read price": "缓存读取单价",

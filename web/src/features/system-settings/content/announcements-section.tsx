@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Save, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import {
   Form,
   FormControl,
@@ -66,14 +67,15 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { SettingsSwitchField } from '../components/settings-form-layout'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
-
-type Announcement = {
-  id: number
-  content: string
-  publishDate: string
-  type: 'default' | 'ongoing' | 'success' | 'warning' | 'error'
-  extra?: string
-}
+import {
+  ANNOUNCEMENT_STATUSES,
+  ANNOUNCEMENT_TYPES,
+  getAnnouncementStatusOption,
+  getAnnouncementTypeOption,
+  normalizeAnnouncementStatus,
+  type Announcement,
+  type AnnouncementStatus,
+} from './announcements'
 
 type AnnouncementsSectionProps = {
   enabled: boolean
@@ -87,6 +89,7 @@ const announcementSchema = z.object({
     .max(500, 'Content must be less than 500 characters'),
   publishDate: z.string().min(1, 'Publish date is required'),
   type: z.enum(['default', 'ongoing', 'success', 'warning', 'error']),
+  status: z.enum(['draft', 'published', 'withdrawn']),
   extra: z
     .string()
     .max(100, 'Extra must be less than 100 characters')
@@ -96,39 +99,6 @@ const announcementSchema = z.object({
 type AnnouncementFormValues = z.infer<typeof announcementSchema>
 
 const ANNOUNCEMENT_FORM_ID = 'announcement-form'
-
-const typeOptions = [
-  {
-    value: 'default',
-    label: 'Default',
-    color: 'bg-gray-500',
-    badgeVariant: 'neutral' as const,
-  },
-  {
-    value: 'ongoing',
-    label: 'Ongoing',
-    color: 'bg-blue-500',
-    badgeVariant: 'info' as const,
-  },
-  {
-    value: 'success',
-    label: 'Success',
-    color: 'bg-green-500',
-    badgeVariant: 'success' as const,
-  },
-  {
-    value: 'warning',
-    label: 'Warning',
-    color: 'bg-orange-500',
-    badgeVariant: 'warning' as const,
-  },
-  {
-    value: 'error',
-    label: 'Error',
-    color: 'bg-red-500',
-    badgeVariant: 'danger' as const,
-  },
-]
 
 export function AnnouncementsSection({
   enabled,
@@ -152,6 +122,7 @@ export function AnnouncementsSection({
       content: '',
       publishDate: new Date().toISOString(),
       type: 'default',
+      status: 'draft',
       extra: '',
     },
   })
@@ -164,6 +135,7 @@ export function AnnouncementsSection({
           parsed.map((item, idx) => ({
             ...item,
             id: item.id || idx + 1,
+            status: normalizeAnnouncementStatus(item.status),
           }))
         )
       }
@@ -195,6 +167,7 @@ export function AnnouncementsSection({
       content: '',
       publishDate: new Date().toISOString(),
       type: 'default',
+      status: 'draft',
       extra: '',
     })
     setShowDialog(true)
@@ -206,9 +179,27 @@ export function AnnouncementsSection({
       content: announcement.content,
       publishDate: announcement.publishDate,
       type: announcement.type,
+      status: announcement.status,
       extra: announcement.extra || '',
     })
     setShowDialog(true)
+  }
+
+  const handleChangeStatus = (
+    announcement: Announcement,
+    status: AnnouncementStatus
+  ) => {
+    setAnnouncements((prev) =>
+      prev.map((item) =>
+        item.id === announcement.id ? { ...item, status } : item
+      )
+    )
+    setHasChanges(true)
+    toast.success(
+      status === 'published'
+        ? t('Announcement published. Click "Save Settings" to apply.')
+        : t('Announcement withdrawn. Click "Save Settings" to apply.')
+    )
   }
 
   const handleDelete = (announcement: Announcement) => {
@@ -400,19 +391,30 @@ export function AnnouncementsSection({
             {
               id: 'type',
               header: t('Type'),
-              cell: (announcement) => (
-                <StatusBadge
-                  label={
-                    typeOptions.find((opt) => opt.value === announcement.type)
-                      ?.label
-                  }
-                  variant={
-                    typeOptions.find((opt) => opt.value === announcement.type)
-                      ?.badgeVariant ?? 'neutral'
-                  }
-                  copyable={false}
-                />
-              ),
+              cell: (announcement) => {
+                const type = getAnnouncementTypeOption(announcement.type)
+                return (
+                  <StatusBadge
+                    label={type ? t(type.labelKey) : undefined}
+                    variant={type?.badgeVariant ?? 'neutral'}
+                    copyable={false}
+                  />
+                )
+              },
+            },
+            {
+              id: 'status',
+              header: t('Status'),
+              cell: (announcement) => {
+                const status = getAnnouncementStatusOption(announcement.status)
+                return (
+                  <StatusBadge
+                    label={status ? t(status.labelKey) : undefined}
+                    variant={status?.badgeVariant ?? 'neutral'}
+                    copyable={false}
+                  />
+                )
+              },
             },
             {
               id: 'extra',
@@ -430,6 +432,25 @@ export function AnnouncementsSection({
                   menuLabel={t('Open menu')}
                   onEdit={() => handleEdit(announcement)}
                   onDelete={() => handleDelete(announcement)}
+                  extraMenuItems={
+                    announcement.status === 'published' ? (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleChangeStatus(announcement, 'withdrawn')
+                        }
+                      >
+                        {t('Withdraw')}
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleChangeStatus(announcement, 'published')
+                        }
+                      >
+                        {t('Publish')}
+                      </DropdownMenuItem>
+                    )
+                  }
                 />
               ),
             },
@@ -523,14 +544,14 @@ export function AnnouncementsSection({
                 <FormItem>
                   <FormLabel>{t('Type')}</FormLabel>
                   <Select
-                    items={typeOptions.map((option) => ({
+                    items={ANNOUNCEMENT_TYPES.map((option) => ({
                       value: option.value,
                       label: (
                         <div className='flex items-center gap-2'>
                           <div
                             className={`h-3 w-3 rounded-full ${option.color}`}
                           />
-                          {option.label}
+                          {t(option.labelKey)}
                         </div>
                       ),
                     }))}
@@ -546,19 +567,59 @@ export function AnnouncementsSection({
                     </FormControl>
                     <SelectContent alignItemWithTrigger={false}>
                       <SelectGroup>
-                        {typeOptions.map((option) => (
+                        {ANNOUNCEMENT_TYPES.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             <div className='flex items-center gap-2'>
                               <div
                                 className={`h-3 w-3 rounded-full ${option.color}`}
                               />
-                              {option.label}
+                              {t(option.labelKey)}
                             </div>
                           </SelectItem>
                         ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='status'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Status')}</FormLabel>
+                  <Select
+                    items={ANNOUNCEMENT_STATUSES.map((option) => ({
+                      value: option.value,
+                      label: t(option.labelKey),
+                    }))}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={t('Select announcement status')}
+                        />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {ANNOUNCEMENT_STATUSES.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {t(option.labelKey)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    {t(
+                      'Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.'
+                    )}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
