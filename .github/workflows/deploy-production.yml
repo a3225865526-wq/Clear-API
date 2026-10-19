@@ -266,7 +266,9 @@ jobs:
           chmod 0600 ~/.ssh/config
 
       - name: Verify exact rehearsed production predecessor
-        if: inputs.rehearsal_run_id != ''
+        # PG03 checks the same predecessor inside the allowlisted root prepare
+        # entry point, under its deployment lock and before publishing targets.
+        if: inputs.rehearsal_run_id != '' && env.POOL_MODE != 'pg03'
         run: |
           set -euo pipefail
           [[ "$PREVIOUS_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
