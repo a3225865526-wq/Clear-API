@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+import base64
 import hashlib
 import importlib.util
 import io
@@ -385,6 +386,35 @@ class CircuitRecoveryTest(unittest.TestCase):
         self.deployments = []
         self.previous = [self.run]
         self.comparison = {"status": "ahead", "merge_base_commit": {"sha": "d" * 40}}
+        self.inspection = None
+
+    def configure_inspection(self):
+        self.inspection_log = "unit-test-only inspection stopped before Runtime\n"
+        self.inspection_sources = {path: b"unit-test-only immutable source" for path in (
+            ".github/workflows/ghcr-pull-rehearsal.yml", "scripts/ci/inspect-vps-authorization.py")}
+        deployment = {"id": 700, "sha": "f" * 40, "ref": "main", "environment": "production",
+                      "created_at": "2026-10-19T00:10:00Z", "task": "deploy",
+                      "production_environment": False, "transient_environment": False}
+        self.deployments = [deepcopy(deployment)]
+        self.inspection = dict(self.run, id=800, path=".github/workflows/ghcr-pull-rehearsal.yml",
+                               event="workflow_dispatch", head_sha=deployment["sha"],
+                               created_at=deployment["created_at"],
+                               actor={"login": "a3225865526-wq"},
+                               triggering_actor={"login": "a3225865526-wq"})
+        self.inspection_steps = [
+            {"name": "Inspect existing VPS authorization without deployment", "conclusion": "failure"},
+            {"name": "Verify installed rehearsal wrapper matches this commit", "conclusion": "skipped"},
+            {"name": "Run pull rehearsal on VPS", "conclusion": "skipped"}]
+        self.inspection_jobs = [{"id": 801, "name": "VPS authorization inspection or exact-digest pull rehearsal",
+                                 "status": "completed", "conclusion": "failure", "steps": self.inspection_steps}]
+        self.inspection_statuses = [{"id": 701, "state": "failure", "environment": "production",
+                                     "created_at": "2026-10-19T00:11:00Z",
+                                     "log_url": f"https://github.com/{policy.REPOSITORY}/actions/runs/800/job/801"}]
+        self.record["read_only_inspections"] = [{"deployment": deployment, "run_id": 800,
+            "source_commit": deployment["sha"], "run_attempt": 1, "job_id": 801,
+            "log_sha256": hashlib.sha256(self.inspection_log.rstrip("\n").encode()).hexdigest(),
+            "source_sha256": {p: hashlib.sha256(raw).hexdigest() for p, raw in self.inspection_sources.items()},
+            "statuses": deepcopy(self.inspection_statuses)}]
 
     def verify(self):
         self.record_path.write_text(json.dumps(self.record))
@@ -394,6 +424,11 @@ class CircuitRecoveryTest(unittest.TestCase):
                 return self.run
             if path == f"compare/{'d' * 40}...{SOURCE}":
                 return self.comparison
+            if self.inspection and path == "actions/runs/800":
+                return self.inspection
+            if self.inspection and path.startswith("contents/"):
+                filename = path.removeprefix("contents/").split("?ref=", 1)[0]
+                return {"encoding": "base64", "content": base64.b64encode(self.inspection_sources[filename]).decode()}
             raise AssertionError(path)
 
         def pages(path):
@@ -403,11 +438,17 @@ class CircuitRecoveryTest(unittest.TestCase):
                 return [{"workflow_runs": self.manual}]
             if path == "deployments?environment=production&per_page=100":
                 return [self.deployments]
+            if self.inspection and path == "actions/runs/800/attempts/1/jobs?per_page=100":
+                return [{"jobs": self.inspection_jobs}]
+            if self.inspection and path == "deployments/700/statuses?per_page=100":
+                return [self.inspection_statuses]
             raise AssertionError(path)
 
         with patch.object(policy, "RECOVERY_RECORD", self.record_path), \
                 patch.object(policy, "api", side_effect=api), patch.object(policy, "pages", side_effect=pages), \
-                patch.object(policy, "gh", return_value=self.log), patch.dict(os.environ, {"GITHUB_RUN_ID": "900"}):
+                patch.object(policy, "gh", side_effect=lambda *args: self.inspection_log
+                             if args[-1].endswith("/801/logs") else self.log), \
+                patch.dict(os.environ, {"GITHUB_RUN_ID": "900"}):
             return policy.verify_circuit_recovery(self.previous, SOURCE)
 
     def test_exact_investigation_is_revalidated_and_produces_only_recovery_audit(self):
@@ -417,6 +458,51 @@ class CircuitRecoveryTest(unittest.TestCase):
         self.assertEqual(result["production_deployments_since_incident"], 0)
         self.assertNotIn("success", result)
         self.assertEqual(result["investigation_sha256"], hashlib.sha256(self.record_path.read_bytes()).hexdigest())
+
+    def test_reviewed_read_only_record_preserves_real_count_and_failed_history(self):
+        self.configure_inspection()
+        result = self.verify()
+        self.assertEqual(result["production_deployments_since_incident"], 1)
+        self.assertEqual(result["read_only_inspections"][0]["deployment_id"], 700)
+        self.assertEqual(self.inspection_statuses[0]["state"], "failure")
+        self.deployments.append(dict(self.deployments[0], id=702))
+        with self.assertRaisesRegex(ValueError, "requires investigation"):
+            self.verify()
+        self.deployments = []
+        with self.assertRaisesRegex(ValueError, "requires investigation"):
+            self.verify()
+
+    def test_inspection_changes_and_any_pull_operation_fail_closed(self):
+        for field, value in (("head_sha", "0" * 40), ("run_attempt", 2),
+                             ("event", "workflow_run"), ("conclusion", "success"),
+                             ("triggering_actor", {"login": "outsider"})):
+            with self.subTest(field=field):
+                self.configure_inspection()
+                self.inspection[field] = value
+                with self.assertRaises(ValueError):
+                    self.verify()
+        for position in (1, 2):
+            self.configure_inspection()
+            self.inspection_steps[position]["conclusion"] = "success"
+            with self.assertRaises(ValueError):
+                self.verify()
+        self.configure_inspection()
+        self.inspection_jobs.append(dict(self.inspection_jobs[0], id=802))
+        with self.assertRaises(ValueError):
+            self.verify()
+
+    def test_inspection_log_source_status_and_deployment_tampering_fail_closed(self):
+        for change in ("log", "source", "source_inventory", "status", "status_added", "deployment"):
+            with self.subTest(change=change):
+                self.configure_inspection()
+                if change == "log": self.inspection_log += "changed"
+                elif change == "source": self.inspection_sources["scripts/ci/inspect-vps-authorization.py"] += b"changed"
+                elif change == "source_inventory": self.record["read_only_inspections"][0]["source_sha256"].pop("scripts/ci/inspect-vps-authorization.py")
+                elif change == "status": self.inspection_statuses[0]["log_url"] += "changed"
+                elif change == "status_added": self.inspection_statuses.insert(0, dict(self.inspection_statuses[0], id=702))
+                else: self.deployments[0]["sha"] = "0" * 40
+                with self.assertRaises(ValueError):
+                    self.verify()
 
     def test_any_production_entry_or_unknown_job_is_unrecoverable(self):
         original = deepcopy(self.jobs)

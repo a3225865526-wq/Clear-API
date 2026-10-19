@@ -2,6 +2,7 @@
 """Fail-closed release policy. Only GitHub-verified main artifacts can authorize CD."""
 
 import argparse
+import base64
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -235,6 +236,64 @@ def verify_rc_artifact(directory):
     return manifest
 
 
+def verify_read_only_inspection(entry, deployment):
+    """Revalidate one reviewed inspection, including immutable source and full status history."""
+    fields = ("id", "sha", "ref", "environment", "created_at", "task",
+              "transient_environment", "production_environment")
+    require({key: deployment.get(key) for key in fields} == entry["deployment"],
+            "investigated inspection deployment changed")
+    run = api(f"actions/runs/{entry['run_id']}")
+    owner = REPOSITORY.split("/", 1)[0]
+    require(run["path"] == ".github/workflows/ghcr-pull-rehearsal.yml"
+            and run["event"] == "workflow_dispatch" and run["head_branch"] == "main"
+            and run["repository"]["full_name"] == REPOSITORY
+            and run["head_repository"]["full_name"] == REPOSITORY
+            and run["actor"]["login"] == run["triggering_actor"]["login"] == owner
+            and run["head_sha"] == deployment["sha"] == entry["source_commit"]
+            and run["created_at"] == deployment["created_at"]
+            and run["run_attempt"] == entry["run_attempt"] == 1
+            and run["status"] == "completed" and run["conclusion"] == "failure",
+            "investigated inspection run changed")
+    jobs = [j for page in pages(f"actions/runs/{run['id']}/attempts/1/jobs?per_page=100")
+            for j in page["jobs"]]
+    require(len(jobs) == 1 and jobs[0]["id"] == entry["job_id"]
+            and jobs[0]["name"] == "VPS authorization inspection or exact-digest pull rehearsal"
+            and jobs[0]["status"] == "completed" and jobs[0]["conclusion"] == "failure",
+            "investigated inspection job changed")
+    steps = jobs[0]["steps"]
+    failed = [s["name"] for s in steps if s["conclusion"] == "failure"]
+    require(failed == ["Inspect existing VPS authorization without deployment"]
+            and all(sum(s["name"] == name and s["conclusion"] == "skipped" for s in steps) == 1
+                    for name in ("Verify installed rehearsal wrapper matches this commit",
+                                 "Run pull rehearsal on VPS")),
+            "investigated inspection reached an unreviewed operation")
+    # Capture original bytes for hashing; never print terminal control sequences.
+    log = gh("api", "--allow-escape-sequences", f"repos/{REPOSITORY}/actions/jobs/{entry['job_id']}/logs")
+    require(hashlib.sha256("\n".join(log.lstrip("\ufeff").splitlines()).encode()).hexdigest()
+            == entry["log_sha256"], "investigated inspection log changed")
+    expected_paths = {".github/workflows/ghcr-pull-rehearsal.yml",
+                      "scripts/ci/inspect-vps-authorization.py"}
+    require(set(entry["source_sha256"]) == expected_paths,
+            "inspection source inventory is incomplete")
+    for path, expected in entry["source_sha256"].items():
+        require(re.fullmatch(r"[a-f0-9]{64}", expected) is not None,
+                "invalid inspection source hash")
+        content = api(f"contents/{path}?ref={run['head_sha']}")
+        require(content["encoding"] == "base64"
+                and hashlib.sha256(base64.b64decode(content["content"])).hexdigest() == expected,
+                "investigated inspection source changed")
+    statuses = [s for page in pages(f"deployments/{deployment['id']}/statuses?per_page=100") for s in page]
+    status_fields = ("id", "state", "created_at", "log_url", "environment")
+    actual = [{key: s.get(key) for key in status_fields} for s in statuses]
+    url = f"https://github.com/{REPOSITORY}/actions/runs/{run['id']}/job/{entry['job_id']}"
+    require(bool(actual) and actual == entry["statuses"] and actual[0]["state"] == "failure"
+            and all(s["log_url"] == url and s["environment"] == "production" for s in actual),
+            "investigated inspection status history changed")
+    return {"deployment_id": deployment["id"], "run_id": run["id"],
+            "job_id": entry["job_id"], "classification": "read_only_inspection_failed_before_runtime",
+            "log_sha256": entry["log_sha256"], "status_count": len(actual)}
+
+
 def verify_circuit_recovery(previous, source):
     """A merged investigation may recover only the exact authorization-only failures.
 
@@ -299,7 +358,7 @@ def verify_circuit_recovery(previous, source):
         require(len(failed) == 1 and failed[0]["name"]
                 == "Authenticate automatic proof before production credentials",
                 "investigated failure is not authorization-only")
-        log = gh("api", f"repos/{REPOSITORY}/actions/jobs/{auth['id']}/logs")
+        log = gh("api", "--allow-escape-sequences", f"repos/{REPOSITORY}/actions/jobs/{auth['id']}/logs")
         log_hash = hashlib.sha256("\n".join(log.lstrip("\ufeff").splitlines()).encode()).hexdigest()
         require(re.fullmatch(r"[a-f0-9]{64}", entry["authorization_log_sha256"]) is not None
                 and log_hash == entry["authorization_log_sha256"]
@@ -317,12 +376,21 @@ def verify_circuit_recovery(previous, source):
     require(not any(r["status"] != "completed" or r["created_at"] >= cutoff for r in manual),
             "release circuit open; concurrent or intervening manual deployment")
     deployments = [d for page in pages("deployments?environment=production&per_page=100") for d in page]
-    require(not any(d["created_at"] >= cutoff for d in deployments),
+    incident_deployments = [d for d in deployments if d["created_at"] >= cutoff]
+    inspections = record.get("read_only_inspections", [])
+    require(all(type(d.get("id")) is int for d in incident_deployments),
+            "release circuit open; malformed production deployment record")
+    require(len(inspections) == len(incident_deployments)
+            and len({e["deployment"]["id"] for e in inspections}) == len(inspections)
+            and {e["deployment"]["id"] for e in inspections} == {d["id"] for d in incident_deployments},
             "release circuit open; production deployment record requires investigation")
+    classified = [verify_read_only_inspection(entry, next(d for d in incident_deployments
+                  if d["id"] == entry["deployment"]["id"])) for entry in inspections]
     return {"schema": record["schema"], "investigation_sha256": hashlib.sha256(raw).hexdigest(),
             "source_commit": source, "deployment_run_id": os.environ["GITHUB_RUN_ID"],
             "verified_at": datetime.now(timezone.utc).isoformat(), "failures": evidence,
-            "production_deployments_since_incident": 0, "intervening_manual_runs": 0}
+            "production_deployments_since_incident": len(incident_deployments),
+            "read_only_inspections": classified, "intervening_manual_runs": 0}
 
 
 def authorize_release(event, destination):
