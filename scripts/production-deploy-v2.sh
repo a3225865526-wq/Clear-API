@@ -167,6 +167,9 @@ PG03_APPROVAL_SHA256=""
 LEGACY_TRANSITION=0
 LEGACY_TRANSITION_ENTERED=0
 LEGACY_TRANSITION_TOOL=/opt/clearapi/bin/pg03-legacy-transition.py
+CONTROLLED_LAUNCH=0
+TRAFFIC_HOLD_TOOL=/opt/clearapi/bin/controlled-traffic-hold.py
+TRAFFIC_HOLD_SHA=b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90
 
 # ---------------------------------------------------------------------------
 # Args (validated before any state change)
@@ -178,6 +181,7 @@ while [ $# -gt 0 ]; do
       [ "$#" -ge 2 ] || { echo 'REFUSING: --pool-mode requires off or pg03' >&2; exit 2; }
       POOL_MODE="$2"; shift 2 ;;
     --legacy-transition-v1) LEGACY_TRANSITION=1; shift ;;
+    --controlled-launch) CONTROLLED_LAUNCH=1; shift ;;
     --digest) DIGEST="$2"; shift 2 ;;
     --commit) COMMIT="$2"; shift 2 ;;
     --workflow-run) WORKFLOW_RUN="$2"; shift 2 ;;
@@ -730,7 +734,7 @@ PYEOF
 }
 set_pg03_success() {
   [ "$POOL_MODE" = pg03 ] || return 0
-  python3 -I - "$MANIFEST" <<'PY'
+  python3 -I - "$MANIFEST" "$CONTROLLED_LAUNCH" <<'PY'
 import json, os, sys, tempfile
 path = sys.argv[1]
 with open(path) as f:
@@ -743,6 +747,10 @@ c.setdefault('validation', {}).update({
     'result': 'passed', 'gateway_executor_connection': 'passed',
     'runtime_integrity_v1': 'passed', 'pg03_runtime_gate': 'passed',
     'health': 'passed', 'billing': 'passed'})
+if sys.argv[2] == '1':
+    c.update(launch_stage='controlled', public_traffic='blocked',
+             provider_acceptance='deferred_to_owner_after_deployment')
+    c['validation']['public_https'] = 'not_run_ingress_isolated'
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix='.pg03-success-')
 with os.fdopen(fd, 'w') as f:
     json.dump(m, f, indent=2); f.write('\n'); f.flush(); os.fsync(f.fileno())
@@ -799,7 +807,7 @@ PY
 pg03_load_pair() { # approved target for deploy; current release for other modes
   local source="$1" kind="$2" metadata
   metadata="$(python3 -I - "$source" "$kind" "$PG03_COMPOSE_FILE" \
-      "$PG03_EXECUTOR_REF" "$PG03_EXECUTOR_REVISION" "$PG03_EXECUTOR_BINARY" "$LEGACY_TRANSITION" <<'PY'
+      "$PG03_EXECUTOR_REF" "$PG03_EXECUTOR_REVISION" "$PG03_EXECUTOR_BINARY" "$LEGACY_TRANSITION" "$CONTROLLED_LAUNCH" <<'PY'
 import hashlib, json, os, pathlib, re, stat, sys
 
 def secure_file(name, private=False):
@@ -832,7 +840,7 @@ def unique(pairs):
     return result
 
 try:
-    name, kind, overlay, pinned_ref, pinned_revision, pinned_binary, legacy_transition = sys.argv[1:]
+    name, kind, overlay, pinned_ref, pinned_revision, pinned_binary, legacy_transition, controlled_launch = sys.argv[1:]
     secure_file(overlay)
     raw = secure_file(name)
     m = json.loads(raw, object_pairs_hook=unique)
@@ -883,6 +891,18 @@ try:
             raise ValueError()
     if kind == 'target' and bool(m.get('legacy_transition')) != (legacy_transition == '1'):
         raise ValueError()
+    if kind == 'target':
+        controlled = m.get('launch_stage') == 'controlled'
+        if controlled != (controlled_launch == '1'):
+            raise ValueError()
+        if controlled:
+            authority = m['validation']['controlled_authorization']
+            if (m.get('public_traffic') != 'blocked' or legacy_transition == '1'
+                    or authority.get('mode') != 'controlled-proof-v1'
+                    or authority.get('run') != m['validation']['approval_run']
+                    or not re.fullmatch(r'[1-9][0-9]*', authority.get('rehearsal_run', ''))
+                    or not re.fullmatch(r'[a-f0-9]{64}', authority.get('artifact_sha256', ''))):
+                raise ValueError()
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', e['image_id']):
         raise ValueError()
     print(g['image_ref'], g['image_digest'], g['oci_revision'], gateway_id or '-',
@@ -1207,6 +1227,16 @@ PY
 }
 
 pg03_configure || { echo 'REFUSING: deployment mode prerequisites failed; no deployment performed' >&2; exit 2; }
+if [ "$CONTROLLED_LAUNCH" = 1 ]; then
+  [ "$POOL_MODE" = pg03 ] && [ "$LEGACY_TRANSITION" = 0 ] && [ "$MIGRATION_COMPATIBLE" = false ] \
+    && [ "$((VERIFY_ONLY + RESTART_ONLY + RECONCILE_ONLY))" = 0 ] \
+    || { echo 'REFUSING: controlled launch requires a distinct PG03 deploy with no legacy retirement or automatic rollback' >&2; exit 2; }
+  [ "$(sha256sum "$TRAFFIC_HOLD_TOOL" | cut -d' ' -f1)" = "$TRAFFIC_HOLD_SHA" ] \
+    || { echo 'REFUSING: traffic containment tool identity mismatch' >&2; exit 2; }
+elif [ "$VERIFY_ONLY" = 0 ] && { [ -e /opt/clearapi/app/controlled-launch-state.json ] || [ -L /opt/clearapi/app/controlled-launch-state.json ]; }; then
+  echo 'REFUSING: controlled launch is awaiting separately reviewed owner acceptance and traffic release' >&2
+  exit 2
+fi
 if [ "$POOL_MODE" = pg03 ]; then
   trap 'die "PG03 command failed; manual review required"' ERR
   pg03_executor_gate && pg03_compose_gate || die 'PG03 prepared Executor/overlay gate BLOCKED'
@@ -1327,6 +1357,11 @@ if [ "$LEGACY_TRANSITION" = 1 ]; then
   audit legacy_transition_preflight old_runtime_blocked 'APPROVAL_VIEW_INVALID; separate maintenance authorization; never a Runtime PASS'
 else
   verify_runtime_gate before "$PREV_IMAGE_ID" || die 'Runtime Integrity Gate BLOCKED before deployment'
+fi
+if [ "$CONTROLLED_LAUNCH" = 1 ]; then
+  python3 -I "$TRAFFIC_HOLD_TOOL" hold "$WORKFLOW_RUN" "$DIGEST" "$COMMIT" \
+    || die 'durable public ingress isolation BLOCKED'
+  audit controlled_launch isolated 'Provider acceptance deferred; public edge stopped with restart disabled'
 fi
 if [ "$RESTART_ONLY" = 1 ]; then
   CURRENT_REF="$(compose_effective_image)"
@@ -1745,7 +1780,11 @@ log "step 15: localhost health PASS"
 # ===========================================================================
 # 16. public health via Cloudflare
 # ===========================================================================
-if [ "$LEGACY_TRANSITION" = 0 ]; then
+if [ "$CONTROLLED_LAUNCH" = 1 ]; then
+  python3 -I "$TRAFFIC_HOLD_TOOL" check "$WORKFLOW_RUN" "$DIGEST" "$COMMIT" \
+    || die 'public ingress isolation changed after replacement'
+  log 'step 16: public HTTPS health NOT RUN; ingress remains isolated pending owner Provider acceptance'
+elif [ "$LEGACY_TRANSITION" = 0 ]; then
   health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray" || die "step 16: public health (${PUBLIC_HEALTH_URL}) with CF-Ray failed"
   log "step 16: public HTTPS health via Cloudflare PASS"
 fi
@@ -1840,6 +1879,10 @@ fi
 # ===========================================================================
 # 19. mark deployment success
 # ===========================================================================
+if [ "$CONTROLLED_LAUNCH" = 1 ]; then
+  python3 -I "$TRAFFIC_HOLD_TOOL" check "$WORKFLOW_RUN" "$DIGEST" "$COMMIT" \
+    || die 'public ingress isolation failed before completion'
+fi
 set_pg03_success || die 'PG03 success manifest update failed'
 set_manifest_status "success"
 if [ "$LEGACY_TRANSITION" = 1 ]; then
@@ -1853,3 +1896,6 @@ log "  image ID:    ${CANDIDATE_IMAGE_ID}"
 log "  previous:    ${PREV_IMAGE_ID}"
 log "  manifest:    ${MANIFEST}"
 log "PRODUCTION DEPLOY COMPLETED"
+if [ "$CONTROLLED_LAUNCH" = 1 ]; then
+  log 'CONTROLLED ONLY: commercial traffic remains BLOCKED; Provider acceptance and public HTTPS acceptance remain outstanding'
+fi

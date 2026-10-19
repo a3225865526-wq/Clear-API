@@ -26,10 +26,13 @@ def main():
     parser.add_argument("--executor-digest", required=True)
     parser.add_argument("--executor-binary-sha256", required=True)
     parser.add_argument("--previous-source-commit", required=True)
+    parser.add_argument("--release-stage", choices=("commercial", "controlled"), default="commercial")
     args = parser.parse_args()
     manifest = json.loads(args.manifest.read_text())
     checks = {}
     for gate in sorted(GATES):
+        if args.release_stage == "controlled" and gate == "gateway_executor_provider_usage_billing":
+            continue
         path = args.receipts / f"{gate}.json"
         if not path.is_file() or path.is_symlink():
             raise SystemExit(f"missing receipt: {gate}")
@@ -74,7 +77,8 @@ def main():
             "startup_passes": 2,
         }
     proof = {
-        "schema": "clearapi.automatic-release/v1",
+        "schema": ("clearapi.controlled-release/v1" if args.release_stage == "controlled"
+                   else "clearapi.automatic-release/v1"),
         "source_commit": manifest["source_commit"],
         "rc_run_id": int(manifest["workflow_run"]),
         "rc_run_attempt": int(manifest["workflow_run_attempt"]),
@@ -92,6 +96,9 @@ def main():
         },
         "checks": checks,
     }
+    if args.release_stage == "controlled":
+        proof["public_traffic"] = "blocked"
+        proof["provider_acceptance"] = "deferred_to_owner_after_deployment"
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(proof, sort_keys=True, indent=2) + "\n")
 

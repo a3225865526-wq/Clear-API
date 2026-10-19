@@ -27,7 +27,7 @@ IMAGE = 'ghcr.io/a3225865526-wq/clearapi'
 EXECUTOR = 'ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58'
 EXECUTOR_REVISION = 'b6e5a90fce6c0b3fa231d43ab07a65622f981be2'
 EXECUTOR_BINARY = 'e99b4dceee9b857c67e7b2b5101552511dbce60c789b2bec3c8fdd6bb5a33523'
-V2_SHA = '1f64785ec871c18a46d8fc89d72c39bd03c7be3de8b8ca4563e24d3238effeee'
+V2_SHA = '1bd21eae376dd8316d1cfabe558133b4e0390965c2f13b7005e4deb656eac109'
 TARGET = Path('/opt/clearapi/app/pg03-target-manifest.json')
 
 
@@ -425,6 +425,56 @@ def verify_production_predecessor(expected, manifest):
         raise ReleaseBlocked('production predecessor has an unresolved deployment')
 
 
+def controlled_release_authority(data, get, archive):
+    if (data.get('release_stage') != 'controlled' or data.get('transition_sha256')
+            or not re.fullmatch(r'[1-9][0-9]*', str(data.get('rehearsal_run', '')))):
+        raise ReleaseBlocked('invalid controlled release scope')
+    run = get('actions/runs/' + str(data['run']))
+    owner = REPO.split('/')[0]
+    if (run['event'] != 'workflow_dispatch' or run['path'] != '.github/workflows/deploy-production.yml'
+            or run['status'] != 'in_progress' or run['run_attempt'] != 1):
+        raise ReleaseBlocked('controlled release requires owner dispatch attempt 1')
+    if run['actor']['login'] != owner or run['triggering_actor']['login'] != owner:
+        raise ReleaseBlocked('controlled release requires owner dispatch')
+    jobs = get('actions/runs/' + str(data['run']) + '/jobs?per_page=100')['jobs']
+    authorizers = [j for j in jobs if j['name'] == 'Validate release authorization before production credentials']
+    if len(authorizers) != 1:
+        raise ReleaseBlocked('controlled authorization job missing or duplicated')
+    job = authorizers[0]
+    steps = [s for s in job.get('steps', [])
+             if s['name'] == 'Authenticate controlled proof before production credentials']
+    if (job['status'] != 'completed' or job['conclusion'] != 'success' or len(steps) != 1
+            or steps[0]['status'] != 'completed' or steps[0]['conclusion'] != 'success'):
+        raise ReleaseBlocked('controlled proof authorization did not pass')
+    name = 'controlled-authorization-' + str(data['run']) + '-1'
+    artifacts = get('actions/runs/' + str(data['run']) + '/artifacts?per_page=100')['artifacts']
+    matches = [a for a in artifacts if a['name'] == name and not a['expired']]
+    if len(matches) != 1:
+        raise ReleaseBlocked('controlled authorization artifact missing or duplicated')
+    with zipfile.ZipFile(io.BytesIO(archive(matches[0]['id']))) as bundle:
+        names = bundle.namelist()
+        if (len(set(names)) != len(names) or 'controlled-authorization.json' not in names
+                or set(names) - {'controlled-authorization.json', 'recovery-audit.json'}):
+            raise ReleaseBlocked('controlled authorization archive inventory mismatch')
+        info = bundle.getinfo('controlled-authorization.json')
+        if info.file_size > 32768:
+            raise ReleaseBlocked('controlled authorization artifact oversized')
+        raw = bundle.read(info)
+    result = json.loads(raw, object_pairs_hook=unique)
+    expected = {'release_stage': 'controlled', 'image_digest': data['digest'],
+                'expected_commit': data['commit'], 'rc_run_id': int(data['rc_run']),
+                'rehearsal_run_id': str(data['rehearsal_run']), 'migration_compatible': 'false',
+                'previous_source_commit': data.get('previous_source_commit'),
+                'executor_image_repository': data.get('executor_repository'),
+                'executor_image_digest': data.get('executor_digest'),
+                'executor_source_commit': data.get('executor_source_commit'),
+                'executor_binary_sha256': data.get('executor_binary_sha256')}
+    if result != expected:
+        raise ReleaseBlocked('controlled authorization artifact identity mismatch')
+    return {'mode': 'controlled-proof-v1', 'run': str(data['run']),
+            'rehearsal_run': str(data['rehearsal_run']), 'artifact_sha256': hashlib.sha256(raw).hexdigest()}
+
+
 def prepare():
     transition_module = importlib.util.spec_from_file_location('maintenance_lifecycle', Path(__file__).with_name('pg03-legacy-transition.py'))
     lifecycle = importlib.util.module_from_spec(transition_module)
@@ -434,6 +484,13 @@ def prepare():
     token = data.pop('token')
     get = lambda path: api(path, token)
     reviewers, rc = approved_run(data, get)
+    stage = data.get('release_stage', 'commercial')
+    if stage not in ('commercial', 'controlled'):
+        raise ReleaseBlocked('unknown release stage')
+    controlled = None
+    if stage == 'controlled':
+        controlled = controlled_release_authority(data, get,
+            lambda ident: api('actions/artifacts/' + str(ident) + '/zip', token, archive=True))
     if data.get('rehearsal_run'):
         # main() holds the existing deployment lock. Read only the fixed,
         # root-owned manifest with no symlink following or caller path override.
@@ -469,8 +526,12 @@ def prepare():
         target['validation']['approval'] = 'passed'
     else:
         target['validation']['authorization'] = (
-            automatic_release_authority(data, get) if data.get('rehearsal_run')
+            automatic_release_authority(data, get) if data.get('rehearsal_run') and stage != 'controlled'
             else autonomous_authority(data, get))
+    if controlled is not None:
+        target['launch_stage'] = 'controlled'
+        target['public_traffic'] = 'blocked'
+        target['validation']['controlled_authorization'] = controlled
     if transition is not None:
         target['legacy_transition'] = transition
     install_target(TARGET, (json.dumps(target, indent=2) + '\n').encode())

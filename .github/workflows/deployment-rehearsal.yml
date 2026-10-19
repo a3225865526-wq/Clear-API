@@ -17,6 +17,12 @@ on:
         description: 'Completed successful PG03 RC run id to rehearse'
         required: true
         type: string
+      release_stage:
+        description: 'Controlled deployment keeps public traffic blocked until owner Provider acceptance'
+        type: choice
+        required: true
+        default: commercial
+        options: [commercial, controlled]
 
 permissions:
   contents: read
@@ -76,6 +82,7 @@ jobs:
       TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
       TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
       REHEARSAL_RC_RUN_ID: ${{ github.event.workflow_run.id || inputs.rc_run_id }}
+      RELEASE_STAGE: ${{ inputs.release_stage || 'commercial' }}
       REHEARSAL_RC_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt || 1 }}
       REHEARSAL_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
       CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
@@ -172,6 +179,7 @@ jobs:
         run: python3 scripts/ci/produce-gate-receipt.py --gate postgres_upgrade_idempotency --output receipts/postgres_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=postgres TEST_BILLING_DSN="$TEST_POSTGRES_DSN" go test -count=1 ./model -run "TestBillingReconciliationDatabase|TestCrashMatrix"'
 
       - name: Provider usage and billing evidence
+        if: env.RELEASE_STAGE == 'commercial'
         continue-on-error: true
         run: python3 scripts/ci/produce-gate-receipt.py --gate gateway_executor_provider_usage_billing --output receipts/gateway_executor_provider_usage_billing.json -- python3 scripts/ci/verify-rehearsal-input.py --kind provider --manifest rc/gateway-image-release.json
 
@@ -194,6 +202,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/ci/assemble-release-proof.py --manifest rc/gateway-image-release.json --receipts receipts \
+            --release-stage "$RELEASE_STAGE" \
             --output release-proof.json \
             --executor-repository "$CLEARAPI_EXECUTOR_IMAGE_REPOSITORY" \
             --executor-source-commit "$CLEARAPI_EXECUTOR_SOURCE_COMMIT" \

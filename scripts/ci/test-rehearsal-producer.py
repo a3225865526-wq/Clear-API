@@ -67,6 +67,42 @@ class ProducerContractTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing receipt", result.stderr + result.stdout)
 
+    def test_controlled_assembler_defers_only_provider_and_never_invents_pass(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            manifest = {'source_commit': 'a' * 40, 'image_digest': 'sha256:' + 'b' * 64,
+                        'workflow_run': 123, 'workflow_run_attempt': 1, 'binary_sha256': 'c' * 64,
+                        'schema_transition': {'source_schema_sha256': '1' * 64, 'target_schema_sha256': '1' * 64}}
+            (root / 'manifest.json').write_text(json.dumps(manifest))
+            gates = set(re.findall(r'--gate ([a-z_]+)', WORKFLOW.read_text()))
+            for gate in gates - {'gateway_executor_provider_usage_billing'}:
+                (root / (gate + '.json')).write_text(json.dumps({
+                    'schema': 'clearapi.gate-evidence/v1', 'gate': gate, 'conclusion': 'success',
+                    'source_commit': manifest['source_commit'], 'gateway_digest': manifest['image_digest'],
+                    'rc_run_id': 123, 'rc_run_attempt': 1}))
+            command = [sys.executable, str(ASSEMBLER), '--manifest', str(root / 'manifest.json'),
+                       '--receipts', str(root), '--output', str(root / 'proof.json'),
+                       '--executor-repository', 'ghcr.io/a3225865526-wq/executor',
+                       '--executor-source-commit', 'd' * 40, '--executor-digest', 'sha256:' + 'e' * 64,
+                       '--executor-binary-sha256', 'f' * 64, '--previous-source-commit', '2' * 40]
+            result = subprocess.run(command + ['--release-stage', 'controlled'], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            proof = json.loads((root / 'proof.json').read_bytes())
+            self.assertEqual(proof['schema'], 'clearapi.controlled-release/v1')
+            self.assertEqual(proof['public_traffic'], 'blocked')
+            self.assertEqual(proof['provider_acceptance'], 'deferred_to_owner_after_deployment')
+            self.assertNotIn('gateway_executor_provider_usage_billing', proof['checks'])
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('missing receipt', result.stderr)
+            path = root / 'billing.json'
+            receipt = json.loads(path.read_text())
+            receipt['conclusion'] = 'failure'
+            path.write_text(json.dumps(receipt))
+            result = subprocess.run(command + ['--release-stage', 'controlled'], capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('gate failed', result.stderr)
+
     def test_assembler_rejects_changed_schema_and_receipt_from_another_rc(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
