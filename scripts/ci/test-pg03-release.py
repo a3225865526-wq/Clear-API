@@ -14,6 +14,7 @@ import textwrap
 import unittest
 import urllib.error
 import zipfile
+from unittest.mock import patch
 
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -28,6 +29,86 @@ def module(name):
 
 CONTROL = module('pg03-release-control')
 PROBE = module('runtime-probe-session')
+INSPECTION = module('ci/inspect-vps-authorization')
+
+
+class VPSAuthorizationInspectionTest(unittest.TestCase):
+    def setUp(self):
+        self.commands = []
+        self.bad_hash = False
+        self.runtime_exit = 0
+        self.identity_exit = 0
+
+    def remote(self, command):
+        self.commands.append(command)
+        if command == '/usr/bin/id -un':
+            return {'exit_code': self.identity_exit, 'stdout': 'clearapi-deploy\n', 'stderr': ''}
+        if command == '/usr/bin/sudo -n -l':
+            return {'exit_code': 0, 'stdout': 'fixture: hash probes and V2 only', 'stderr': ''}
+        prefix = '/usr/bin/sudo -n /usr/bin/sha256sum '
+        if command.startswith(prefix):
+            target = command[len(prefix):]
+            source = next(source for source, path in INSPECTION.ASSETS.items() if path == target)
+            digest = hashlib.sha256((INSPECTION.ROOT / source).read_bytes()).hexdigest()
+            if self.bad_hash:
+                digest = '0' * 64
+            return {'exit_code': 0, 'stdout': digest + '  ' + target + '\n', 'stderr': ''}
+        if command == '/usr/bin/sudo -n /opt/clearapi/bin/production-deploy-v2.sh --verify':
+            return {'exit_code': self.runtime_exit, 'stdout': 'fixture verification result', 'stderr': ''}
+        raise AssertionError('Unexpected remote command: ' + command)
+
+    def test_inspection_never_installs_logs_in_or_deploys(self):
+        with patch.object(INSPECTION, 'ssh', side_effect=self.remote):
+            result = INSPECTION.inspect()
+        self.assertEqual(result['status'], 'VERIFIED')
+        self.assertTrue(result['runtime_gate_passed'])
+        for field in ('production_deployed', 'installation_attempted', 'session_creation_attempted'):
+            self.assertFalse(result[field])
+        self.assertEqual(len(self.commands), 9)
+        self.assertTrue(all(command in ('/usr/bin/id -un', '/usr/bin/sudo -n -l',
+            '/usr/bin/sudo -n /opt/clearapi/bin/production-deploy-v2.sh --verify')
+            or command.startswith('/usr/bin/sudo -n /usr/bin/sha256sum /opt/clearapi/')
+            for command in self.commands))
+
+    def test_changed_installed_bytes_and_failed_ssh_never_invoke_runtime(self):
+        for bad_hash, identity_exit in ((True, 0), (False, 255)):
+            with self.subTest(bad_hash=bad_hash, identity_exit=identity_exit):
+                self.commands = []
+                self.bad_hash, self.identity_exit = bad_hash, identity_exit
+                with patch.object(INSPECTION, 'ssh', side_effect=self.remote):
+                    result = INSPECTION.inspect()
+                self.assertEqual(result['status'], 'BLOCKED')
+                self.assertFalse(any('--verify' in command for command in self.commands))
+
+    def test_probe_failure_is_not_an_authorization_or_runtime_pass(self):
+        self.runtime_exit = 1
+        with patch.object(INSPECTION, 'ssh', side_effect=self.remote):
+            result = INSPECTION.inspect()
+        self.assertEqual(result['status'], 'BLOCKED')
+        self.assertFalse(result['runtime_gate_passed'])
+
+    def test_manual_inspection_preserves_existing_environment_and_excludes_pull_steps(self):
+        workflow = (SCRIPTS.parent / '.github/workflows/ghcr-pull-rehearsal.yml').read_text()
+        self.assertIn('  workflow_dispatch:', workflow)
+        self.assertNotIn('  workflow_run:', workflow)
+        self.assertIn('    environment: production', workflow)
+        self.assertIn('  cancel-in-progress: false', workflow)
+        self.assertNotIn('PROD_SSH_PRIVATE_KEY }}\n', (SCRIPTS / 'ci/inspect-vps-authorization.py').read_text())
+        for name in ('Verify installed rehearsal wrapper matches this commit', 'Run pull rehearsal on VPS'):
+            block = workflow.split('      - name: ' + name, 1)[1].split('      - name:', 1)[0]
+            self.assertIn('if: ${{ !inputs.inspection_only }}', block)
+
+    def test_ssh_options_preserve_pinned_host_key_and_noninteractive_authentication(self):
+        response = subprocess.CompletedProcess([], 0, 'fixture', '')
+        with patch.object(INSPECTION.subprocess, 'run', return_value=response) as run:
+            INSPECTION.ssh('/usr/bin/id -un')
+        args = run.call_args.args[0]
+        self.assertIn('BatchMode=yes', args)
+        self.assertIn('StrictHostKeyChecking=yes', args)
+        self.assertIn('-T', args)
+        with patch.dict(os.environ, {'PROD_SSH_ALIAS': '-oProxyCommand=unsafe'}):
+            with self.assertRaises(ValueError):
+                INSPECTION.ssh('/usr/bin/id -un')
 
 
 class WorkflowContractTest(unittest.TestCase):
