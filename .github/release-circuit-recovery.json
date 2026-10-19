@@ -3,7 +3,7 @@
   "baseline_commit": "cd6f719e79de432de6219561b04502784cb58930",
   "investigated_at": "2026-10-19T04:22:00Z",
   "expires_at": "2026-10-20T04:22:00Z",
-  "investigation": "Original GitHub logs inspected: initial unexpected run event; subsequent persistent circuit failures. All production jobs skipped. Live revalidation of history, logs, manual runs and deployment records remains mandatory before recovery.",
+  "investigation": "Retain original authorization failure investigation and original expiry. Exact inspection deployment 7166252463 investigated through run, job, skipped pull steps, source bytes, original logs and full status chain. Final current proof, Runtime, billing, backup and maintenance gates remain mandatory. No failed history rewritten.",
   "failures": [
     {
       "run_id": 39176488931,
@@ -45,5 +45,70 @@
       "authorization_log_sha256": "f5f15c338cc2e5666be18854ab320025dbc27f3175afbd869e8869cecab55b3b",
       "reason": "release circuit open; investigate prior deployment before resuming"
     }
-  ]
+  ],
+  "read_only_inspections": [
+    {
+      "deployment": {
+        "id": 7166252463,
+        "sha": "29b6e6ff1b0d1d380b0b8940b1ac4104808f0904",
+        "ref": "main",
+        "environment": "production",
+        "created_at": "2026-10-19T05:14:53Z",
+        "task": "deploy",
+        "transient_environment": false,
+        "production_environment": false
+      },
+      "run_id": 39203542451,
+      "source_commit": "29b6e6ff1b0d1d380b0b8940b1ac4104808f0904",
+      "run_attempt": 1,
+      "job_id": 117901393251,
+      "log_sha256": "d896e78cca99cb9c980d0f71214335ade746138f1053e3a0a8dc68fd6052ce23",
+      "source_sha256": {
+        ".github/workflows/ghcr-pull-rehearsal.yml": "afeed524d4ee00d202b513393c670e87426f2ad682f425d8770693aa16618907",
+        "scripts/ci/inspect-vps-authorization.py": "70d2f048f6f61dbc63af5b8111030c6be6f5acb60ef3714d0a175a5a3e3d17bc"
+      },
+      "statuses": [
+        {
+          "id": 20008146855,
+          "state": "failure",
+          "created_at": "2026-10-19T05:15:23Z",
+          "log_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39203542451/job/117901393251",
+          "environment": "production"
+        },
+        {
+          "id": 20008133412,
+          "state": "in_progress",
+          "created_at": "2026-10-19T05:14:58Z",
+          "log_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39203542451/job/117901393251",
+          "environment": "production"
+        },
+        {
+          "id": 20008132266,
+          "state": "queued",
+          "created_at": "2026-10-19T05:14:55Z",
+          "log_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39203542451/job/117901393251",
+          "environment": "production"
+        },
+        {
+          "id": 20008132252,
+          "state": "queued",
+          "created_at": "2026-10-19T05:14:55Z",
+          "log_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39203542451/job/117901393251",
+          "environment": "production"
+        },
+        {
+          "id": 20008131771,
+          "state": "waiting",
+          "created_at": "2026-10-19T05:14:55Z",
+          "log_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39203542451/job/117901393251",
+          "environment": "production"
+        }
+      ]
+    }
+  ],
+  "vps_investigation": {
+    "observed_at": "2026-10-19T14:08:31.144186+00:00",
+    "report_sha256": "4feee8fc6d9bbdabd6024ee01624299e5a6592accf5b71c8fd61add32351fc84",
+    "finding": "No lock holder. Prior request expired, source differs from current successful production, no transition state or backup receipt; only review event. Runtime auth failed 401; no runtime pass or release authorization granted."
+  }
 }

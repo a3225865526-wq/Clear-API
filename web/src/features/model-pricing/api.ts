@@ -119,6 +119,52 @@ export async function previewModelPricing(request: {
   }
 }
 
+export type ModelPricingCleanupAction = 'keep' | 'clear'
+
+export type ModelPricingCleanupRecord = {
+  model_name: string
+  billing_mode: string
+  version: string
+  action: ModelPricingCleanupAction
+  /** Stored sales-price options that cleanup removes. */
+  configured: string[]
+  /** Number of stored entries cleanup removes. */
+  clear_count: number
+  /** The engine has a built-in expression; cleanup never persists it. */
+  built_in: boolean
+  built_in_expr?: string
+}
+
+export type ModelPricingCleanupPlan = ModelPricingCleanupRecord & {
+  pricing: PricingValues
+}
+
+export type ModelPricingCleanup = {
+  snapshot: string
+  records: ModelPricingCleanupRecord[]
+  plans: ModelPricingCleanupPlan[]
+  cleared?: string[]
+}
+
+export async function getModelPricingCleanup(): Promise<ModelPricingCleanup> {
+  const res = await api.get('/api/option/model_pricing/cleanup')
+  if (!res.data.success) {
+    throw createServerError(res.data, t('Failed to load model pricing records'))
+  }
+  return res.data.data
+}
+
+export async function applyModelPricingCleanup(request: {
+  snapshot: string
+  changes: ModelPricingChange[]
+}): Promise<ModelPricingCleanup> {
+  const res = await api.post('/api/option/model_pricing/cleanup', request)
+  if (!res.data.success) {
+    throw createServerError(res.data, t('Failed to clean up model pricing'))
+  }
+  return res.data.data
+}
+
 export function useCanEditModelPricing() {
   return useAuthStore((state) => state.auth.user?.role === ROLE.SUPER_ADMIN)
 }

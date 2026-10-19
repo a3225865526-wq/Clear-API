@@ -46,9 +46,16 @@ func aliAnthropicMessagesModelPatterns() []string {
 	})
 }
 
-func (a *Adaptor) ConvertGeminiRequest(*gin.Context, *relaycommon.RelayInfo, *dto.GeminiChatRequest) (any, error) {
-	//TODO implement me
-	return nil, errors.New("not implemented")
+// Qwen (Bailian) serves chat completions plus Anthropic and OpenAI Responses
+// compatible surfaces; it has no Gemini endpoint. A Gemini generateContent
+// request is translated to chat first and then goes through the same provider
+// rules as a native chat request.
+func (a *Adaptor) ConvertGeminiRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeminiChatRequest) (any, error) {
+	chatRequest, err := channel.ConvertGeminiRequestToChat(c, info, request)
+	if err != nil {
+		return nil, err
+	}
+	return a.ConvertOpenAIRequest(c, info, chatRequest)
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, info *relaycommon.RelayInfo, req *dto.ClaudeRequest) (any, error) {

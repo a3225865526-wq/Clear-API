@@ -51,6 +51,7 @@ import {
   USD_PRICING_CURRENCY,
 } from './currency'
 import { modelPricingDisplay, pricingFromDraft, pricingRow } from './pricing'
+import { UpstreamPricingDialog } from './upstream-pricing-dialog'
 
 export function ModelPricingPanel(props: {
   modelName: string
@@ -66,6 +67,7 @@ export function ModelPricingPanel(props: {
   const save = useSaveModelPricing()
   const [entry, setEntry] = useState<ModelPricingEntry | null>(null)
   const [resetOpen, setResetOpen] = useState(false)
+  const [upstreamOpen, setUpstreamOpen] = useState(false)
   const editor = useRef<ModelPricingEditorPanelHandle>(null)
   const editData = useMemo(() => {
     if (!entry) return null
@@ -182,6 +184,14 @@ export function ModelPricingPanel(props: {
               <Button
                 variant='outline'
                 size='sm'
+                onClick={() => setUpstreamOpen(true)}
+                disabled={save.isPending}
+              >
+                {t('Generate prices from upstream')}
+              </Button>
+              <Button
+                variant='outline'
+                size='sm'
                 onClick={() => setResetOpen(true)}
                 disabled={save.isPending}
               >
@@ -250,6 +260,35 @@ export function ModelPricingPanel(props: {
             )}
           </>
         }
+      />
+      <UpstreamPricingDialog
+        open={upstreamOpen}
+        onOpenChange={setUpstreamOpen}
+        initialModels={
+          effectivePricing.billing_expr
+            ? [
+                {
+                  model: entry.model_name,
+                  expression: effectivePricing.billing_expr,
+                },
+              ]
+            : []
+        }
+        onApply={(pricing) => {
+          const expression = pricing.models.find(
+            (item) => item.model === entry.model_name
+          )?.expression
+          if (!expression) return false
+          // The generated expression becomes the unsaved draft; the existing
+          // save flow still owns validation and persistence.
+          editor.current?.applyBillingExpr(expression)
+          toast.success(
+            t(
+              'Generated prices applied to the draft. Save model pricing to activate them.'
+            )
+          )
+          return true
+        }}
       />
       <ConfirmDialog
         open={resetOpen}

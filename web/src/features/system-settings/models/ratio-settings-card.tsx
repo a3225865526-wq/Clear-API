@@ -35,6 +35,7 @@ import {
   useSaveModelPricing,
   type ModelPricingConfig,
 } from '@/features/model-pricing/api'
+import { ModelPricingCleanupDialog } from '@/features/model-pricing/model-pricing-cleanup-dialog'
 import { pricingOptions } from '@/features/model-pricing/pricing'
 import {
   applyGeneratedUpstreamPricing,
@@ -180,6 +181,7 @@ export function RatioSettingsCard({
   const updateOption = useUpdateOption()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [upstreamPricingOpen, setUpstreamPricingOpen] = useState(false)
+  const [cleanupOpen, setCleanupOpen] = useState(false)
   const [hasGeneratedDraft, setHasGeneratedDraft] = useState(false)
 
   const pricingQuery = useModelPricing()
@@ -553,6 +555,14 @@ export function RatioSettingsCard({
             >
               {t('Generate prices from upstream')}
             </Button>
+            <Button
+              variant='outline'
+              size='sm'
+              onClick={() => setCleanupOpen(true)}
+              disabled={savePricing.isPending || resetMutation.isPending}
+            >
+              {t('Clear model pricing')}
+            </Button>
           </div>
           {savePricing.isError && (
             <Button
@@ -657,6 +667,10 @@ export function RatioSettingsCard({
         open={upstreamPricingOpen}
         onOpenChange={setUpstreamPricingOpen}
         onApply={applyUpstreamPrices}
+      />
+      <ModelPricingCleanupDialog
+        open={cleanupOpen}
+        onOpenChange={setCleanupOpen}
       />
     </>
   )

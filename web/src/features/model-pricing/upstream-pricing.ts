@@ -102,6 +102,50 @@ export const UPSTREAM_PRICE_FIELDS = [
   ['audio_output', 'ao', 'Audio output price'],
 ] as const
 
+// Convert an applied billing expression back into the upstream price table the
+// generator accepts, so the same sales-price workflow is available for a model
+// whose upstream cost is already stored as an expression.
+export function generatePriceTableFromExpression(
+  model: string,
+  expression: string
+): UpstreamPriceTable | null {
+  const fixed = /fixed\(\s*([0-9.]+)\s*\)/.exec(expression)
+  if (fixed) {
+    const request = Number(fixed[1])
+    return Number.isFinite(request)
+      ? { currency: 'USD', token_unit: '1M', models: [{ model, request }] }
+      : null
+  }
+  // The generator emits `<variable> * <USD per 1M tokens>` terms, so the
+  // variable name decides which upstream price field the coefficient is.
+  const prices: Record<string, number> = {}
+  for (const [field, variable] of UPSTREAM_PRICE_FIELDS) {
+    const match = new RegExp(`\\b${variable}\\s*\\*\\s*([0-9.]+)`).exec(
+      expression
+    )
+    if (!match) continue
+    const price = Number(match[1])
+    if (Number.isFinite(price)) prices[field] = price
+  }
+  if (!Object.keys(prices).length) return null
+  return {
+    currency: 'USD',
+    token_unit: '1M',
+    models: [
+      {
+        model,
+        input: prices.input ?? 0,
+        output: prices.output ?? 0,
+        ...Object.fromEntries(
+          Object.entries(prices).filter(
+            ([field]) => field !== 'input' && field !== 'output'
+          )
+        ),
+      } as UpstreamPriceTable['models'][number],
+    ],
+  }
+}
+
 export type GeneratedPriceRow = {
   model: string
   tier: number

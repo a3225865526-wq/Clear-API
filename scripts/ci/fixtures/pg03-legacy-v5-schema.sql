@@ -1656,6 +1656,72 @@ ALTER SEQUENCE public.perf_metrics_id_seq OWNED BY public.perf_metrics.id;
 
 
 --
+-- Name: pool_fallback_member; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pool_fallback_member (
+    id bigint NOT NULL,
+    policy_id bigint,
+    account_id bigint,
+    priority bigint,
+    enabled boolean
+);
+
+
+--
+-- Name: pool_fallback_member_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.pool_fallback_member_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: pool_fallback_member_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.pool_fallback_member_id_seq OWNED BY public.pool_fallback_member.id;
+
+
+--
+-- Name: pool_fallback_policy; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pool_fallback_policy (
+    id bigint NOT NULL,
+    pool_id character varying(64),
+    model_name character varying(128),
+    max_fallback_count bigint,
+    enabled boolean,
+    created_at timestamp with time zone,
+    updated_at timestamp with time zone
+);
+
+
+--
+-- Name: pool_fallback_policy_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.pool_fallback_policy_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: pool_fallback_policy_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.pool_fallback_policy_id_seq OWNED BY public.pool_fallback_policy.id;
+
+
+--
 -- Name: prefill_groups; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1919,6 +1985,239 @@ CREATE SEQUENCE public.referral_rewards_id_seq
 --
 
 ALTER SEQUENCE public.referral_rewards_id_seq OWNED BY public.referral_rewards.id;
+
+
+--
+-- Name: route_chain_attempt_records; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.route_chain_attempt_records (
+    id bigint NOT NULL,
+    attempt_id character varying(64),
+    request_id character varying(64),
+    sequence bigint,
+    route_chain_id bigint,
+    route_chain_version bigint,
+    candidate_id bigint,
+    candidate_type character varying(16),
+    channel_id bigint,
+    channel_type bigint,
+    safe_account_ref character varying(128),
+    requested_model character varying(255),
+    canonical_model character varying(255),
+    upstream_model character varying(255),
+    started_at bigint,
+    dispatch_at bigint,
+    finished_at bigint,
+    dispatch_state character varying(16),
+    terminal_state character varying(32),
+    final_outcome character varying(48),
+    request_written boolean,
+    authoritative_rejection boolean,
+    work_observed boolean,
+    usage_observed boolean,
+    client_output_observed boolean,
+    tool_output_observed boolean,
+    outcome_uncertain boolean,
+    http_status bigint,
+    failure_class character varying(64),
+    failure_code character varying(128),
+    upstream_attempt_ref character varying(128),
+    upstream_response_id character varying(128),
+    usage_state character varying(16),
+    input_tokens bigint,
+    cached_input_tokens bigint,
+    output_tokens bigint,
+    reasoning_tokens bigint,
+    total_tokens bigint,
+    provider_cost_state character varying(24),
+    provider_cost_amount character varying(64),
+    provider_cost_currency character varying(8),
+    health_outcome character varying(24),
+    breaker_effect character varying(16),
+    stream_completion character varying(16),
+    late_event_at bigint,
+    late_event_note character varying(255),
+    created_time bigint,
+    updated_time bigint
+);
+
+
+--
+-- Name: route_chain_attempt_records_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.route_chain_attempt_records_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: route_chain_attempt_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.route_chain_attempt_records_id_seq OWNED BY public.route_chain_attempt_records.id;
+
+
+--
+-- Name: route_chain_candidates; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.route_chain_candidates (
+    id bigint NOT NULL,
+    chain_id bigint,
+    candidate_type character varying(16),
+    target_id bigint,
+    priority bigint,
+    enabled boolean,
+    archived boolean,
+    archived_target_id bigint,
+    policy text,
+    created_time bigint,
+    updated_time bigint
+);
+
+
+--
+-- Name: route_chain_candidates_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.route_chain_candidates_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: route_chain_candidates_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.route_chain_candidates_id_seq OWNED BY public.route_chain_candidates.id;
+
+
+--
+-- Name: route_chain_decision_records; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.route_chain_decision_records (
+    id bigint NOT NULL,
+    request_id character varying(64),
+    chain_id bigint,
+    chain_version bigint,
+    candidate_id bigint,
+    phase character varying(24),
+    decision character varying(16),
+    reason character varying(160),
+    outcome character varying(48),
+    at bigint,
+    created_time bigint
+);
+
+
+--
+-- Name: route_chain_decision_records_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.route_chain_decision_records_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: route_chain_decision_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.route_chain_decision_records_id_seq OWNED BY public.route_chain_decision_records.id;
+
+
+--
+-- Name: route_chain_request_records; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.route_chain_request_records (
+    id bigint NOT NULL,
+    request_id character varying(64),
+    route_chain_id bigint,
+    route_chain_version bigint,
+    requested_model character varying(255),
+    canonical_model character varying(255),
+    "group" character varying(64),
+    transport character varying(16),
+    started_at bigint,
+    finished_at bigint,
+    final_status character varying(32),
+    final_candidate_id bigint,
+    final_attempt_id character varying(64),
+    final_classification character varying(48),
+    user_billing_state character varying(24),
+    billing_reservation_id bigint,
+    created_time bigint,
+    updated_time bigint
+);
+
+
+--
+-- Name: route_chain_request_records_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.route_chain_request_records_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: route_chain_request_records_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.route_chain_request_records_id_seq OWNED BY public.route_chain_request_records.id;
+
+
+--
+-- Name: route_chains; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.route_chains (
+    id bigint NOT NULL,
+    model character varying(255),
+    "group" character varying(64),
+    active_scope_key character varying(64),
+    enabled boolean DEFAULT false,
+    allow_cross_source boolean DEFAULT false,
+    archived boolean,
+    version bigint DEFAULT 1,
+    created_time bigint,
+    updated_time bigint
+);
+
+
+--
+-- Name: route_chains_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.route_chains_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: route_chains_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.route_chains_id_seq OWNED BY public.route_chains.id;
 
 
 --
@@ -3043,6 +3342,20 @@ ALTER TABLE ONLY public.perf_metrics ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
+-- Name: pool_fallback_member id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pool_fallback_member ALTER COLUMN id SET DEFAULT nextval('public.pool_fallback_member_id_seq'::regclass);
+
+
+--
+-- Name: pool_fallback_policy id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pool_fallback_policy ALTER COLUMN id SET DEFAULT nextval('public.pool_fallback_policy_id_seq'::regclass);
+
+
+--
 -- Name: prefill_groups id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -3089,6 +3402,41 @@ ALTER TABLE ONLY public.referral_ledgers ALTER COLUMN id SET DEFAULT nextval('pu
 --
 
 ALTER TABLE ONLY public.referral_rewards ALTER COLUMN id SET DEFAULT nextval('public.referral_rewards_id_seq'::regclass);
+
+
+--
+-- Name: route_chain_attempt_records id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_attempt_records ALTER COLUMN id SET DEFAULT nextval('public.route_chain_attempt_records_id_seq'::regclass);
+
+
+--
+-- Name: route_chain_candidates id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_candidates ALTER COLUMN id SET DEFAULT nextval('public.route_chain_candidates_id_seq'::regclass);
+
+
+--
+-- Name: route_chain_decision_records id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_decision_records ALTER COLUMN id SET DEFAULT nextval('public.route_chain_decision_records_id_seq'::regclass);
+
+
+--
+-- Name: route_chain_request_records id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_request_records ALTER COLUMN id SET DEFAULT nextval('public.route_chain_request_records_id_seq'::regclass);
+
+
+--
+-- Name: route_chains id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chains ALTER COLUMN id SET DEFAULT nextval('public.route_chains_id_seq'::regclass);
 
 
 --
@@ -3592,6 +3940,22 @@ ALTER TABLE ONLY public.perf_metrics
 
 
 --
+-- Name: pool_fallback_member pool_fallback_member_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pool_fallback_member
+    ADD CONSTRAINT pool_fallback_member_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: pool_fallback_policy pool_fallback_policy_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pool_fallback_policy
+    ADD CONSTRAINT pool_fallback_policy_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: prefill_groups prefill_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3645,6 +4009,46 @@ ALTER TABLE ONLY public.referral_ledgers
 
 ALTER TABLE ONLY public.referral_rewards
     ADD CONSTRAINT referral_rewards_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: route_chain_attempt_records route_chain_attempt_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_attempt_records
+    ADD CONSTRAINT route_chain_attempt_records_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: route_chain_candidates route_chain_candidates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_candidates
+    ADD CONSTRAINT route_chain_candidates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: route_chain_decision_records route_chain_decision_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_decision_records
+    ADD CONSTRAINT route_chain_decision_records_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: route_chain_request_records route_chain_request_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chain_request_records
+    ADD CONSTRAINT route_chain_request_records_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: route_chains route_chains_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.route_chains
+    ADD CONSTRAINT route_chains_pkey PRIMARY KEY (id);
 
 
 --
@@ -4620,6 +5024,27 @@ CREATE UNIQUE INDEX idx_perf_model_group_bucket ON public.perf_metrics USING btr
 
 
 --
+-- Name: idx_pool_fallback_member_account; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_pool_fallback_member_account ON public.pool_fallback_member USING btree (policy_id, account_id);
+
+
+--
+-- Name: idx_pool_fallback_member_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pool_fallback_member_order ON public.pool_fallback_member USING btree (policy_id, priority);
+
+
+--
+-- Name: idx_pool_fallback_scope; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_pool_fallback_scope ON public.pool_fallback_policy USING btree (pool_id, model_name);
+
+
+--
 -- Name: idx_prefill_groups_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4778,6 +5203,146 @@ CREATE UNIQUE INDEX idx_referral_rewards_redemption_id ON public.referral_reward
 --
 
 CREATE INDEX idx_referral_rewards_status ON public.referral_rewards USING btree (status);
+
+
+--
+-- Name: idx_route_attempt_req_seq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_route_attempt_req_seq ON public.route_chain_attempt_records USING btree (request_id, sequence);
+
+
+--
+-- Name: idx_route_chain_active_scope; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_route_chain_active_scope ON public.route_chains USING btree (active_scope_key);
+
+
+--
+-- Name: idx_route_chain_attempt_records_attempt_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_route_chain_attempt_records_attempt_id ON public.route_chain_attempt_records USING btree (attempt_id);
+
+
+--
+-- Name: idx_route_chain_attempt_records_candidate_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_attempt_records_candidate_id ON public.route_chain_attempt_records USING btree (candidate_id);
+
+
+--
+-- Name: idx_route_chain_attempt_records_channel_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_attempt_records_channel_id ON public.route_chain_attempt_records USING btree (channel_id);
+
+
+--
+-- Name: idx_route_chain_attempt_records_dispatch_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_attempt_records_dispatch_state ON public.route_chain_attempt_records USING btree (dispatch_state);
+
+
+--
+-- Name: idx_route_chain_attempt_records_provider_cost_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_attempt_records_provider_cost_state ON public.route_chain_attempt_records USING btree (provider_cost_state);
+
+
+--
+-- Name: idx_route_chain_attempt_records_route_chain_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_attempt_records_route_chain_id ON public.route_chain_attempt_records USING btree (route_chain_id);
+
+
+--
+-- Name: idx_route_chain_attempt_records_terminal_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_attempt_records_terminal_state ON public.route_chain_attempt_records USING btree (terminal_state);
+
+
+--
+-- Name: idx_route_chain_candidate_target; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_route_chain_candidate_target ON public.route_chain_candidates USING btree (chain_id, candidate_type, target_id);
+
+
+--
+-- Name: idx_route_chain_candidates_chain_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_candidates_chain_id ON public.route_chain_candidates USING btree (chain_id);
+
+
+--
+-- Name: idx_route_chain_candidates_priority; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_candidates_priority ON public.route_chain_candidates USING btree (priority);
+
+
+--
+-- Name: idx_route_chain_decision_records_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_decision_records_at ON public.route_chain_decision_records USING btree (at);
+
+
+--
+-- Name: idx_route_chain_decision_records_candidate_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_decision_records_candidate_id ON public.route_chain_decision_records USING btree (candidate_id);
+
+
+--
+-- Name: idx_route_chain_decision_records_request_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_decision_records_request_id ON public.route_chain_decision_records USING btree (request_id);
+
+
+--
+-- Name: idx_route_chain_request_records_final_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_request_records_final_status ON public.route_chain_request_records USING btree (final_status);
+
+
+--
+-- Name: idx_route_chain_request_records_request_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_route_chain_request_records_request_id ON public.route_chain_request_records USING btree (request_id);
+
+
+--
+-- Name: idx_route_chain_request_records_route_chain_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_request_records_route_chain_id ON public.route_chain_request_records USING btree (route_chain_id);
+
+
+--
+-- Name: idx_route_chain_request_records_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_request_records_started_at ON public.route_chain_request_records USING btree (started_at);
+
+
+--
+-- Name: idx_route_chain_request_records_user_billing_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_route_chain_request_records_user_billing_state ON public.route_chain_request_records USING btree (user_billing_state);
 
 
 --
@@ -5410,6 +5975,14 @@ ALTER TABLE ONLY public.offline_order_codes
 
 ALTER TABLE ONLY public.offline_order_codes
     ADD CONSTRAINT fk_offline_orders_codes FOREIGN KEY (order_id) REFERENCES public.offline_orders(id);
+
+
+--
+-- Name: pool_fallback_member fk_pool_fallback_policy_members; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pool_fallback_member
+    ADD CONSTRAINT fk_pool_fallback_policy_members FOREIGN KEY (policy_id) REFERENCES public.pool_fallback_policy(id) ON DELETE CASCADE;
 
 
 --

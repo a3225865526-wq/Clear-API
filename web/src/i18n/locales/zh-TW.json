@@ -8006,7 +8006,15 @@
     "Model Pinned To API Source": "Model Pinned To API Source",
     "Needs Review": "Needs Review",
     "Usage Unavailable": "Usage Unavailable",
-    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source."
+    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.",
+    "Ongoing": "進行中",
+    "Withdrawn": "已撤回",
+    "Publish": "發佈",
+    "Withdraw": "撤回",
+    "Select announcement status": "選擇公告狀態",
+    "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "只有已發佈的公告會展示給使用者；草稿和已撤回的公告僅保留在管理員這裡。",
+    "Announcement published. Click \"Save Settings\" to apply.": "公告已發佈。點擊「儲存設定」生效。",
+    "Announcement withdrawn. Click \"Save Settings\" to apply.": "公告已撤回。點擊「儲存設定」生效。"
   },
   "CNY per USD": "CNY per USD",
   "Cache read price": "Cache read price",

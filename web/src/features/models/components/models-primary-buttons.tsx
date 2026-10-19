@@ -60,13 +60,22 @@ export function ModelsPrimaryButtons() {
         {t('Sync metadata')}
       </Button>
       {canPrice && (
-        <Button
-          onClick={() => setOpen('price-sync')}
-          variant='outline'
-          size='sm'
-        >
-          {t('Sync pricing')}
-        </Button>
+        <>
+          <Button
+            onClick={() => setOpen('price-sync')}
+            variant='outline'
+            size='sm'
+          >
+            {t('Sync pricing')}
+          </Button>
+          <Button
+            onClick={() => setOpen('price-cleanup')}
+            variant='outline'
+            size='sm'
+          >
+            {t('Clear model pricing')}
+          </Button>
+        </>
       )}
       {/* Create Model */}
       <Button onClick={handleCreateModel} size='sm'>

@@ -24,6 +24,7 @@ import { buildPricingChanges, type ModelPricingConfig } from '../api'
 import { pricingOptions } from '../pricing'
 import {
   applyGeneratedUpstreamPricing,
+  generatePriceTableFromExpression,
   generateUpstreamPricing,
 } from '../upstream-pricing'
 
@@ -243,5 +244,39 @@ describe('upstream screenshot pricing', () => {
       },
     })
     expect(options.ModelRatio).toBe('{"example":1,"unrelated":7}')
+  })
+
+  it('recovers the upstream price table from a stored expression so a sales price can be generated', () => {
+    const generated = generateUpstreamPricing(table, 0.5, 0.8, 1)
+
+    const recovered = generatePriceTableFromExpression(
+      'example',
+      generated.models[0].expression
+    )
+
+    // The recovered table carries the coefficients stored in the expression
+    // (the generated sales prices), so regenerating from it is lossless.
+    expect(recovered).toEqual({
+      currency: 'USD',
+      token_unit: '1M',
+      models: [{ model: 'example', input: 8, output: 24, cache_read: 0 }],
+    })
+  })
+
+  it('recovers a per-request upstream price and reports nothing for an expression without prices', () => {
+    expect(
+      generatePriceTableFromExpression('flat', 'tier("request", fixed(0.02))')
+    ).toEqual({
+      currency: 'USD',
+      token_unit: '1M',
+      models: [{ model: 'flat', request: 0.02 }],
+    })
+
+    expect(
+      generatePriceTableFromExpression(
+        'usage',
+        'tier("base", u("seconds") * 1)'
+      )
+    ).toBeNull()
   })
 })

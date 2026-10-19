@@ -120,6 +120,8 @@ class ProducerContractTest(unittest.TestCase):
                     "target_id": "unit-test-target", **manifest["schema_transition"]}
             for kind in ("backup", "rollback", "provider"):
                 valid = dict(base, kind=kind)
+                if kind == "rollback":
+                    valid["rollback_proven"] = True
                 cases = [(None, None), ("kind", "executor"), ("rc_run_id", 122), ("rc_run_id", "123"),
                          ("rc_run_attempt", 2), ("manifest_sha256", "0" * 64),
                          ("source_schema_sha256", "0" * 64), ("target_schema_sha256", "0" * 64),
@@ -134,6 +136,32 @@ class ProducerContractTest(unittest.TestCase):
                         result = subprocess.run([sys.executable, str(VERIFIER), "--kind", kind,
                                                  "--manifest", str(path)], env=env, capture_output=True, text=True)
                         self.assertEqual(result.returncode == 0, field is None, result.stderr)
+
+            # The historical operator generator described two candidate
+            # startups but explicitly disclaimed rollback. A matching RC and
+            # success conclusion must not let that produce a success receipt.
+            for proven in (None, False, "true", 1):
+                with self.subTest(rollback_proven=proven):
+                    evidence = dict(base, kind="rollback", startup_passes=2,
+                                    pass1_schema_sha256="2" * 64,
+                                    pass2_schema_sha256="2" * 64,
+                                    production_restore_executed=False)
+                    if proven is not None:
+                        evidence["rollback_proven"] = proven
+                    env = dict(os.environ, CLEARAPI_REHEARSAL_TARGET_ID="unit-test-target",
+                               CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE=json.dumps(evidence),
+                               REHEARSAL_SOURCE_COMMIT=manifest["source_commit"],
+                               REHEARSAL_GATEWAY_DIGEST=manifest["image_digest"],
+                               REHEARSAL_RC_RUN_ID="123", REHEARSAL_RC_RUN_ATTEMPT="1")
+                    output = Path(temp) / "safe_rollback.json"
+                    result = subprocess.run([sys.executable, str(PRODUCER), "--gate", "safe_rollback",
+                                             "--output", str(output), "--", sys.executable,
+                                             str(VERIFIER), "--kind", "rollback", "--manifest", str(path)],
+                                            env=env, capture_output=True, text=True)
+                    self.assertNotEqual(result.returncode, 0)
+                    receipt = json.loads(output.read_text())
+                    self.assertEqual(receipt["conclusion"], "failure")
+                    self.assertIn("does not prove rollback recovery", receipt["stderr_tail"])
 
     def test_executor_must_match_existing_release_allowlist(self):
         tree = ast.parse((ROOT / "scripts/pg03-release-control.py").read_text())

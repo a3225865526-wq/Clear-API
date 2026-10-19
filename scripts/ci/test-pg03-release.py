@@ -14,6 +14,8 @@ import textwrap
 import unittest
 import urllib.error
 import zipfile
+from types import SimpleNamespace
+from unittest.mock import Mock
 from unittest.mock import patch
 
 
@@ -275,6 +277,44 @@ else:
 
 
 class ReleaseApprovalTest(unittest.TestCase):
+    def test_rehearsed_predecessor_requires_exact_source_and_resolved_state(self):
+        current = {'candidate_commit': 'a' * 40, 'status': 'success',
+                   'deployment_attempt': {'status': 'success'}}
+        CONTROL.verify_production_predecessor('a' * 40, {'releases': {'current': current}})
+        rejected = [({}, 'a' * 40), ({'releases': {'current': None}}, 'a' * 40),
+                    ({'releases': {'current': current}}, ''),
+                    ({'releases': {'current': current}}, 'b' * 40)]
+        for field in ('status', 'deployment_attempt'):
+            for state in ('pending', 'failed'):
+                changed = copy.deepcopy(current)
+                changed[field] = state if field == 'status' else {'status': state}
+                rejected.append(({'releases': {'current': changed}}, 'a' * 40))
+        for manifest, expected in rejected:
+            with self.subTest(manifest=manifest, expected=expected), self.assertRaises(CONTROL.ReleaseBlocked):
+                CONTROL.verify_production_predecessor(expected, manifest)
+
+    def test_predecessor_read_is_fixed_and_failure_prevents_preparation_writes(self):
+        path = Path('/opt/clearapi/app/release-manifest.json')
+        lifecycle = SimpleNamespace(Paths=lambda: SimpleNamespace(manifest=path),
+            lifecycle_ready=Mock(), read_json=Mock(return_value={
+                'releases': {'current': {'candidate_commit': 'c' * 40}}}))
+        spec = SimpleNamespace(loader=SimpleNamespace(exec_module=lambda _: None))
+        payload = dict(self.data, token='synthetic-sensitive-token', rehearsal_run='101',
+                       previous_source_commit='a' * 40, manifest_path='/tmp/caller-controlled')
+        with patch.object(CONTROL.importlib.util, 'spec_from_file_location', return_value=spec), \
+             patch.object(CONTROL.importlib.util, 'module_from_spec', return_value=lifecycle), \
+             patch.object(CONTROL, 'approved_run', return_value=([], {})), \
+             patch.object(CONTROL, 'release_manifest') as manifest, \
+             patch.object(CONTROL, 'maintenance_authorization') as maintenance, \
+             patch.object(CONTROL, 'install_target') as install, \
+             patch.object(CONTROL.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(json.dumps(payload).encode()))):
+            with self.assertRaisesRegex(CONTROL.ReleaseBlocked, 'production predecessor differs'):
+                CONTROL.prepare()
+        lifecycle.read_json.assert_called_once_with(path, private=False)
+        manifest.assert_not_called()
+        maintenance.assert_not_called()
+        install.assert_not_called()
+
     def setUp(self):
         self.data = {'run':'100','rc_run':'99','commit':'b'*40,'digest':'sha256:'+'a'*64}
         run = {'head_sha':'b'*40,'head_branch':'main','event':'workflow_dispatch',

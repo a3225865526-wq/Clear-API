@@ -27,7 +27,7 @@ IMAGE = 'ghcr.io/a3225865526-wq/clearapi'
 EXECUTOR = 'ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58'
 EXECUTOR_REVISION = 'b6e5a90fce6c0b3fa231d43ab07a65622f981be2'
 EXECUTOR_BINARY = 'e99b4dceee9b857c67e7b2b5101552511dbce60c789b2bec3c8fdd6bb5a33523'
-V2_SHA = '490af9ab74b354de17075f9c01b66a4b88fa63ca376c3730da550d18818468fe'
+V2_SHA = 'be01cd79e22e0e68f10253edce7520606751fe65cac526ca1e6d007282c5e549'
 TARGET = Path('/opt/clearapi/app/pg03-target-manifest.json')
 
 
@@ -409,6 +409,22 @@ def maintenance_authorization(data, manifest, manifest_sha, reviewers, get, path
     return {'schema_version': module.SCHEMA, 'request_sha256': data['transition_sha256']}
 
 
+def verify_production_predecessor(expected, manifest):
+    """Keep the rehearsed predecessor check inside the bounded root entry point."""
+    if not isinstance(expected, str) or not re.fullmatch(r'[a-f0-9]{40}', expected):
+        raise ReleaseBlocked('missing or malformed rehearsed predecessor')
+    if not isinstance(manifest, dict) or not isinstance(manifest.get('releases'), dict):
+        raise ReleaseBlocked('production predecessor manifest is malformed')
+    current = manifest['releases'].get('current')
+    if not isinstance(current, dict) or not isinstance(current.get('deployment_attempt', {}), dict):
+        raise ReleaseBlocked('production predecessor manifest is malformed')
+    if current.get('candidate_commit') != expected:
+        raise ReleaseBlocked('production predecessor differs from authenticated rehearsal')
+    if (current.get('status') not in (None, 'success')
+            or current.get('deployment_attempt', {}).get('status') not in (None, 'success')):
+        raise ReleaseBlocked('production predecessor has an unresolved deployment')
+
+
 def prepare():
     transition_module = importlib.util.spec_from_file_location('maintenance_lifecycle', Path(__file__).with_name('pg03-legacy-transition.py'))
     lifecycle = importlib.util.module_from_spec(transition_module)
@@ -418,6 +434,11 @@ def prepare():
     token = data.pop('token')
     get = lambda path: api(path, token)
     reviewers, rc = approved_run(data, get)
+    if data.get('rehearsal_run'):
+        # main() holds the existing deployment lock. Read only the fixed,
+        # root-owned manifest with no symlink following or caller path override.
+        current = lifecycle.read_json(lifecycle.Paths().manifest, private=False)
+        verify_production_predecessor(data.get('previous_source_commit'), current)
     m, manifest_sha = release_manifest(data, rc,
         get('actions/runs/' + str(data['rc_run']) + '/artifacts?per_page=100'),
         lambda ident: api('actions/artifacts/' + str(ident) + '/zip', token, archive=True))

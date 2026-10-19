@@ -3,6 +3,16 @@ name: GHCR Pull Rehearsal
 on:
   workflow_dispatch:
     inputs:
+      release_audit_only:
+        description: 'Read-only RC/evidence/deployment-record audit; no SSH, environment or rehearsal'
+        required: true
+        type: boolean
+        default: false
+      audit_rc_run_id:
+        description: 'Existing successful RC to audit; never builds or deploys'
+        required: false
+        type: string
+        default: '39205228315'
       inspection_only:
         description: 'Read-only SSH/sudo/asset/Runtime verification; never pulls or deploys'
         required: true
@@ -26,7 +36,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  release_audit:
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.release_audit_only &&
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/pg03-predecessor-compat-20261019')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Audit existing release identities without production access
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_RC_RUN_ID: ${{ inputs.audit_rc_run_id }}
+          CLEARAPI_REHEARSAL_TARGET_ID: ${{ vars.CLEARAPI_REHEARSAL_TARGET_ID }}
+          CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE }}
+          CLEARAPI_REHEARSAL_BACKUP_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_BACKUP_EVIDENCE }}
+          CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE }}
+        run: python3 scripts/ci/audit-release-state.py
+      - name: Preserve sanitized read-only audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-state-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-state-audit.json
+          if-no-files-found: error
+
   rehearse:
+    if: ${{ !inputs.release_audit_only }}
     name: VPS authorization inspection or exact-digest pull rehearsal
     runs-on: ubuntu-latest
     environment: production

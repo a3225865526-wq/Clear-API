@@ -8006,7 +8006,15 @@
     "Model Pinned To API Source": "Model Pinned To API Source",
     "Needs Review": "Needs Review",
     "Usage Unavailable": "Usage Unavailable",
-    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source."
+    "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.": "This configuration mixes pool and API candidates, but cross-source failover is disabled. Enable cross-source failover explicitly or use a single source.",
+    "Ongoing": "В процессе",
+    "Withdrawn": "Отозвано",
+    "Publish": "Опубликовать",
+    "Withdraw": "Отозвать",
+    "Select announcement status": "Выберите статус объявления",
+    "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Пользователям показываются только опубликованные объявления. Черновики и отозванные объявления остаются здесь для администраторов.",
+    "Announcement published. Click \"Save Settings\" to apply.": "Объявление опубликовано. Нажмите «Сохранить настройки», чтобы применить.",
+    "Announcement withdrawn. Click \"Save Settings\" to apply.": "Объявление отозвано. Нажмите «Сохранить настройки», чтобы применить."
   },
   "CNY per USD": "CNY per USD",
   "Cache read price": "Cache read price",
