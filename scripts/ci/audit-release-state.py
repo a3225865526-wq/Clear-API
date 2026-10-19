@@ -97,12 +97,16 @@ def deployment_metadata(record, statuses):
     observed = []
     for status in statuses:
         state = status.get('state')
-        if state not in ('error', 'failure', 'inactive', 'pending', 'success', 'queued', 'in_progress'):
-            raise AuditBlocked('Unknown deployment status; investigation remains blocked')
+        known = state in ('error', 'failure', 'inactive', 'pending', 'success', 'queued', 'in_progress')
+        # Inventory must preserve new GitHub states without treating them as
+        # success or dropping the rest of the investigation. Arbitrary text is
+        # not reflected, and every record still requires investigation.
+        if not isinstance(state, str) or not re.fullmatch(r'[a-z_]{1,40}', state):
+            state = 'UNKNOWN'
         log = status.get('log_url', '')
         match = re.fullmatch(r'https://github\.com/' + re.escape(REPO)
                              + r'/actions/runs/([1-9][0-9]*)(?:/job/[1-9][0-9]*)?', log or '')
-        observed.append({'id': status['id'], 'state': state,
+        observed.append({'id': status['id'], 'state': state, 'known_state': known,
                          'actions_run_id': int(match[1]) if match else None})
     return {'id': record['id'], 'source_commit': sha, 'statuses': observed,
             'created_at': created.isoformat(),
@@ -182,7 +186,8 @@ def main():
     for kind, evidence in report.get('operator_evidence', {}).items():
         mismatches = ','.join(k for k, v in evidence.get('binding_matches', {}).items() if not v) or 'none'
         history = ';'.join(k + ':' + ','.join(v) for k, v in evidence.get('public_history_matches', {}).items()) or 'none'
-        print(f'AUDIT_EVIDENCE kind={kind} configured={int(evidence["configured"])} mismatches={mismatches} public_history={history}')
+        reference = int(evidence.get('source_reference_present', False))
+        print(f'AUDIT_EVIDENCE kind={kind} configured={int(evidence["configured"])} mismatches={mismatches} public_history={history} source_reference_present={reference} original_acceptance_verified=0')
     for record in report.get('production_deployments', []):
         states = ','.join(s['state'] for s in record['statuses']) or 'UNKNOWN'
         runs = ','.join(str(s['actions_run_id']) for s in record['statuses'] if s['actions_run_id']) or 'UNKNOWN'

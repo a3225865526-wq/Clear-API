@@ -72,8 +72,12 @@ class ReadOnlyReleaseAuditTest(unittest.TestCase):
         self.assertTrue(result['requires_investigation'])
         self.assertEqual(result['statuses'][0]['actions_run_id'], 39203542451)
         self.assertNotIn('never-echo-payload', json.dumps(result))
-        with self.assertRaises(ValueError):
-            audit.deployment_metadata(record, [{'id': 10, 'state': 'unclassified'}])
+        unknown = audit.deployment_metadata(record, [{'id': 10, 'state': 'unclassified'}])
+        self.assertTrue(unknown['requires_investigation'])
+        self.assertEqual(unknown['statuses'][0]['state'], 'unclassified')
+        self.assertFalse(unknown['statuses'][0]['known_state'])
+        unsafe = audit.deployment_metadata(record, [{'id': 10, 'state': 'arbitrary sensitive text'}])
+        self.assertEqual(unsafe['statuses'][0]['state'], 'UNKNOWN')
 
     def test_audit_job_has_no_production_environment_or_ssh_and_excludes_vps_job(self):
         workflow = (Path(__file__).parents[2] / '.github/workflows/ghcr-pull-rehearsal.yml').read_text()

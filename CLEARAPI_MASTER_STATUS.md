@@ -3,7 +3,7 @@
 ## 2026-10-19 — READ-ONLY AUDIT CHANNEL PREPARED（最新阶段）
 
 - **CURRENT STATUS:** BLOCKED。main 仍为 `d0c20d6c46d86845805e4a9d35b067b0f6b20be4`；RC `39205228315` 保留。本轮无新 RC、Rehearsal、VPS 操作或熔断恢复。
-- **CURRENT BLOCKER:** 三份 Secrets 的真实绑定/来源元数据及 production deployment records 尚未取得。已有 gh 实测 deployments 请求返回 `Forbidden`；连接器拒绝该 API 端点。Cloud 当前无配置的 secret/outbound identity。不能将出口/端点拒绝直接认定为 GitHub token 缺某个 scope，也不能将不可读记录当作不存在。
+- **CURRENT BLOCKER:** 自动审计已取得三份真实绑定关系，但原始验收来源尚未验证；production records 已可读，审计遇到未识别的 deployment status，完整调查尚未完成。未知状态保持 BLOCKED。Cloud 直接 gh 的 Forbidden 不能等同于仓库 scope 缺失，Actions 只读身份现已实际可用。
 - **CURRENT PRIORITY:** 使用现有 Actions 的短期只读身份，在不接触 SSH/root/production environment 的 job 中读取 RC、证据发布身份和部署记录，收敛 PR #72 的最终修复范围。
 - **NEXT MINIMUM ACTION:** Cloud 先通过已有仓库写入授权，在限定审阅分支自动执行独立的只读 push audit，取得真实结果；暂无需用户操作。仅若该正式通道确实不可用，才使用 owner 手机单次分支审计作为 fallback（既有 GHCR Pull Rehearsal，branch=`codex/pg03-predecessor-compat-20261019`，`release_audit_only=true`，`audit_rc_run_id=39205228315`）。无需 Windows、VNC、root 或新凭据。工具没有 workflow_dispatch，重跑旧事件也不能替代新增模式；但不能据此跳过仍可尝试的受约束只读 push 通道。
 
@@ -26,6 +26,13 @@ PR #72 原 head `33bea6ce40d7b27c18133624e9b4430ae81e4b82` 的 CI `39207544711` 
 实际本地验证：automatic-release/audit 28 tests PASS（含 Secret payload/target/provenance 不反射、异常日志脱敏、未知部署状态拒绝及 job 权限隔离）；PG03 28 tests（26 PASS、2 root-only skipped）；rehearsal producer 6 PASS；YAML/py_compile/diff 检查 PASS。新增补丁改变 PR 身份，旧 PR CI 不能冒充新 head CI，更新后的必需 CI 另行核实。
 
 ### 阶段 3：审计结果回来后的边界
+
+**首次实际自动审计已完成运行：** [39210043117](https://github.com/a3225865526-wq/Clear-API/actions/runs/39210043117)，job `117921166702`，源码 `62119ac189288e8b7694e8c91fd1b1ea0b7d2d6f`，Artifact `12166868531`（`release-state-audit-39210043117-1`，SHA256 `f08dcf40d41e221e9af7736bc3449853ef07e9c5f1ea83ac593cf881356bf4f3`）。它不属于 Rehearsal 或生产部署。
+
+- 原始日志的三项 `public_history` 均精确匹配 `passed_cd6f_RC39197505434` 的 source_commit / gateway_digest / rc_run_id，即当前三份 Secrets 仍绑定 cd6f719e79de432de6219561b04502784cb58930、Gateway bdbb535b...fdc6、RC 39197505434；这不再只是历史文档推测。
+- 与当前 RC 39205228315 不匹配的字段均为 source_commit、gateway_digest、rc_run_id、manifest_sha256；rc_run_attempt、source/target schema、target_id、kind/schema/运营方 success 声明均匹配。身份匹配结果不等于原始验收来源已经核验，不改写任何 Secret。
+- Actions token 已成功读到 deployments 与 status API，阶段错误为 `Unknown deployment status`，不是权限拒绝。调查工具应保留新状态与记录并继续盘点，不能把未知状态改成 success 或据此恢复熔断；本次补丁仅修正诊断的前向兼容处理，固定 BLOCKED/逐项待调查不变。
+- 尚未取得生产部署、VPS 未决操作或原始运营验收已闭环的证据。暂无需用户手机/VNC/凭据操作。
 
 先读取真实报告并关联原始验收来源，逐项调查 production records；未知/失败维持 BLOCKED。调查收敛后才决定 PR #72 合并及一次必要的新 RC，按最终 manifest 重新取得真实证据。VPS 安装仍独立待办，control 待审阅哈希 `2c3b1d22e4109aef1a075a46e42b127830515ab3f3161830f91df114d5948422` 未改变；旧 PR #70 清单不能用于修复后的候选。
 
