@@ -137,6 +137,8 @@ type ModelPricingEditorPanelProps = Omit<
 
 export type ModelPricingEditorPanelHandle = {
   commitDraft: () => Promise<ModelRatioData | null>
+  /** Replace the draft's expression, used by generated upstream prices. */
+  applyBillingExpr: (expression: string) => void
 }
 
 const DEFAULT_TOKEN_BILLING_EXPR = 'tier("base", p * 0 + c * 0)'
@@ -801,6 +803,12 @@ export const ModelPricingEditorPanel = forwardRef<
         const isValid = await form.trigger()
         if (!isValid || !validatePricingValues()) return null
         return buildSubmitData(form.getValues())
+      },
+      applyBillingExpr: (expression: string) => {
+        setBillingExpr(expression)
+        setWasConverted(true)
+        setPricingMode('tiered_expr')
+        setEditorReloadToken((token) => token + 1)
       },
     }),
     [form, validatePricingValues, buildSubmitData]
