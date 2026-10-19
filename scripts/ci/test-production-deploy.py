@@ -485,6 +485,50 @@ class RuntimeGateContractTest(unittest.TestCase):
     setUp = WrapperModesTest.setUp
     run_wrapper = WrapperModesTest.run_wrapper
 
+    def test_commercial_catalog_requires_explicit_operator_policy_and_approved_report(self):
+        report = runtime_report()
+        report['data'].update(store_enabled=True, effective_product_count=3)
+        config = {k: report['data'][k] for k in ('online_payment_enabled', 'store_enabled',
+                  'billing_mode', 'referral_enabled', 'pool_enabled')}
+        report['data']['config_digest'] = 'sha256:' + hashlib.sha256(
+            json.dumps(config, separators=(',', ':')).encode()).hexdigest()
+        self.env['RUNTIME_REPORT'] = json.dumps(report)
+        # Inherited caller values do not select a production policy.
+        self.env['DEPLOY_STORE_POLICY'] = 'commercial_catalog'
+        result = self.run_wrapper('--verify')
+        self.assertNotEqual(result.returncode, 0)
+        with self.config.open('a') as f:
+            f.write('\nDEPLOY_LAUNCH_BASELINE=commercial\nDEPLOY_STORE_POLICY=commercial_catalog\n')
+        result = self.run_wrapper('--verify')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Runtime Gate PASS', result.stderr)
+        for field, value, code in (
+            ('online_payment_enabled', True, 'RUNTIME_CONFIG_MISMATCH'),
+            ('pool_enabled', True, 'RUNTIME_CONFIG_MISMATCH'),
+            ('billing_mode', 'monitor', 'RUNTIME_CONFIG_MISMATCH'),
+            ('referral_enabled', True, 'RUNTIME_CONFIG_MISMATCH'),
+            ('store_enabled', False, 'RUNTIME_CONFIG_MISMATCH'),
+            ('approval_view_digest', 'invalid', 'APPROVAL_VIEW_INVALID'),
+            ('effective_product_count', -1, 'PRODUCT_VIEW_INVALID'),
+        ):
+            with self.subTest(field=field):
+                changed = json.loads(json.dumps(report))
+                changed['data'][field] = value
+                config = {k: changed['data'][k] for k in config}
+                changed['data']['config_digest'] = 'sha256:' + hashlib.sha256(
+                    json.dumps(config, separators=(',', ':')).encode()).hexdigest()
+                self.reject_report(changed, code)
+
+    def test_closed_baseline_and_unknown_operator_store_policy_remain_blocked(self):
+        for policy in ('commercial_catalog', 'unknown'):
+            with self.subTest(policy=policy):
+                original = self.config.read_text()
+                with self.config.open('a') as f:
+                    f.write('\nDEPLOY_STORE_POLICY=' + policy + '\n')
+                result = self.run_wrapper('--verify')
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.config.write_text(original)
+
     def reject_report(self, report, code):
         self.env['RUNTIME_REPORT'] = json.dumps(report)
         result = self.run_wrapper('--verify')
@@ -575,7 +619,9 @@ class RuntimeGateContractTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         with self.config.open('a') as f:
             f.write('\nCLEARAPI_STORE_POLICY=approved\n')
-        self.reject_report(runtime_report(), 'RUNTIME_CONFIG_MISMATCH')
+        result = self.run_wrapper('--verify')
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn('REFUSING: DEPLOY_STORE_POLICY', result.stderr)
 
     def test_unsafe_or_missing_credentials_and_transport_never_fall_back(self):
         for mode in (0o644, 0o666):

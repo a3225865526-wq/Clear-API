@@ -39,7 +39,7 @@ umask 077
 exec 3<&0
 exec </dev/null
 unset GHCR_PULL_TOKEN
-unset CLEARAPI_STORE_POLICY DEPLOY_EXPECT_REFERRAL_ENABLED DEPLOY_RUNTIME_PROBE_TOKEN_FILE
+unset CLEARAPI_STORE_POLICY DEPLOY_STORE_POLICY DEPLOY_EXPECT_REFERRAL_ENABLED DEPLOY_RUNTIME_PROBE_TOKEN_FILE
 
 # Operator configuration is authoritative over inherited DEPLOY_* variables.
 # Derive aliases only after sourcing; absent keys retain the caller/default value.
@@ -125,7 +125,14 @@ POLICY_MODE_KEY="${DEPLOY_POLICY_MODE_KEY:-billing_reserve_policy.mode}"
 # Stage 2B-2 consumes only Runtime Integrity Report v1. The Stage 2B-1
 # diagnostic response is deliberately incompatible; never synthesize missing
 # version, product counts or identity evidence to make it pass.
-STORE_POLICY="${CLEARAPI_STORE_POLICY:-disabled}"
+# Only root-owned operator configuration may select the existing commercial catalog.
+STORE_POLICY="${DEPLOY_STORE_POLICY:-${CLEARAPI_STORE_POLICY:-disabled}}"
+case "$STORE_POLICY" in
+  disabled) ;;
+  commercial_catalog)
+    [ "$LAUNCH_BASELINE" = commercial ] || { echo 'REFUSING: commercial_catalog requires commercial launch baseline' >&2; exit 2; } ;;
+  *) echo 'REFUSING: DEPLOY_STORE_POLICY must be disabled or commercial_catalog' >&2; exit 2 ;;
+esac
 EXPECT_REFERRAL_ENABLED="${DEPLOY_EXPECT_REFERRAL_ENABLED:-false}"
 RUNTIME_PROBE_TOKEN_FILE="${DEPLOY_RUNTIME_PROBE_TOKEN_FILE:-/opt/clearapi/secrets/runtime-probe-session}"
 RUNTIME_BASELINE=""
@@ -421,7 +428,7 @@ def unique_object(pairs):
 
 try:
     token_path, identity, expected_image, binary, policy, referral, baseline, restarting = sys.argv[1:]
-    if policy != 'disabled' or referral not in ('true', 'false'):
+    if policy not in ('disabled', 'commercial_catalog') or referral not in ('true', 'false'):
         blocked('RUNTIME_CONFIG_MISMATCH')
     parts = identity.split()
     if len(parts) != 3 or not re.fullmatch(r'[a-f0-9]{64}', parts[0]) or parts[2] != expected_image:
@@ -505,13 +512,14 @@ try:
     expected_config = 'sha256:' + hashlib.sha256(json.dumps(config, separators=(',', ':')).encode()).hexdigest()
     if report['config_digest'] != expected_config:
         blocked('RUNTIME_CONFIG_MISMATCH')
-    if (report['online_payment_enabled'] or report['store_enabled'] or report['pool_enabled']
+    if (report['online_payment_enabled'] or report['store_enabled'] != (policy == 'commercial_catalog') or report['pool_enabled']
             or report['billing_mode'] != 'enforce'
             or report['referral_enabled'] != (referral == 'true')):
         blocked('RUNTIME_CONFIG_MISMATCH')
     if report['approval_schema'] != 1:
         blocked('APPROVAL_VIEW_INVALID')
-    if (report['catalog_version'] <= 0 or report['effective_product_count'] != 0
+    if (report['catalog_version'] <= 0 or report['effective_product_count'] < 0
+            or (policy == 'disabled' and report['effective_product_count'] != 0)
             or not re.fullmatch(digest, report['product_view_digest'])):
         blocked('PRODUCT_VIEW_INVALID')
     if not re.fullmatch(digest, report['approval_view_digest']):
