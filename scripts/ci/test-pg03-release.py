@@ -367,6 +367,9 @@ from pathlib import Path
 cmd=sys.argv[-1]
 raw=sys.stdin.read()
 if 'sha256sum' in cmd:
+    import re
+    allowed=re.findall(r'/usr/bin/sha256sum ([^,\\s]+)',(Path(os.environ['SCRIPTS'])/'pg03-deploy.sudoers').read_text())
+    if cmd.split()[-1] not in allowed: sys.exit('hash probe is not in the existing sudo allowlist')
     name=cmd.split()[-1].split('/')[-1]
     if name=='clearapi-backup.sh': name='production-backup.sh'
     import hashlib

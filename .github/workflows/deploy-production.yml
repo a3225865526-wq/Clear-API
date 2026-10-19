@@ -347,11 +347,8 @@ jobs:
           LOCAL_SHA=$(sha256sum scripts/pg03-release-control.py | cut -d' ' -f1)
           REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-release-control.py' | cut -d' ' -f1)
           [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
-          if [[ "${RELEASE_STAGE:-commercial}" == controlled ]]; then
-            LOCAL_SHA=$(sha256sum scripts/controlled-traffic-hold.py | cut -d' ' -f1)
-            REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/controlled-traffic-hold.py' | cut -d' ' -f1)
-            [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
-          fi
+          # V2 pins and verifies the traffic helper as root before containment.
+          # Keep the existing sudo allowlist unchanged; do not add a hash probe.
           if [[ -n "${LEGACY_TRANSITION_SHA256:-}" || "${RELEASE_STAGE:-commercial}" == controlled ]]; then
             LOCAL_SHA=$(sha256sum scripts/pg03-legacy-transition.py | cut -d' ' -f1)
             REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-legacy-transition.py' | cut -d' ' -f1)
