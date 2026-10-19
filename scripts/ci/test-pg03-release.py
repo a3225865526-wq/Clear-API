@@ -46,6 +46,8 @@ class WorkflowContractTest(unittest.TestCase):
         self.assertEqual(hashlib.sha256((SCRIPTS / 'production-deploy-v2.sh').read_bytes()).hexdigest(), CONTROL.V2_SHA)
 
     def test_automatic_call_requires_prior_proof_job_and_stays_on_v2(self):
+        prepare = self.workflow.split('      - name: Verify PG03 control tool and prepare approved pair', 1)[1].split('      - name:', 1)[0]
+        self.assertIn("if: env.POOL_MODE == 'pg03'", prepare)
         self.assertIn('  workflow_call:\n', self.workflow)
         self.assertIn('    needs: authorize\n', self.workflow)
         self.assertIn('    environment: production\n', self.workflow)

@@ -1,0 +1,49 @@
+{
+  "schema": "clearapi.authorization-circuit-recovery/v1",
+  "baseline_commit": "cd6f719e79de432de6219561b04502784cb58930",
+  "investigated_at": "2026-10-19T04:22:00Z",
+  "expires_at": "2026-10-20T04:22:00Z",
+  "investigation": "Original GitHub logs inspected: initial unexpected run event; subsequent persistent circuit failures. All production jobs skipped. Live revalidation of history, logs, manual runs and deployment records remains mandatory before recovery.",
+  "failures": [
+    {
+      "run_id": 39176488931,
+      "source_commit": "bdae86e8b6b07e24b7d7e8e09cb8ed548508e2f8",
+      "run_attempt": 1,
+      "created_at": "2026-10-18T23:25:57Z",
+      "authorization_job_id": 117820121938,
+      "deployment_job_id": 117820156188,
+      "authorization_log_sha256": "dd95a6d58b7dedbbc961ddfe0ae554c515d83aba8d71ac366b502a11a4003e76",
+      "reason": "unexpected run event"
+    },
+    {
+      "run_id": 39189520883,
+      "source_commit": "fd8f27641d49f6c5a5b5b6c30fac230d3c074cd1",
+      "run_attempt": 1,
+      "created_at": "2026-10-19T02:20:42Z",
+      "authorization_job_id": 117859024517,
+      "deployment_job_id": 117859067835,
+      "authorization_log_sha256": "73c28c84ad5169ba22b818a6be7b28d4e82a992333024f5f743825ce0ba58aba",
+      "reason": "release circuit open; investigate prior deployment before resuming"
+    },
+    {
+      "run_id": 39195457908,
+      "source_commit": "9a3e6585737d823896137346faf94c2e1f4d1b04",
+      "run_attempt": 1,
+      "created_at": "2026-10-19T03:36:07Z",
+      "authorization_job_id": 117877147524,
+      "deployment_job_id": 117877202838,
+      "authorization_log_sha256": "5ff598463eee08a30f0e5b37c18cd072996c5e6a99f68d0f4ae3e4b087bfb9d4",
+      "reason": "release circuit open; investigate prior deployment before resuming"
+    },
+    {
+      "run_id": 39198826181,
+      "source_commit": "cd6f719e79de432de6219561b04502784cb58930",
+      "run_attempt": 1,
+      "created_at": "2026-10-19T04:18:40Z",
+      "authorization_job_id": 117887315369,
+      "deployment_job_id": 117887374107,
+      "authorization_log_sha256": "f5f15c338cc2e5666be18854ab320025dbc27f3175afbd869e8869cecab55b3b",
+      "reason": "release circuit open; investigate prior deployment before resuming"
+    }
+  ]
+}

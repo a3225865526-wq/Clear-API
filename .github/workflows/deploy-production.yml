@@ -147,6 +147,14 @@ jobs:
             echo "legacy_transition_sha256="
           } >> "$GITHUB_OUTPUT"
 
+      - name: Upload release circuit recovery audit
+        if: success() && inputs.rehearsal_run_id != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-circuit-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/verified-release-${{ github.run_id }}-${{ github.run_attempt }}/recovery-audit.json
+          if-no-files-found: ignore
+
       - name: Report blocked authorization
         if: failure()
         run: echo 'Release authorization failed. Production credentials were not requested.' >> "$GITHUB_STEP_SUMMARY"
@@ -292,7 +300,7 @@ jobs:
           }
 
       - name: Verify PG03 control tool and prepare approved pair
-        if: inputs.pool_mode == 'pg03'
+        if: env.POOL_MODE == 'pg03'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
