@@ -4,6 +4,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -14,9 +15,75 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location("automatic_release", Path(__file__).with_name("automatic-release.py"))
 policy = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(policy)
+audit_spec = importlib.util.spec_from_file_location('release_audit', Path(__file__).with_name('audit-release-state.py'))
+audit = importlib.util.module_from_spec(audit_spec)
+audit_spec.loader.exec_module(audit)
 SOURCE = "a" * 40
 DIGEST = "sha256:" + "b" * 64
 EXECUTOR_IMAGE = "ghcr.io/a3225865526-wq/executor-unit-fixture"
+
+
+class ReadOnlyReleaseAuditTest(unittest.TestCase):
+    def test_unexpected_library_error_cannot_print_credentials_or_mark_audit_complete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = io.StringIO()
+            with patch.dict(os.environ, {'AUDIT_RC_RUN_ID': '123'}), \
+                 patch.object(audit, 'gh', side_effect=ValueError('never-echo-credential')), \
+                 patch.object(audit, 'Path', side_effect=lambda p: root / p), \
+                 patch('sys.stdout', output):
+                self.assertEqual(audit.main(), 1)
+            report = json.loads((root / 'release-state-audit.json').read_text())
+            self.assertFalse(report['audit_complete'])
+            self.assertFalse(report['circuit_recovered'])
+            self.assertEqual(report['status'], 'BLOCKED')
+            self.assertNotIn('never-echo-credential', output.getvalue() + json.dumps(report))
+
+    def test_evidence_reports_binding_without_echoing_secret_payloads_or_granting_pass(self):
+        manifest = {'source_commit': SOURCE, 'image_digest': DIGEST, 'workflow_run': '123',
+                    'workflow_run_attempt': '1', 'schema_transition': {
+                        'source_schema_sha256': '1' * 64, 'target_schema_sha256': '2' * 64}}
+        evidence = {'schema': 'clearapi.rehearsal-evidence/v1', 'kind': 'backup',
+                    'conclusion': 'success', 'source_commit': 'c' * 40, 'gateway_digest': DIGEST,
+                    'manifest_sha256': '3' * 64, 'source_schema_sha256': '1' * 64,
+                    'target_schema_sha256': '2' * 64, 'rc_run_id': 123, 'rc_run_attempt': 1,
+                    'target_id': 'private-target-value', 'token': 'never-echo-token',
+                    'provenance': 'https://example.invalid/?token=never-echo-provenance'}
+        report = audit.evidence_metadata(json.dumps(evidence), 'backup', manifest, '3' * 64,
+                                         'private-target-value')
+        self.assertFalse(report['binding_matches']['source_commit'])
+        self.assertTrue(report['binding_matches']['gateway_digest'])
+        self.assertTrue(report['binding_matches']['target_id'])
+        self.assertFalse(report['original_acceptance_verified'])
+        for secret in ('never-echo-token', 'never-echo-provenance', 'private-target-value'):
+            self.assertNotIn(secret, json.dumps(report))
+        evidence['source_commit'] = 'credential-that-is-not-a-sha'
+        report = audit.evidence_metadata(json.dumps(evidence), 'backup', manifest, '3' * 64, '')
+        self.assertIsNone(report['declared_release_identity']['source_commit'])
+        self.assertNotIn('credential-that-is-not-a-sha', json.dumps(report))
+        self.assertIn('error', audit.evidence_metadata('/root/private-file', 'backup', manifest, '', ''))
+
+    def test_deployment_records_preserve_unresolved_history_without_payload_or_recovery(self):
+        record = {'id': 9, 'sha': SOURCE, 'created_at': '2026-10-19T05:14:53Z',
+                  'payload': {'token': 'never-echo-payload'}}
+        statuses = [{'id': 10, 'state': 'in_progress',
+                     'log_url': 'https://github.com/' + audit.REPO + '/actions/runs/39203542451/job/11'}]
+        result = audit.deployment_metadata(record, statuses)
+        self.assertTrue(result['requires_investigation'])
+        self.assertEqual(result['statuses'][0]['actions_run_id'], 39203542451)
+        self.assertNotIn('never-echo-payload', json.dumps(result))
+        with self.assertRaises(ValueError):
+            audit.deployment_metadata(record, [{'id': 10, 'state': 'unclassified'}])
+
+    def test_audit_job_has_no_production_environment_or_ssh_and_excludes_vps_job(self):
+        workflow = (Path(__file__).parents[2] / '.github/workflows/ghcr-pull-rehearsal.yml').read_text()
+        job = workflow.split('  release_audit:\n', 1)[1].split('  rehearse:\n', 1)[0]
+        self.assertIn('github.actor == github.repository_owner', job)
+        self.assertIn('github.triggering_actor == github.repository_owner', job)
+        self.assertIn('      deployments: read', job)
+        for forbidden in ('environment: production', 'PROD_SSH', 'sudo ', 'secrets: inherit', ': write'):
+            self.assertNotIn(forbidden, job)
+        self.assertIn("    if: ${{ !inputs.release_audit_only }}", workflow.split('  rehearse:\n', 1)[1])
 
 
 class ReleaseProofTest(unittest.TestCase):
