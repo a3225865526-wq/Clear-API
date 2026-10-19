@@ -273,7 +273,10 @@ describe('upstream screenshot pricing', () => {
     })
 
     expect(
-      generatePriceTableFromExpression('usage', 'tier("base", u("seconds") * 1)')
+      generatePriceTableFromExpression(
+        'usage',
+        'tier("base", u("seconds") * 1)'
+      )
     ).toBeNull()
   })
 })

@@ -35,12 +35,12 @@ import {
   useSaveModelPricing,
   type ModelPricingConfig,
 } from '@/features/model-pricing/api'
+import { ModelPricingCleanupDialog } from '@/features/model-pricing/model-pricing-cleanup-dialog'
 import { pricingOptions } from '@/features/model-pricing/pricing'
 import {
   applyGeneratedUpstreamPricing,
   type GeneratedUpstreamPricing,
 } from '@/features/model-pricing/upstream-pricing'
-import { ModelPricingCleanupDialog } from '@/features/model-pricing/model-pricing-cleanup-dialog'
 import { UpstreamPricingDialog } from '@/features/model-pricing/upstream-pricing-dialog'
 import { handleServerError } from '@/lib/handle-server-error'
 

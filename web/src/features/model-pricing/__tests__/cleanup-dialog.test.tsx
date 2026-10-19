@@ -127,9 +127,7 @@ it('submits an empty draft for the reviewed selection so nothing is restored', a
     within(table).getByText('Stored pricing: ModelRatio, CompletionRatio')
   ).toBeVisible()
 
-  expect(
-    screen.getByRole('button', { name: 'Clear 0 models' })
-  ).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Clear 0 models' })).toBeDisabled()
 
   await user.click(screen.getByRole('checkbox', { name: 'Select gpt-4' }))
   await user.click(screen.getByRole('button', { name: 'Clear 1 models' }))
