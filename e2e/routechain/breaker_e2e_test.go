@@ -2,6 +2,7 @@ package routechain
 
 import (
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -181,6 +182,9 @@ func TestE2EBreakerHalfOpenProbeFailureReopens(t *testing.T) {
 // happens through the single HALF_OPEN probe.
 func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	breakerE2ESetup(t)
+	var clock atomic.Int64
+	clock.Store(1000)
+	routechain.Breaker.ResetForTest(clock.Load)
 	oldMax := common.RouteChainRetryAfterMaxSeconds
 	common.RouteChainRetryAfterMaxSeconds = 1
 	t.Cleanup(func() { common.RouteChainRetryAfterMaxSeconds = oldMax })
@@ -208,9 +212,8 @@ func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	require.Equal(t, 1, mockA.count())
 	require.Eventually(t, func() bool {
 		snapshot := routechain.Breaker.CandidateSnapshot(1, 1, nil)
-		// Counters carry the verdict — the state itself may lazily flip to
-		// half_open once the short Retry-After window elapses mid-poll.
-		return snapshot.ConsecutiveFailures == 0 &&
+		return snapshot.State == routechain.CircuitStateOpen &&
+			snapshot.OpenUntil == 1001 && snapshot.ConsecutiveFailures == 0 &&
 			snapshot.Counters["retry_after_cooldown_total"] == 1 &&
 			snapshot.Counters["circuit_open_total"] == 0
 	}, 3*time.Second, 10*time.Millisecond, "429 opens the cooldown window without any failure count")
@@ -223,25 +226,24 @@ func TestE2EBreaker429RetryAfterCooldown(t *testing.T) {
 	require.Equal(t, 1, mockA.count(), "cooled-down candidate must not be called")
 	require.Equal(t, 2, mockB.count())
 
-	// Cooldown (2s) elapses → probe; A answers 429 with Retry-After 999999999
+	// The first window is also capped to 1s. At its exact expiry boundary,
+	// probe A, which answers 429 with Retry-After 999999999
 	// → capped to RouteChainRetryAfterMaxSeconds=1 (C21). The probe request
 	// still advances to B per policy.
-	time.Sleep(2100 * time.Millisecond)
-	before := time.Now().Unix()
+	clock.Store(1001)
 	status, body, _ = h.postChat(t, e2eModel, "", false)
-	after := time.Now().Unix()
 	require.Equal(t, http.StatusOK, status)
 	require.Contains(t, body, "from-b")
 	require.Equal(t, 2, mockA.count())
 	require.Eventually(t, func() bool {
 		snapshot := routechain.Breaker.CandidateSnapshot(1, 1, nil)
 		return snapshot.Counters["retry_after_cooldown_total"] == 2 &&
-			snapshot.OpenUntil >= before+1 &&
-			snapshot.OpenUntil <= after+1 // Retry-After capped to max seconds
+			snapshot.State == routechain.CircuitStateOpen &&
+			snapshot.OpenUntil == 1002 // Retry-After capped to max seconds
 	}, 3*time.Second, 10*time.Millisecond, "capped cooldown window applied")
 
 	// After the capped window the probe succeeds and closes the circuit.
-	time.Sleep(1200 * time.Millisecond)
+	clock.Store(1002)
 	status, body, _ = h.postChat(t, e2eModel, "", false)
 	require.Equal(t, http.StatusOK, status)
 	require.Contains(t, body, "from-a")

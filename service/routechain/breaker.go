@@ -132,15 +132,15 @@ type circuit struct {
 
 func (c *circuit) counters() map[string]int64 {
 	return map[string]int64{
-		"circuit_open_total":          c.opens,
-		"circuit_half_open_total":     c.halfOpens,
-		"circuit_close_total":         c.closes,
-		"candidate_skipped_open_total": c.skipsOpen,
+		"circuit_open_total":             c.opens,
+		"circuit_half_open_total":        c.halfOpens,
+		"circuit_close_total":            c.closes,
+		"candidate_skipped_open_total":   c.skipsOpen,
 		"half_open_probe_rejected_total": c.probeRejects,
-		"retry_after_cooldown_total":  c.retryAfterCooldowns,
-		"health_success_total":        c.healthSuccess,
-		"health_failure_total":        c.healthFailure,
-		"health_neutral_total":        c.healthNeutral,
+		"retry_after_cooldown_total":     c.retryAfterCooldowns,
+		"health_success_total":           c.healthSuccess,
+		"health_failure_total":           c.healthFailure,
+		"health_neutral_total":           c.healthNeutral,
 	}
 }
 
@@ -202,10 +202,16 @@ var Breaker = &BreakerRegistry{circuits: map[string]*circuit{}, now: func() int6
 // ResetForTest clears every circuit — test isolation only. Production code
 // must never clear the registry at runtime: the breaker state clears itself
 // on restart, by reset API, or by window expiry, nothing else.
-func (r *BreakerRegistry) ResetForTest() {
+// An optional clock controls expiry boundaries in tests. Call without a clock
+// to restore wall time during cleanup. Call only while requests are stopped.
+func (r *BreakerRegistry) ResetForTest(clock ...func() int64) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.circuits = map[string]*circuit{}
+	r.now = func() int64 { return time.Now().Unix() }
+	if len(clock) > 0 && clock[0] != nil {
+		r.now = clock[0]
+	}
 }
 
 func circuitKey(chainId, candidateId int) string {
