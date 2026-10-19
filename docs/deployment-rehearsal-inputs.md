@@ -1,7 +1,7 @@
 # Deployment rehearsal evidence inputs
 
-The existing producer and 11 mandatory gates remain unchanged. A successful
-workflow run alone does not establish production readiness.
+Commercial release requires all 11 gates. A successful workflow run alone does
+not establish production readiness or authorize public traffic.
 
 `CLEARAPI_REHEARSAL_BACKUP_EVIDENCE`, `CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE`, and
 `CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE` are trusted operator inputs (JSON or a
@@ -48,6 +48,37 @@ A proof that claims `no_schema_change` while the Manifest hashes differ is
 rejected, and so is an upgrading Manifest with a proof that omits the
 migration block, states the wrong mode, or quotes different hashes.
 Successful forward restore alone still cannot authorize this route.
-`migration_compatible=false` remains mandatory. Broader real Provider
-acceptance may be deferred, but missing required real Provider evidence must
-remain a failed gate under the current release contract.
+`migration_compatible=false` remains mandatory. Missing required real Provider
+evidence remains a failed gate for commercial release.
+
+The explicit `controlled` rehearsal stage produces a different proof schema,
+`clearapi.controlled-release/v1`. It requires all ten other gates and records
+`provider_acceptance=deferred_to_owner_after_deployment` and
+`public_traffic=blocked`; it never creates a Provider PASS. The automatic
+commercial consumer rejects this proof. A fresh owner dispatch with
+`release_stage=controlled`, the exact successful controlled rehearsal and
+`DEPLOY_CONTROLLED_PRODUCTION` is required. The authorization job verifies the
+same RC artifacts, source CI, evidence identities and release circuit before
+requesting production credentials. Root independently binds its target to that
+job's exact authorization artifact and the actual production predecessor.
+
+Deploy V2 then verifies its pinned traffic helper and writes a root-owned,
+fsynced isolation journal before disabling the Caddy container's restart policy
+and stopping it. The Gateway must remain bound to `127.0.0.1:3000`; no TCP/UDP
+web listener on 80/443 may remain. Failures preserve isolation. Local health,
+Runtime, paired Executor, accounting, backup and migration checks remain
+mandatory. Public HTTPS health is explicitly `not_run_ingress_isolated`.
+Provider checks must use local access or an SSH tunnel during this phase.
+
+There is no automatic opening operation. The durable journal blocks subsequent
+ordinary deployment/restart/reconcile operations. After owner Provider
+usage/billing acceptance, opening requires a separately reviewed operation,
+fresh system/security checks and explicit owner confirmation. Until then, the
+recorded edge restart policy must not be restored. An isolation failure needs
+operator recovery review; do not delete the journal or reopen the edge.
+
+These workflow/wrapper changes alter the release contract. The current policy
+requires a new reviewed main RC after merge. Preserve old evidence verbatim;
+do not rebind its commit, digest, manifest, run or schema identity. Reuse the
+authenticated encrypted backup as input when candidate-specific verification
+is necessarily refreshed. The pre-deploy official fresh backup remains required.

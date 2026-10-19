@@ -32,6 +32,187 @@ def module(name):
 CONTROL = module('pg03-release-control')
 PROBE = module('runtime-probe-session')
 INSPECTION = module('ci/inspect-vps-authorization')
+TRAFFIC = module('controlled-traffic-hold')
+
+
+class ControlledTrafficHoldTest(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        self.edge = {'Id': 'c' * 64, 'Image': 'sha256:' + 'd' * 64,
+                     'State': {'Running': True, 'Paused': False},
+                     'HostConfig': {'RestartPolicy': {'Name': 'unless-stopped', 'MaximumRetryCount': 0}}}
+        self.calls = []
+        self.public_listener = False
+        self.exposed_gateway = False
+        self.fail_stop = False
+        self.hold = TRAFFIC.TrafficHold(self.root, self.command)
+        self.target = {'launch_stage': 'controlled', 'public_traffic': 'blocked', 'pool_mode': 'pg03',
+                       'components': {'gateway': {'image_digest': 'sha256:' + 'b' * 64, 'oci_revision': 'a' * 40}},
+                       'validation': {'approval_run': '123', 'controlled_authorization': {
+                           'mode': 'controlled-proof-v1', 'run': '123', 'rehearsal_run': '456'}}}
+        TRAFFIC.lifecycle.publish(self.hold.target, self.target)
+        self.binding = self.hold.binding('123', 'sha256:' + 'b' * 64, 'a' * 40)
+
+    def command(self, args):
+        self.calls.append(args)
+        if args == ['docker', 'inspect', 'clearapi-edge-caddy']:
+            return json.dumps([self.edge])
+        if args[:2] == ['docker', 'update']:
+            self.assertTrue(self.hold.state.is_file(), 'durable journal must precede mutations')
+            self.edge['HostConfig']['RestartPolicy'] = {'Name': 'no', 'MaximumRetryCount': 0}
+            return ''
+        if args[:2] == ['docker', 'stop']:
+            if self.fail_stop:
+                raise ValueError('simulated stop failure')
+            self.edge['State']['Running'] = False
+            return ''
+        if args[:2] == ['docker', 'port']:
+            return '0.0.0.0:3000' if self.exposed_gateway else '127.0.0.1:3000'
+        if args == ['ss', '-lntuH']:
+            return 'tcp LISTEN 0 128 0.0.0.0:443 0.0.0.0:*' if self.public_listener else ''
+        raise AssertionError('Unexpected command')
+
+    def test_isolation_is_durable_idempotent_and_has_no_release_action(self):
+        state = self.hold.hold(self.binding)
+        self.assertEqual(state['stage'], 'isolated')
+        self.assertEqual(state['edge']['restart_policy']['Name'], 'unless-stopped')
+        self.assertEqual(self.hold.state.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(self.edge['HostConfig']['RestartPolicy']['Name'], 'no')
+        mutations = len([a for a in self.calls if a[:2] in (['docker', 'update'], ['docker', 'stop'])])
+        self.hold.hold(self.binding)
+        self.assertEqual(len([a for a in self.calls if a[:2] in (['docker', 'update'], ['docker', 'stop'])]), mutations)
+        self.assertFalse(any('start' in a or 'unpause' in a for a in self.calls))
+        self.edge['State']['Running'] = True
+        with self.assertRaisesRegex(ValueError, 'durably stopped'):
+            self.hold.verify(self.binding)
+
+    def test_failure_keeps_journal_and_disabled_restart_then_can_only_continue_isolation(self):
+        self.fail_stop = True
+        with self.assertRaises(ValueError):
+            self.hold.hold(self.binding)
+        self.assertEqual(TRAFFIC.lifecycle.read_json(self.hold.state)['stage'], 'isolating')
+        self.assertEqual(self.edge['HostConfig']['RestartPolicy']['Name'], 'no')
+        with self.assertRaisesRegex(ValueError, 'journal mismatch'):
+            self.hold.verify(self.binding)
+        self.fail_stop = False
+        self.hold.hold(self.binding)
+        with self.assertRaisesRegex(ValueError, 'another controlled release'):
+            self.hold.hold(dict(self.binding, run='999'))
+
+    def test_listener_or_nonloopback_gateway_is_never_isolated(self):
+        self.hold.hold(self.binding)
+        self.public_listener = True
+        with self.assertRaisesRegex(ValueError, 'listener remains'):
+            self.hold.verify(self.binding)
+        self.public_listener = False
+        self.exposed_gateway = True
+        with self.assertRaisesRegex(ValueError, 'outside loopback'):
+            self.hold.verify(self.binding)
+
+    def test_binding_rejects_wrong_candidate_or_commercial_target(self):
+        for run, digest, commit in [('999', 'sha256:' + 'b' * 64, 'a' * 40),
+                                    ('123', 'sha256:' + 'c' * 64, 'a' * 40),
+                                    ('123', 'sha256:' + 'b' * 64, 'b' * 40)]:
+            with self.assertRaises(ValueError):
+                self.hold.binding(run, digest, commit)
+        self.target['launch_stage'] = 'commercial'
+        TRAFFIC.lifecycle.publish(self.hold.target, self.target, exclusive=False)
+        with self.assertRaises(ValueError):
+            self.hold.binding('123', 'sha256:' + 'b' * 64, 'a' * 40)
+
+    def test_actual_v2_target_parser_requires_matching_controlled_flag_and_authority(self):
+        target = copy.deepcopy(self.target)
+        target['components']['gateway'].update(image_ref='ghcr.io/a3225865526-wq/clearapi@sha256:' + 'b' * 64)
+        target['components']['executor'] = {'image_ref': CONTROL.EXECUTOR,
+            'image_digest': CONTROL.EXECUTOR.split('@')[1], 'oci_revision': CONTROL.EXECUTOR_REVISION,
+            'image_id': 'sha256:' + 'e' * 64, 'binary_sha256': CONTROL.EXECUTOR_BINARY,
+            'executor_id': 'unit-executor', 'process_epoch': 'f' * 32}
+        target['validation'].update(reviewers=[], authorization={
+            'mode': 'owner-dispatch-v1', 'actor': 'a3225865526-wq', 'run': '123'})
+        target['validation']['controlled_authorization']['artifact_sha256'] = '1' * 64
+        overlay = self.root / 'overlay.yaml'
+        overlay.write_text('services: {}\n')
+        source = (SCRIPTS / 'production-deploy-v2.sh').read_text()
+        function = 'pg03_load_pair() {' + source.split('pg03_load_pair() {', 1)[1].split('\npg03_load_environment()', 1)[0]
+        env = dict(os.environ, PG03_COMPOSE_FILE=str(overlay), PG03_EXECUTOR_REF=CONTROL.EXECUTOR,
+                   PG03_EXECUTOR_REVISION=CONTROL.EXECUTOR_REVISION, PG03_EXECUTOR_BINARY=CONTROL.EXECUTOR_BINARY,
+                   LEGACY_TRANSITION='0', CLEARAPI_POOL_EXECUTOR_ID='unit-executor',
+                   CLEARAPI_PG02_PROCESS_EPOCH='f' * 32)
+        for flag, valid, passes in [('1', True, True), ('0', True, False), ('1', False, False)]:
+            if not valid:
+                target['validation']['controlled_authorization'].pop('artifact_sha256')
+            TRAFFIC.lifecycle.publish(self.hold.target, target, exclusive=False)
+            result = subprocess.run(['bash', '-c', function + '\npg03_load_pair "$1" target',
+                                     'controlled-parser', str(self.hold.target)],
+                                    env=dict(env, CONTROLLED_LAUNCH=flag), capture_output=True, text=True)
+            with self.subTest(flag=flag, valid=valid):
+                self.assertEqual(result.returncode == 0, passes, result.stderr)
+
+
+class ControlledReleaseAuthorizationTest(unittest.TestCase):
+    def setUp(self):
+        self.data = {'release_stage': 'controlled', 'run': '123', 'rc_run': '456', 'rehearsal_run': '789',
+                     'commit': 'a' * 40, 'digest': 'sha256:' + 'b' * 64, 'previous_source_commit': 'c' * 40,
+                     'executor_repository': 'ghcr.io/a3225865526-wq/clearapi-executor',
+                     'executor_digest': CONTROL.EXECUTOR.split('@')[1],
+                     'executor_source_commit': CONTROL.EXECUTOR_REVISION, 'executor_binary_sha256': CONTROL.EXECUTOR_BINARY}
+        self.result = {'release_stage': 'controlled', 'expected_commit': self.data['commit'],
+                       'image_digest': self.data['digest'], 'rc_run_id': 456, 'rehearsal_run_id': '789',
+                       'migration_compatible': 'false', 'previous_source_commit': self.data['previous_source_commit'],
+                       'executor_image_repository': self.data['executor_repository'],
+                       'executor_image_digest': self.data['executor_digest'],
+                       'executor_source_commit': self.data['executor_source_commit'],
+                       'executor_binary_sha256': self.data['executor_binary_sha256']}
+        self.run = {'event': 'workflow_dispatch', 'path': '.github/workflows/deploy-production.yml',
+                    'status': 'in_progress', 'run_attempt': 1,
+                    'actor': {'login': 'a3225865526-wq'}, 'triggering_actor': {'login': 'a3225865526-wq'}}
+        self.job = {'name': 'Validate release authorization before production credentials', 'status': 'completed',
+                    'conclusion': 'success', 'steps': [{'name': 'Authenticate controlled proof before production credentials',
+                                                      'status': 'completed', 'conclusion': 'success'}]}
+
+    def get(self, path):
+        if path == 'actions/runs/123':
+            return self.run
+        if path == 'actions/runs/123/jobs?per_page=100':
+            return {'jobs': [self.job]}
+        if path == 'actions/runs/123/artifacts?per_page=100':
+            return {'artifacts': [{'id': 42, 'name': 'controlled-authorization-123-1', 'expired': False}]}
+        raise AssertionError(path)
+
+    def archive(self, ident):
+        self.assertEqual(ident, 42)
+        raw = io.BytesIO()
+        with zipfile.ZipFile(raw, 'w') as bundle:
+            bundle.writestr('controlled-authorization.json', json.dumps(self.result))
+        return raw.getvalue()
+
+    def test_exact_authorized_artifact_binds_root_target_to_controlled_scope(self):
+        result = CONTROL.controlled_release_authority(self.data, self.get, self.archive)
+        self.assertEqual(result['mode'], 'controlled-proof-v1')
+        self.assertEqual(result['rehearsal_run'], '789')
+        self.assertRegex(result['artifact_sha256'], r'^[0-9a-f]{64}$')
+        for field, value in [('image_digest', 'sha256:' + 'd' * 64), ('rehearsal_run_id', '790'),
+                              ('migration_compatible', 'true'), ('release_stage', 'commercial')]:
+            before = self.result[field]
+            self.result[field] = value
+            with self.subTest(field=field), self.assertRaisesRegex(CONTROL.ReleaseBlocked, 'identity mismatch'):
+                CONTROL.controlled_release_authority(self.data, self.get, self.archive)
+            self.result[field] = before
+
+    def test_failed_authorizer_wrong_actor_and_legacy_transition_cannot_publish_scope(self):
+        self.job['steps'][0]['conclusion'] = 'failure'
+        with self.assertRaisesRegex(CONTROL.ReleaseBlocked, 'did not pass'):
+            CONTROL.controlled_release_authority(self.data, self.get, self.archive)
+        self.job['steps'][0]['conclusion'] = 'success'
+        self.run['actor']['login'] = 'foreign-actor'
+        with self.assertRaisesRegex(CONTROL.ReleaseBlocked, 'owner dispatch'):
+            CONTROL.controlled_release_authority(self.data, self.get, self.archive)
+        self.run['actor']['login'] = 'a3225865526-wq'
+        self.data['transition_sha256'] = 'e' * 64
+        with self.assertRaisesRegex(CONTROL.ReleaseBlocked, 'scope'):
+            CONTROL.controlled_release_authority(self.data, self.get, self.archive)
 
 
 class VPSAuthorizationInspectionTest(unittest.TestCase):
@@ -175,7 +356,7 @@ class WorkflowContractTest(unittest.TestCase):
                     self.assertTrue(trace.exists())
                     self.assertEqual(json.loads(config.read_text()), {'features': {'other-feature': True, 'containerd-snapshotter': True}, 'debug': False})
 
-    def invoke(self, mode='pg03', failure='', transition='', confirmation='DEPLOY_PRODUCTION'):
+    def invoke(self, mode='pg03', failure='', transition='', confirmation='DEPLOY_PRODUCTION', stage='commercial'):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             trace = root / 'trace.jsonl'
@@ -186,6 +367,9 @@ from pathlib import Path
 cmd=sys.argv[-1]
 raw=sys.stdin.read()
 if 'sha256sum' in cmd:
+    import re
+    allowed=re.findall(r'/usr/bin/sha256sum ([^,\\s]+)',(Path(os.environ['SCRIPTS'])/'pg03-deploy.sudoers').read_text())
+    if cmd.split()[-1] not in allowed: sys.exit('hash probe is not in the existing sudo allowlist')
     name=cmd.split()[-1].split('/')[-1]
     if name=='clearapi-backup.sh': name='production-backup.sh'
     import hashlib
@@ -217,6 +401,7 @@ else:
                        INPUT_POOL_MODE=mode, INPUT_RC_RUN_ID='99',
                        INPUT_TRANSITION_SHA256=transition, INPUT_MIGRATION='false',
                        INPUT_CONFIRMATION=confirmation,
+                       INPUT_RELEASE_STAGE=stage, RELEASE_STAGE=stage,
                        REHEARSAL_RUN_ID='', PREVIOUS_SOURCE_COMMIT='', EXPECTED_EXECUTOR_REPOSITORY='',
                        EXPECTED_EXECUTOR_DIGEST='', EXPECTED_EXECUTOR_BINARY_SHA256='', EXPECTED_EXECUTOR_SOURCE_COMMIT='',
                        POOL_MODE=mode, RC_RUN_ID='99', PROD_SSH_ALIAS='isolated-vps',
@@ -263,6 +448,14 @@ else:
         rc, trace = self.invoke('unknown')
         self.assertNotEqual(rc,0)
         self.assertEqual(trace,'')
+
+    def test_controlled_dispatch_uses_exact_confirmation_and_v2_containment_flag(self):
+        code, trace = self.invoke(stage='controlled', confirmation='DEPLOY_CONTROLLED_PRODUCTION')
+        self.assertEqual(code, 0, trace)
+        self.assertIn('--controlled-launch', trace)
+        code, trace = self.invoke(stage='controlled')
+        self.assertNotEqual(code, 0)
+        self.assertNotIn('production-deploy-v2.sh', trace)
 
     def test_maintenance_requires_its_exact_confirmation_and_cannot_use_pool_off(self):
         code, trace = self.invoke(transition='a'*64, confirmation='DEPLOY_LEGACY_RETIREMENT_V1')

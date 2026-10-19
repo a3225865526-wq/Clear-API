@@ -33,6 +33,16 @@ on:
         description: 'Optional legacy-retirement-v1 request SHA256; requires fresh root authentication and exact maintenance authority'
         type: string
         required: false
+      release_stage:
+        description: 'Controlled holds public ingress after deployment; Provider acceptance is deferred'
+        type: choice
+        required: true
+        default: commercial
+        options: [commercial, controlled]
+      controlled_rehearsal_run_id:
+        description: 'Successful controlled rehearsal (required for controlled stage)'
+        type: string
+        required: false
       migration_compatible:
         description: 'Is the candidate migration backward-compatible with the previous image?'
         required: true
@@ -71,15 +81,17 @@ jobs:
       image_digest: ${{ steps.manual.outputs.image_digest || steps.release.outputs.image_digest }}
       expected_commit: ${{ steps.manual.outputs.expected_commit || steps.release.outputs.expected_commit }}
       migration_compatible: ${{ steps.manual.outputs.migration_compatible || steps.release.outputs.migration_compatible }}
-      previous_source_commit: ${{ steps.release.outputs.previous_source_commit }}
+      previous_source_commit: ${{ steps.controlled.outputs.previous_source_commit || steps.release.outputs.previous_source_commit }}
       pool_mode: ${{ steps.manual.outputs.pool_mode || steps.release.outputs.pool_mode }}
       rc_run_id: ${{ steps.manual.outputs.rc_run_id || steps.release.outputs.rc_run_id }}
       legacy_transition_sha256: ${{ steps.manual.outputs.legacy_transition_sha256 || steps.release.outputs.legacy_transition_sha256 }}
       rehearsal_run_id: ${{ steps.release.outputs.rehearsal_run_id }}
-      executor_image_repository: ${{ steps.release.outputs.executor_image_repository }}
-      executor_image_digest: ${{ steps.release.outputs.executor_image_digest }}
-      executor_binary_sha256: ${{ steps.release.outputs.executor_binary_sha256 }}
-      executor_source_commit: ${{ steps.release.outputs.executor_source_commit }}
+      executor_image_repository: ${{ steps.controlled.outputs.executor_image_repository || steps.release.outputs.executor_image_repository }}
+      executor_image_digest: ${{ steps.controlled.outputs.executor_image_digest || steps.release.outputs.executor_image_digest }}
+      executor_binary_sha256: ${{ steps.controlled.outputs.executor_binary_sha256 || steps.release.outputs.executor_binary_sha256 }}
+      executor_source_commit: ${{ steps.controlled.outputs.executor_source_commit || steps.release.outputs.executor_source_commit }}
+      release_stage: ${{ steps.controlled.outputs.release_stage || 'commercial' }}
+      controlled_rehearsal_run_id: ${{ steps.controlled.outputs.rehearsal_run_id }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -96,6 +108,7 @@ jobs:
           INPUT_TRANSITION_SHA256: ${{ inputs.legacy_transition_sha256 }}
           INPUT_MIGRATION: ${{ inputs.migration_compatible }}
           INPUT_CONFIRMATION: ${{ inputs.confirmation }}
+          INPUT_RELEASE_STAGE: ${{ inputs.release_stage }}
         run: |
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = a3225865526-wq/Clear-API
@@ -103,6 +116,8 @@ jobs:
           if [[ -n "$INPUT_TRANSITION_SHA256" ]]; then
             [[ "$INPUT_TRANSITION_SHA256" =~ ^[a-f0-9]{64}$ ]]
             [[ "$INPUT_CONFIRMATION" == DEPLOY_LEGACY_RETIREMENT_V1 && "$INPUT_POOL_MODE" == pg03 && "$INPUT_MIGRATION" == false ]]
+          elif [[ "${INPUT_RELEASE_STAGE:-commercial}" == controlled ]]; then
+            [[ "$INPUT_CONFIRMATION" == DEPLOY_CONTROLLED_PRODUCTION && "$INPUT_POOL_MODE" == pg03 && "$INPUT_MIGRATION" == false ]]
           else
             [[ "$INPUT_CONFIRMATION" == DEPLOY_PRODUCTION ]]
           fi
@@ -123,6 +138,27 @@ jobs:
             echo "rc_run_id=$INPUT_RC_RUN_ID"
             echo "legacy_transition_sha256=$INPUT_TRANSITION_SHA256"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate controlled proof before production credentials
+        if: github.event_name == 'workflow_dispatch' && inputs.release_stage == 'controlled'
+        id: controlled
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLEARAPI_EXECUTOR_IMAGE_REPOSITORY: ${{ vars.CLEARAPI_EXECUTOR_IMAGE_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/automatic-release.py authorize-controlled \
+            --destination "$RUNNER_TEMP/verified-controlled-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+
+      - name: Upload exact controlled authorization
+        if: steps.controlled.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: controlled-authorization-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/verified-controlled-${{ github.run_id }}-${{ github.run_attempt }}/controlled-authorization.json
+            ${{ runner.temp }}/verified-controlled-${{ github.run_id }}-${{ github.run_attempt }}/recovery-audit.json
+          if-no-files-found: error
 
       - name: Authenticate automatic proof before production credentials
         if: inputs.rehearsal_run_id != ''
@@ -177,7 +213,8 @@ jobs:
       IMAGE_DIGEST: ${{ needs.authorize.outputs.image_digest }}
       MIGRATION_COMPATIBLE: ${{ needs.authorize.outputs.migration_compatible }}
       LEGACY_TRANSITION_SHA256: ${{ needs.authorize.outputs.legacy_transition_sha256 }}
-      REHEARSAL_RUN_ID: ${{ needs.authorize.outputs.rehearsal_run_id }}
+      REHEARSAL_RUN_ID: ${{ needs.authorize.outputs.rehearsal_run_id || needs.authorize.outputs.controlled_rehearsal_run_id }}
+      RELEASE_STAGE: ${{ needs.authorize.outputs.release_stage }}
       PREVIOUS_SOURCE_COMMIT: ${{ needs.authorize.outputs.previous_source_commit }}
       EXPECTED_EXECUTOR_REPOSITORY: ${{ needs.authorize.outputs.executor_image_repository }}
       EXPECTED_EXECUTOR_DIGEST: ${{ needs.authorize.outputs.executor_image_digest }}
@@ -224,7 +261,7 @@ jobs:
           esac
 
       - name: Recheck main after the production environment queue
-        if: inputs.rehearsal_run_id != ''
+        if: needs.authorize.outputs.rehearsal_run_id != '' || needs.authorize.outputs.controlled_rehearsal_run_id != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -310,7 +347,9 @@ jobs:
           LOCAL_SHA=$(sha256sum scripts/pg03-release-control.py | cut -d' ' -f1)
           REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-release-control.py' | cut -d' ' -f1)
           [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
-          if [[ -n "${LEGACY_TRANSITION_SHA256:-}" ]]; then
+          # V2 pins and verifies the traffic helper as root before containment.
+          # Keep the existing sudo allowlist unchanged; do not add a hash probe.
+          if [[ -n "${LEGACY_TRANSITION_SHA256:-}" || "${RELEASE_STAGE:-commercial}" == controlled ]]; then
             LOCAL_SHA=$(sha256sum scripts/pg03-legacy-transition.py | cut -d' ' -f1)
             REMOTE_SHA=$(ssh "$PROD_SSH_ALIAS" 'sudo sha256sum /opt/clearapi/bin/pg03-legacy-transition.py' | cut -d' ' -f1)
             [[ "$LOCAL_SHA" == "$REMOTE_SHA" ]]
@@ -336,6 +375,7 @@ jobs:
           print(json.dumps({'token': e['GH_TOKEN'], 'run': e['GITHUB_RUN_ID'],
                             'rc_run': e['RC_RUN_ID'], 'commit': e['EXPECTED_COMMIT'],
                             'digest': e['IMAGE_DIGEST'],
+                            'release_stage': e.get('RELEASE_STAGE', 'commercial'),
                             'transition_sha256': e.get('LEGACY_TRANSITION_SHA256', ''),
                             'rehearsal_run': e.get('REHEARSAL_RUN_ID', ''),
                             'previous_source_commit': e.get('PREVIOUS_SOURCE_COMMIT', ''),
@@ -359,6 +399,7 @@ jobs:
           MODE_ARGS=''
           if [[ "$POOL_MODE" == pg03 ]]; then MODE_ARGS='--pool-mode pg03'; fi
           if [[ -n "${LEGACY_TRANSITION_SHA256:-}" ]]; then MODE_ARGS+=' --legacy-transition-v1'; fi
+          if [[ "${RELEASE_STAGE:-commercial}" == controlled ]]; then MODE_ARGS+=' --controlled-launch'; fi
           printf '%s\n' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
             "sudo $DEPLOY_WRAPPER \
               $MODE_ARGS --ghcr-token-stdin \

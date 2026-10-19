@@ -142,9 +142,14 @@ def authorize_pr(event):
     return {"number": pr["number"], "head": pr["head"]["sha"]}
 
 
-def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image):
+def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image, controlled=False):
     """The caller must authenticate the artifact's producing workflow through GitHub."""
-    require(proof["schema"] == "clearapi.automatic-release/v1", "unsupported proof contract")
+    expected_schema = "clearapi.controlled-release/v1" if controlled else "clearapi.automatic-release/v1"
+    require(proof["schema"] == expected_schema, "unsupported proof contract")
+    if controlled:
+        require(proof.get("public_traffic") == "blocked"
+                and proof.get("provider_acceptance") == "deferred_to_owner_after_deployment",
+                "controlled proof must prohibit public traffic and defer Provider acceptance truthfully")
     require("approval" not in proof, "human approval cannot be replaced by a PASS constant")
     require(proof["source_commit"] == source == manifest["source_commit"], "proof/source mismatch")
     require(re.fullmatch(SHA, source) is not None, "invalid source")
@@ -191,7 +196,8 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
         require(transition.get("source_commit") == source,
                 "in-place migration rehearsal does not bind this candidate")
     require(re.fullmatch(SHA, proof["previous_source_commit"]) is not None, "missing predecessor identity")
-    require(set(proof["checks"]) == PROOF_CHECKS, "missing/unknown release evidence checks")
+    required_checks = PROOF_CHECKS - {"gateway_executor_provider_usage_billing"} if controlled else PROOF_CHECKS
+    require(set(proof["checks"]) == required_checks, "missing/unknown release evidence checks")
     for name, check in proof["checks"].items():
         require(check["conclusion"] == "success", "gate failed: " + name)
         filename = check["file"]
@@ -210,7 +216,8 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
         require(type(receipt.get("rc_run_attempt")) is int
                 and receipt["rc_run_attempt"] == proof["rc_run_attempt"],
                 "stale evidence RC attempt: " + name)
-    return {"image_digest": manifest["image_digest"], "expected_commit": source,
+    return {"release_stage": "controlled" if controlled else "commercial",
+            "image_digest": manifest["image_digest"], "expected_commit": source,
             "rc_run_id": rc_run,
             "executor_image_repository": executor["image_repository"],
             "executor_image_digest": executor["image_digest"],
@@ -294,7 +301,7 @@ def verify_read_only_inspection(entry, deployment):
             "log_sha256": entry["log_sha256"], "status_count": len(actual)}
 
 
-def verify_circuit_recovery(previous, source):
+def verify_circuit_recovery(previous, source, current_manual_run=None):
     """A merged investigation may recover only the exact authorization-only failures.
 
     GitHub history remains the circuit's state. This never rewrites a failed run,
@@ -373,6 +380,8 @@ def verify_circuit_recovery(previous, source):
     # Fail closed if another formal path operated on production during the incident.
     manual = [r for page in pages("actions/workflows/deploy-production.yml/runs?per_page=100")
               for r in page["workflow_runs"]]
+    if current_manual_run is not None:
+        manual = [r for r in manual if str(r["id"]) != str(current_manual_run)]
     require(not any(r["status"] != "completed" or r["created_at"] >= cutoff for r in manual),
             "release circuit open; concurrent or intervening manual deployment")
     deployments = [d for page in pages("deployments?environment=production&per_page=100") for d in page]
@@ -393,16 +402,34 @@ def verify_circuit_recovery(previous, source):
             "read_only_inspections": classified, "intervening_manual_runs": 0}
 
 
-def authorize_release(event, destination):
+def authorize_release(event, destination, controlled=False):
     require(os.environ.get("GITHUB_RUN_ATTEMPT") == "1", "automatic deployment reruns require incident recovery")
-    rehearsal = api(f"actions/runs/{event['workflow_run']['id']}")
+    if controlled:
+        current = api("actions/runs/" + os.environ["GITHUB_RUN_ID"])
+        require(current["event"] == "workflow_dispatch"
+                and current["path"] == ".github/workflows/deploy-production.yml"
+                and current["actor"]["login"] == current["triggering_actor"]["login"] == REPOSITORY.split('/')[0]
+                and current["head_branch"] == "main" and current["head_sha"] == os.environ["GITHUB_SHA"]
+                and current["repository"]["full_name"] == current["head_repository"]["full_name"] == REPOSITORY
+                and current["status"] == "in_progress" and current["run_attempt"] == 1,
+                "controlled release requires fresh owner dispatch on main")
+        inputs = event["inputs"]
+        require(inputs.get("release_stage") == "controlled" and inputs.get("pool_mode") == "pg03"
+                and inputs.get("confirmation") == "DEPLOY_CONTROLLED_PRODUCTION"
+                and inputs.get("migration_compatible") == "false" and not inputs.get("legacy_transition_sha256"),
+                "invalid controlled deployment authorization")
+        require(re.fullmatch(r"[1-9][0-9]*", inputs.get("controlled_rehearsal_run_id", "")) is not None,
+                "controlled rehearsal is required")
+        rehearsal = api("actions/runs/" + inputs["controlled_rehearsal_run_id"])
+    else:
+        rehearsal = api(f"actions/runs/{event['workflow_run']['id']}")
     source = rehearsal["head_sha"]
     # A dispatched rehearsal is legitimate: operator evidence is bound to an RC
     # manifest that only exists after the RC finishes, which the automatic
     # trigger cannot win. Both entries run the same gates and assembler.
     verified_run(rehearsal, source, "deployment-rehearsal.yml",
                  ("workflow_run", "workflow_dispatch"))
-    require(rehearsal["run_attempt"] == event["workflow_run"]["run_attempt"], "stale rehearsal attempt")
+    require(rehearsal["run_attempt"] == (1 if controlled else event["workflow_run"]["run_attempt"]), "stale rehearsal attempt")
     require(api("git/ref/heads/main")["object"]["sha"] == source, "rehearsal source is no longer main")
     successful_jobs(rehearsal)
     source_ci = latest_main_ci(source)
@@ -413,7 +440,7 @@ def authorize_release(event, destination):
                 and r["conclusion"] != "skipped"]
     recovery = None
     if previous and previous[0]["conclusion"] != "success":
-        recovery = verify_circuit_recovery(previous, source)
+        recovery = verify_circuit_recovery(previous, source, os.environ["GITHUB_RUN_ID"] if controlled else None)
     destination.mkdir(parents=True, exist_ok=False)
     gh("run", "download", str(rehearsal["id"]), "--repo", REPOSITORY, "--name",
        f"deployment-proof-{rehearsal['id']}-{rehearsal['run_attempt']}", "--dir", str(destination / "proof"))
@@ -436,7 +463,11 @@ def authorize_release(event, destination):
                 and run["status"] == "completed" and run["conclusion"] == "success"
                 for run in manifest.get("source_ci_runs", [])), "manifest source CI mismatch")
     result = validate_proof(manifest, proof, destination / "proof", source, rc["id"],
-                            os.environ.get("CLEARAPI_EXECUTOR_IMAGE_REPOSITORY", ""))
+                            os.environ.get("CLEARAPI_EXECUTOR_IMAGE_REPOSITORY", ""), controlled=controlled)
+    if controlled:
+        require(result["expected_commit"] == inputs["expected_commit"] == current["head_sha"]
+                and result["image_digest"] == inputs["image_digest"]
+                and str(result["rc_run_id"]) == inputs["rc_run_id"], "controlled inputs differ from authenticated proof")
     comparison = api(f"compare/{proof['previous_source_commit']}...{source}")
     require(comparison["status"] == "ahead", "deployment source must advance the production predecessor")
     # GitHub caps compare files at 300. Never treat a truncated diff as safe.
@@ -456,7 +487,7 @@ def authorize_release(event, destination):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("pr", "source", "authorize"))
+    parser.add_argument("mode", choices=("pr", "source", "authorize", "authorize-controlled"))
     parser.add_argument("--event", type=Path, default=os.environ.get("GITHUB_EVENT_PATH"))
     parser.add_argument("--destination", type=Path)
     args = parser.parse_args()
@@ -472,7 +503,9 @@ def main():
         result = {"source_commit": run["head_sha"], "ci_run_id": current["id"]}
     else:
         require(args.destination is not None, "evidence destination required")
-        result = authorize_release(event, args.destination)
+        result = authorize_release(event, args.destination, controlled=args.mode == "authorize-controlled")
+        if args.mode == "authorize-controlled":
+            (args.destination / "controlled-authorization.json").write_text(json.dumps(result, sort_keys=True) + "\n")
     output = json.dumps(result, indent=2)
     print(output)
     if os.environ.get("GITHUB_OUTPUT"):

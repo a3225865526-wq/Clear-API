@@ -144,6 +144,45 @@ class ReleaseProofTest(unittest.TestCase):
         self.assertEqual(result["executor_image_digest"], self.proof["executor"]["image_digest"])
         self.assertEqual(result["migration_compatible"], "false", "unclassified runtime failures must stop")
 
+    def test_controlled_scope_cannot_be_used_for_commercial_release(self):
+        self.proof.update(schema='clearapi.controlled-release/v1', public_traffic='blocked',
+                          provider_acceptance='deferred_to_owner_after_deployment')
+        self.proof['checks'].pop('gateway_executor_provider_usage_billing')
+        with self.assertRaisesRegex(ValueError, 'unsupported proof'):
+            self.validate()
+        result = policy.validate_proof(self.manifest, self.proof, self.root, SOURCE, 123,
+                                       EXECUTOR_IMAGE, controlled=True)
+        self.assertEqual(result['release_stage'], 'controlled')
+        for field in ('public_traffic', 'provider_acceptance'):
+            proof = deepcopy(self.proof)
+            proof.pop(field)
+            with self.assertRaisesRegex(ValueError, 'prohibit public traffic'):
+                policy.validate_proof(self.manifest, proof, self.root, SOURCE, 123, EXECUTOR_IMAGE, controlled=True)
+        for gate in self.proof['checks']:
+            proof = deepcopy(self.proof)
+            proof['checks'].pop(gate)
+            with self.subTest(gate=gate), self.assertRaisesRegex(ValueError, 'missing/unknown'):
+                policy.validate_proof(self.manifest, proof, self.root, SOURCE, 123, EXECUTOR_IMAGE, controlled=True)
+
+    def test_controlled_scope_rejects_stale_backup_and_failed_billing(self):
+        self.proof.update(schema='clearapi.controlled-release/v1', public_traffic='blocked',
+                          provider_acceptance='deferred_to_owner_after_deployment')
+        self.proof['checks'].pop('gateway_executor_provider_usage_billing')
+        for gate, field, value in (('backup_restore', 'rc_run_id', 122), ('billing', 'conclusion', 'failure')):
+            path = self.root / (gate + '.json')
+            receipt = json.loads(path.read_bytes())
+            receipt[field] = value
+            raw = json.dumps(receipt).encode()
+            path.write_bytes(raw)
+            self.proof['checks'][gate]['sha256'] = hashlib.sha256(raw).hexdigest()
+            with self.subTest(gate=gate), self.assertRaises(ValueError):
+                policy.validate_proof(self.manifest, self.proof, self.root, SOURCE, 123, EXECUTOR_IMAGE, controlled=True)
+            # Restore this gate so the next negative case exercises its own boundary.
+            receipt[field] = 123 if field == 'rc_run_id' else 'success'
+            raw = json.dumps(receipt).encode()
+            path.write_bytes(raw)
+            self.proof['checks'][gate]['sha256'] = hashlib.sha256(raw).hexdigest()
+
     def test_rc_artifact_inventory_and_schema_receipt_are_bound_to_manifest(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -352,6 +391,30 @@ class ReleaseProofTest(unittest.TestCase):
             responses[f"compare/{'d' * 40}...{SOURCE}"]["files"] = []
             with self.assertRaisesRegex(ValueError, "empty"):
                 policy.authorize_release({"workflow_run": rehearsal}, self.root / "empty-diff")
+            responses[f"compare/{'d' * 40}...{SOURCE}"]["files"] = [{"filename": "scripts/production-deploy-v2.sh"}]
+            self.proof.update(schema='clearapi.controlled-release/v1', public_traffic='blocked',
+                              provider_acceptance='deferred_to_owner_after_deployment')
+            self.proof['checks'].pop('gateway_executor_provider_usage_billing')
+            responses['actions/runs/900'] = dict(run, event='workflow_dispatch', status='in_progress',
+                path='.github/workflows/deploy-production.yml', actor={'login': 'a3225865526-wq'},
+                triggering_actor={'login': 'a3225865526-wq'})
+            controlled_event = {'inputs': {'release_stage': 'controlled', 'pool_mode': 'pg03',
+                'confirmation': 'DEPLOY_CONTROLLED_PRODUCTION', 'migration_compatible': 'false',
+                'controlled_rehearsal_run_id': '100', 'expected_commit': SOURCE,
+                'image_digest': DIGEST, 'rc_run_id': '123'}}
+            with patch.dict(os.environ, {'GITHUB_SHA': SOURCE}):
+                result = policy.authorize_release(controlled_event, self.root / 'controlled', controlled=True)
+                self.assertEqual(result['release_stage'], 'controlled')
+                self.assertEqual(result['rehearsal_run_id'], '100')
+                for field, value in [('confirmation', 'DEPLOY_PRODUCTION'), ('pool_mode', 'off'),
+                                      ('legacy_transition_sha256', '1' * 64), ('migration_compatible', 'true')]:
+                    bad = deepcopy(controlled_event)
+                    bad['inputs'][field] = value
+                    with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'authorization'):
+                        policy.authorize_release(bad, self.root / ('bad-' + field), controlled=True)
+                responses['actions/runs/900']['triggering_actor']['login'] = 'another-user'
+                with self.assertRaisesRegex(ValueError, 'owner dispatch'):
+                    policy.authorize_release(controlled_event, self.root / 'wrong-owner', controlled=True)
 
 
 class CircuitRecoveryTest(unittest.TestCase):
@@ -416,7 +479,7 @@ class CircuitRecoveryTest(unittest.TestCase):
             "source_sha256": {p: hashlib.sha256(raw).hexdigest() for p, raw in self.inspection_sources.items()},
             "statuses": deepcopy(self.inspection_statuses)}]
 
-    def verify(self):
+    def verify(self, current_manual_run=None):
         self.record_path.write_text(json.dumps(self.record))
 
         def api(path):
@@ -449,7 +512,7 @@ class CircuitRecoveryTest(unittest.TestCase):
                 patch.object(policy, "gh", side_effect=lambda *args: self.inspection_log
                              if args[-1].endswith("/801/logs") else self.log), \
                 patch.dict(os.environ, {"GITHUB_RUN_ID": "900"}):
-            return policy.verify_circuit_recovery(self.previous, SOURCE)
+            return policy.verify_circuit_recovery(self.previous, SOURCE, current_manual_run)
 
     def test_exact_investigation_is_revalidated_and_produces_only_recovery_audit(self):
         result = self.verify()
@@ -565,6 +628,15 @@ class CircuitRecoveryTest(unittest.TestCase):
         self.deployments = [{"created_at": "2026-10-19T00:00:00Z"}]
         with self.assertRaises(ValueError):
             self.verify()
+
+    def test_controlled_owner_dispatch_excludes_only_its_current_authorization_run(self):
+        self.manual = [{'id': 900, 'status': 'in_progress', 'created_at': '2026-10-20T00:00:00Z'}]
+        with self.assertRaisesRegex(ValueError, 'manual deployment'):
+            self.verify()
+        self.verify(current_manual_run='900')
+        self.manual.append({'id': 901, 'status': 'in_progress', 'created_at': '2026-10-20T00:00:00Z'})
+        with self.assertRaisesRegex(ValueError, 'manual deployment'):
+            self.verify(current_manual_run='900')
 
     def test_expired_future_overlong_and_missing_investigation_fail_closed(self):
         original = deepcopy(self.record)
