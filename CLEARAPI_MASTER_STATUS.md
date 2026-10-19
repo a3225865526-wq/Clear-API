@@ -5,7 +5,7 @@
 - **CURRENT STATUS:** BLOCKED。main 仍为 `d0c20d6c46d86845805e4a9d35b067b0f6b20be4`；RC `39205228315` 保留。本轮无新 RC、Rehearsal、VPS 操作或熔断恢复。
 - **CURRENT BLOCKER:** 三份 Secrets 的真实绑定/来源元数据及 production deployment records 尚未取得。已有 gh 实测 deployments 请求返回 `Forbidden`；连接器拒绝该 API 端点。Cloud 当前无配置的 secret/outbound identity。不能将出口/端点拒绝直接认定为 GitHub token 缺某个 scope，也不能将不可读记录当作不存在。
 - **CURRENT PRIORITY:** 使用现有 Actions 的短期只读身份，在不接触 SSH/root/production environment 的 job 中读取 RC、证据发布身份和部署记录，收敛 PR #72 的最终修复范围。
-- **NEXT MINIMUM ACTION:** 本审计补丁通过 CI 后，仅需 owner 在手机对既有 **GHCR Pull Rehearsal** 发起一次分支审计：branch=`codex/pg03-predecessor-compat-20261019`，`release_audit_only=true`，`audit_rc_run_id=39205228315`。确认出现该审计字段后才运行；不是 main 上的旧 inspection。无需 Windows、VNC、root 或新凭据。当前工具只有 rerun、没有 workflow_dispatch；重跑旧事件不能执行本次新增审计模式，故不能替代该动作。
+- **NEXT MINIMUM ACTION:** Cloud 先通过已有仓库写入授权，在限定审阅分支自动执行独立的只读 push audit，取得真实结果；暂无需用户操作。仅若该正式通道确实不可用，才使用 owner 手机单次分支审计作为 fallback（既有 GHCR Pull Rehearsal，branch=`codex/pg03-predecessor-compat-20261019`，`release_audit_only=true`，`audit_rc_run_id=39205228315`）。无需 Windows、VNC、root 或新凭据。工具没有 workflow_dispatch，重跑旧事件也不能替代新增模式；但不能据此跳过仍可尝试的受约束只读 push 通道。
 
 ### 阶段 1：已有授权通道核查完成，读取边界明确
 
@@ -20,6 +20,8 @@ PR #72 原 head `33bea6ce40d7b27c18133624e9b4430ae81e4b82` 的 CI `39207544711` 
 - 下载既有 RC artifact，复用原 inventory/hash 校验；核对 main/source/run/attempt。仅输出三份证据中格式受限的发布 SHA/digest/run/manifest/schema 身份和字段匹配结果，不输出原始 Secret JSON、target_id 值、任意 provenance 文本/URL、token、会话或 API 错误响应。
 - 读取 production deployment records/statuses，以及正式部署 workflow 的未完成或事故期间非 skipped 运行；保留记录 ID、状态与 Actions 关联，逐项待调查。VPS 上是否有未决操作仍必须现场核实，不能从 GitHub 空列表推定安全。
 - 所有输出固定为 `clearapi.release-state-audit/v1`、`status=BLOCKED`、`not_release_evidence=true`；不会重签证据、生成 release-proof、恢复熔断或部署。原 VPS job 在该模式被跳过，且 GHCR 工作流不会触发 Automatic production release。
+
+另提供独立 `PG03 release state audit`：push 触发仅限本 PR 分支且只监听审计源码/工作流文件，owner/triggering owner 双检查；同样只有 read 权限、无 production environment 或 SSH。它不会触发 RC、Rehearsal 或自动部署。使用现有仓库写入身份尝试自动调查，不创建高权限凭据或替代 root 登录方式。当前有效 CI 完成后才推送该必要补丁，不取消正在运行的工作流。
 
 实际本地验证：automatic-release/audit 28 tests PASS（含 Secret payload/target/provenance 不反射、异常日志脱敏、未知部署状态拒绝及 job 权限隔离）；PG03 28 tests（26 PASS、2 root-only skipped）；rehearsal producer 6 PASS；YAML/py_compile/diff 检查 PASS。新增补丁改变 PR 身份，旧 PR CI 不能冒充新 head CI，更新后的必需 CI 另行核实。
 

@@ -15,6 +15,15 @@ KINDS = ('backup', 'provider', 'rollback')
 IDENTITIES = {'source_commit': r'[a-f0-9]{40}', 'gateway_digest': r'sha256:[a-f0-9]{64}',
               'manifest_sha256': r'[a-f0-9]{64}', 'source_schema_sha256': r'[a-f0-9]{64}',
               'target_schema_sha256': r'[a-f0-9]{64}'}
+PUBLIC_HISTORY = {
+    'archived_9a3e_RC39193373708': ('9a3e6585737d823896137346faf94c2e1f4d1b04',
+        'sha256:95f7e50f1894171aef3eaf5c94b9e123491430c8f17d4caab3c107aa0ae79b6c', 39193373708),
+    'passed_cd6f_RC39197505434': ('cd6f719e79de432de6219561b04502784cb58930',
+        'sha256:bdbb535b8826aa243eee7922a7a5e2d0fb8646f69a34653b4251ca60c488fdc6', 39197505434),
+    'prior_8b4b_RC39200419037': ('8b4bc07cf02c8fc23884d64278b728eafa23a6eb',
+        'sha256:31b178271d01aeddbcee9a510a880ea5f40ed9221c7d10ecdc010164a7001ecf', 39200419037),
+    'current_d0c2_RC39205228315': ('d0c20d6c46d86845805e4a9d35b067b0f6b20be4',
+        'sha256:98e615c08fd0697506340c2150c6e2a7e5aa53c543741ce61ebe4a190424ca65', 39205228315)}
 
 
 class AuditBlocked(ValueError):
@@ -52,6 +61,12 @@ def evidence_metadata(raw, kind, manifest, manifest_hash, target):
         value = data.get(field)
         identity[field] = value if type(value) is int and value > 0 else None
     report['declared_release_identity'] = identity
+    report['public_history_matches'] = {}
+    for label, values in PUBLIC_HISTORY.items():
+        fields = [field for field, value in zip(('source_commit', 'gateway_digest', 'rc_run_id'), values)
+                  if identity[field] == value]
+        if fields:
+            report['public_history_matches'][label] = fields
     expected = {'source_commit': manifest['source_commit'], 'gateway_digest': manifest['image_digest'],
                 'rc_run_id': int(manifest['workflow_run']),
                 'rc_run_attempt': int(manifest['workflow_run_attempt']), 'manifest_sha256': manifest_hash,
@@ -144,7 +159,7 @@ def main():
         report['stage'] = 'formal_production_runs'
         report['formal_production_runs'] = []
         for workflow in ('automatic-deploy.yml', 'deploy-production.yml'):
-            runs = [r for page in pages(f'actions/workflows/{workflow}/runs?branch=main&per_page=100')
+            runs = [r for page in pages(f'actions/workflows/{workflow}/runs?per_page=100')
                     for r in page['workflow_runs']]
             for run_record in runs:
                 if (run_record['status'] == 'completed'
@@ -161,7 +176,21 @@ def main():
         # Fixed errors from this module only; no API responses or Secret values.
         report['errors'].append(str(error) if type(error) is AuditBlocked else type(error).__name__)
     Path('release-state-audit.json').write_text(json.dumps(report, sort_keys=True, indent=2) + '\n')
-    print(json.dumps(report, sort_keys=True))
+    # Logs contain comparisons to already-public history, not values extracted
+    # from Secrets. Full allowlisted metadata is confined to the audit artifact.
+    print('AUDIT_RESULT complete=' + str(int(report['audit_complete'])) + ' stage=' + report['stage'])
+    for kind, evidence in report.get('operator_evidence', {}).items():
+        mismatches = ','.join(k for k, v in evidence.get('binding_matches', {}).items() if not v) or 'none'
+        history = ';'.join(k + ':' + ','.join(v) for k, v in evidence.get('public_history_matches', {}).items()) or 'none'
+        print(f'AUDIT_EVIDENCE kind={kind} configured={int(evidence["configured"])} mismatches={mismatches} public_history={history}')
+    for record in report.get('production_deployments', []):
+        states = ','.join(s['state'] for s in record['statuses']) or 'UNKNOWN'
+        runs = ','.join(str(s['actions_run_id']) for s in record['statuses'] if s['actions_run_id']) or 'UNKNOWN'
+        print(f'AUDIT_DEPLOYMENT id={record["id"]} sha={record["source_commit"]} created={record["created_at"]} states={states} actions_runs={runs}')
+    for run in report.get('formal_production_runs', []):
+        print(f'AUDIT_FORMAL_RUN workflow={run["workflow"]} id={run["id"]} sha={run["source_commit"]} status={run["status"]} conclusion={run["conclusion"]}')
+    for error in report['errors']:
+        print('AUDIT_BLOCKED ' + error)
     return 0 if report['audit_complete'] else 1
 
 

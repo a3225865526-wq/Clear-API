@@ -84,6 +84,12 @@ class ReadOnlyReleaseAuditTest(unittest.TestCase):
         for forbidden in ('environment: production', 'PROD_SSH', 'sudo ', 'secrets: inherit', ': write'):
             self.assertNotIn(forbidden, job)
         self.assertIn("    if: ${{ !inputs.release_audit_only }}", workflow.split('  rehearse:\n', 1)[1])
+        standalone = (Path(__file__).parents[2] / '.github/workflows/release-state-audit.yml').read_text()
+        self.assertIn('branches: [codex/pg03-predecessor-compat-20261019]', standalone)
+        self.assertIn('github.actor == github.repository_owner', standalone)
+        self.assertIn('github.triggering_actor == github.repository_owner', standalone)
+        for forbidden in ('environment: production', 'PROD_SSH', 'sudo ', ': write', 'workflow_run:'):
+            self.assertNotIn(forbidden, standalone)
 
 
 class ReleaseProofTest(unittest.TestCase):
