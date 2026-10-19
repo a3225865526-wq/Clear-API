@@ -9,16 +9,16 @@
 | 项目 | 当前值 | 状态 |
 | --- | --- | --- |
 | 生产域名 | `https://www.clear999.com` | HTTP 200（全程未被触碰） |
-| **远端 main（最新）** | **`fd8f27641d49f6c5a5b5b6c30fac230d3c074cd1`** | VERIFIED |
+| **远端 main（最新）** | **`9a3e6585737d823896137346faf94c2e1f4d1b04`** | VERIFIED |
 | 本轮合并 PR | #59 schema 契约、#60 Executor 重钉、#61/#62 链路触发、#63 manual rehearsal、#64/#65 event 授权 | MERGED |
-| **最终 Gateway RC** | Run `39177706410`, digest `sha256:9606af0f5c7e8b002cd80f4f7f108992304abbe663af89eb9e363114d054d6d0`, Manifest SHA `e6aa32f5b760f476b2d377583aafbacfb420cf70b937cf4f95a921dacf3b4b70` | SUCCESS |
-| **Rehearsal** | Run `39189031358`：**11/11 gate success，release-proof.json 已生成** | PASS |
+| **最终 Gateway RC** | Run `39193373708`, digest `sha256:95f7e50f1894171aef3eaf5c94b9e123491430c8f17d4caab3c107aa0ae79b6c`, Manifest SHA `898b7b15648799b7d1b2f5e168526eb0e905c93066343e37eb05ca59517061e4` | SUCCESS |
+| **Rehearsal** | Run `39194957755`：**11/11 gate success，release-proof.json 已生成** | PASS |
 | schema 发布契约 | 改为从 manifest 推导 `in_place_startup_migration`；10 个负向用例仍全部拒绝 | FIXED |
-| 三份运营方证据 | backup / rollback / provider，均先过真实 verifier 再安装；绑定 RC `39177706410` | PASS |
-| Executor 分支 / commit | `codex/pg03-executor-mvp` / `a45358edf1f440b51fb613d82b044456199c38e1`（tip `945fc3ee` 内容相同） | PUSHED |
-| Executor digest | `sha256:722915a67271b8404ae6411c5763d3ff6a4f5bcadee1a14025e888441f03a4f8` | VERIFIED |
-| Executor binary SHA256 | `b9222051f1275d0da003c04dfe20f9cc38180273d69d4ff1c0715cb4e05218f5` | VERIFIED |
-| 自动发布熔断器 | `39176488931` / `39189520883` 两次 failure（均在授权步骤，部署步骤 skipped）后**持久打开** | BLOCKED |
+| 三份运营方证据 | backup / rollback / provider，均先过真实 verifier 再安装；绑定 RC `39193373708` | PASS |
+| Executor 分支 / commit | `codex/pg03-executor-mvp` / `b6e5a90fce6c0b3fa231d43ab07a65622f981be2`（tip `945fc3ee` 内容相同） | PUSHED |
+| Executor digest | `sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58` | VERIFIED |
+| Executor binary SHA256 | `e99b4dceee9b857c67e7b2b5101552511dbce60c789b2bec3c8fdd6bb5a33523` | VERIFIED |
+| 自动发布熔断器 | `39176488931` / `39189520883` / `39195457908` 三次 failure（均在授权步骤，部署步骤 skipped）后**持久打开** | BLOCKED |
 | VPS 已安装脚本 | 与当前 commit **不一致**（本轮改过 `production-deploy-v2.sh` / `pg03-release-control.py`） | NEEDS ROOT REINSTALL |
 | PG03 生产启用 | 未执行 | NOT RUN |
 | 线上验收 | 未执行 | NOT RUN |
@@ -26,7 +26,7 @@
 
 ### 剩余阻塞（均需 VPS root）
 
-1. 重装 `production-deploy-v2.sh`（`b03679284eac818dd69ef50a537277939435fb06016546fff734b91161b19c72`）与 `pg03-release-control.py`（`b3389dc40d66fedb287d56304260178035ee817660d8af61d00aec84a50e0a07`）到 `/opt/clearapi/bin/`，root 属主、`0750`。
+1. 重装 `production-deploy-v2.sh`（`490af9ab74b354de17075f9c01b66a4b88fa63ca376c3730da550d18818468fe`）与 `pg03-release-control.py`（`9dce204701e835c68633ed27859f90c40b8c43ccf75b7f83e12b006e4bb666f4`）到 `/opt/clearapi/bin/`，root 属主、`0750`。
 2. 以 root 经真实交互式登录 + MFA 生成 `/opt/clearapi/secrets/runtime-probe-session`。
 3. （仅自动路径额外需要）确认无影响后恢复发布熔断器。
 

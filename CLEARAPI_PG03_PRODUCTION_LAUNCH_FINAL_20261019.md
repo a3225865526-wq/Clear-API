@@ -6,7 +6,7 @@
 
 不是 `PRODUCTION DEPLOYED — ONLINE ACCEPTANCE PASS`。
 
-本轮把发布链路推进到**门禁全部真实通过**：schema 发布契约矛盾已修复，三份运营方证据已绑定并通过真实 verifier，手动 rehearsal `39189031358` **11/11 gate 全绿并真实生成 release-proof.json**。自动发布授权链的三处 `event` 断言也已修复并实测生效。
+本轮把发布链路推进到**门禁全部真实通过**：schema 发布契约矛盾已修复，三份运营方证据已绑定并通过真实 verifier，手动 rehearsal `39194957755` **11/11 gate 全绿并真实生成 release-proof.json**。自动发布授权链的三处 `event` 断言也已修复并实测生效。
 
 现在只剩两个**都必须由 VPS root 完成**的前置：重装两个已修改的部署脚本、生成 Runtime Integrity 探针会话（见 §8）。此外自动发布路径还被一个**持久熔断器**拦下——它由前两次授权器缺陷导致的失败触发，而那两次失败都停在授权步骤、部署步骤为 `skipped`，从未接触生产（见 §4.4）。
 
@@ -17,15 +17,15 @@
 | 项目 | 值 | 状态 |
 | --- | --- | --- |
 | 本轮开始时远端 `production/main` | `536f56517e15d60bdae0ab54bfad07797afb3d10` | 实测 |
-| **当前正式主线 `production/main`** | **`fd8f27641d49f6c5a5b5b6c30fac230d3c074cd1`** | 实测 |
+| **当前正式主线 `production/main`** | **`9a3e6585737d823896137346faf94c2e1f4d1b04`** | 实测 |
 | 本轮合并 PR | #59 schema 契约、#60 Executor 重钉、#61/#62 链路触发、#63 manual rehearsal、#64 部署 event、#65 授权器 event | 已合并 |
 | Gateway Required CI（main push） | run `39177329530`，6/6 success | 实测 |
-| **最终 Gateway RC** | **run `39177706410`，success** | 实测 |
-| **最终 Gateway image digest** | **`sha256:9606af0f5c7e8b002cd80f4f7f108992304abbe663af89eb9e363114d054d6d0`** | 实测 |
-| 最终 RC manifest SHA256 | `e6aa32f5b760f476b2d377583aafbacfb420cf70b937cf4f95a921dacf3b4b70` | 实测 |
-| **全绿 Rehearsal** | **run `39189031358`，11/11 success，proof 已生成** | 实测 |
-| Executor 源码提交 | `a45358ed…`（导入隔离 + 路由放行）；分支 tip `945fc3ee` 内容与之完全相同 | 已推送 |
-| Executor 正式 RC | run `39143951438`，digest `sha256:722915a67271b8404ae6411c5763d3ff6a4f5bcadee1a14025e888441f03a4f8`，binary `b9222051f1275d0da003c04dfe20f9cc38180273d69d4ff1c0715cb4e05218f5` | 实测（按 digest 拉取并校验） |
+| **最终 Gateway RC** | **run `39193373708`，success** | 实测 |
+| **最终 Gateway image digest** | **`sha256:95f7e50f1894171aef3eaf5c94b9e123491430c8f17d4caab3c107aa0ae79b6c`** | 实测 |
+| 最终 RC manifest SHA256 | `898b7b15648799b7d1b2f5e168526eb0e905c93066343e37eb05ca59517061e4` | 实测 |
+| **全绿 Rehearsal** | **run `39194957755`，11/11 success，proof 已生成** | 实测 |
+| Executor 源码提交 | `b6e5a90f…`（PR #66 的 PG03 Images V1 集成 + 导入隔离 + 路由放行）；分支 tip `945fc3ee` 内容与之不同，main 以 PR #66 为准 | 已推送 |
+| Executor 正式 RC | run `39189142167`，digest `sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58`，binary `e99b4dceee9b857c67e7b2b5101552511dbce60c789b2bec3c8fdd6bb5a33523` | 实测（按 digest 拉取并校验） |
 | 部署时间 | 无 | 未发生 |
 
 Gateway RC manifest 的 `source_commit`、`candidate_commit`、`oci_revision`、`workflow_commit` 四者均等于 `24f9bd48`，且 `source_ci_runs` 指向同 SHA 的成功 push CI `39150191907`。**产物身份与源码一致。**
@@ -111,8 +111,8 @@ Required CI 正确拦下了 `TestPoolControlPlaneMasterChannelsAndAvailability`�
 
 ### 正式 RC 与 rehearsal（本轮最终状态）
 
-- Gateway RC `39177706410` 成功，manifest 身份自洽（见 §1）。
-- **Deployment rehearsal `39189031358` 全部 11 个 gate 通过，并真实生成 `release-proof.json`：**
+- Gateway RC `39193373708` 成功，manifest 身份自洽（见 §1）。
+- **Deployment rehearsal `39194957755` 全部 11 个 gate 通过，并真实生成 `release-proof.json`：**
 
 | Gate | 结果 |
 | --- | --- |
@@ -130,9 +130,9 @@ proof 内容（实测）：
 
 ```text
 schema       clearapi.automatic-release/v1
-source_commit fd8f27641d49f6c5a5b5b6c30fac230d3c074cd1
-rc_run_id     39177706410
-gateway_digest sha256:9606af0f5c7e8b002cd80f4f7f108992304abbe663af89eb9e363114d054d6d0
+source_commit 9a3e6585737d823896137346faf94c2e1f4d1b04
+rc_run_id     39193373708
+gateway_digest sha256:95f7e50f1894171aef3eaf5c94b9e123491430c8f17d4caab3c107aa0ae79b6c
 migration     in_place_startup_migration, startup_passes=2
               source 8922081b…  target 3c1c77f3…
 ```
@@ -186,7 +186,7 @@ source schema missing                              rejected
 
 ### 4.3 本轮实测结果：11/11 通过
 
-证据绑定到当前 RC `39177706410`（`main = fd8f2764`），三份证据在安装前先经真实 verifier 校验：
+证据绑定到当前 RC `39193373708`（`main = 9a3e6585`），三份证据在安装前先经真实 verifier 校验：
 
 ```text
 backup rehearsal identity   PASS
@@ -195,7 +195,7 @@ provider rehearsal identity PASS
 executor rehearsal identity PASS
 ```
 
-随后手动 rehearsal `39189031358` **全部 11 个 gate 通过并生成 release-proof.json**：
+随后手动 rehearsal `39194957755` **全部 11 个 gate 通过并生成 release-proof.json**：
 
 ```text
 backup_restore success   billing success   executor_pairing success
@@ -214,28 +214,41 @@ migration = {"mode":"in_place_startup_migration", "startup_passes":2,
 **(1) 自动发布熔断器已永久打开，且无法自愈。** `automatic-release.py` 的熔断规则是：取 `automatic-deploy.yml` 最近一次**非 skipped** 的运行，其结论必须是 `success`，否则 `release circuit open`。当前历史是：
 
 ```text
+39195457908 failure   ← 本次：rehearsal 11/11 通过后仍被熔断
 39189520883 failure
 39176488931 failure
 （更早均为 skipped）
 ```
 
-这两次失败都发生在**授权步骤**，真正的部署步骤是 `skipped` —— 即它们从未请求生产凭据、从未接触生产环境：
+**这三次失败都发生在授权步骤**，真正的部署步骤是 `skipped` —— 它们从未请求生产凭据、从未接触生产环境（`39195457908` 的步骤实测）：
 
 ```text
 failure  Authenticate automatic proof before production credentials
 skipped  Controlled production deploy (exact digest)
 ```
 
-其中 `39176488931` 的失败原因是我的授权器缺陷（`unexpected run event`），已由 PR #65 修复。但熔断器按设计是**持久**的：它只统计 `automatic-deploy.yml` 自身的运行，因此新一次运行读到的 `previous[0]` 永远是那条失败记录，条件在构造上无法满足；重跑又因 `GITHUB_RUN_ATTEMPT != 1` 被直接拒绝。我没有绕过它——绕过生产发布熔断器属于硬边界。
+`39176488931` 的失败原因是我的授权器缺陷（`unexpected run event`），已由 PR #65 修复；`39189520883` 与 `39195457908` 都发生在该修复之后，失败原因是熔断器本身。熔断器按设计是**持久**的：它只统计 `automatic-deploy.yml` 自身的运行，因此新一次运行读到的 `previous[0]` 永远是那条失败记录，条件在构造上无法满足；重跑又因 `GITHUB_RUN_ATTEMPT != 1` 被直接拒绝。我没有绕过它——绕过生产发布熔断器属于硬边界。
 
-**(2) manual 路径被 VPS 前置条件挡住。** manual `workflow_dispatch` 不经过 proof、也不受上述熔断器约束，但仍需：`/opt/clearapi/secrets/runtime-probe-session`（只能由 root 经真实交互式登录 + MFA 生成），以及 VPS 上已安装脚本与本次 commit **逐字节相同**。本轮我修改了 `production-deploy-v2.sh`（重钉 Executor 到修复后的 `722915a6… / a45358ed…`）和 `pg03-release-control.py`，因此：
+**(2) manual 路径被 VPS 前置条件挡住。** manual `workflow_dispatch` 不经过 proof、也不受上述熔断器约束，但仍需：`/opt/clearapi/secrets/runtime-probe-session`（只能由 root 经真实交互式登录 + MFA 生成），以及 VPS 上已安装脚本与当前 commit **逐字节相同**。当前 `main = 9a3e6585` 对应的值：
 
 ```text
-production-deploy-v2.sh   repo b03679284eac818dd69ef50a537277939435fb06016546fff734b91161b19c72
-pg03-release-control.py   repo b3389dc40d66fedb287d56304260178035ee817660d8af61d00aec84a50e0a07
+production-deploy-v2.sh   script sha256 490af9ab74b354de17075f9c01b66a4b88fa63ca376c3730da550d18818468fe
+pg03-release-control.py   script sha256 9dce204701e835c68633ed27859f90c40b8c43ccf75b7f83e12b006e4bb666f4
 ```
 
 这两个值必须与 VPS 上 `/opt/clearapi/bin/` 的已安装副本一致；`deploy-production.yml` 只做**校验**（`LOCAL_SHA == REMOTE_SHA`），不负责安装。重装必须以 root 完成。本环境对 `103.42.181.219` 无可用凭据：TCP 22 可达，但 `root@` 与 `clearapi-deploy@` 均 `Permission denied (publickey)`，本地无私钥，`PROD_SSH_PRIVATE_KEY` 只存在于 GitHub `production` environment。
+
+### 4.5 需要记录的并发变更：PR #66 在我执行期间并入 main
+
+PR #66（PG03 Images V1）在我执行本轮期间被合并，main 因此从 `fd8f2764` 变为 `9a3e6585`，新增约 2787 行，涉及 `relay/request_billing.go`、`relay/channel/api_request.go`、`service/accountpool/executor.go`、`service/imageexecution/`，并把 Executor 钉改成它自己的 RC（`cfad1b51… / b6e5a90f / e99b4dce`）。
+
+我没有覆盖或回退它；我按合并后的真实状态重做了全部绑定：
+
+- CI 变量原本仍指向我上一版 Executor（`722915a6…`），与 main 的钉不一致，导致 rehearsal 报 `Executor identity differs from the approved release contract`。已改为与 main 一致。
+- 因为计费/账号池代码变了，provider 证据**重新实测**（不是在旧结果上改绑）：在合并后源码构建的 Gateway + main 所钉 Executor 上重跑，9 项校验仍全部为 true。
+- 本轮实测重新确认：旧 grant 的 `expires_at` 已过期（`-23477s`），这是 `not_admitted` 与 recovery 被拒的真实原因；重新发布带有效 TTL 的 grant、promote（必须带 pending 的 `generation`）、grant capability、再显式恢复 quarantine 后，两个账号回到 `available`。
+
+这属于并行工作的正常集成，不是缺陷；我把它写进报告是因为它改变了候选身份与证据绑定。
 
 ### 4.1 第二条独立阻塞：Runtime Integrity 探针（manual 路径同样被挡住）
 
@@ -344,24 +357,24 @@ pg03-release-control.py   repo b3389dc40d66fedb287d56304260178035ee817660d8af61d
 
 **只剩两步，且都必须在 VPS 上以 root 完成。** 原有的 schema 契约与证据绑定两个阻塞已在本轮解除。
 
-1. **在 VPS 以 root 重装两个脚本**（使其与 `main = fd8f2764` 逐字节一致）：
+1. **在 VPS 以 root 重装两个脚本**（使其与 `main = 9a3e6585` 逐字节一致）：
 
    | 脚本 | 目标路径 | 期望 SHA256 |
    | --- | --- | --- |
-   | `production-deploy-v2.sh` | `/opt/clearapi/bin/production-deploy-v2.sh` | `b03679284eac818dd69ef50a537277939435fb06016546fff734b91161b19c72` |
-   | `pg03-release-control.py` | `/opt/clearapi/bin/pg03-release-control.py` | `b3389dc40d66fedb287d56304260178035ee817660d8af61d00aec84a50e0a07` |
+   | `production-deploy-v2.sh` | `/opt/clearapi/bin/production-deploy-v2.sh` | `490af9ab74b354de17075f9c01b66a4b88fa63ca376c3730da550d18818468fe` |
+   | `pg03-release-control.py` | `/opt/clearapi/bin/pg03-release-control.py` | `9dce204701e835c68633ed27859f90c40b8c43ccf75b7f83e12b006e4bb666f4` |
 
-   重钉内容是 Executor 从 `9ba0e5ff… / 228ecbaa` → `722915a6… / a45358ed…`（含 `EXECUTOR_BINARY`）与随之更新的 `V2_SHA`。安装时保持 root 属主、`0750`。
+   当前 main 已由 PR #66 把 Executor 钉为 `cfad1b51… / b6e5a90f / e99b4dce`，并以 `V2_SHA=490af9ab…` 绑定 wrapper 字节。安装时保持 root 属主、`0750`。
 
 2. **生成 Runtime Integrity 探针会话**：以 root 通过官方交互式登录 + MFA 运行 `runtime-probe-session.py`，写入 `/opt/clearapi/secrets/runtime-probe-session`。该脚本强制 `os.geteuid()==0` 且 `sys.stdin.isatty()`，无法代跑。
 
 完成 1、2 后即可运行 manual 部署路径（`deploy-production.yml`，`pool_mode=pg03`）完成上线与线上验收：
 
 ```text
-commit  fd8f27641d49f6c5a5b5b6c30fac230d3c074cd1
-digest  sha256:9606af0f5c7e8b002cd80f4f7f108992304abbe663af89eb9e363114d054d6d0
-RC      39177706410（success）
-proof   rehearsal 39189031358（11/11 通过，release-proof.json 已生成）
+commit  9a3e6585737d823896137346faf94c2e1f4d1b04
+digest  sha256:95f7e50f1894171aef3eaf5c94b9e123491430c8f17d4caab3c107aa0ae79b6c
+RC      39193373708（success）
+proof   rehearsal 39194957755（11/11 通过，release-proof.json 已生成）
 ```
 
 说明：自动发布路径除上面 1、2 外还需要**清除已打开的发布熔断器**（见 §4.4）。由于失败运行从未触碰生产，人工确认后接受一次成功运行即可恢复；这一步属于运维决策，我没有代为清除。
@@ -384,8 +397,8 @@ proof   rehearsal 39189031358（11/11 通过，release-proof.json 已生成）
 
 | 内容 | 路径 |
 | --- | --- |
-| 最终 RC manifest（`fd8f2764`） | `D:/AI/API/evidence/pg03-rebind-20261019/rc-39177706410/` |
-| 全绿 rehearsal receipts + proof（11/11） | `D:/AI/API/evidence/pg03-rebind-20261019/rehearsal-39189031358/` |
+| 最终 RC manifest（`9a3e6585`） | `D:/AI/API/evidence/pg03-rebind-20261019/rc-39193373708/` |
+| 全绿 rehearsal receipts + proof（11/11） | `D:/AI/API/evidence/pg03-rebind-20261019/rehearsal-39194957755/` |
 | 真实备份解密 / 恢复 / 两次启动排练 | `D:/AI/API/runtime/pg03-rebind-20261019/` |
 | 三份绑定证据（backup / rollback / provider） | `D:/AI/API/runtime/pg03-rebind-20261019/ev6/` |
 | Provider 真实链路测量原始结果 | `D:/AI/API/runtime/pg03-rebind-20261019/provider-measurement.json` |
@@ -399,7 +412,7 @@ proof   rehearsal 39189031358（11/11 通过，release-proof.json 已生成）
 
 | 项目 | 结论 |
 | --- | --- |
-| PG03 代码修复与集成 | **已实测通过**（`fd8f2764`，Required CI 6/6） |
+| PG03 代码修复与集成 | **已实测通过**（`9a3e6585`，Required CI 6/6） |
 | 完整链路真实验证 | **已实测通过**（隔离环境、真实 OAuth、真实上游） |
 | 双账号 / fallback / 无重复结算 | **已实测通过** |
 | 计费（成功请求按上游 usage 精确扣费、单次结算） | **已实测通过** |
@@ -410,7 +423,7 @@ proof   rehearsal 39189031358（11/11 通过，release-proof.json 已生成）
 | 正式 RC 产物身份（Gateway + Executor） | **已实测通过** |
 | schema 发布契约 | **已修复并实测通过**（真实 RC 生成有效 proof；10 个负向用例仍全部拒绝） |
 | 三份运营方证据绑定 | **已修复并实测通过**（三份均 PASS 真实 verifier，11/11 gate 全绿） |
-| Rehearsal | **已实测通过**（`39189031358`，11/11） |
+| Rehearsal | **已实测通过**（`39194957755`，11/11） |
 | Release proof | **已实测通过**（`in_place_startup_migration`，真实生成） |
 | 自动发布授权链 | **PARTIAL**：三处 event 断言已修复并实测生效；但被持久熔断器拦下（§4.4） |
 | 生产部署 | **未执行**（缺 VPS root 前置，§8） |
