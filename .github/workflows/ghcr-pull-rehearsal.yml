@@ -213,18 +213,18 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       RC_RUN_ID: ${{ inputs.audit_rc_run_id }}
-      EXPECTED_MAIN: 0848ce7a4ac157cc2ac8411b617bceeba55366ad
+      EXPECTED_MAIN: c50a53c1b89e121bcade7dac41d3f11e53a9832a
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
-          ref: 0848ce7a4ac157cc2ac8411b617bceeba55366ad
+          ref: c50a53c1b89e121bcade7dac41d3f11e53a9832a
           persist-credentials: false
 
       - name: Authenticate existing main RC and its source CI
         shell: bash
         run: |
           set -euo pipefail
-          test "$RC_RUN_ID" = 39334166644
+          test "$RC_RUN_ID" = 39339871064
           test "$GITHUB_RUN_ATTEMPT" = 1
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RC_RUN_ID" > rc-run.json
           python3 - <<'PY'
@@ -237,7 +237,7 @@ jobs:
           assert run['run_attempt']==1 and str(run['id'])==os.environ['RC_RUN_ID']
           assert policy.api('git/ref/heads/main')['object']['sha']==os.environ['EXPECTED_MAIN']
           ci=policy.latest_main_ci(os.environ['EXPECTED_MAIN'])
-          assert ci['id']==39333198873
+          assert ci['id']==39338987624
           PY
           mkdir rc
           gh run download "$RC_RUN_ID" --repo "$GITHUB_REPOSITORY" --name "pg03-gateway-release-$RC_RUN_ID-1" --dir rc
@@ -248,7 +248,7 @@ jobs:
           policy=importlib.util.module_from_spec(spec);spec.loader.exec_module(policy)
           m=policy.verify_rc_artifact(Path('rc'))
           assert m['source_commit']==m['oci_revision']==os.environ['EXPECTED_MAIN']
-          assert m['image_ref']=='ghcr.io/a3225865526-wq/clearapi@sha256:84f69ec152aed7f820b610fcf65f2b8adbea80e89c4539b6d8911bda46cac5f1'
+          assert m['image_ref']=='ghcr.io/a3225865526-wq/clearapi@sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02'
           assert m['binary_sha256']=='40ebc70665bf7f45c7a201c4fdd82a90913a1873b2c7ca0debda1829983eee4b'
           assert str(m['workflow_run'])==os.environ['RC_RUN_ID'] and str(m['workflow_run_attempt'])=='1'
           assert m['production_ready'] is False and m['production_acceptance']=='not_run'
@@ -309,7 +309,7 @@ jobs:
       - name: Preserve the authenticated image transfer
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rc-image-transfer-39334166644-${{ github.run_id }}-1
+          name: rc-image-transfer-39339871064-${{ github.run_id }}-1
           path: |
             candidate-image.tar.gz
             export-receipt.json
