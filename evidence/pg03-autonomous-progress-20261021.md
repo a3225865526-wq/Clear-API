@@ -35,3 +35,9 @@ CI 39466058635：MySQL 三库新增步骤 success；SQLite 在 InitDB 返回 sql
 已按固定依赖和 Go 标准库定位两项兼容性：Go1.25 的 database/sql 对 NumInput=-1 且存在 ColumnConverter 的路径会跳过默认转换，包装层现在显式保留无原生 converter 驱动的默认参数转换；pgx Exec 返回 driver.RowsAffected，LastInsertId 是不支持的可选能力，GORM 在 RETURNING 模式会正常忽略该能力错误，不能把它当SQL执行失败。结果能力保持原样返回，SQL执行、Trace、Row.Err、延迟读取/关闭、事务错误观察继续保留。集中 driver 夹具增加原生 int 转换和“不支持 LastInsertId 仍为健康执行”回归，随后重跑实际矩阵。
 
 Linux 本地 Go setup 曾因 WSL 网络无法下载两个固定 Linux 依赖失败；通过 Windows 网络恢复同一 go.sum 版本并执行 Linux -deps 加载，增加固定 numcpus 依赖缓存。没有改版本或锁文件；再次验证使用 GOPROXY=off，避免重复网络超时。尚未将该次执行记录为通过。
+
+## 新矩阵结果与既有集成夹具修正
+
+9ef82f0ac5b359fda2246268a49dae6bfa8f56ca / CI39467424629：真实 SQLite、MySQL、PostgreSQL 矩阵 job 全部 success，包读取能力与前端 success。Linux 定向两包 Go exit0，SQLite3.50.4 真实重复启动通过。独立审查对本次默认参数转换及 Result 能力转发复核通过。
+
+Backend required job 在既有 test-legacy-transition.py 的 schema 夹具失败：共享 helper 现先创建受所有权清理保护的 binary probe，并在两次启动前分别取 schema/启动后核对 process，旧夹具仍模拟旧 run 路径。更新夹具保留原真实合同（首次 schema 升级、第二次幂等、失败不发布与全部清理），Linux 单个相关用例 exit0（内部3场景）。不修改门禁降低要求。完整 CI 需在该差异后重新通过。
