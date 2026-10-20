@@ -1,6 +1,8 @@
 package model
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/internal/migrationproof"
 	sqlitedriver "github.com/glebarez/go-sqlite"
 	"github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -23,10 +26,56 @@ const (
 )
 
 func newGormConfig(prepareStmt bool) *gorm.Config {
+	output := newGormLogger(os.Stdout)
+	if migrationproof.Enabled() {
+		output = migrationProofLogger{Interface: output, fail: migrationproof.Fail}
+	}
 	return &gorm.Config{
 		PrepareStmt: prepareStmt,
-		Logger:      newGormLogger(os.Stdout),
+		Logger:      output,
 	}
+}
+
+// database/sql can reject a query before reaching the driver (closed pool or
+// canceled context). RowQuery does not assign that deferred error to db.Error.
+// Driver rows instrumentation covers the later Next/Close errors separately.
+func observeMigrationQueries(db *gorm.DB) error {
+	if !migrationproof.Enabled() {
+		return nil
+	}
+	return db.Callback().Row().After("gorm:row").Register("clearapi:migration_proof_row_error", func(tx *gorm.DB) {
+		if row, ok := tx.Statement.Dest.(*sql.Row); ok && row.Err() != nil {
+			migrationproof.Fail()
+		}
+	})
+}
+
+// Observe errors delivered to GORM Trace independently of log level or writer
+// success. Deferred driver reads are observed by the proof SQL connector.
+type migrationProofLogger struct {
+	logger.Interface
+	fail func()
+}
+
+func (l migrationProofLogger) LogMode(level logger.LogLevel) logger.Interface {
+	l.Interface = l.Interface.LogMode(level)
+	return l
+}
+
+func (l migrationProofLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		l.fail()
+	}
+	l.Interface.Trace(ctx, begin, fc, err)
+}
+
+func (l migrationProofLogger) ParamsFilter(ctx context.Context, sql string, params ...any) (string, []any) {
+	if filter, ok := l.Interface.(interface {
+		ParamsFilter(context.Context, string, ...any) (string, []any)
+	}); ok {
+		return filter.ParamsFilter(ctx, sql, params...)
+	}
+	return sql, params
 }
 
 func newGormLogger(w io.Writer) logger.Interface {

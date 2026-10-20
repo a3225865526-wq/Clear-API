@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/i18n"
+	"github.com/QuantumNous/new-api/internal/migrationproof"
 	"github.com/QuantumNous/new-api/internal/stagingdiag"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/middleware"
@@ -345,6 +346,10 @@ func InitResources() error {
 
 	// 加载环境变量
 	common.InitEnv()
+	if err := migrationproof.Begin(common.IsMasterNode, os.Getenv("CLEARAPI_MIGRATION_PROOF_CHALLENGE"), migrationproof.Path); err != nil {
+		return err
+	}
+	defer migrationproof.End()
 
 	logger.SetupLogger()
 
@@ -361,6 +366,7 @@ func InitResources() error {
 		common.FatalLog("failed to initialize database: " + err.Error())
 		return err
 	}
+	migrationproof.Complete("main_database")
 	if err = authz.Init(model.DB); err != nil {
 		common.FatalLog("failed to initialize authorization: " + err.Error())
 		return err
@@ -377,9 +383,11 @@ func InitResources() error {
 	// Initialize options, should after model.InitDB()
 	if common.IsMasterNode {
 		if err := model.MigrateRetiredFrontendOptions(); err != nil {
+			migrationproof.Fail()
 			common.SysError("failed to migrate retired frontend options: " + err.Error())
 		}
 	}
+	migrationproof.Complete("retired_options")
 	model.InitOptionMap()
 
 	// 清理旧的磁盘缓存文件
@@ -388,6 +396,10 @@ func InitResources() error {
 	// Initialize SQL Database
 	err = model.InitLogDB()
 	if err != nil {
+		return err
+	}
+	migrationproof.Complete("log_database")
+	if err := migrationproof.Publish(); err != nil {
 		return err
 	}
 

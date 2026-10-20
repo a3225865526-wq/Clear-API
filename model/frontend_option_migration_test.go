@@ -2,9 +2,12 @@ package model
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/internal/migrationproof"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,6 +120,29 @@ func TestMigrateRetiredFrontendOptionsPreservesMalformedValuesAndContinues(t *te
 	assert.JSONEq(t, legacy[1].Value, requireOptionValue(t, db, "console_setting.faq"))
 	assert.Equal(t, "https://status.example.com", requireOptionValue(t, db, "UptimeKumaUrl"))
 	requireOptionMissing(t, db, "console_setting.uptime_kuma_groups")
+}
+
+func TestRetiredOptionsCannotPublishCompletionForSkippedMalformedValues(t *testing.T) {
+	for _, legacy := range [][]Option{
+		{{Key: "ApiInfo", Value: `{invalid`}},
+		{{Key: "UptimeKumaUrl", Value: "https://status.example.com"}},
+		{{Key: "UptimeKumaUrl", Value: "invalid-url"}, {Key: "UptimeKumaSlug", Value: "status"}},
+	} {
+		t.Run(legacy[0].Value, func(t *testing.T) {
+			db := useFrontendOptionMigrationDB(t)
+			require.NoError(t, db.Create(&legacy).Error)
+			proofPath := filepath.Join(t.TempDir(), "proof.json")
+			require.NoError(t, migrationproof.Begin(true, strings.Repeat("a", 64), proofPath))
+			t.Cleanup(migrationproof.End)
+			migrationproof.Complete("main_database")
+			require.NoError(t, MigrateRetiredFrontendOptions(), "default best-effort contract is preserved")
+			migrationproof.Complete("retired_options")
+			migrationproof.Complete("log_database")
+			require.Error(t, migrationproof.Publish(), "skipped migration cannot claim completion")
+			assert.NoFileExists(t, proofPath, "failure is latched before any completion file is created")
+			assert.Equal(t, legacy[0].Value, requireOptionValue(t, db, legacy[0].Key))
+		})
+	}
 }
 
 func TestMigrateRetiredFrontendOptionsPreservesMixedInvalidFAQ(t *testing.T) {

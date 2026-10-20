@@ -1,5 +1,460 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-21 — 自主多阶段推进中：阶段 A/B 验证与 PR 准备（当前）
+
+本轮最新授权覆盖安全分支/提交/推送/PR、必要 CI，以及满足全部门禁后的隔离工作流注册和运行；不再沿用历史“这些操作一律待批”的停止条件，生产禁止项完整保留。详见 `evidence/pg03-autonomous-progress-20261021.md`。
+
+- P2-1 继续 Linux 本地 PASS；P2-2 已以 driver 读取/事务错误观察补齐 Row 后置错误路径，独立源码审查未发现阻断项，仍待 Linux/真实三库结果，不能提前 PASS。
+- 便携 Go1.26.1 官方归档 SHA 已核验，任务目录运行、不改系统 PATH/依赖版本/锁文件；gofmt 已执行，Windows 定向两包 go test exit 0。Linux 定向验证进行中；CI 专用三库/日志库步骤已准备。原 Python 51 项集中回归通过（Windows9 skip）。
+- 已新鲜读取 main、两个 false 发布开关、三项 strict required checks 与保护；原生产 workflow 未修改。当前分支 codex/pg03-migration-proof-20261021 基于实际 Clear-API main，原工作区改动保留。
+- 新候选、精确镜像和真实两次启动尚未执行；真实演练修复/重跑 0/2。阶段 C 仍依赖 P2 与 CI、包 Read 和触发链门禁；阶段 D 继续本地准备，生产证据不使用模拟替代。
+
+当前继续验证和安全 PR，不执行生产操作。
+
+
+## 2026-10-21 — PG03 自主推进：候选侧迁移凭证差异已形成，P2-2/真实验收仍 BLOCKED（当前权威）
+
+本节取代历史章节中的“等待普通步骤确认”作为当前执行状态，历史证据全部保留。依据本轮授权已完成本地源码差异、离线验证和一次独立审查；详见 `evidence/pg03-migration-proof-source-review-20261021.md` 与身份/哈希清单 `evidence/pg03-migration-proof-preparation-20261021.json`。
+
+- **P2-1 PASS（Linux 本地）**：现有原子发布/失败撤回/回读上传门禁保持；本轮集中回归再次覆盖。没有真实 runner/断电验收，不扩大 PASS 含义。
+- **P2-2 BLOCKED**：新增 opt-in 候选侧专用凭证，直接跟踪真实 InitDB→旧选项→InitLogDB 完成顺序、结构化 GORM 错误和非 SQL 吞错；失败不发布可用凭证。凭证绑定本次 challenge、容器 hostname/PID、实际 binary hash 和主/日志库类型，文件/目录持久化失败阻止启动。控制脚本逐次从活容器读取并校验；缺失/冲突不出成功 receipt，日志/exit 0/schema 相等不能代替它。另已核实 GORM v1.25.12 的 Row/Rows 后置 Next/Scan 错误不能靠 Trace 完整观察；proof 模式现对这类查询无条件拒绝成功，正常迁移预计也会 BLOCKED。正向源码闭环尚未完成，不能删除护栏求通过；Go 与真实数据库未跑，不能判 PASS。
+- **修改范围**：`main.go`、`model/main.go`、`model/frontend_option_migration.go`、`model/gorm_logger.go`；新增 `internal/migrationproof/proof.go` 和唯一新 Go 测试文件 `proof_test.go`，扩展原 `model/gorm_logger_test.go`/`model/frontend_option_migration_test.go`；schema/successor/集中 Python 测试及本轮证据。successor CLI 也强制迁移证据，不能通过省略 observation 跳过。未修改任何 workflow、adapter 固定候选常量、依赖或锁文件。
+- **实际验证**：WSL Linux 最终 51 项全部通过；Windows 51 项中 42 通过、9 项平台相关跳过。3 Python AST、11 源码/测试 UTF-8/尾空白、diff 检查通过。原 46 项作为受影响集中回归复用和扩展，没有重跑无关 boot/全量 CI。Go 编译、Go 测试和 gofmt NOT RUN：当前未找到工具链，未安装依赖。Docker Linux named pipe 不可用；真实三数据库矩阵/独立日志库、引擎版本和启动验证均 NOT RUN/N/A。
+- **独立审查**：子代理只读审查发现 uptime 两处吞错未锁存的 P2，已补 Fail 和坏值/凭证不生成回归；复核确认修复。随后双方确认 Row/Rows 观察缺口，已增保守拒绝护栏并复核，但正向证明仍未解决；不声称无剩余缺口。审查不代替尚未执行的 Go/数据库验证。
+- **必须新候选**：原 source `69a66431646b5cc8912bf97a739e08de07316443` / digest `sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a` / RC `39357150402/1` 不含凭证生产代码，保留原样并继续 BLOCKED。修复需新源码提交/重新构建，不能替换旧 digest 的含义。新 source/digest/RC 尚未产生；本地 HEAD `ff6e0f4b2f5096d12717a01afbb3f5d90d28b801` 不冒充修复候选。现 adapter 仍绑定旧 RC，不具备注册/运行就绪条件。
+- **真实状态**：镜像获取/新候选身份核验 NOT RUN；新候选构建 NOT RUN；第一次/第二次真实隔离启动 NOT RUN；真实迁移/schema UNKNOWN；没有真实成功 receipt。新候选身份、验证命令、隔离条件和后续授权顺序已写入阶段证据，不能当作实测结果。
+- **边界**：未提交/推送/PR/合并/注册/触发 workflow；未取镜像或启动真实 DB/容器，未改生产配置/权限/Secrets/发布开关，未连接生产 SSH、写生产数据、开放入口或部署。旧修改和历史证据保留。
+
+最小下一步：提供已有获准 Go 与隔离数据库验证环境（或另批工具链安装），先让迁移查询读取错误显式返回/传播，解决 Row/Rows 正向证明缺口，完成 gofmt/定向 Go 回归和真实 SQLite/MySQL/PostgreSQL 主/日志库矩阵；当前不应直接构建成已修复 RC。通过后再分别取得提交/推送/新 RC 构建授权，核验新完整身份并重固定 adapter；注册与一次真实演练仍另批控制 ref、runner、窗口和合成 DB 写入范围。当前停于无法可靠证明迁移安全、缺少验证环境及外部操作授权边界，**PG03 仍 BLOCKED，不自动进入生产部署**。
+
+
+## 2026-10-21 — PG03 独立隔离工作流本地实现完成；真实演练仍 BLOCKED（当前）
+
+本节更新当前主线；历史状态和工作区已有修改保留。依据负责人本轮明确授权，已按既有设计与发布链审查完成本地实现和静态验证，详见 `evidence/pg03-isolated-rehearsal-local-implementation-20261021.md`。
+
+- **本地实物**：新增 `.github/workflows/pg03-isolated-rehearsal.yml` 与固定 RC/认证/证据适配脚本；复用已有 successor 双启动入口，扩展 schema helper 和集中测试，未修改任何既有 workflow。本轮开始时 9 份现有 workflow 的字节哈希全部保持一致（包括 ci.yml 已有修改）。
+- **固定边界**：仅手动、同仓库 main/owner、独立任务名与并发组；contents:read/packages:read，actions:read 仅下载固定 RC。checkout/upload 使用完整 SHA，无 production Environment/仓库 Secrets/SSH/部署调用。候选固定为 `ghcr.io/a3225865526-wq/clearapi@sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a`，源码 `69a66431646b5cc8912bf97a739e08de07316443`，RC `39357150402/1`。
+- **未来执行契约**：原始 RC ZIP 外部 hash 与身份先验证；精确拉取后清除临时认证，再核验 RepoDigest/平台/OCI/image ID/二进制。独立 PostgreSQL 17.6 的无外联 tmpfs 数据库连续供两个新 Gateway 使用，分别记录启动前后 schema、健康、命令与最终进程退出。异常/清理失败不发布成功凭证；always 复核 nonce 所有权清理，仅上传脱敏白名单，7 天保留。
+- **实际验证**：离线定向 31 tests OK（无 skip）；10 份 YAML 唯一键解析、权限/触发图断言、4 份 Python AST、新工作流 7 个 shell run 块 Git Bash -n、UTF-8/空白及差异检查通过。actionlint/shellcheck 未安装、未运行；未安装依赖。测试替身不代表真实启动或迁移。
+- **真实状态**：本轮未读取/拉取候选、未启动容器或数据库。镜像读取 NOT RUN，第一次/第二次启动均 NOT RUN，真实 schema UNKNOWN，无真实成功 receipt。schema 是固定 RC 目标 DDL，不是新鲜生产快照；PG03 与生产验收仍 BLOCKED。
+- **未执行边界**：未提交/推送/PR/合并/注册/触发 Actions，未改自动开关、Secrets、保护、包权限、依赖或生产发布配置；未执行生产 SSH、部署、重启或数据库写入。本地共享 schema helper 的新 hash 仅属于本地控制实现，不冒充旧 RC/生产已安装工具。
+
+最小下一步：负责人审阅本地 8 文件差异。默认分支注册和一次真实运行仍须分别明确批准；注册前重新核查两项开关仍 false、当前触发图/并发与 required checks，保留正常 CI 和保护；运行再固定控制 ref/窗口及测试 runner 写入范围。此轮完成后停止，等待审阅。
+
+
+## 2026-10-21 — PG03 Actions安全接入只读审查：总体BLOCKED，静态安全路径已确认（当前）
+
+详见 `evidence/pg03-actions-safe-integration-review-20261021.md`；以下历史记录原样保留。本轮唯一任务为发布链审查和文档更新，未实施新workflow。
+
+- **关键新增事实**：仓库默认main仍为69a66431646b5cc8912bf97a739e08de07316443；实际API读取 `CLEARAPI_AUTO_RC_ENABLED=false`（updated_at 2026-10-19T15:19:02Z）和 `CLEARAPI_AUTO_PRODUCTION_ENABLED=false`（2026-10-19T14:16:55Z）。此前“开关未核实”在当前快照中已解除；无需临时关开关、改发布权限或申请PAT。包Actions Admin沿用负责人确认，本地CLI scope不代表Actions拒绝。
+- **完整配置覆盖**：固定远端9份workflow及唯一job级reusable引用automatic-deploy→deploy-production均检查。main push/PR merge→CI→专用PG03 RC→Deployment rehearsal→Automatic production release→reusable deploy；监听completed与job真正执行分开。CI无路径过滤，新增workflow注册仍触发正常CI；当前false使自动RC/生产job跳过，可能留下skipped后继记录。新独立名称任务完成不匹配任何现有workflow_run消费者。
+- **生产路径区分**：手动RC不受自动RC开关限制；手动Deployment rehearsal若成功可被自动生产caller消费（仍受生产开关）；直接手动Deploy Production、恢复和GHCR VPS入口不受两个开关统一控制，本轮均禁止调用。production Environment仅main分支策略，无required reviewers/timer，不能当成人工审批屏障。
+- **安全注册建议**：审批后的新路径为 `.github/workflows/pg03-isolated-rehearsal.yml`（替代先前方案路径），仅手动、独立name，显式contents:read/packages:read及固定RC下载所需actions:read。正常PR保留main严格三项required checks和管理员保护，两个现有false状态保持不变；合并前复核触发图/开关/并发约束，合并后只观察CI和skipped后继，再另批一次独立运行。不绕过默认分支注册，不skip-ci，不擅改权限或生产配置。
+- **当前判定**：触发图/过滤/当前开关只读核查PASS；保持当前设置的条件安全路径PASS。具体workflow尚未实现/审阅，PR注册及运行未获批，因此整体接入与PG03仍BLOCKED。只有负责人后续批准的实物差异和执行窗口才能推进；不能把当前快照视为永久安全保证。
+- **执行事实**：本轮仅新增审查报告、追加阶段报告和更新本总控。没有workflow/脚本变更、提交/推送/PR合并、Actions触发、权限/Secrets/保护变更、生产SSH/部署/服务重启或数据库操作。镜像读取NOT RUN，两次启动均NOT RUN，schema UNKNOWN，无新成功receipt。
+
+最小下一步：负责人审阅报告后，仅批准独立任务的本地实现和定向验证；PR发布/注册和一次运行继续分别待批。本轮收尾后停止。
+
+
+## 2026-10-20 23:58 — PG03 同仓库Actions隔离演练方案：BLOCKED / 待批（当前）
+
+负责人确认包Manage Actions access已列Clear-API且为Admin；此前Actions包授权UNKNOWN的假设由此更新。本地CLI缺read:packages不代表Actions缺权；不再以该scope为同仓库job不可用的结论，也不申请PAT或扩大包ACL。
+
+- **静态检查完成**：9个远端workflow固定源码均只读核查；发布job保留packages:write，新任务拟contents:read/packages:read，另加仅下载固定RC所需actions:read。现有生产SSH入口不调用；独立名称不会匹配现有workflow_run消费者。main仍69a66431646b5cc8912bf97a739e08de07316443，RC39357150402/1成功。
+- **推荐方案**：独立手动 `PG03 isolated exact-image schema rehearsal`，GitHub hosted ubuntu-24.04，一次固定digest读取；临时认证在启动测试前清理；固定RC目标DDL在无外联tmpfs PostgreSQL17.6中连续两次真实启动，逐次健康/schema/退出/清理留证。完整镜像继续固定sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a；历史目标schema不称新鲜生产快照。
+- **发布风险已明确**：successor工具/集中测试仍仅本地，不能checkout旧候选源码假定工具存在。新手动workflow需默认分支注册；发布main可能触发CI→RC→演练→自动生产链，开关未核实，不准直接推送/注册。实施、发布、运行须分别获批，保持必需checks，不擅改开关或发布权限。
+- **文件差异与验证**：本轮仅新增 `evidence/pg03-actions-isolated-rehearsal-design-20261020T155803Z.md`、更新本总控及阶段记录；工作流/脚本差异为该方案内拟议清单，尚未实施。9份本地YAML解析和触发链检查通过；actionlint未安装且未运行，新工作流和定向回归未运行。
+- **真实状态**：Actions读取未执行，未取得镜像，第一次/第二次启动均NOT RUN，schema结果UNKNOWN；无新成功receipt。不提交、不推送、不dispatch，不改ACL/PAT/现有发布权限，不连接生产、不部署、不重启生产服务、不写生产数据库。
+
+下一步限于审阅该具体方案和批准后续本地实现范围；安全默认分支注册与一次运行仍需各自明确授权。**PG03隔离演练与整体状态仍BLOCKED，不能报告PASS。**
+
+
+## 2026-10-20 23:46 — PG03 精确镜像只读交接待批：BLOCKED（当前）
+
+本节为本轮最新状态；以下历史记录及全部既有修改保留。唯一候选仍为 `ghcr.io/a3225865526-wq/clearapi@sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a`，源码 `69a66431646b5cc8912bf97a739e08de07316443`。
+
+- **限定核查结论**：未发现同时具备批准、访问证明及精确镜像交接能力的只读隔离环境；并非断言所有外部环境不存在。本地只有named-pipe Docker contexts，desktop-linux中精确镜像仍不存在；仓库Environment列表仅production。最近10条run均completed，in_progress/queued各为0；RC现存两项artifact仍仅小型证据归档和build record，没有镜像归档。均为只读查询，不触发workflow。
+- **沿用权限阻塞**：CLI缺少read:packages及GHCR拒绝为上轮已确认结果；本轮未重复被拒绝的包接口/拉取，不修改凭据，不推断当前包ACL或Actions授权。现有GHCR Pull Rehearsal涉及生产SSH，Deployment rehearsal可能接自动生产链，均不转用。
+- **具体待批事项**：`PG03-PACKAGE-READ-20261020-R1` 已准备，详见 `evidence/pg03-package-read-approval-20261020T154609Z.md`。限定上述仓库/完整digest、管理员指定的非生产隔离读取环境、一次只读获取及经批准交接到本地desktop-linux；需填写执行人、环境ID、UTC窗口和批准ref。最低为有效包Read及适用的read:packages（或另批独立job的packages:read），无包Write/Admin要求；先核对已有授权，不自动改ACL或创建凭据。scope/包ACL不能声称限到单digest，由执行和交接校验落实。
+- **真实验收**：镜像尚未取得；第一次启动NOT RUN、第二次启动NOT RUN，退出码均N/A；schema幂等性UNKNOWN，无新成功receipt。只有获准取得并独立核验精确镜像后，才进入已有真实目标DDL的连续两次隔离启动；历史schema不冒充新鲜生产观察。
+- **本轮边界与验证**：仅更新本地总控和阶段证据，未执行生产SSH、workflow dispatch/rerun、生产部署、任何数据库写入或容器启动。历史19/19与baseline PASS未重跑。原文按字节保留，进行文档/哈希及差异检查；本轮不宣称PG03通过。
+
+唯一下一步：管理员审阅上述具体交接事项并提供有效批准与可校验镜像交接；在此之前 **PG03 = BLOCKED**，生产及其他既有门禁不变。本事项尚未向外部发送，不是执行许可。
+
+
+## 2026-10-20 23:37 — PG03 精确候选读取权限定位：BLOCKED（本轮最新）
+
+本节更新当前下一步，保留以下全部历史记录。本轮只做本地/GitHub只读核验和本地证据更新；没有拉取重试、登录/凭据或权限变更、workflow dispatch/rerun、SSH、数据库/容器启动、生产写入、提交、推送或部署。
+
+- **精确候选已核实**：`ghcr.io/a3225865526-wq/clearapi@sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a`；源码 `69a66431646b5cc8912bf97a739e08de07316443`；RC `39357150402/1` API为completed/success。归档 `12235966400` 未过期，API/本地SHA256均为 `ac7c42fc5a3549773f2c59080b503d6d5201f7442c9c20a955eb542f97ffb09b`；本轮重新运行baseline inspector退出0，四项payload/目标schema校验PASS。清单仍为production_ready=false / production_acceptance=not_run。
+- **读取阻塞已精确定位**：现有CLI身份 `a3225865526-wq` 的响应头仍仅 `gist, read:org, repo, workflow`，无 `read:packages`；包接口退出1并明确返回 `You need at least read:packages scope to get a package.`。仓库admin/pull不能替代包scope。包visibility/ACL及当前Actions包授权仍UNKNOWN；未假定Docker使用同一凭据。本地Docker可用，精确候选inspect退出1（No such image），固定PostgreSQL已缓存；未重复历史失败拉取。
+- **已有Actions入口不能直接转用**：核对四份固定源码workflow与本地一致（忽略CRLF）。GHCR Pull Rehearsal虽然packages:read，但pull路径进入production并使用SSH/sudo；Deployment rehearsal不是本地successor两次真实启动入口，其成功还可能触发自动生产链。未触发任何workflow或获取其短期token，没有已核实可直接使用的额外隔离包读取环境。
+- **真实演练状态**：镜像实物身份UNKNOWN；第一次启动NOT RUN，第二次启动NOT RUN，退出码均不适用；隔离schema/迁移幂等性UNKNOWN，无隔离实例或成功receipt。目标schema `3c1c77f3…` 来自已核实RC目标及历史证据，不能声称是本轮新鲜生产观察。PG03仍不具备进入下一阶段的已验证条件。
+- **最小待批事项**：优先由已有获准包读取环境提供/预载上述精确镜像；若没有，管理员另批隔离的只读包读取运行环境（packages:read及该包有效Read权限，先核对现有包授权）与必要的镜像交接。任何新workflow/dispatch或本地read:packages授权变更均未执行，不创建长期凭据，不转用生产SSH。源码/镜像读取完成后才运行已有目标schema两次启动入口。
+- **证据与剩余门禁**：详见 `evidence/pg03-exact-image-access-20261020T153750Z.md` 和原阶段报告新增附录。生产执行授权、完整successor执行器、停止写入方备份/恢复与启动写入范围、新候选连接/路由/账务验收及新鲜生产schema仍待分别核实；本轮没有PG03或上线PASS。
+
+
+## 2026-10-20 23:31 — 最新 PG03 本地修复与验收准备（当前主线）
+
+本节取代下方历史记录中的当前目标与下一步：**推进最新版 PG03 验收和正式上线；不以恢复10月17日旧版或仅恢复事故同一容器为最终目标。** 保留原 failed 清单、隔离记录、全部既有工作区改动及旧正式镜像回退引用。本轮没有 commit/push/dispatch 或任何生产写入。
+
+- **已核实候选（GitHub只读）**：当前 main `69a66431646b5cc8912bf97a739e08de07316443`；最新成功 RC `39357150402/1`；候选 digest `sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a`。归档 `12235966400` 实测 SHA256 `ac7c42fc5a3549773f2c59080b503d6d5201f7442c9c20a955eb542f97ffb09b`，四项payload哈希及基线输入校验通过。清单仍为 `production_ready=false` / `production_acceptance=not_run`，不是最终生产选定版本。
+- **阶段一结论（复用已有证据）**：缺失目录根因是易失 `/run/clearapi` 无开机创建/排序；现有 boot/identity 实现与哈希未改，已有12项boot验证及安装审查沿用、不重跑。生产安装、实际配置/挂载和新实例身份仍未现场复验，不能标记阶段验收PASS。
+- **阶段二结论**：原 Wget管道配置导致认证请求发送前失败的修复已存在；现有恢复入口仍只恢复事故原容器，普通发布拒绝failed前驱/hold。生产 Gateway→Executor 认证仍未验证，Executor healthy不等于连接通过。完整successor替换/授权消费/新清单执行链尚未实现，不声称已解除PG03阻塞。
+- **新增有效发现**：最新RC schema演练是旧 `578bc6f8…` → `3c1c77f3…`；事故后历史数据库已经是后者。该演练不能替代“当前schema → 当前schema”的两次启动证明；本轮未取得当前生产schema/数据投影，不能由preflight-only推断无写入。
+- **本地增量**：用户已批准本地successor设计/实现。新增 `scripts/pg03-successor-plan.py`，实现失败前驱/候选/RC/挂载/隔离/完整receipt离线契约与“固定RC目标schema上再启动两次”的独立演练入口；复用现有schema helper和gate清单。结构匹配永不授予生产许可；缺少生产事实不伪造观察。它是验收准备工具，**没有生产执行器或特权入口**。新增集中测试 `scripts/ci/test-pg03-successor-plan.py`，在已有修改的CI中只增加该测试一行，其他既有修改保留。
+- **实际验证**：最终19/19新增定向测试通过；真实RC ZIP/四项payload/基线输入校验通过；Python AST、新文件空白、UTF-8 CI YAML接线检查和 `git diff --check` 通过。首次YAML检查因Windows默认GBK解码失败，显式UTF-8后通过。没有重跑已通过且未变的boot/全量CI/数据库矩阵，也没有把startup替身测试记为真实候选启动。
+- **本地真实演练阻塞**：Docker 29.7.2/containerd可用、固定PostgreSQL已缓存；最新版候选镜像未在本地。精确digest拉取失败 `permission_denied: The token provided does not match expected scopes`；既有GitHub CLI响应头不含 `read:packages`。未读取/输出token值、修改凭据/权限或重试。真实候选启动/schema演练及新候选配对、route、billing/失败请求验收 **NOT RUN**；未生成成功演练receipt。
+- **生产SSH BLOCKED**：默认既有身份连接在认证阶段返回 `Permission denied (publickey)`，远端命令未执行。用户随后明确选择保持BLOCKED、继续本地工作；未切换身份、绕过认证或修改SSH。当前boot安装、schema/待处理账务、备份可恢复性、容器和公网状态均无本轮新鲜验收证据。
+- **执行计划边界**：详见 `evidence/pg03-latest-successor-local-20261020.md`。已列出只读资格→本地验收/执行器补齐→精确资产归档安装→受支持的停止写入方备份→独占后继尝试→仅Gateway替换和新身份→隔离验收/新receipt→另行Caddy开放的逐项写入/容器范围。当前backup/启动写入契约与执行器未完成，计划是**有条件草案，不是可执行审批清单**；不能直接用现有要求running identity的备份机制支持stopped Gateway。
+- **未完成与状态**：未达到整体 `LOCAL FIX PASS`；`CANDIDATE ACCEPTANCE PASS` / `PRODUCTION DEPLOYMENT PASS` / `WEBSITE UPDATED — CORE ACCEPTANCE PASS` 均未达到。最终生产镜像/源码未批准；旧正式digest `sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5` / source `eb67c5f21639716eed7489d32ca322c249e5fdf3` 仅作保留的回退参考。
+- **唯一下一步**：通过已获准的包读取环境提供/预载精确候选镜像，执行准备好的当前schema两次真实隔离启动并保留补充证据；不扩大token权限或自行触发外部workflow。随后仍需候选验收、恢复获准只读现场渠道、确认备份/启动写入契约并补齐successor执行器；生产SSH及全部生产变更继续BLOCKED。
+
+## 2026-10-20 Production Incident
+
+- Previous production image:
+  sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5
+- Candidate image:
+  sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02
+- Candidate source commit:
+  c50a53c1b89e121bcade7dac41d3f11e53a9832a
+- Controlled deployment run: 39347012653 — FAILURE
+- Automatic production release run: 39341639498 — SKIPPED
+- Local Gateway health and post-deploy Runtime Gate: PASS
+- PG03 Gateway-to-Executor health/authenticated connection: BLOCKED
+- Public ingress: ISOLATED; public HTTPS acceptance NOT RUN
+- Automatic rollback: NOT PERFORMED
+- Post-reboot defect: /run/clearapi missing; Gateway exited 127
+- Caddy: exited 0; restart policy no
+- Current overall status: WEBSITE DOWN / PG03 BLOCKED
+- Next action: inspect deployment audit and release manifest,
+  then choose the official recovery path; repair boot-time runtime
+  identity initialization without weakening identity validation.
+- Guardrail: no blind redeploy, manual image replacement, or
+  public ingress re-enable before recovery validation.
+
+### READ-ONLY OBSERVER R2 — READY FOR APPROVAL（DESIGN ONLY）/ COLLECTION BLOCKED
+
+本轮为方案审查与本地文档修订，**不是生产操作授权**。未连接VPS、未运行或修改helper、未创建生产用户/key/SSH/sudoers/状态文件、未恢复采集；现有管理员登录能力保持原边界。
+
+- **当前设计**：现行 `CLEARAPI_READONLY_IDENTITY_ADMIN_CHECKLIST.md` 第3节推荐A：单独300秒授权中，helper最多启动1次、合法采集最多1次；不保证成功一次。nonce仅关联响应，无重放保护；key expiry和MaxSessions不能提供调用总次数限制。B被明确区分为未选择的3次/1次/300秒方案，同样需服务端持久门禁，不可仅靠客户端或人工撤key。
+- **P0处理**：拟新增独立root gate；固定持久目录、稳定inode非阻塞锁、O_EXCL claim及文件/父目录fsync先于任何helper启动。claim存在即已用（含损坏/失败/超时/UNKNOWN/断连/崩溃），不可退款、重置或通过回退重新激活；observer仅sudo无参gate，不能保留直接sudo helper旁路。全部新代码/哈希审阅/状态记账写入均尚未实现、未批准。
+- **验证分类**：P类只在获批管理员渠道本地做元数据、语法、有效投影及sudo -l权限查询，不执行gate/helper；E类为真实认证/会话/命令/subsystem/TTY等可能进入门禁的测试。ForceCommand会替换原请求；负向测试也可能消耗额度，不是免费测试。A仅提议一个正常生产请求，其余优先隔离fixture或单独新授权。
+- **四层证明分离**：文件语法、磁盘有效配置、运行daemon加载、真实认证授权端到端分别列PASS/FAIL/UNKNOWN，不能互相替代。全版本/启动参数/Include/Match/key与CA/动态授权/sudo外部策略/组/间接提权/执行链安全仍待现场核验。
+- **备份/回退设计**：拟用 `/var/backups/clearapi-observer/observer-isolation-r2-20261020-01/`（root:root/0700，文件0600），保留原字节/身份/ACL等、外部seal及恢复演练；未创建。保留独立管理员会话/控制台；仅恢复本事务且身份仍匹配的对象，不覆盖并发变更，不恢复旧ARMED状态；clearadmin NOPASSWD: ALL收敛单独审批。
+- **现有现场事实**：仍仅引用负责人确认的2026-10-20 21:53左右Asia/Shanghai证据，详见下方R1原文；本轮无新增现场结果。本地helper哈希继续固定 `b36f2e99c29cd85e1eec4baeee75426f09f931dc4f20907b56e71e44ef3c451e`。没有把设计或已有全局查询改记为实际链PASS。
+- **历史与审查**：原方案原始字节保存于 `evidence/readonly-observer-identity-plan-v1-20261020.md`，SHA256 `89d5cac0981117b6cad2c34de673a89a73b2bb31bcda9fd98ce53adbaea382bf`；新增 `evidence/readonly-observer-review-20261020-r2.md`。现行VPS方案替代R1直接sudo helper链；下方历史记录及其余已有修改保留。
+- **未解决的执行阻塞**：A/B未获负责人选择批准；gate及集中测试未实现、无真实gate哈希；原observer元数据仍绑定直接sudo helper，需未来独立适配审查；管理员现行渠道、现场版本/完整策略/持久化与恢复能力、L1-L4证明均未取得。A也不能支持原60秒连续采样，因此没有恢复原观察/归档流程的资格。
+- **下一步仅审批**：负责人审阅R2设计，决定是否单独批准本地gate实现/测试/接线适配；之后再分别审批管理员预检、备份、精确生产安装/配置/reload/回退、UNARMED到带真实T0/T1的激活及一次E2E请求。设计批准不等于任何生产批准，旧clearadmin一次授权不转用。
+- **本轮本地检查**：原方案历史副本哈希一致；原第1/2节逐字符保留；移除R2新增总控前缀后重建的原总控哈希仍为 `d3e1eb503cee18590ae1a834a2cd019301e9e491ae199669dbf119886e697bc5`；helper/reader/observer三份代码哈希不变。方案no-index差异检查已完成（返回1表示有差异、无空白报错）；总控 `git diff --check` 退出0，四份Markdown空白/围栏检查PASS。没有运行gate测试或生产验证。
+
+**设计P0已有明确可验证规格，故标记READY FOR APPROVAL — DESIGN ONLY；不是READY FOR EXECUTION。READ-ONLY COLLECTION仍BLOCKED，helper本轮调用0、生产变更0、60秒观察未启动。已完成本地差异/哈希检查，停止并等待负责人审阅。**
+
+### R1历史方案（以下原文保留；现行方案以R2为准）
+
+### READ-ONLY COLLECTION — BLOCKED / OBSERVER 权限隔离方案待负责人批准
+
+**当前任务仅制定方案并更新本总控；不得连接生产、执行 helper 或恢复采集。** 本节取代下方历史记录的当前事实判断与下一步安排，不删除历史证据，不扩大或续期历史授权。
+
+现场证据基准：**2026-10-20 21:53 左右 Asia/Shanghai（13:53 左右 UTC）**。来源为负责人在本次《CLEARAPI — READ-ONLY OBSERVER 权限隔离方案设计》请求中明确提供的已确认现场审计结果；本轮仅核对本地源码和资料，**没有重新连接 VPS 或独立复测现场**，不虚构精确秒数、原始回执或审计签名。
+
+| 项目 | 最新已核实事实或尚未证明项 | 结论 |
+| --- | --- | --- |
+| 目标与 helper | `103.42.181.219`；`/usr/local/libexec/clearapi-readonly-state` 存在，root:root，0755，现场 SHA256 与 `b36f2e99c29cd85e1eec4baeee75426f09f931dc4f20907b56e71e44ef3c451e` 一致 | 已核实（负责人提供的现场证据） |
+| 专用 observer 身份 | `clearapi-observer` 用户不存在 | 已核实；专用身份前置条件不满足 |
+| SSH 全局查询 | `forcecommand none`、`allowtcpforwarding yes`、`allowagentforwarding yes`、`x11forwarding yes`、`permittty yes` | 已核实；不能代替特定用户/来源 Match、公钥选项及运行 daemon 的生效证明 |
+| 管理身份 sudo | `clearadmin` 存在 `NOPASSWD: ALL` sudoers 规则 | 已核实；不能用该身份冒充最小只读身份，也不能仅加窄规则声称宽授权已撤销 |
+| 专用受限通道及完整有效权限 | 用户/组与所有 sudo 策略来源、SSH Include/Match/密钥/CA 来源、环境与运行配置尚未完成完整核验 | UNKNOWN / NOT QUALIFIED |
+| helper 与生产采集 | helper 尚未执行；生产采集尚未开始 | BLOCKED；不自动恢复 |
+
+- **本轮本地核对 PASS**：完整静态读取 `scripts/recovery-tool-vps-helper.py`，实测 SHA256 与上述现场/预期值一致；核对现有 `scripts/recovery-tool-vps-reader.py`、`scripts/recovery-tool-observer.py` 和管理员清单。helper 的 shebang 是 `/usr/bin/python3 -IB`，入口要求有效 UID 0、`len(sys.argv)==1`；stdin 只接受 nonce 请求，子命令为固定路径/参数且 `shell=False`。既有 reader 拒绝 root/clearadmin/clearapi-deploy，绑定 clearapi-observer；现有元数据固定强制命令，不能通过修改接线绕过权限门禁。
+- **最小待批方案**：新增独立无附加特权组用户及 root 拥有且不可由 observer 写入的 home；唯一短期专用公钥使用 `restrict`、UTC expiry 和固定 command；用户级 SSH Match 同时固定命令、禁用转发/TTY/用户 rc/其他认证来源。固定命令仍为 `/usr/bin/sudo -n -- /usr/local/libexec/clearapi-readonly-state`。sudo 仅 `(root)`、`NOPASSWD`、`NOSETENV`、绝对 helper 路径且末尾明确 `""`，核验完整有效规则和环境；不授权通用 Python、shell、docker 或 systemctl，不授予 docker 组。已匹配 helper 只复核，不重复安装、覆盖或改模式；0755 也是现有本地资格门禁要求。
+- **sudo 语义已核对**：官方 sudoers 文档和上游 `command_args_match` 均明确：只写路径且不写参数约束会允许任意参数；末尾唯一 `""` 才匹配无参数。窄规则不会普遍抵消其他适用规则，须审查 include 顺序、别名、组和外部策略并用 `sudo -l -U` 做正反向查询，不能仅以单文件 `visudo` 成功放行。参考 https://raw.githubusercontent.com/sudo-project/sudo/main/plugins/sudoers/match_command.c 及 https://manpages.debian.org/bookworm/sudo/sudoers.5.en.html 。生产安装版本仍待批准后核验。
+- **root 兼容性与残留风险**：保留 root 执行是为读取受保护的 proc/cron/部署锁及固定 Docker socket 投影；NOEXEC 会阻断必需子进程，不作为默认隔离方案。SSH ForceCommand 会替换客户端 shell/参数/subsystem 请求，而不是保证拒绝请求或不执行 helper；禁止把试连、错误命令或拒绝测试当作零 helper 调用。公钥 expiry 只约束新认证，MaxSessions=1 仅限制每连接，nonce 不是服务端一次调用授权；既有通用 root 管理通道仍属可信管理边界。helper 没有显式业务写入，不保证操作系统 atime、SSH/sudo 审计等零写入。
+- **实施与回退门禁（均未执行）**：负责人分别批准管理员只读预检、受保护备份、精确用户/公钥/sudoers/SSH 配置写入、必要 SSH reload 及有界回退；保留既有管理员连接并确认控制台/第二管理员连接。先备份实际 Include 图及目标 absent 状态，核对恢复能力；先完成静态语法/完整策略检查，最后激活新密钥和配置。失败先拒绝 observer 新连接并撤销其专用 sudo 权限，再按对象身份恢复本事务文件并检查/reload；不解除限制作为补救，不删除未知资产，不改 clearadmin 宽权限或业务服务。活跃 observer 会话终止须在回退批准范围内。
+- **后续验证及非秘密证明（未运行）**：用户 UID/组/密码状态、helper 哈希/类型/链接/父目录/ACL、完整 sudo 策略来源及允许/拒绝查询回执、具体来源上下文 SSH Match 投影、唯一公钥指纹/选项/期限、可信 host key、生效 daemon/启动参数/reload 记录、配置备份与变更哈希、审阅人/UTC/退出码。真实认证、禁用能力测试及任何 helper 调用另行限定次数/输入/时间审批；静态查询不代替端到端证明。不得提交私钥、凭据值、完整公钥正文或原始敏感日志。
+- **本轮验证边界**：只做本地源码哈希、文档/调用链静态核对和总控差异/空白检查；未运行 helper、测试、CI、RC、演练或生产检查。认证/授权设计参考 OWASP ASVS 5.0.0 的 8.1.1、8.2.1、8.3.1、16.2.1/2/5、16.3.1/2、16.5.3 及 Authentication / Session Management Cheat Sheets；仅设计对照，未完成生产控制验证，不声明合规。
+
+**唯一下一步：负责人审阅本次七项权限隔离方案并明确批准具体后续操作。方案交付后停止；READ-ONLY COLLECTION 保持 BLOCKED，60秒观察未启动，归档/升级/恢复/部署/公网操作均未获本轮授权。** 原 clearadmin 一次只读授权不能转用于新 observer、验证批次或配置变更，也不得因本节记录自动续跑。
+
+### 历史记录：2026-10-20 21:43 — READ-ONLY COLLECTION BLOCKED
+
+- 审计时间：2026-10-20 21:43:21 Asia/Shanghai
+- 授权有效期：2026-10-21 21:39:17 Asia/Shanghai
+- 本地源码 SHA256：PASS
+- 生产配置检查：七项均 UNKNOWN
+- 生产连接：未执行
+- Helper 调用：0
+- 生产变更：0
+- 证据报告：`evidence/readonly-collection-blocker-evidence-20261020T134321Z.md`
+
+阻塞原因：缺少经过核实的管理员审计渠道及当前生产权限证据。历史权限记录不能替代现场核验。
+
+唯一下一步：获取带时间戳的脱敏管理员审计证据，覆盖 helper 文件身份、SSH 强制命令实际生效情况及完整有效 sudo 权限。
+
+禁止自动恢复采集、启动 helper、执行归档或扩大授权。授权到期后不得继续使用本次授权。
+
+### 2026-10-20 — 精确版本一次性只读授权已取得；执行前门禁 BLOCKED（未连接生产）
+
+**APPROVED — LIMITED READ-ONLY COLLECTION / READ-ONLY COLLECTION: BLOCKED / helper 调用 0 次。** 来源为本次 ChatGPT 对话中负责人身份用户的明确授权；范围仅 `clearadmin@103.42.181.219:22` 通过已核实受限通道无额外参数调用 `/usr/local/libexec/clearapi-readonly-state` 一次。批准源码 SHA256 `b36f2e99c29cd85e1eec4baeee75426f09f931dc4f20907b56e71e44ef3c451e`，本轮本地实测一致。首次实测记录签发时间为 **2026-10-20 21:39:17 Asia/Shanghai（13:39:17 UTC）**，到期 **2026-10-21 21:39:17 Asia/Shanghai（13:39:17 UTC）**；不推断消息原始发送时间，不追认历史安装/执行。
+
+- 完整授权边界、时间证据、逐项门禁及执行记录见 `evidence/readonly-collection-authorization-execution-20261020T133917Z.md`。已完整静态读取本地 helper：未发现显式生产写入，固定只读命令、root 无参数入口、4秒总期限及256KiB成功输出限制存在；不替代远端版本和实际权限核验。
+- **停止原因**：已有 `evidence/recovery-tools-vps-entry-audit-20261020T082550Z.json` 第130、157–163、199行记录历史 clearadmin 通用sudo、key无forced command及sshd forcecommand=none；旧SSH审计记载 `NOPASSWD: ALL`。没有当前证据证明这些限制已收紧，不能声称当前实测失败或通过。既有 `SshTransport` 还明确拒绝 clearadmin；未修改或绕过该限制。
+- **实际结果**：未连接VPS、未取得远端helper SHA256/属主/权限，未现场核验SSH/sudoers，未发送nonce或运行helper，采集执行时间不适用。没有生产输出；本授权下采集未开始。仅新增本地报告并更新本节，保留已有修改；未运行测试/CI/RC/演练，无安装、服务/容器、数据库、部署、配置、监控、60秒预观察或归档操作。
+- **唯一下一步**：管理员提供针对clearadmin的当前非秘密文件身份/哈希及受限SSH/完整有效sudo门禁证明；需要改变身份、通道或生产配置时先单独审批。保持暂停，不自动续跑。下面旧记录中的授权UNKNOWN、候选未安装及身份方案是历史记录，不代表本次已确认生产安装或满足执行门禁；原有观察/归档/恢复门禁继续保持。
+
+### 2026-10-20 — 管理员身份配置清单已交付（未执行）
+
+新增本地 `CLEARAPI_READONLY_IDENTITY_ADMIN_CHECKLIST.md`：列明单仓库GitHub App只读权限/受限签发及非秘密证明G、VPS专用用户/helper/无参sudo/SSH限制的配置与静态验证命令及证明V。新核对的语法要点：sudoers末尾 `""` 禁止附加参数；`PermitUserEnvironment`只能核对全局有效设置，不能放入`Match User`；`sshd -T`不能单独证明运行daemon已加载新配置。所有管理员操作及可能需要的SSH配置生效操作均待独立授权，本会话未执行。未修改采集器、未运行测试/CI/RC/演练、未读取真实凭据或连接生产；无新增生产资格证据，**LIVE QUALIFICATION UNKNOWN / 60秒观察未启动 / 归档NO-GO** 不变。下一步仅由管理员交回清单G/V证明，再由负责人另行授权一次生产只读身份资格核验。
+
+### 2026-10-20 — 受限身份采集接线完成；生产资格仍待管理员证据
+
+**LOCAL BINDING PASS（隔离验证） / LIVE QUALIFICATION UNKNOWN / 60秒预观察 NOT STARTED / 生产归档 NO-GO。** 负责人已选择专用受限身份，不再使用宽权限 `gh` 或 `clearadmin` 作为只读采集身份。本轮只修改本地采集接线/测试与本总控，保留其余未提交工作；未连接目标仓库 API 或 VPS、未加载真实凭据、未创建/轮换凭据或修改生产文件，未开始观察或归档。仅查询了公开官方权限/安全文档。
+
+- **本地接线**：新增 `scripts/recovery-tool-observer.py`，提供 `build_driver(config, approval, window_module=UPGRADE.W, ...)`，绑定升级器所用的同一个门禁模块/类；固定 source/repository、代码SHA、两个已审阅inventory指纹、VPS运行身份指纹、四工具哈希及管理员权限/有效期声明。默认无凭据加载、无transport启动、无观察或归档调用；未来真实接线必须显式 `enable_live=True` 且匹配独立的只读授权引用。每次HTTP/SSH调用前后均重新检查凭据租期，过期即不再发送后续请求；整个窗口必须落在两个身份有效期内。权限元数据是待管理员核验的声明，不是程序已经证明了生产实际权限。
+- **GitHub 实际覆盖**：固定目标仓库的GET端点；全refs六类Actions队列、非空run的jobs/pending deployments、独立deployments及其status完整分页、main ref、自动发布变量、workflow列表。根据实时读取的repository/main/auto/workflow(id,path,state)规范JSON重新计算指纹，采集前后重读配置拒绝期间漂移，不再回传静态预期值伪装为实时指纹。分页重复/不完整、未知部署状态、权限拒绝、超时、断线或畸形数据均UNKNOWN；活动队列/部署、main/auto/指纹不符均FAIL。令牌只发往固定仓库的GET白名单；禁重定向/继承代理，响应上限2MiB，单请求≤5秒、采集预算≤25秒，迟到结果拒绝。Socket读取使用单次底层读取并检查期限；既有门禁另以30秒TTL关闭失效源，不宣称可即时取消内核调用。当前main提交标识绑定其完整源码；其他ref/特权/外部事件仍需负责人冻结承诺，不能将采样覆盖写成技术上排除所有未来调用。
+- **VPS 实际覆盖**：新增本地候选 `scripts/recovery-tool-vps-helper.py`（尚未安装），固定无参数入口，仅接受32位hex nonce；读取固定工具/配置目录清单的内容哈希及元数据、相关进程名称投影（不输出完整cmdline）、标准cron/at入口、systemd jobs、FLOCK的device/inode/PID、Docker已运行状态和四容器最小状态投影。Docker未运行即停止，不触发socket激活；不执行任何项目工具、服务启动、迁移、数据库或恢复命令。关键代码父目录必须root拥有且不可被组/其他用户写入；清单前后漂移/读取异常关闭采集。配置清单输出只有路径/哈希/元数据，不输出文件正文。helper总期限4秒、输出上限256KiB；超出覆盖数量/体积限制为UNKNOWN。
+- **VPS transport/验证**：显式专用用户/密钥文件引用/known_hosts和SSH绝对路径；`-F none`、strict host key、IdentitiesOnly、无agent/proxy/复用/转发/TTY/口令认证，不继承用户SSH配置。固定远端命令 `/usr/local/libexec/clearapi-readonly-state`；有界stdout、超时kill并回收子进程，不暴露stderr。reader核对nonce、coverage_complete、重新计算inventory指纹、target与inventory的一致性及真实锁PID；接线再核对四项工具、已安装helper代码身份和服务/四容器运行身份基线。失联/重放/未知字段/到期/漂移使真实WindowDriver进入不可恢复关闭状态。未观察到的改名/已加载调用、控制台及外部凭据调用仍不是可排除项。
+
+**管理员需提供或单独批准的最小身份与用途（只提供引用/非秘密证明，禁止聊天或日志提供值）：**
+
+| 身份引用 | 范围与用途 | 有效期/约束 |
+| --- | --- | --- |
+| `CLEARAPI_OBSERVER_GITHUB_TOKEN`；建议专用App身份名 `clearapi-pg03-observer`（未创建） | 仅 `a3225865526-wq/Clear-API` 的GitHub App installation token。`Actions:read` 读取队列/workflows/jobs/pending deployments；`Deployments:read` 读取部署/status；现有完整门禁还必须有 `Contents:read` 读取main ref、`Variables:read` 读取 `CLEARAPI_AUTO_PRODUCTION_ENABLED`；`Metadata:read` 为基础只读权限。不给任何write、Secrets、Administration、其他仓库或组织权限。只有Actions/Deployments两项不能满足现有main/auto门禁，不自动扩大权限。 | 管理员在外部提供已签发token，通过仅本次进程环境注入上述引用；本程序不读取App私钥、不签发/刷新token。安装token官方期限1小时，代码拒绝超过1小时的租期；记录签发/到期UTC、单仓库及精确权限证明、审核人/引用，剩余期限须覆盖资格核验、60秒预观察及窗口结束。 |
+| `CLEARAPI_OBSERVER_SSH`；专用 `clearapi-observer@103.42.181.219`（未创建/未现场确认） | 管理员提供专用identity_file及严格known_hosts的绝对路径引用，不提供私钥值。不加入docker组、不赋予通用sudo、不使用root/clearadmin/clearapi-deploy。root拥有且不可写的受限入口仅执行固定无参helper，专用账号禁止其他密钥、口令、TTY/转发/user rc及可写shell初始化/环境入口。 | SSH key或证书由管理员设置≤1小时的UTC到期，并记录non-secret权限审查引用；代码租期同样≤1小时且必须覆盖窗口。专用账号的强制命令为 `/usr/bin/sudo -n -- /usr/local/libexec/clearapi-readonly-state`；sudoers候选仅 `clearapi-observer ALL=(root) NOPASSWD: /usr/local/libexec/clearapi-readonly-state ""`（空参数限制，不含通配符）。`restrict`、`expiry-time`、force-command及有效sudoers/sshd/父目录状态须管理员核验，不凭本地声明认定实际生效。 |
+
+如无现成受限入口，管理员须先另行批准专用账号/受限key配置、精确sudo规则及helper安装；本轮不执行这些外部写入。helper候选目标root:root/0755，其父目录不可由该账号写入。未来认证/查询可能产生系统正常SSH/sudo审计日志或读访问时间更新；固定探针不请求业务/配置/数据库写入。权限资料依据：[Actions](https://docs.github.com/en/rest/actions/workflow-runs#list-workflow-runs-for-a-repository)、[Deployments](https://docs.github.com/en/rest/deployments/statuses#list-deployment-statuses)、[main ref](https://docs.github.com/en/rest/git/refs#get-a-reference)、[Variables](https://docs.github.com/en/rest/actions/variables#get-a-repository-variable)、[安装token期限](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app)、[OpenSSH限制](https://man.openbsd.org/sshd.8)。已参考OWASP Authentication/Session Management的最小权限、凭据保密及期限要求；本轮未修改应用认证流程，不声称生产ASVS合规。
+
+**本次验证（仅新增或受影响路径，未重跑既有CI/RC/恢复演练）：**
+
+- Windows Python **3.12.10**：`python -B scripts/ci/test-recovery-tool-readers.py` **11/11 PASS**；随后仅新增 `CollectorTests.test_http_body_limit_and_deadline` **1/1 PASS**（最终12个不同方法分组通过，不声称最终全量suite重跑）。`python -B scripts/ci/test-recovery-tool-vps-reader.py` **12/12 PASS**。
+- WSL Ubuntu/root临时目录：新 `scripts/ci/test-recovery-tool-observer.py` 首批9项为8 PASS / 1夹具错误（Caddy初始running已为true），修正夹具后定向接线用例PASS；新增SSH限时测试初因mock了全局Event.wait干扰Thread.start而ERROR，改为同步thread fixture后该项PASS。现有 **13个不同新方法均已分组通过**；只在helper父目录/HTTP读取/逐请求租期变更后重验直接受影响的接线、期限或相关新增用例。最后一组 `QualificationTests.test_expiry_during_read_closes_driver_without_retry`、`test_real_helper_contract_binds_both_readers_to_existing_window`、`test_default_has_no_credentials_transports_or_started_observation` **3/3 PASS**。所有新接线测试显式禁止真实socket/Popen；helper只使用临时目录、合成状态、fake commands，未启动真实观察线程或等待60秒。
+- 七个变更/新增Python文件AST语法、空白检查PASS；静默门禁/升级器/boot安装器源码与原固定SHA保持一致，未重跑它们的25/19/31项。代码身份：observer=`c5933c1a15ab9612aea35baaec37fd7bb5b3d85d2d0e35f89a76ef3e6f91f27d`；GitHub reader=`544ee7efb53bbb387119422850484f1b2fefdfb4815c5e382e85928e730cb405`；VPS reader=`1228db9195355862a8a329a2ecb0ceeb2bbbe528e6a1d917a1c00b2f46ae0fbc`；helper=`b36f2e99c29cd85e1eec4baeee75426f09f931dc4f20907b56e71e44ef3c451e`。observer内部固定上述reader/helper及原window哈希；它们不是历史RC的发布资产。
+
+**剩余硬阻塞 / 启动60秒预观察的最小前置：** (1) 管理员提供上述已审阅专用身份、非秘密权限/到期证明和远端helper实际安装/隔离证据；(2) 另行授权一次真实只读资格核验，取得并审核GitHub配置、VPS入口inventory/运行身份、四工具和helper的新鲜基线，填入 `clearapi.restricted-observer/v1` 配置（三个指纹、target_sha256及身份声明），不能首次自动信任旧JSON或用预期哈希替代实时指纹；(3) 两源真实连通、覆盖与时效全部PASS后，确认固定UTC起止≤15分钟、唯一执行者/PID、事务及全部入口冻结，且两种身份有效期覆盖窗口，才可授权启动60秒实时观察。任何FAIL/UNKNOWN继续拒绝。生产归档、工具替换、boot安装、Gateway/数据库/公网操作均仍不在本轮范围内；未取得这些前置条件前停止扩展实现。
+
+### 2026-10-20 — 中断续接核对与 VPS reader 验证收尾（本地）
+
+**当前结论：中断留下的 VPS 接口验证已收尾；生产采集接线未完成，预观察 NOT STARTED / 归档 NO-GO / 网站与 PG03 上线未完成。** 以下取代上一节笼统的 `LOCAL WORK COMPLETE`，不将历史在线快照或旧测试结果当作当前生产 PASS。本轮未连接 GitHub/VPS、读取秘密值、写入生产、提交或推送。
+
+- **Git 现场**：当前分支 `codex/clearapi-failed-recovery-20261020`，HEAD `ff6e0f4b2f5096d12717a01afbb3f5d90d28b801`；三项已跟踪差异为本总控、`.github/workflows/ci.yml` 和 `scripts/ci/test-runtime-boot-recovery.py`，另有既有未跟踪脚本/证据/缓存，不能把“上一会话四文件”理解为整个工作区只有四项差异。无暂存差异，未重置、清理或覆盖已有工作。只在已有 VPS 测试中续写，并在本总控追加本节。本地 `production/main` ref 为 `c50a53c1b89e121bcade7dac41d3f11e53a9832a`，是本地缓存，不代表远端当前 main；RC/source `39357150402/1` / `69a66431646b5cc8912bf97a739e08de07316443` 仅沿用历史身份，不更新为新鲜核验。
+- **确认中断缺口**：`scripts/recovery-tool-vps-reader.py` 已要求 `inventory_sha256`、锁 `pid` 并返回门禁所需的平面字段，但其测试尚未同步。定向命令 `python -B scripts/ci/test-recovery-tool-vps-reader.py ReaderTests.test_ok_and_fixed_command` 实际报 `ValueError: invalid_inventory_sha256`（1 ERROR）；因此之前 7/7 PASS 不覆盖中断后的源码。
+- **本次修复与验证**：同步显式指纹/锁 PID fixture，扩展锁归属、缺失字段、指纹漂移、调用/进程/jobs 拒绝、迟到响应和真实 `QuietWindow.sample()` 接口验证。`python -B scripts/ci/test-recovery-tool-vps-reader.py` **11/11 PASS**，全部使用 fake transport / 合成批准和时钟，未启动 `WindowDriver` 或真实60秒观察。只重验中断后改变且旧 PASS 不再适用的 VPS 测试；GitHub 6项、门禁25项、原事务19/安装31项、CI、RC、演练与线上验收均未重跑。
+- **文件身份**：保留的 VPS reader SHA256 `d2c44946295ca73d6962f7adbdab21374068d98fcfe182b8250298b4ec4adc8a`；本次测试 SHA256 `465278862a393a5d2a2031e4482d9379cfc8f133a9b965e42cf5c021591bdb59`。静默门禁 `284125307fca2814b84f659d0470c41d133612de9d400362f888908b69fc3973`、升级器 `77ba66604746da9bd7ee41783dc40cc21e3184608185c1decce534a9365f25ed`、boot 安装器 `6bf1c77e6ce1c162e22328239badbaf67b77bde21f100fbbcf3a5747812d01d5` 与既有审阅 pin 一致，无须重跑其既有测试。
+- **仍阻止预观察的具体缺项**：没有生产 driver 将两个 reader 绑定到升级器导出的同一个 `W.QuietWindow`；VPS transport 未绑定，固定远端 `/usr/local/libexec/clearapi-readonly-state` 的实现、安装状态、字段覆盖和受限 SSH 身份均未验证；GitHub 显式 token 引用、读取范围和有效期未绑定。GitHub 当前 `inventory_sha256` 由调用方传入，不能据此声称实时检测了 workflow/config inventory 漂移；VPS helper 的 fingerprint 来源亦未核验。必须先审阅真实采集/指纹计算与接线，不能仅填一个预期哈希或读取历史 JSON 获得资格。继承交接中负责人对唯一执行者/不另行触发生产操作的承诺；固定 UTC 窗口及特权/外部凭据等入口覆盖仍须明确。当前无新生产信息可使这些 UNKNOWN 变为 PASS。
+- **下一次最小确认（集中一次，不要求提供秘密值）**：明确真实只读采集路径及凭据引用、权限/有效期。可提供已有受限身份；若选择复用历史 `gh`/`clearadmin` 宽权限身份，须明确接受并另行审阅固定 GET/只读命令边界，不能称其为最小只读权限。任何新 helper 安装、SSH/sudo 限制或凭据配置都属于另行列明的外部写入；本轮未授权实施。接线资格确认后再固定不超过15分钟的归档窗口、全入口冻结、唯一执行者/PID与事务，执行60秒实时只读预观察。
+- **预备归档边界（供后续精确清单使用，尚非可执行批准）**：只调用已固定升级器 `Upgrade.prepare(window)`，不调用 `apply`/`rollback` 或直接运行无 CLI 的脚本。需另行批准私有输入目录、`/run/lock/clearapi-production-deploy.lock`（0:0/0600）与新的 `/opt/clearapi/.tool-upgrade-rc39357150402-1-<唯一UTC尝试>`（0:0/0700）。按历史 OLD 基线，归档实际含 **9个文件**：四个 `backup-{production-deploy-v2.sh,pg03-release-control.py,pg03-legacy-transition.py,pg03-schema-rehearsal.py}`、两个 `stage-{pg03-release-control.py,production-deploy-v2.sh}`（0:0/0750）及 `baseline.json`、`baseline.sha256`、`journal.jsonl`；其余文件0:0/0600。输入目录的精确名称/内容/哈希、独立外部 seal 留存位置及现场 NOREPLACE/fsync 验证写入对象须在最终审批清单固定，不能遗漏或假称已执行。四项已安装工具均不在归档步骤中被替换。失败或失效时停止后续写入、保留部分归档和锁文件、释放持有FD，不自动删除、重试或继续工具替换。
+- **剩余主线**：采集接线资格 → 新鲜只读预检/60秒观察 → 获批归档与独立 seal 核验 → 独立窗口下 control→wrapper 升级 → boot archive/install → 明确启动写入范围后恢复 Gateway → 最新合格版本部署与 Runtime/PG03 验收 → 独立批准 Caddy/公网恢复。Gateway 的迁移/后台写入仍 UNKNOWN；Provider Usage/Billing 按交接由负责人上线后验证，当前 NOT VERIFIED。可独立准备后续精确审批清单和启动只读投影；本轮不再扩展本地功能，不以历史快照解除任何生产门禁。
+
+### 2026-10-20 — 最短路径盘点与本地采集器完成（生产未执行）
+
+**当前结论：LOCAL WORK COMPLETE / PRODUCTION NO-GO / WEBSITE NOT RESTORED.** 本轮未连接生产、GitHub API 或读取凭据值；未创建生产锁/归档、替换工具、安装 boot 资产、启动服务、修改数据库/账务、解除隔离或开放公网。
+
+- 已完成本地硬阻塞盘点：生产旧 Gateway 仍为历史 `Exited(127)`；RC `39357150402/1`、来源 `69a66431646b5cc8912bf97a739e08de07316443` 及七项 boot 来源链沿用已核验记录；生产实时状态不是当前在线证据。
+- 已新增并隔离验证两个 fail-closed reader：GitHub `scripts/recovery-tool-readers.py`（显式 token 引用、GET-only、六类 Actions 队列、活动 run jobs、pending deployments、main ref、自动发布变量、分页/超时/权限/字段校验）；VPS `scripts/recovery-tool-vps-reader.py`（固定 SSH 到受限 helper，不使用 sudo，校验服务/容器、调用/进程、systemd jobs、部署锁和目标文件身份）。生产 transport/身份未绑定，故生产资格仍为 **UNKNOWN**。
+- 受影响验证：`python scripts/ci/test-recovery-tool-readers.py` **6/6 PASS**；`python scripts/ci/test-recovery-tool-vps-reader.py` **7/7 PASS**；四个 reader/门禁模块 `py_compile` 通过。未重跑既有 19/31、CI、RC、恢复演练或线上验收。
+- Gateway 启动副作用静态审查确认 `InitResources()` 先于 readiness 检查，可能执行主/日志库迁移、选项迁移、auth cleanup；后续可能启动 finance sync、订阅重置、credential refresh、task runner、billing protection 及 route-ledger recovery。有效开关、schema 差异、待处理 workload、外部调用和启动写入范围均未由生产只读证据确认，不能安全恢复 Gateway。
+
+**依赖排序：** (1) 负责人批准并提供有界静默窗口、唯一执行者、全入口冻结和两个最小只读身份；(2) 只读预检及 60 秒观察；(3) 单独批准并执行工具四文件归档/外部 seal；(4) 单独批准 control→wrapper 工具升级；(5) 单独批准 boot archive/install；(6) 单独批准 Gateway 恢复并确认启动写入范围；(7) 最新合格 Gateway/Executor 部署与 Runtime/PG03 验收；(8) 单独批准 Caddy/公网恢复。任一关键条件为 `FAIL/UNKNOWN` 即停止对应生产写入。
+
+### 2026-10-20 — Local constrained VPS reader adapter (no production binding)
+
+- Added `scripts/recovery-tool-vps-reader.py` and isolated fake-transport tests at `scripts/ci/test-recovery-tool-vps-reader.py`. The adapter emits a fixed SSH invocation for a constrained remote helper, validates strict JSON and required state fields, and maps timeout/disconnect/denial/schema/UNKNOWN to fail-closed `UNKNOWN`. No production connection, credential lookup, or provisioning occurred; transport remains unbound, so production state is **UNKNOWN**.
+- Local isolated fake-transport tests: 7/7 PASS (`python scripts/ci/test-recovery-tool-vps-reader.py`). This is not live-source qualification and does not change archive/upgrade authorization.
+
+### 2026-10-20 — 实时只读采集源资格与负责人确认（仅本地核验）
+
+**结论：两个生产实时采集源均未具备启动观察的资格；不连接生产/GitHub，不读秘密值，不开始60秒观察。** 本节是对现有采集实现/历史审计的核对，不是新鲜在线证据。静默窗口门禁文件 `scripts/recovery-tool-window.py` SHA256 `284125307fca2814b84f659d0470c41d133612de9d400362f888908b69fc3973` 只实现读取回调接口和拒绝条件；没有可执行生产 reader、命令绑定或凭据绑定。历史源代码与记录见 `evidence/recovery-tools-window-gate-local-review-20261020.md`、`evidence/recovery-tools-quiescent-window-review-20261020.md`。
+
+| 源 | 命令/来源及覆盖 | 凭据、权限与有效期 | 副作用及资格 |
+| --- | --- | --- | --- |
+| GitHub Actions reader（尚不存在为可执行实时reader） | 门禁要求回调返回六队列 `in_progress/queued/waiting/pending/requested/action_required` 的完整分页与零计数、当前 main SHA、自动发布开关和配置/inventory指纹。历史审计脚本 `evidence/recovery-tools-github-entry-audit-20261020.py` SHA256 `efbe080…` 使用 `gh api --method GET <repos/a3225865526-wq/Clear-API/...>` 读取 repo/ref/workflows、六队列、活动run的jobs/pending deployments及main workflow/blob；该脚本不是门禁reader，历史运行曾有 API EOF，不能视为完整实时源。 | 历史使用本机 `gh` 已登录身份；记录显示对仓库有 admin/maintain/push 等权限，而不只是只读。凭据具体引用/后端名称、最小有效权限与到期时间均未在不读秘密的条件下核实，保持 **UNKNOWN**。不得假设PAT/App/会话仅有GET权限。 | 已审历史API方法均为GET，按设计不改仓库/Actions；但缺少已审定的实时绑定与调用封装，不能证明将来命令不含其他动作。可用性、权限最小化、错误/超时、字段映射与来源指纹 **UNKNOWN**；资格 **不通过前置核验（UNKNOWN）**。 |
+| VPS生产状态reader（尚不存在为可执行实时reader） | 门禁要求返回SSH连通、匹配生产调用、进程、systemd jobs、部署锁及相关inventory/来源指纹；历史探针使用 `/proc/*/cmdline` 名称投影、`/run/lock/clearapi-production-deploy.lock` 与 `/proc/locks`、`systemctl list-jobs`，以及相关定时器/服务/入口清单。历史采集代码 `evidence/recovery-tools-vps-entry-audit-20261020.py` SHA256 `2c8d980…` 声明 stdin root inventory/no tool execution；较早的 production preflight 脚本/摘要记载命令形式为现有 `ssh` 身份 + strict existing `known_hosts` + `sudo -n python3 -B -` 执行审阅过的stdin只读探针。它们不是当前窗口采集器，也没有持续观察集成。 | 历史SSH身份为 `clearadmin@103.42.181.219`，复用本机现有SSH key；仅引用身份/主机，不读取或输出私钥。历史审计报告 `clearadmin` 具有 `NOPASSWD: ALL`，为广泛特权而非只读限定；远端授权密钥还存在root及clearapi-deploy入口。密钥轮换/有效期及 sudo 规则当前状态 **UNKNOWN**。不得将 `sudo -n` 等同于只读授权。 | 探针预期只读，但以root运行且其身份权限允许任意写命令；stdin代码审阅和命令参数绑定未对当前持续reader完成，间接调用/审计采集副作用亦未验证。SSH可达性和现时进程/调用/jobs/lock均未检查，资格 **不通过前置核验（UNKNOWN）**。 |
+
+**范围与静默窗口契约（不是绝对技术锁定）：** 需纳入 Actions 全refs的六种队列/dispatch、rerun、approval、upstream events、GHCR核验及九份现存 workflow/action 定义；VPS侧已识别的 deploy/recovery/restore/inspection/manual SSH、systemd/cron/at/timer及相关工具调用。门禁的显式路由为 `actions_all_refs`、`dispatch_rerun_approval`、`upstream_events`、`ghcr_verify`、`manual_clearadmin`、`manual_clearapi_deploy`、`console_root`、`external_credentials`、`systemd_cron_at`、`other_agents`。唯一执行者须由负责人在本次归档专用窗口明确实名/身份并固定 executor PID、事务与归档目标；现有记录仅列历史owner标识 `a3225865526-wq`，不等于本次确认。窗口须先有负责人正面确认，批准固定UTC起止（不超过15分钟）、全部入口覆盖、两个合格只读源及单一执行者；两源均取得完整新鲜PASS后，连续观察满60秒且到达T0才可申请后续归档写入许可。任何新调用/队列、SSH失联、采集异常/超时/过期、UNKNOWN、字段/指纹漂移、监控线程停止、覆盖未知、锁异常、时钟偏差或窗口到期均不可恢复地关闭窗口；停止后不再推进写入，不自动重试/续期/回退，保留现场并报告。任意root/控制台命令、改名或已加载调用、外部凭据持有人、其他agent及未来其他ref等无法由快照技术证明排除，必须由负责人明确覆盖承诺；不能声称已被锁定。
+
+**负责人确认清单（本轮未授权、未执行）：**
+1. 确认仅归档窗口的UTC起止（<=15分钟）、唯一执行者及executor身份/PID；确认上述正常入口冻结范围，并明确接受未能技术锁定入口的人工覆盖责任；否则不启动观察。
+2. 明确批准的只读采集用途/字段：GitHub只查询目标仓库全refs Actions六队列、当前main与自动发布/配置指纹；VPS只读取SSH连通、调用/进程/jobs、部署锁与入口清单。指定可审计的最小权限身份及凭据引用名称、存放/注入方式、权限范围、到期时间；禁止在聊天/日志中披露值。VPS不得用 `NOPASSWD: ALL` 冒充只读授权，须先提供可证明的只读命令范围或接受并另行审阅其风险。
+3. 单独明确生产写入边界：允许在归档专用窗口内一次创建/持有指定 `/run/lock/clearapi-production-deploy.lock` 部署锁、指定 `/opt/clearapi/.tool-upgrade-...` 归档目录及其中四个归档/manifest/seal文件；列明确切目标、root属主/模式、内容与哈希验证方式、外部seal留存位置，以及归档部分失败时停止并保留现场的处理。此项不授权工具替换、boot资产安装、服务/数据库/账务/公网变更或第二个替换窗口。
+
+在采集器代码/哈希、只读凭据范围/有效期、真实连通与字段覆盖均得到独立核验，且负责人确认上述清单前，开始60秒实时预观察的条件仍为 **NO**。本次仅更新本总控；既有未提交内容原样保留。
+## 2026-10-20 — 当前恢复与 PG03 上线状态
+
+**CURRENT STATUS: LOCAL WINDOW STOP GATE IMPLEMENTED / 25 NEW GATE TESTS PASS / LIVE COVERAGE & OWNER WINDOW UNKNOWN / PRODUCTION ARCHIVE NO-GO.** 本轮仅本地实现并单独只读复审静默窗口失效停止门禁：归档/替换独立、各最长15分钟、双有效采集后先观察60秒；任何新调用、失联、UNKNOWN或到期都锁定失败，逐项阻止后续逻辑写入，包括日志和回退，不自动续期或重试。25项新增门禁测试分组20+3+1+1通过，原19项事务测试及既有验收未重跑。未连接生产/GitHub、创建生产归档/输入/锁、替换工具或执行服务/数据库/账务/公网操作。生产真实采集源资格、全入口覆盖与负责人窗口承诺仍未取得，归档及替换未获本轮授权；boot/Gateway/上线阻塞保持。
+
+### 2026-10-20 — 静默窗口失效门禁：本地实现与复审
+
+- **本地实现/只读复审 GO；生产归档 NO-GO**。完整记录：`evidence/recovery-tools-window-gate-local-review-20261020.md`。既有入口清单/08:23–08:30快照仍是历史证据，没有作为当前实时PASS输入；原设计记录 SHA256 `45ebb3c7ff1bad77b09bd180c03dc8db6bfcf1d08010d7a37a910ab193310d8f` 保持不变。
+- 新 `scripts/recovery-tool-window.py`：SHA256 `284125307fca2814b84f659d0470c41d133612de9d400362f888908b69fc3973`；`QuietWindow` / `WindowDriver` 实现一次性、固定UTC与单调时钟期限、60秒预观察、双监测线程、缺源/覆盖不完整拒绝及失效不可恢复。GitHub名义15秒/VPS2秒采集，TTL与最大观测间隔30/5秒；无默认PASS读源，不提供生产CLI或凭据。真实读源必须是单独审阅的实时只读回调，不能读取旧JSON伪装新观察。
+- 更新 `scripts/recovery-tool-upgrade.py`：SHA256 `77ba66604746da9bd7ee41783dc40cc21e3184608185c1decce534a9365f25ed`，固定新门禁模块及原boot基础函数哈希。`prepare(window)`、`apply(seal,window)`、`rollback(seal,window)` 均必需相符窗口，绑定phase/action/精确事务。部署锁、归档/备份/暂存/manifest/seal、日志、quarantine/publish/retire/restore逐项检查许可；门禁失效不追加成功/失败生产receipt，也不自动继续回退写入。已进入的durable原语完成自身fsync/close，随后变更一律重新检查；不声称能取消已进入的系统调用或实现零延迟全局互斥。
+- 新归档 schema `clearapi.recovery-tool-upgrade/v2` 封存归档窗口ref/期限/事务标识；prepared日志必须绑定该封存窗口，replace begin记录独立窗口。旧无窗口v1归档不能自动升格为新流程证据。新的生产候选必须固定以上新代码哈希，不能沿用旧操作API `7759004a...` 的批准身份；原RC/发布payload/停止receipt不变。
+- 在原 `scripts/ci/test-recovery-tool-upgrade.py` 增加25项 `WindowGateTest`，文件 SHA256 `5652f4e396dc4da52e8cbb819c907385083a833dc6f9a476ac5500b1f37b6150`。分组通过20/20、3/3、1/1、1/1；覆盖正常独立窗口、60秒/到期/不续期、新队列/调用/进程/jobs、SSH/监控异常、UNKNOWN/缺源、漂移/锁/时钟、归档及替换中途停止、回退停止、FD释放、最后发布后禁止成功receipt与重试。首次新增16项中的3个参数冲突已修复；通过结果及分组边界见审计。不把分组结果声称为最终全量suite跑过。原19项仅调整合成窗口fixture调用，不执行；无CI/RC/boot/演练/备份验收重跑。
+- **未覆盖/未验证**：任意控制台/特权命令、改名/已加载调用、外部凭据/其他agent及未来其他ref调用不能由进程快照直接证明静默；需要负责人覆盖冻结承诺。两个真实实时读源的凭据/字段映射/规范inventory指纹、全入口覆盖和采集时效尚未现场只读资格验证，不能判PASS。申请归档窗口前须确认owner、UTC起止<=15分钟、唯一executor及全部入口覆盖；固定新代码后，完成允许的60秒实时只读预观察并另行批准归档/input/lock写入。替换仍需实际归档独立验seal后再单独申请，现场NOREPLACE/fsync仍未实测。
+
+### 2026-10-20 16:23–16:34 — 上一轮静默窗口与调用入口证据（历史）
+
+本轮已实现下列历史记录中缺少的API门禁，见上方最新实现记录；历史入口/配置与空队列快照不因此成为当前窗口PASS，真实读源资格及owner承诺仍待取得。
+
+- 完整清单、窗口方案及证据哈希：`evidence/recovery-tools-quiescent-window-review-20261020.md`。GitHub 全为 GET，现有 gh 凭据；VPS 复用原 SSH 身份，仅内存只读探针。所有观察记录独立保存，不改写16:17停止证据或旧 RC 身份。
+- **PASS（采样范围）**：Actions in_progress / queued / waiting / pending / requested / action_required 六类在08:23与08:29 UTC两次采集中均 total_count=0、分页完整；main 始终为 `69a66431646b5cc8912bf97a739e08de07316443`。9项 workflow 全部 active，精确源定义补取完成。`CLEARAPI_AUTO_PRODUCTION_ENABLED=false`（既有状态，非本轮暂停）；production 环境仅允许 main、只有 branch_policy，无人工 reviewer/wait_timer 门禁。只列出1名仓库协作者（owner/admin），不能由此推断其所有 PAT/App/外部自动化持有者已静默。
+- **入口链**：main push→CI→Gateway RC→Deployment rehearsal→Automatic production release→可复用 Deploy Production（最后自动步骤当前受 false 变量阻断）；直接 deploy/recovery workflow_dispatch 与 rerun/approval 仍可构成调用。GHCR inspection 经 `inspect-vps-authorization.py:69` 调用 VPS V2 `--verify`，处于独立并发组且不受正常部署锁路径覆盖；不能将“只读检查”排除出调用冻结清单。所有refs、上游触发及人工/凭据API调用都需纳入窗口。
+- **VPS证据**：284项唯一 unit/config、15项标准 cron/anacron/periodic/user-spool 文件已作有界静态检查；backup/edge timer服务脚本及备份两项leaf依赖进一步核对，未发现四项工具的定时调用；标准at入口未发现。相关进程采样为空、部署锁不存在、systemd jobs为空。clearadmin为 unrestricted sudo；clearapi-deploy受限sudo白名单仍可调用四项工具，两种身份各有1条无 forced-command 的公钥记录；root直连SSH禁用。未读取/复制私钥或输出公钥值，未执行备份/工具/服务。
+- **方案（未激活）**：归档与最终替换各开一个最长15分钟的独立窗口，负责人明确UTC起止和唯一执行者，覆盖两类SSH、控制台、其他agent及外部凭据调用；窗口内不push/dispatch/rerun/approve/改配置。开始前60秒排空观察，GitHub至少15秒检查一次（证据TTL30秒），VPS进程/锁/jobs至少2秒检查一次（TTL5秒）；每次目标变更前检查身份和新鲜permit。检测新调用、漂移、失联、UNKNOWN或到期即停止推进，按已审阅身份规则回退或保留现场。等待负责人审批期间关闭窗口，替换前重新进入新窗口并核对封存基线，不无限占锁。
+- **仍缺最小条件 / NO-GO**：负责人尚未确认覆盖所有正常入口的有界维护承诺；现有 `Upgrade.apply()` 不是静默监控器，没有外部活性permit回调，最终小范围执行驱动必须先审阅其失效停止/回退联动。之后才可另行授权归档窗口、独立核验四项归档seal，并提交两项替换清单申请最终授权。现场NOREPLACE/fsync行为仍未实测，需在获批私有文件范围验证，不能由符号存在推断PASS。本轮没有擅自禁用工作流/调度、改权限或部署强制门禁。
+
+### 2026-10-20 16:17 — 工具升级现场预检：UNKNOWN 停止归档
+
+- 只读原始记录：`evidence/recovery-tools-production-preflight-20261020T081749Z.json`，SHA256 `aaa4eafb998f8426cb51b5f44b731ce711ce9baba4cd79e019e7896c75fb9203`；判定与缺失证据见 `evidence/recovery-tools-preflight-decision-20261020T081749Z.md`。探针仅经 SSH stdin 运行，未上传远端文件。
+- **PASS（当前观测）**：四项工具及 runtime-probe-session / controlled-traffic-hold 规范旧版字节、root:root 0750、普通单链接/无 xattr；控制 pin 匹配旧 wrapper。目标/归档父目录 0:0/0755、同文件系统、挂载非只读，可用 24713482240 bytes / 4966845 inodes，候选归档路径不存在。原 Gateway stopped/127、Executor/PostgreSQL running、Caddy stopped/no、Docker active/running/NeedDaemonReload=no 的基线保持。
+- **在途调用：采样未观察到，持续静默 UNKNOWN**。08:17:49.801352 与 .986064 UTC 的 `/proc/*/cmdline` 投影无已知工具/Actions runner 匹配且无读取错误；部署锁不存在、systemd jobs 为空。直接 systemd/cron 名称引用未检出；这些有限投影不能排除已加载模块、改名/间接入口、远端队列或采样后的新调用。未将采样结果写成完整窗口 PASS。
+- **硬阻塞**：缺少明确时限、责任人及禁止新人工调用/dispatch 的窗口约束，并缺少相关远端部署/恢复/维护队列与间接调度入口的排除证据。共享锁不足以阻止加锁前的模块导入/校验。libc renameat2 符号存在，但现场文件系统 NOREPLACE/持久性行为未做写入实测，不冒称 PASS。
+- **归档 NOT CREATED / 完整性 NOT RUN / 替换 NOT RUN**。目录与容量可行不等于已满足写入门禁；出现必要 UNKNOWN 后未调用 prepare、创建锁或暂存新代码。故本轮不签发最终生产替换清单、不申请将 UNKNOWN 豁免为 PASS。下一最小动作是补齐静默窗口/队列/入口证据；若需要暂停调度或修改访问控制，先列明最小动作另行批准。门禁解除后重新核对现场，才可在授权范围内生成四项归档、独立验 seal，并提交仅两项替换的最终待批清单。
+
+### 2026-10-20 — 四项旧工具本地复审：两项替换、两项保留
+
+- **本地方案 GO / 生产执行 NO-GO（未另行授权）**。完整方案及历史证据更正：`evidence/recovery-tools-upgrade-review-20261020.md`。现有 HEAD 的根 tree 恰为 `7231fa53f2a1bb8cebb7ab314f9f038442ac3de6`，与既有精确源提交审计一致；本轮直接比较该本地 tree 与事故提交 `c50a53c1b89e121bcade7dac41d3f11e53a9832a` 的原始 Git blob，没有修改发布脚本或重建 RC。
+- 最小生产候选仅两项：先将 control 从 `08f457e0...` 替换为 `2c14d16d...`，再将 wrapper 从 `1bd21eae...` 替换为 `dd4e2fbe...`，均固定 `0:0/0750`。新 control 原字节已固定新 wrapper SHA；新 wrapper 已固定 recovery helper SHA，不现场修改常量或放宽哈希门禁。legacy-transition 的规范 SHA 为 `c078b3c8...`，schema-rehearsal 为 `5bb73efc...`，旧→新均相同，作为不写入的身份护栏。
+- 更正上一轮证据中的两项 `recovery_source_sha256`：`7eef8104...` / `0b594a4f...` 是 CRLF 工作区字节，不能安装为规范恢复源码。原停止 receipt SHA 仍为 `535918ade2d0c7b887b705b3f561fa3c3a91093eb4c5ceee34f96070d8739df5`，不覆盖原件；更正不撤销真实 wrapper/control 停止原因，也不改变七项来源 PASS、原 RC `39357150402/1` 或其历史。
+- 新本地事务 API：`scripts/recovery-tool-upgrade.py`，SHA256 `7759004a21e68b03b2ece8ae9300364043a7adc2625a8c8075177abf1d320d42`。复用哈希固定且未修改的 boot 安装器安全读写/部署锁/日志基础函数；独立封存四项原件与元数据、外部 seal 校验后，仅两项通过 NOREPLACE 逐项替换。日志 intent 与 dev/inode/内容/权限约束回退；未知文件、护栏漂移或回退失败即停止并保留现场。无生产 CLI，无服务/网络/数据库调用，不属于原 RC 产物。
+- 新增一个定向测试文件 `scripts/ci/test-recovery-tool-upgrade.py`，SHA256 `7d8bf8613612db963cd89742857fb935b088aa0bd89cd37f1cc292acd8fdcf28`；WSL Linux root 临时目录 **19/19 PASS**，含8个替换失败边界、旧拒绝/新兼容、CRLF与哈希拒绝、归档校验、部分回退失败及身份约束恢复、冲突/权限/链接/日志/幂等检查。未重跑既有31项 boot 安装器测试、CI、RC、恢复演练或备份验收。
+- 只读复审 PASS；生产最新状态/调用静默窗口/依赖身份/容量与文件系统前提 **UNKNOWN / 本轮未检查**。共享部署锁不能阻止所有入口在锁前导入或校验模块；未来需先排除在途调用并禁止新调用，否则不得升级。下一步只可单独申请“两项替换、四项归档、固定新工具输入、独立校验、受控回退”授权；不能自动续跑 boot 安装或 Gateway/Caddy 恢复。
+
+### 已完成
+
+- 恢复源代码 `ff6e0f4b2` 已合并为 main `69a66431646b5cc8912bf97a739e08de07316443`（PR #77）。原 CI `39354033185` SUCCESS；合并后 main CI `39354908193` SUCCESS，SQLite/MySQL/PostgreSQL 检查均通过。
+- Gateway RC `39357150402` SUCCESS，源码与 RC 身份一致；Gateway digest `sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a`，binary SHA256 `40ebc70665bf7f45c7a201c4fdd82a90913a1873b2c7ca0debda1829983eee4b`，manifest/schema rehearsal 均通过。RC 明确标记 `production_ready=false`、`production_acceptance=not_run`。
+- 失败恢复演练 `39358088019` SUCCESS；同源 `recovery-rehearsal.json` 绑定 RC `39357150402`、source `69a66431646b5cc8912bf97a739e08de07316443`、wrapper SHA256 `dd4e2fbedff508588b203d3736b6104e1fcd5557c05182f5ef47db8a3ed34d85`。演练没有生产凭据或生产写入。
+- 授权后的只读门禁复核完成：RC `39357150402` 和恢复演练 `39358088019` 仍为 SUCCESS；未触发 recover workflow，未产生生产 job、receipt 或运行状态变化。
+- SSH 只读审计 PASS：`clearadmin@103.42.181.219:22` 通过默认 `known_hosts` 的严格主机密钥校验，实际 sudo 权限与历史记录一致；未创建新密钥或扩大权限。完整证据：`evidence/controlled-recovery-ssh-audit-20261020.md`。
+- 现场只读结果：Gateway `clearapi-new-api-1` 为 `Exited (127)`；Executor 与 PostgreSQL running/healthy；Caddy 为 stopped 且 `restart=no`；公网 localhost health probes 均未连接成功，未执行外部开放检查。
+- 备份/回滚资产核对：manifest SHA256 `a9b9c32cd168c5a68740e20f1c949cff41da665b14d7aeb5790404dd0d795166`、加密备份 SHA256 `0c8757c8d204cddd7cc5b3b9a7835823e376093b9ee344f5a8bd8c219d3b3b31` 均匹配；旧 Gateway image 在场。未执行恢复，真实回滚仍为 UNVERIFIED。
+- Caddy reconcile 已在本地实现：只调用 `systemctl is-active` 门禁和固定 Docker socket 的最小 `docker inspect --format` 投影；Docker daemon 不活跃、容器缺失、JSON/状态无效或探测异常均为 `UNKNOWN`，不会因异常默认 `PASS`。持久化 journal 的 `edge` 被按隔离前原始快照解释，推导出的 stopped/no 才是隔离期望；不改写 journal、不执行 start/stop/update/systemctl 写操作。
+- reconcile 支持 `--stdout-only` 零审计写入探测；使用 `--audit-log` 时只允许在本地 `evidence/` 目录追加 JSONL，记录 UTC 观测时间、observed/persisted/expected、差异、错误和建议动作；拒绝生产路径、UNC、符号链接、硬链接和状态文件别名。针对正常隔离、运行中、身份/镜像/暂停/restart policy 漂移、容器缺失、Docker 不可用、超时、坏 JSON、重复字段和审计追加已覆盖测试。
+- boot recovery 正式实现已从当前恢复分支和历史提交 `7a491c3ff`、`ff6e0f4b2` 核对：`scripts/runtime-boot-recovery.py`、四项 tmpfiles/systemd 资产定义及 `scripts/ci/test-runtime-boot-recovery.py` 均存在；缺失的是生产安装状态，不是本地源码。新增重启恢复/幂等安装测试，未安装到生产。
+- 本地验证：Windows `python -B scripts/ci/test-caddy-state-reconcile.py` 共 19 项，18 PASS、1 项 POSIX symlink 用例跳过；WSL root 下 Caddy 19/19 PASS、boot recovery 12/12 PASS（含真实 tmpfiles 与 systemd-analyze 验证）；Python 语法检查与 `git diff --check` 通过。完整根因、资产 SHA256、启动触发条件与前置检查见 `evidence/controlled-recovery-local-review-20261020.md`。
+- RC `39357150402` 的缓存发布原件已找到并核对：`artifact-hashes.json` 中 4 个条目全部匹配（gateway manifest `68bbc50ff0703cfc172eff77d1c56b45bf79ef03cad7556f592836e7c8d46fa0`、binary info `c5a9fae198f220074302eec01da247ffecc5eb5f627811508adb45edf6b5add1`、schema JSON `75f09b27fe2330ce5481ea1ea01fbf8a676bc1c3308e9840702a4b72ad755eb4`、target SQL `79d553767b10ed9edc45c37e56a2a82bcc1dce661e0ddd469b306b43d732f6a4`）。Manifest 的 source/candidate/OCI/workflow commit 均为 `69a66431646b5cc8912bf97a739e08de07316443`，RC run/attempt 为 `39357150402/1`，Gateway digest 与 binary SHA256 均匹配既有记录；`production_ready=false`、`production_acceptance=not_run`。
+- Recovery rehearsal 缓存原件也匹配：source `69a66431646b5cc8912bf97a739e08de07316443`、RC `39357150402`、wrapper SHA256 `dd4e2fbedff508588b203d3736b6104e1fcd5557c05182f5ef47db8a3ed34d85`，与当前 `production-deploy-v2.sh` 一致。
+- boot recovery 来源链 **PASS**：2026-10-20 06:40 UTC 通过现有 `production` 远端对应的 GitHub API 读取精确提交 `69a66431646b5cc8912bf97a739e08de07316443`，根 tree 为 `7231fa53f2a1bb8cebb7ab314f9f038442ac3de6`；三个 Python 文件（Git 模式均 `100644`）与本地 `ff6e0f4b2` 资产逐字节一致，SHA256 分别为 `354a69bccfeb3ad7ba631a5b28dce27b2f2989d7315d597f8b53d82d13a5cdd5`、`afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e`、`860914fd36624296f6177dcf127a2aa5e1c1ab82c95b98760b79c9818ad99ff1`。四项 systemd/tmpfiles 资产来自该 tree 的 `scripts/runtime-boot-recovery.py:35-68` 中 `ASSETS` 字面量，UTF-8 内容也全部逐字节一致；不是四个独立 Git 文件。原本因本地缺失 merge object 而留下的 UNKNOWN 已解除，没有替换资产或改变本地 HEAD/main。
+- RC `39357150402/1` 在线原件核对 PASS（沿用上一轮结果）：head/source/candidate/OCI/workflow commit 均为上述提交；artifact `12235966400` ZIP SHA256 `ac7c42fc5a3549773f2c59080b503d6d5201f7442c9c20a955eb542f97ffb09b` 与 GitHub digest 一致，四项内部 inventory 哈希全匹配。恢复源码明确将 boot/helper 列为 recovery assets，并在执行前对照该提交逐字节校验。**原 RC 未包含独立 boot inventory**：其四项 inventory 不包含这七项资产，Gateway 最终镜像也未打包它们；本轮以独立本地补充归档记录该交付清单缺口，不改变原 RC 身份或历史。原始来源审计保留于 `evidence/controlled-recovery-local-review-20261020.md`，本轮未覆盖该证据。
+- 七项资产的独立补充 inventory 已保存至 `evidence/boot-recovery-assets-supplement-rc39357150402-attempt1-20261020.json`；归档 SHA256 为 `b25e5a9c3deee05b51c7aaf3d0c74167c0be223929e2f1191d01ebc5492917d2`，校验文件为同路径后缀 `.json.sha256`。归档包含 source commit/tree、原 RC `39357150402/1`、artifact/manifest 身份、三项源码路径/Git 模式/blob/哈希及四项内嵌资产定义位置、目标路径、请求安装模式和哈希；未知生产模式明确标为未验证。七项本地哈希均与既有审计一致；归档字节、JSON 内容、SHA256 与校验文件回读核验 PASS。此为事后本地补充清单，不是原 RC workflow 产物，未上传外部系统；原始审计文件保持不变。
+- 四个 systemd/tmpfiles 内容的本地期望 SHA256：`/etc/tmpfiles.d/clearapi-runtime.conf`=`61c0985511f716a07407f3f27ee8b81a43cf34ccd9c5d9a906641380f4985932`；`clearapi-runtime-directory.service`=`f1ded6ec46c2906f0173459ab5e0768de37e4bf4c63a387f0eaa9e8b6b83ca93`；Docker drop-in=`b327be816c5c2a7bcef7a8378be6af5eb91cd9689ac04515766dad38e8d2d630`；`clearapi-runtime-identity.service`=`81dfc61b3d6b118dac38f846827bd49d0f4dcfd9f3c874a796b534eb4e8972aa`。安装目标、权限和回退说明已写入本地审计记录；生产目标未读取或修改。
+- 独立审阅与生产只读预检（2026-10-20 15:39–15:43 Asia/Shanghai）完成：安装器固定哈希 `6bf1c77e6ce1c162e22328239badbaf67b77bde21f100fbbcf3a5747812d01d5` 的事务边界、封存校验、权限、受控回退、重复执行及路径约束审阅 PASS；七项目标中 helper 正确、其余六项缺失且无未知内容冲突；Caddy 隔离与归档目录/容量只读前提 PASS。详见 `evidence/boot-recovery-independent-review-20261020.md`。本轮读取了生产目标，取代上条“生产目标未读取”的旧阶段状态；仍无资产写入。
+- 已收到限定生产安装授权；执行前兼容性只读门禁 **FAIL / STOP**。新 helper 的 `authority()` 必须让 RC manifest 的 `v2_wrapper_sha256` 等于所加载 `CONTROL.V2_SHA`；现场旧 control 仍固定 `1bd21eae376dd8316d1cfabe558133b4e0390965c2f13b7005e4deb656eac109`，而 RC/恢复源码要求 `dd4e2fbedff508588b203d3736b6104e1fcd5557c05182f5ef47db8a3ed34d85`，旧 wrapper 同时缺少 `--recover-failed-controlled`。负责人本次第6条将此类兼容性风险明确列为停止条件，因此在归档/暂存/锁创建之前停止，不更新旧工具。
+
+### 当前阻塞
+
+- 当前硬阻塞：Gateway 仍为原容器 Exited(127)，/run/clearapi 缺失；六项 boot/recovery 安装目标仍缺失。Caddy 现场隔离已只读核验 PASS，原始 running/unless-stopped 快照与当前 stopped/no 的差异符合隔离流程，不再作为 journal 损坏或来源不明阻塞。没有修写 journal、创建运行目录或启动服务。
+- 恢复执行依赖 **FAIL / BLOCKED（本轮16:17重新只读确认）**：四项工具均精确匹配事故提交，但只有 `production-deploy-v2.sh`、`pg03-release-control.py` 与恢复 tree 不同。另两项规范 Git blob 完全相同，先前“不匹配恢复源提交”的四项泛化已纠正。旧 wrapper 缺少 `--recover-failed-controlled`，旧 control 的 V2_SHA 仍为 `1bd21eae...`，恢复 RC 要求 `dd4e2fbe...`；七项 boot 安装不能修复该差异。两项替换、四项独立归档/身份护栏的本地方案已 GO；现场工具身份/目录可行性已 PASS，但持续排除新调用仍 UNKNOWN，因此未进入归档，生产替换仍须单独批准。不夹带入 create-only 七项安装，不重建 RC。
+- 启动写入风险仍 UNKNOWN：生产环境存在 finance、billing outbox/protection/reconciliation 和 task-settlement 控制变量，但有效迁移/后台写入开关无法从现场安全确认。恢复文档明确记录 Gateway 启动可能执行 AutoMigrate、auth cleanup、system updates、finance sync、completion/outbox processing 和 route ledger recovery；按授权边界停止在任何生产写入之前。
+- 本地 boot/helper/recovery/wrapper 到 RC 精确源码提交的字节身份已核实为 PASS，boot 实现未改写；独立 boot inventory 已完成本地补充归档，该项不再是本地归档阻塞。新 Caddy 工具/测试仍未纳入发布身份。历史 CI/RC 成功保留，不冒称新增代码已通过远端门禁。
+- 安装入口改为新本地 `scripts/boot-recovery-install.py`：必须先封存并独立验证七项原状态、enable 链接与目录基线，再在部署锁下安装；无立即 start/restart 调用。旧 boot 脚本内置 `install` 保持原字节，不得作为后续生产安装入口绕过事务归档门禁。
+- 安装前归档、模式及回退的**本地修复 GO / 独立审阅 PASS** 保留；负责人限定批准已经取得，但新增的兼容性停止条件已触发，安装执行 **BLOCKED**。真实生产归档及其完整性均 NOT RUN，不冒充 PASS；本次没有进入生产写入，也没有可验证的生产安装 receipt。
+- 网站恢复和 PG03 正式上线仍未执行；Provider、真实 Usage/Billing、登录及商业验收仍未验证。CI/RC/演练通过不等于上线成功。
+
+### 需要负责人执行
+
+- **历史限定 boot 安装批准已按第6条停止，当前任务不授权任何生产归档、替换、boot 安装或 Gateway 启动**：原提案及 SHA256 `9ad6fe8b0aa0db20087409fae2a75be5e0379aefd7b6480c65a2ce312cccab05` 保留。新鲜permit门禁已本地实现/复审，下一最小条件是负责人确认15分钟窗口/全入口冻结、固定新版操作代码，并绑定审阅合格的真实实时只读源与规范指纹，完成60秒预观察；缺失/UNKNOWN即门禁拒绝。再另行授权生成/独立校验四项归档，提交 control→wrapper 两项替换/受控回退清单供确认。快照为空和既有auto=false都不是替换批准，不自动续跑七项安装。
+- 新事务入口只有在独立归档校验、原状态回读和精确来源/权限检查全部通过后才可创建缺失资产；不覆盖任何既有版本，不自动规范化权限异常。回退仅撤销本次日志可证明且身份未漂移的对象；来源不明、目录创建身份无法证明、加载状态异常或回退 reload 失败均保留证据并停止，禁止以 start/restart、删除目录树或覆盖未知文件补救。
+- `mode=recover` 前仍必须明确启动写入范围：master 执行迁移/初始化；finance 需 enabled=true 且 owner ID 有效；protection 或 durable-wallet 开启即触发 reservation completion，outbox 只控制额外日志交付；settlement 在 polling 被调用且相关开关/前置 schema 满足时恢复；route-ledger recovery 和 instance reporter 不受 master 角色统一禁止。生产门禁在 InitResources 之后，可能晚于部分写入。已与事件镜像对应源码核对这些路径未变；任何有效配置、schema、pending workload 或写入影响 UNKNOWN 时保持 BLOCKED，需另行明确授权已审阅的启动写入范围。
+- 仅在 `recover` 成功且新 receipt、备份/回滚和全量 Runtime 检查通过后，再单独授权 `mode=restore` 恢复原 Caddy；随后仍需独立完成 PG03 线上验收，不能将 website restore 视为 PG03 上线完成。
+
+### 2026-10-20 — 上一轮 boot 授权执行尝试：兼容性停止（历史记录）
+
+以下保留上一轮停止过程；其中“四项均不匹配恢复源码”的判断已由本轮原始 Git blob 审阅更正为“两项不匹配、两项保留”。原 receipt 不改写，生产停止事实不变。本轮新增本地代码与测试的结论以上方最新复审为准。
+
+| 检查/阶段 | 结果 | 说明 |
+| --- | --- | --- |
+| 授权接收与本地安装器身份 | PASS | 负责人批准限定 boot 安装并附七项约束；安装器仍为已审阅 SHA256 `6bf1c77e6ce1c162e22328239badbaf67b77bde21f100fbbcf3a5747812d01d5`，未改写。 |
+| 执行前旧工具/新资产兼容性 | FAIL / STOP | 15:55:13 Asia/Shanghai 经原 SSH 身份只读确认四项旧工具仍不匹配恢复源码；旧 wrapper 无恢复入口，旧 control 不接受恢复 RC wrapper 哈希。按本次第6条停止，不沿用上一轮“boot-only 可分阶段申请”的范围判断绕过此新停止门禁。 |
+| 生产输入目录、安装前归档、部署锁 | NOT CREATED | 三个授权候选路径均仍不存在；没有调用安装器 archive/lock，也没有任何现场归档可供校验。 |
+| 归档完整性 / 安装 / reload / enable / check-installed | NOT RUN | 停止发生在任何生产写入前。不能把本地方案验证或旧31项测试视为这些生产步骤已通过。 |
+| 回退与生产 receipt | NOT NEEDED / NOT CREATED | 无本次生产变更；不调用回退，不虚构生产安装成功 receipt。已生成独立本地停止 receipt，保存授权文档及安装器哈希、只读实测和停止原因。 |
+| 现场容器与隔离 | 保持原状态 | 精确 Gateway 仍 stopped/127；原 Executor/PostgreSQL running；原 Caddy stopped、未暂停、restart=no/0。未执行任何 start/restart、Docker/主机重启、数据库、账务或公网动作。 |
+
+本地停止 receipt：`evidence/boot-install-compatibility-stop-20261020T075513Z.json`；SHA256 `535918ade2d0c7b887b705b3f561fa3c3a91093eb4c5ceee34f96070d8739df5`，已重新读取核验。它是本地执行尝试/停止记录，不是生产安装完成 receipt。观测时间为 `2026-10-20T07:55:13.753503+00:00`。
+
+停止原因已足够明确，本轮不扩大为旧工具修复或追加生产权限申请；不继续归档/安装，也不重跑既有测试、RC 或验收。后续恢复仍须解决四项旧工具合同及 Gateway 启动写入范围，Caddy 恢复和正式部署仍未授权。
+
+### 2026-10-20 — 上一轮独立审阅与生产只读预检
+
+| 检查 | 状态 | 本轮依据及范围 |
+| --- | --- | --- |
+| 安装器独立审阅 | PASS | 重新读取完整代码，核对事务/路径边界、封存完整性、权限、原子 no-replace 发布、日志对象归属回退及无立即 start/restart 调用。相同事务重放被拒绝且不追加目标变更；新事务可保留已正确资产。不是任意重试都不运行 reload/enable。 |
+| SSH 身份与 root 只读权限 | PASS | 复用历史明确密钥；公钥指纹与旧审计一致、严格 known_hosts、IdentityAgent=none。未读取/复制私钥，未创建凭据或扩大权限。默认身份失败后仅改为正确的原身份。 |
+| 七项目标、属主/权限与链接 | PASS（仅安装兼容性） | identity helper SHA256 与 inventory 一致，0:0/0750/nlink=1/无 xattr；其余六项缺失。预期 enable 链接及额外相关 alias/mask 不存在；docker.service.d 缺失，wants 目录及其它必需父目录为 root:root 0755。缺失不等于已经安装。 |
+| 当前 systemd 前提 | PASS | Docker active/running，NeedDaemonReload=no，无待执行 job；两个新 boot unit 的 not-found/inactive/dead 投影字段完整、无覆盖。只执行 show/list-jobs/is-active，没有加载或 enable。 |
+| Docker、Gateway、Executor、PostgreSQL | PASS（保留现场身份）；Gateway 可用性 FAIL | 原 Gateway f8f963a7... 停止/127，缺失运行目录的 mount 错误未变；精确 Executor 1081a1b5... 与 PostgreSQL running/healthy。Docker 活跃后才读取固定 socket 投影，无 Docker exec 或数据库查询。 |
+| Caddy 与隔离 | PASS（观测范围） | 原 Caddy 54c8550b... / f2a1290d... 停止、未暂停、restart=no/0；与冻结日志推导的隔离期望一致；TCP/UDP 80/443 无监听。未做公网访问或入口操作。 |
+| 原事故记录与备份信息 | PASS（身份/元数据） | manifest/target/hold 三份冻结 SHA 匹配。备份 manifest SHA a9b9c32c... 匹配；加密文件 root:root 0600、12323351 bytes 在场；未重跑加密文件全量哈希、解密、恢复或旧备份验收。当前加密内容新鲜验证不声称 PASS，既有验收按原范围保留。 |
+| 归档可行性 | PASS（只读条件） | 候选 `/opt/clearapi/.boot-preinstall-rc39357150402-1-20261020T073800Z` 及 input 兄弟路径不存在；父目录0:0/0755无 xattr，root可写/可搜索，挂载非只读；根与七目标最近父目录同 device=64769。可用24713674752 bytes、4966845 inodes，超过16 MiB/64 inode计划余量。未做任何创建/写入/fsync探针。 |
+| 真实归档、生产安装及回退实证 | UNKNOWN / NOT RUN | 本轮明确禁止。只能在后续单独批准后生成归档、独立验 seal 和原状态，再决定是否进入安装；不可从只读可行性推断已经成功。 |
+| 完整恢复工具合同 | FAIL | 四项 root 工具为精确可追溯旧版；旧 wrapper 没有恢复入口，旧 V2 pin 与恢复 RC 不符。后续最小四项升级需单独规范和审批，不因此放宽七项安装器对既有资产的拒绝覆盖规则。 |
+| Gateway 启动及上线写入影响 | UNKNOWN / BLOCKED | 本轮不查账、不执行 schema/pending-workload 验证；旧启动写入范围阻塞保持。boot enable 的未来启动影响须在有限清单中明确接受，不等于授权当前重启/恢复或开放。 |
+
+- 原始只读证据：`evidence/boot-recovery-independent-preflight-20261020T073948Z.json`、`evidence/boot-recovery-preflight-followup-20261020T074134Z.json`、`evidence/boot-recovery-dependency-preflight-20261020T074500Z.json`。最后一份以 JSON 内观测时间 07:43:41 UTC 为准，不以文件名充当时间。首次 Docker 健康字段投影对停止容器失败，原 UNKNOWN 记录保留；缩小投影后的补采已解析真实容器状态，未修改原记录。
+- 独立审阅及阻塞根因完整记录：`evidence/boot-recovery-independent-review-20261020.md`。只读复审未改安装器或测试；原31/31结果保留，未重复运行。
+- 具备**仅 boot 七项安装**的限定申请条件，待负责人审阅 `evidence/boot-recovery-install-authorization-20261020.md` 后另行批准；不具备 Gateway 恢复、网站开口或 PG03 正式上线的执行条件。实际生产归档完整性未知是批准后执行阶段的硬门禁，不能绕过；现场四项旧工具与启动写入未知仍阻塞后续恢复。
+
+### 2026-10-20 — 上一轮三项修复及只读复审
+
+**本地结论：GO。生产结论：NO-GO。** 完成本轮授权的归档、精确安装模式、可审计失败回退三项修复；生产连接、现场归档与安装未授权也未执行。下面保留的历史 NO-GO 记录已由本节对应实现与测试结果取代，不作为本地修复仍未完成的结论。
+
+| 修复 | 实现及复审结果 |
+| --- | --- |
+| 七项安装前归档 | 新 `scripts/boot-recovery-install.py` 封存现存原始字节、数值 UID/GID、完整权限位、SHA256/长度、链接数及 dev/inode，明确记录 absent；保存 enable 链接目标/权限/属主/哈希、两项可能新建目录和只读 systemd 投影。root:root 0700 归档目录、0600 manifest/seal、文件和目录 fsync、独立外部 SHA 校验及安装前再次比较；归档失败不得安装。 |
+| 三项 Python 安装策略 | 三个 `/opt/clearapi/bin/*.py` 目标固定 root:root `0750`，四项配置固定 root:root `0644`；显式 fchown/fchmod，不依赖 umask。依据现有 root 运维安装器的 0750 策略、recovery 对 identity helper 的直接执行要求和 boot unit Python 调用，非推测现场权限。原 inventory 的 null 安装模式字段不回写，独立策略记录于新审计。 |
+| 部分失败及冲突 | 完整暂存后原子 no-replace 发布；部署锁、预期前置状态和 hash-chain JSONL 日志绑定逐项对象身份。已存在者必须内容/精确权限都匹配，否则停止；从不替换未知旧资产。 |
+| reload/enable 失败回退 | enable 的唯一预期 WantedBy 链接先由事务创建、记账；真实适配器仅允许显式 reload、`--no-reload enable` 和只读投影，无 start/restart/disable/Docker。失败仅撤销日志中本次创建、身份仍匹配的对象；核对完整原文件/权限/链接及 systemd 基线。回退 reload 最多一次，失败记录 incomplete，不自动重试。 |
+| 崩溃及未知状态边界 | 回退可只依赖封存归档、外部归档 SHA 与持久日志，不依赖源码包。不能证明的目录创建、未知 inode/内容/权限、意外 enable 链接、ACL/xattr、额外 mask/alias/覆盖及跨文件系统布局均 fail-closed；保留未知对象，不伪报恢复 PASS。 |
+
+- 新安装器 SHA256：`6bf1c77e6ce1c162e22328239badbaf67b77bde21f100fbbcf3a5747812d01d5`；新定向测试 `scripts/ci/test-boot-recovery-install.py` SHA256：`93f601d9eb3bd4955176cd64c332f30e4e0c4dc732b083563e5dafe662dbeb2b`。两者都是新本地资产，不冒充源提交 `69a66431646b5cc8912bf97a739e08de07316443` 或 RC `39357150402/1` 的文件。
+- 仅运行新增测试：现有 WSL Ubuntu root / Python 3.14.4 下 `python3 -B .../scripts/ci/test-boot-recovery-install.py` **31/31 PASS**。全部目标、归档及变更只位于临时目录，systemd 使用替身，真实 subprocess 调用被禁止；已验证归档截断/篡改/漏项、archive 路径冲突、不同 umask、权限/属主/链接异常、部分发布、同字节 inode 替换、reload/enable 失败及回退失败、进程重建后回退、互斥和加载顺序漂移。未执行旧 boot/Caddy 测试、完整 CI/RC/备份验收或真实 systemd 集成测试。Python 内存语法解析及空白检查通过。
+- 最终只读复审：归档校验与回退入口独立；公有 archive/install/rollback API 均获取部署锁；既有正确资产及原 enable 链接不变；未知对象不能以内容相同替代 inode 归属判断；所有 incomplete 分支均阻止成功结论和自动再次回退。旧 `runtime-boot-recovery.py install` 不再列入待执行方案。
+- **剩余生产阻塞**：新安装器独立身份及策略尚待负责人审阅接受；七项目标、相关链接/覆盖/权限、无待执行 systemd 作业和同文件系统归档条件需要另行授权的现场只读预检；之后还须现场生成并独立验证生产归档，再单独授权安装。归档阶段也可能创建部署锁和归档目录/文件，不能当作只读步骤。Gateway 启动写入、Caddy/隔离、数据库及业务验收仍属后续独立门禁。
+- 本轮停止在本地修复与复审完成，不请求或执行生产写入；在上述必要生产前提齐全前，不整理可执行的生产安装授权清单。完整依据及失败语义见 `evidence/boot-recovery-install-local-review-20261020.md`。
+
+### 2026-10-20 — 历史安装前归档与回退静态审阅（修复前）
+
+**当时结论：NO-GO，仅完成本地审阅。该阶段记录保留，最新本地修复复审结论以上节为准。** 七项资产的来源与目标路径一致，不代表已具备可执行、可恢复的生产安装事务。当时只改本总控文档；未改源码、inventory、校验文件或其引用的原始审计，未运行既有测试。RC 在线状态沿用既有证据，未重新访问 GitHub。
+
+| 必要检查 | 本轮结果 | 证据或缺口 |
+| --- | --- | --- |
+| 补充 inventory 完整性及来源身份 | PASS | 实测 SHA256 仍为 `b25e5a9c3deee05b51c7aaf3d0c74167c0be223929e2f1191d01ebc5492917d2`；sidecar 匹配；其引用原始审计 SHA256 `e1ad09c894f4efb8970ea68ab5a17091ee09cb3be14eb09087830d3ae0118b9d` 未变；source/tree 与 RC `39357150402/1` 均匹配既有记录。 |
+| 七项内容和安装目标 | PASS | 三个本地源码文件的 SHA256/Git 模式/blob 匹配 inventory；四项 UTF-8 ASSETS 内容的 SHA256、字节数、目标路径全部匹配，无重复目标。 |
+| 明确安装权限和属主 | 未通过 | 三项脚本的 `installation_mode` 均为 null；Git `100644` 不能当作生产安装模式。四项配置的 `0644` 只是 `os.open` 请求值，受 umask 影响；尚无统一的七项 root:root/精确模式与安装后回读方案。helper 被恢复代码作为可执行路径直接调用，必须明确其执行权限。 |
+| 保存七项目标的安装前内容、权限、属主、哈希、缺失状态 | 未通过 | `scripts/runtime-boot-recovery.py:211-230` 只生成四项配置，不安装三个 Python 文件、不归档旧内容或缺失状态；文档仅要求存在安装前归档。补充 inventory 是新资产清单，不含生产旧文件 payload，不能替代现场基线。 |
+| 生产归档完整性 | 未验证 | 未连接生产、未创建或读取现场归档；现有资料没有覆盖全部条目的 manifest/payload/元数据回读验收证据。 |
+| 部分失败与 systemd 回退 | 未通过 | 无跨七项文件及 enable 链接的事务日志、失败恢复状态机与验收步骤；文件 fsync 不等于父目录项已持久化；配置创建中断、reload/enable 失败均可能留下部分结果。 |
+| 无立即启动或重启调用 | PASS（静态） | `install()` 及已核对 helper 导入调用链无 start/restart、Docker 操作或运行时目录创建；不代表生产现场的作业队列和有效配置已被检查。 |
+
+**安装前归档方案必须补齐的内容（审阅要求，不是生产命令）：**
+
+1. 采用固定七项目标 allowlist，并另列 `enable` 的预期链接 `/etc/systemd/system/multi-user.target.wants/clearapi-runtime-identity.service`、实际相关既有 enable/mask 链接及可能新建的 `docker.service.d`/wants 父目录。记录既有 unit enable/mask 状态、有效 FragmentPath/DropInPaths 与顺序；不得假定链接或目录原先缺失，也不得遍历或归档无关生产数据。出现额外覆盖来源时先停下并分类。
+2. 对七项目标逐项保存明确的 `present`/`absent` 状态；存在者保存原始字节、SHA256、字节数、数值 UID/GID、完整权限位、文件类型和链接数；相关目录/链接保留类型、属主、模式和链接目标。ACL/xattr 等额外权限元数据若存在，须明确可保存和恢复，否则阻塞。符号链接、硬链接、非普通文件、异常父目录或来源不明资产只记录并停止，不能通过跟随链接、chmod/chown 或强制覆盖“修复”现场。
+3. 明确 root-owned 归档目录、唯一事务 ID、与 source/tree、原 RC、补充 inventory 哈希的绑定、部署互斥范围及不可覆盖的保存方式；同一锁下以安全文件描述符读取，核对读取前后的 inode/元数据，防止归档时状态变化。已知旧资产还需有受信旧版本身份依据，单纯给未知旧文件计算哈希不等于证明其来源。
+4. 在任何安装目标变更前落盘全部旧 payload、缺失条目与元数据 manifest，对文件及目录项完成持久化；重新打开逐项核对 payload 哈希、长度、类型、属主/模式和缺失条目，确认无漏项/多项。再封存归档 manifest/容器自身 SHA256 并保留独立校验记录；任一项失败即不安装。此处尚无实现或实际验收，不能标为归档完整性 PASS。
+
+**回退覆盖要求与现有缺口：**
+
+| 失败场景 | 必须遵循的回退边界 | 当前方案状态 |
+| --- | --- | --- |
+| 第 N 个文件创建/写入或进程中断 | 用持久化事务日志区分未触碰、完整新建、部分新建、既有文件；原先缺失者只处理可证明由本事务创建且身份仍匹配的对象。无法确认当前部分文件来源或遭并发更改时停止并保留证据。不能仅按“安装前 absent”就删除当前路径。 | 无逐文件创建意图、inode/哈希、完成标记及中断恢复流程；NO-GO。 |
+| 既有文件内容冲突或来源不明 | 四项配置预检会拒绝当时存在的冲突；七项统一安装也必须先拒绝未知版本/目标漂移。回退只允许恢复可信归档中的原件，且先确认当前目标属于本事务允许撤销的状态；无此证据不得覆盖。 | 三项脚本安装尚无审定流程；预检与写入间也无整体锁/最终复核；NO-GO。 |
+| 权限、属主、链接或目录异常 | 首次写入前停止；中途异常只对日志证明由本事务改变的对象恢复已归档数值 UID/GID 和权限/链接状态，验证哈希及元数据。不得用统一 chmod/chown 掩盖原始异常。 | 缺七项精确模式和元数据恢复验收；NO-GO。 |
+| `daemon-reload` 失败/超时 | 认为加载状态未知，停止后续 enable；按可信基线和事务日志恢复文件/链接，再在另行授权的回退范围内 reload 并回读验证。若回退 reload 仍失败，记录恢复未完成、停止重试，保留隔离和证据，禁止以启动/重启服务补救。 | 现有代码只抛错退出，不撤销已创建配置，也不恢复管理器加载状态；NO-GO。 |
+| `enable` 部分成功或失败 | 记录所有本事务实际创建的链接；仅撤销仍与事务记录一致的新链接，保留原有 enable/mask 链接和状态。不能粗暴执行 disable、删除整个目录或强制解除 mask。恢复后验证磁盘链接与加载状态；目录只在证明本事务创建且为空、未漂移时处理。 | 原回退原则未覆盖 enable 链接及目录；NO-GO。 |
+
+现有 `scripts/clearapi-install-approved-script.sh` 只针对旧 `production-deploy.sh` 和 identity helper 两件套，硬编码旧 wrapper SHA256；不覆盖本次七项目标和 systemd 链接，且恢复路径会固定 chmod/chown。不能将该脚本当作本轮七项归档/回退能力的证明，也不得在本轮调用它。
+
+**未来启动行为：** `enable clearapi-runtime-identity.service` 不带 `--now`，会建立持久化的 multi-user.target 启动关系，本身没有立即启动该服务的请求。未来启动进入该 target 时，identity unit 在 Docker/目录服务之后执行 reconcile，可能写 `/run/clearapi` 的身份文件；Docker drop-in 的 Requires/After 使未来 Docker 启动依赖目录服务，后者运行 tmpfiles 准备目录。identity unit 的 After 本身不拉起 Docker；独立的主机/Docker 启动仍可能按现有容器 restart policy 启动 Gateway，并触发既有启动写入。这些持久配置影响必须列入后续授权，不能把“本次没有 start”当作未来无行为变化。
+
+**下一步最小本地清单（补齐条件，不是生产操作授权清单）：**
+
+1. 明确七项目标的安装数值 UID/GID、精确模式、已知旧版本允许列表和互斥方式；若提出脚本 `0750`/配置 `0644`、root:root 等策略，应另行审阅记录，不能修改既有 inventory 后沿用旧校验值。
+2. 补齐可审阅的现场归档与完整性验收步骤，以及上述五类失败的逐对象回退、链接/目录处理、加载状态验证和一次回退失败后的停止条件。本轮只记录缺口，不新写安装器或回退实现。
+3. 本地方案必要检查全部通过后，再提交供负责人审阅的生产操作授权清单。现场只读预检、生产归档创建、资产安装、daemon-reload/enable 都仍需后续明确范围；Gateway 启动、数据库、Caddy、解除隔离与公网开放不并入 boot 安装授权。
+
 ## 2026-10-19 — 统一整合 A/B/C/E + PG03
 
 - **CURRENT STATUS: PARTIAL / RELEASE BLOCKED。** 用户已授权全部正式门禁通过后自动生产部署，D 继续暂缓；此前冻结约束已被本次任务替代。尚未执行最终生产部署或线上计费验收。
@@ -344,3 +799,29 @@ Status: **BLOCKED**（首次生产切换尚未完成）
 按最小上线路径执行，未新增企业级、复杂商业或逐模型验收。新 Gateway Runtime PASS 和生产更新尚未发生；Channel 2 保持禁用，不为宣布成功强行开启或读取用户 Token 做请求。非关键配置改进后置；不恢复最近网站配置来迎合旧快照。
 
 完整记录见根目录 `CLEARAPI_PG03_AUTONOMOUS_PRODUCTION_FINAL_REPORT.md`。此文件是唯一项目总控状态文件。
+
+
+## 2026-10-21 — PG03 隔离演练实现独立只读复审：BLOCKED（最新审查）
+
+本节为本轮最新审查结论，历史记录原样保留。报告追加在 `evidence/pg03-isolated-rehearsal-local-implementation-20261021.md` 的“独立只读审查”部分。负责人已明确允许只追加本报告与总控；没有修改实现或测试。
+
+- **判定**：BLOCKED，当前不建议将此实物版本提交注册审批；从事件/权限隔离角度的条件安全路线仍成立，但两项 P2 验收正确性问题需负责人决定处理，未发现 P0/P1 生产直达路径。
+- **F1 / P2（已用临时故障探针复现）**：`scripts/ci/pg03-isolated-rehearsal.py:160–171` 先发布 result=success/receipt_present=true 再写 success.json；后一步 I/O 失败时公开结果仍成功、凭证却不存在。job 会失败，但 always 上传可保留这份错误成功摘要；现有测试未覆盖，代码未修复。
+- **F2 / P2（源码确认的检测缺口）**：`scripts/pg03-schema-rehearsal.py:143–182` 的健康/退出/schema 门禁没有迁移错误状态采集；固定候选源码存在只记日志不阻断的迁移错误路径，同 hash 不代表所有迁移/数据回填成功。真实候选未运行，不能声称现场已发生此错误。
+- **已验证**：31 项离线测试重跑 OK；10 YAML 解析、4 Python AST、7 shell 块语法及差异检查通过；另有两次 start 超时替身均不产成功 receipt。actionlint/shellcheck 未安装、未运行，完整 CI/真实数据库/演练未运行。所有受审代码、workflow、测试、设计文档字节保持本轮开始值。
+- **远端只读新鲜事实**：main 仍 `69a66431646b5cc8912bf97a739e08de07316443`，已注册 9 workflow，新任务尚未注册；两个自动开关仍 false，main 三项严格 required checks/enforce_admins 保持；查询时 in_progress/queued/waiting 各 0。固定 RC/artifact 元数据仍有效，两 Action SHA 经官方 commit API 确认存在；未读/拉镜像，未下载 RC ZIP。此快照不代表未来窗口持续安全。
+- **真实状态不变**：镜像读取 NOT RUN，两次启动 NOT RUN，schema/迁移结果 UNKNOWN，PG03 BLOCKED。固定 RC 目标 DDL 不代表新鲜生产快照或数据行验收。
+
+下一步仅由负责人决定 F1/F2 修复范围；修复并复审后才能建议注册。即使以后批准注册，实际拉取与双启动仍须另行明确审批；本轮无提交/推送/PR/注册/触发 Actions、真实数据库、生产 SSH/配置/数据操作。此轮到此停止，不执行下一阶段。
+
+
+## 2026-10-21 — PG03 两项 P2 本地修复：P2-1 PASS / P2-2 BLOCKED（最新）
+
+完整证据追加在 `evidence/pg03-isolated-rehearsal-local-implementation-20261021.md` 的“两项 P2 本地修复”章节；原独立审查发现保留，不以新测试改写历史结论。
+
+- **P2-1 PASS（Linux 本地）**：私有暂存 → 中间观察 flush/fsync → 成功凭证 flush/fsync → 最后结果 flush/fsync → 目录同步/原子发布/父目录同步；失败改发 failure_or_unknown 或直接非零，不留半成品在上传路径。旧 public 只在当前 run 根下改名保留，并使本轮失败。新增独立回读同时核对 finalizer outcome，成功回读才许可上传，旧目录无法隔离时也不能沿用旧 success。发布后不再执行私有 state finally 写入。
+- **P2-2 BLOCKED**：固定候选 SysLog/SysError 同格式且忽略 writer 错误，没有可靠迁移完成契约。新隔离模式已采集 stdout+stderr、按实例/source/记录语法识别已知迁移错误；exit 0/schema 不变仍可被拒绝。日志不足/无法解析/缺完成证据均 UNKNOWN，schema 冲突为 failure；不存在以“没搜到错误”放行的分支。当前候选没有可证明 success 的输入，本轮不伪造或更换 digest；仍缺正向迁移成功证据生产方案。
+- **验证**：WSL Linux 最终 46 tests OK，无 skip；Windows 46 项中 37 通过、9 项 Linux 持久化明确 skip。四 Python AST、10 YAML、8 shell 块语法、回读上传门禁与空白/差异检查通过；原 9 workflow 字节未变。actionlint/shellcheck 未安装未运行。没有真实 Docker/数据库/迁移/镜像验证，所有此类测试使用替身。
+- **范围**：仅新独立 workflow、adapter/schema/successor、集中测试及这两份阶段文档，共 7 文件；保留既有工作区修改，不改生产 workflow、Go 迁移业务、配置/Secrets/包权限/开关。没有提交/推送/PR/合并/注册/触发 Actions、镜像拉取、数据库启动或生产 SSH。
+
+具备申请新一轮独立审查的本地条件，审查须同时确认 P2-2 的未闭环边界；**不具备注册/真实运行就绪条件，PG03 仍 BLOCKED，不是 READY。** 实际镜像读取与两次启动均 NOT RUN，真实 schema/迁移 UNKNOWN。完成本轮后停止，等待审阅，不执行下一阶段。

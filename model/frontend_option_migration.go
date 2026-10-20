@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/internal/migrationproof"
 	"github.com/QuantumNous/new-api/setting/console_setting"
 	"gorm.io/gorm"
 )
@@ -85,6 +86,7 @@ func migrateLegacyOption(sourceKey, targetKey string, transform legacyOptionTran
 
 		value, transformErr := transform(source.Value)
 		if transformErr != nil {
+			migrationproof.Fail()
 			common.SysError(fmt.Sprintf("legacy option %s was not migrated: %v", sourceKey, transformErr))
 			return nil
 		}
@@ -205,6 +207,7 @@ func migrateLegacyUptimeOptions() error {
 		}
 
 		if urlErr != nil || slugErr != nil || strings.TrimSpace(urlOption.Value) == "" || strings.TrimSpace(slugOption.Value) == "" {
+			migrationproof.Fail()
 			common.SysError("legacy Uptime Kuma options were not migrated: both URL and slug are required")
 			return nil
 		}
@@ -221,6 +224,7 @@ func migrateLegacyUptimeOptions() error {
 		}
 		value := string(encoded)
 		if err := console_setting.ValidateConsoleSettings(value, "UptimeKumaGroups"); err != nil {
+			migrationproof.Fail()
 			common.SysError(fmt.Sprintf("legacy Uptime Kuma options were not migrated: %v", err))
 			return nil
 		}
