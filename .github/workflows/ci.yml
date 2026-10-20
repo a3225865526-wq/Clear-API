@@ -19,10 +19,11 @@ jobs:
   pg03-package-read:
     name: PG03 isolated package read capability
     if: >-
-      github.event_name == 'pull_request' &&
       github.repository == 'a3225865526-wq/Clear-API' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor == github.repository_owner
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor == github.repository_owner))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
