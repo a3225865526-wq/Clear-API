@@ -49,3 +49,7 @@ Backend required job 在既有 test-legacy-transition.py 的 schema 夹具失败
 独立审查先发现文件稳定性、路径和inventory缺口，已修复并复核通过。完整生产successor仍缺新鲜生产配置/写入范围、停止态全writer独占证明、真实备份恢复和新的生产一次性审批协议，不能把该本地组件标成完整执行器或生产PASS。现有生产身份配置清单已复用，无生产SSH或账号/权限修改。
 
 CI package-read同时在同仓main push运行，防止source CI的skipped job触发既有release-control拒绝；权限仍contents:none/packages:read，只pull旧完整digest，无容器启动/发布。与旧schema夹具修复均经独立复核通过。
+
+## CI39469656112结果与备份测试执行身份修正
+
+f23c6839777214c3beae1be46e2f5ed30bbc54a4：Backend、Frontend、三库及包读取均success；Secret scan job在26个备份测试的新增stopped全备份完成校验失败（unsafe backup directory）。该校验刻意要求根目录链由当前root持有，本地WSL root执行通过，而原CI以runner非root调用；不放宽生产文件资格，改该备份测试命令为sudo，与既有部署/Runtime安全文件测试一致。其余检查和断言完整保留，最新head仍须正常CI通过。

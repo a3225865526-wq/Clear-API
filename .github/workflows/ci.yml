@@ -260,6 +260,6 @@ jobs:
           sudo python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest
           bash -n scripts/production-backup.sh
           shellcheck --severity=warning scripts/production-backup.sh
-          python3 scripts/ci/test-backup-identity.py
+          sudo python3 scripts/ci/test-backup-identity.py
           python3 scripts/ci/test-automatic-release.py
           python3 scripts/ci/test-rehearsal-producer.py
