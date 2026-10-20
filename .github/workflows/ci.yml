@@ -201,6 +201,7 @@ jobs:
           shellcheck --severity=warning --exclude=SC2034,SC2163 scripts/production-deploy-v2.sh
           DEPLOY_SOURCE=scripts/production-deploy-v2.sh python3 scripts/ci/test-production-deploy.py WrapperModesTest WorkflowStdinTest
           sudo python3 scripts/ci/test-pg03-release.py
+          sudo python3 scripts/ci/test-failed-recovery.py
           sudo visudo --check --file scripts/pg03-deploy.sudoers
           sudo python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest
           bash -n scripts/production-backup.sh

@@ -1,0 +1,151 @@
+name: Failed production recovery
+run-name: Failed controlled recovery ${{ inputs.mode }} RC${{ inputs.assets_rc_run }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        required: true
+        options: [rehearse, recover]
+      assets_rc_run:
+        description: Successful reviewed-main RC for recovery assets
+        type: string
+        required: true
+      rehearsal_run:
+        description: Same-source successful recovery rehearsal; empty for rehearse
+        type: string
+        required: false
+      confirmation:
+        description: REHEARSE_FAILED_RECOVERY or RECOVER_FAILED_CONTROLLED
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: Authenticate failed recovery
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Authenticate failed recovery authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECOVERY_MODE: ${{ inputs.mode }}
+          ASSETS_RC: ${{ inputs.assets_rc_run }}
+          RECOVERY_REHEARSAL: ${{ inputs.rehearsal_run }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = a3225865526-wq/Clear-API
+          test "$GITHUB_REF" = refs/heads/main
+          case "$RECOVERY_MODE:$CONFIRMATION" in
+            rehearse:REHEARSE_FAILED_RECOVERY|recover:RECOVER_FAILED_CONTROLLED) ;;
+            *) exit 1 ;;
+          esac
+          python3 - <<'PY' | python3 scripts/pg03-failed-recovery.py authorize
+          import json, os
+          print(json.dumps(dict(token=os.environ['GH_TOKEN'], run=os.environ['GITHUB_RUN_ID'],
+              commit=os.environ['GITHUB_SHA'], rc_run=os.environ['ASSETS_RC'],
+              rehearsal_run=os.environ['RECOVERY_REHEARSAL'], mode=os.environ['RECOVERY_MODE'])))
+          PY
+
+  rehearse:
+    name: Rehearse incident recovery without production credentials
+    if: inputs.mode == 'rehearse'
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Exercise real Wget and failed recovery safety cases
+        run: sudo python3 scripts/ci/test-failed-recovery.py
+      - name: Record exact successful recovery rehearsal
+        env:
+          ASSETS_RC: ${{ inputs.assets_rc_run }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          Path('recovery-rehearsal.json').write_text(json.dumps(dict(
+              schema='clearapi.failed-recovery-rehearsal/v1', source=os.environ['GITHUB_SHA'],
+              rc_run=os.environ['ASSETS_RC'], failed_run='39347012653', tests='passed',
+              v2_sha256=hashlib.sha256(Path('scripts/production-deploy-v2.sh').read_bytes()).hexdigest()))+'\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: failed-recovery-rehearsal
+          path: recovery-rehearsal.json
+          if-no-files-found: error
+
+  recover:
+    name: Recover failed controlled postflight
+    if: inputs.mode == 'recover'
+    needs: authorize
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    env:
+      PROD_SSH_HOST: ${{ vars.PROD_SSH_HOST }}
+      PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+      PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Configure pinned SSH identity
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_KEY" && test -n "$KNOWN_HOSTS" && test -n "$PROD_SSH_HOST" && test -n "$PROD_SSH_USER"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/ci_deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/ci_known_hosts
+          chmod 0600 ~/.ssh/ci_deploy_key
+          {
+            echo 'Host clearapi-recovery'
+            echo "  HostName $PROD_SSH_HOST"
+            echo "  Port ${PROD_SSH_PORT:-22}"
+            echo "  User $PROD_SSH_USER"
+            echo '  IdentityFile ~/.ssh/ci_deploy_key'
+            echo '  UserKnownHostsFile ~/.ssh/ci_known_hosts'
+            echo '  StrictHostKeyChecking yes'
+            echo '  IdentitiesOnly yes'
+            echo '  BatchMode yes'
+          } > ~/.ssh/config
+          chmod 0600 ~/.ssh/config
+      - name: Verify installed wrapper identity
+        run: |
+          set -euo pipefail
+          test "$(sha256sum scripts/production-deploy-v2.sh | cut -d' ' -f1)" = "$(ssh clearapi-recovery 'sudo sha256sum /opt/clearapi/bin/production-deploy-v2.sh' | cut -d' ' -f1)"
+      - name: Run authenticated recovery without image or database replacement
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSETS_RC: ${{ inputs.assets_rc_run }}
+          RECOVERY_REHEARSAL: ${{ inputs.rehearsal_run }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | ssh clearapi-recovery 'sudo /opt/clearapi/bin/production-deploy-v2.sh --pool-mode pg03 --recover-failed-controlled'
+          import json, os
+          print(json.dumps(dict(token=os.environ['GH_TOKEN'], run=os.environ['GITHUB_RUN_ID'],
+              commit=os.environ['GITHUB_SHA'], rc_run=os.environ['ASSETS_RC'],
+              rehearsal_run=os.environ['RECOVERY_REHEARSAL'], mode='recover')))
+          PY
+      - name: Remove job SSH material
+        if: always()
+        run: rm -f ~/.ssh/ci_deploy_key ~/.ssh/ci_known_hosts ~/.ssh/config

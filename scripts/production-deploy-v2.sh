@@ -168,6 +168,10 @@ LEGACY_TRANSITION=0
 LEGACY_TRANSITION_ENTERED=0
 LEGACY_TRANSITION_TOOL=/opt/clearapi/bin/pg03-legacy-transition.py
 CONTROLLED_LAUNCH=0
+FAILED_RECOVERY_VERIFY=0
+FAILED_RECOVERY_EXECUTE=0
+FAILED_RECOVERY_TOOL=/opt/clearapi/bin/pg03-failed-recovery.py
+FAILED_RECOVERY_TOOL_SHA=9afbc67d04235d069be56cc249c84a2b1d7fd811355d4fe41d3f5fafb14c9500
 TRAFFIC_HOLD_TOOL=/opt/clearapi/bin/controlled-traffic-hold.py
 TRAFFIC_HOLD_SHA=b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90
 
@@ -197,6 +201,8 @@ while [ $# -gt 0 ]; do
     # when invoked from a systemd timer
     # (monitoring minimal set) or before any manual container operation.
     --verify) VERIFY_ONLY="1"; shift 1 ;;
+    --recover-failed-controlled) FAILED_RECOVERY_EXECUTE=1; shift ;;
+    --verify-failed-controlled) VERIFY_ONLY=1; FAILED_RECOVERY_VERIFY=1; shift ;;
     --restart) RESTART_ONLY="1"; shift 1 ;;
     --reconcile) RECONCILE_ONLY="1"; shift 1 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -807,7 +813,7 @@ PY
 pg03_load_pair() { # approved target for deploy; current release for other modes
   local source="$1" kind="$2" metadata
   metadata="$(python3 -I - "$source" "$kind" "$PG03_COMPOSE_FILE" \
-      "$PG03_EXECUTOR_REF" "$PG03_EXECUTOR_REVISION" "$PG03_EXECUTOR_BINARY" "$LEGACY_TRANSITION" "$CONTROLLED_LAUNCH" <<'PY'
+      "$PG03_EXECUTOR_REF" "$PG03_EXECUTOR_REVISION" "$PG03_EXECUTOR_BINARY" "$LEGACY_TRANSITION" "$CONTROLLED_LAUNCH" "${FAILED_RECOVERY_VERIFY:-0}" <<'PY'
 import hashlib, json, os, pathlib, re, stat, sys
 
 def secure_file(name, private=False):
@@ -840,7 +846,7 @@ def unique(pairs):
     return result
 
 try:
-    name, kind, overlay, pinned_ref, pinned_revision, pinned_binary, legacy_transition, controlled_launch = sys.argv[1:]
+    name, kind, overlay, pinned_ref, pinned_revision, pinned_binary, legacy_transition, controlled_launch, recovery_verify = sys.argv[1:]
     secure_file(overlay)
     raw = secure_file(name)
     m = json.loads(raw, object_pairs_hook=unique)
@@ -870,7 +876,8 @@ try:
     if kind == 'current':
         if (g['image_ref'] != c['image_ref'] or g['image_digest'] != c['image_digest']
                 or g['image_id'] != c['new_api_image_id'] or g['oci_revision'] != c['candidate_commit']
-                or c.get('status') not in ('success', 'pending')):
+                or c.get('status') not in (('failed',) if recovery_verify == '1' else ('success', 'pending'))
+                or (recovery_verify == '1' and c.get('deployment_attempt', {}).get('status') != 'failed')):
             raise ValueError()
     else:
         validation = m.get('validation', {})
@@ -1189,14 +1196,19 @@ try:
 except Exception:
     sys.exit("PG03 BLOCKED: Gateway runtime identity or required credential presence invalid")
 ' "$PG03_GATEWAY_IMAGE_ID" "$PG03_GATEWAY_REF" "$cid" "$NETWORK_NAME" || return 1
-  # wget is already part of the Gateway image. Authentication stays in stdin,
-  # never argv; do not print management responses, follow redirects or proxies.
+  # GNU Wget cannot read its configuration from a non-regular pipe.
+  # Keep credentials out of argv/logs and clean the private regular file.
   docker exec "$cid" /bin/sh -c '
+    set -eu
     set +x
-    test -n "$CLEARAPI_POOL_CLIPROXY_KEY" || exit 1
-    wget --no-proxy --max-redirect=0 --timeout=5 --tries=1 -q -O /dev/null http://pool-executor:8317/healthz || exit 1
-    printf "header = X-Management-Key: %s\n" "$CLEARAPI_POOL_CLIPROXY_KEY" |
-      wget --config=/dev/stdin --no-proxy --max-redirect=0 --timeout=5 --tries=1 -q -O /dev/null http://pool-executor:8317/v0/management/auth-files
+    test -n "$CLEARAPI_POOL_CLIPROXY_KEY"
+    wget --no-proxy --max-redirect=0 --timeout=5 --tries=1 -q -O /dev/null http://pool-executor:8317/healthz
+    umask 077
+    probe_config=$(mktemp /tmp/clearapi-executor-probe.XXXXXX)
+    trap "rm -f \"$probe_config\"" EXIT
+    trap "exit 1" HUP INT TERM
+    printf "header = X-Management-Key: %s\n" "$CLEARAPI_POOL_CLIPROXY_KEY" > "$probe_config"
+    wget --config="$probe_config" --no-proxy --max-redirect=0 --timeout=5 --tries=1 -q -O /dev/null http://pool-executor:8317/v0/management/auth-files
   ' >/dev/null 2>&1 || { log 'PG03 BLOCKED: Gateway to Executor health/authenticated connection unavailable'; return 1; }
   after="$(docker inspect --format '{{.Id}} {{.State.StartedAt}} {{.Image}}' "$cid" 2>/dev/null)" || return 1
   [ "$before" = "$after" ] || { log 'PG03 BLOCKED: Gateway changed during connection check'; return 1; }
@@ -1225,6 +1237,109 @@ except Exception:
     sys.exit('PG03 failure status persistence unavailable')
 PY
 }
+
+verify_postflight() {
+NEW_ID="$(service_id)"
+[ -n "$NEW_ID" ] || die "step 17: ${SERVICE} container missing after replace"
+cenv() { compose exec -T "$SERVICE" printenv "$1"; }
+
+for pair in $EXPECT_ENV_KEYS; do
+  key="${pair%%=*}"; expected="${pair#*=}"
+  actual="$(cenv "$key")" || die "step 17: required env key ${key} unavailable"
+  [ "$actual" = "$expected" ] || die "step 17: env gate ${key}='${actual}' expected '${expected}'"
+done
+verify_launch_baseline
+verify_stop_policy
+verify_runtime_gate after "$1" || die 'Runtime Integrity Gate BLOCKED after replacement'
+pg03_runtime_gate || die 'PG03 Runtime Gate BLOCKED after replacement'
+
+PORTS_3000="$(sudo docker port "$NEW_ID" 3000/tcp 2>/dev/null || true)"
+[ "$PORTS_3000" = "127.0.0.1:3000" ] || die "step 17: new-api must bind 127.0.0.1:3000 only (got: ${PORTS_3000:-<unpublished>})"
+
+PG_ID="$(compose ps -q "$PG_SERVICE")"
+[ -n "$PG_ID" ] || die "step 17: postgres container missing"
+PG_PORTS="$(sudo docker port "$PG_ID" 2>/dev/null || true)"
+[ -z "$PG_PORTS" ] || die "step 17: postgres must not publish ports (got: ${PG_PORTS})"
+
+NETWORKS="$(sudo docker inspect --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}} {{end}}' "$NEW_ID")"
+printf '%s' "$NETWORKS" | grep -qw "$NETWORK_NAME" || die "step 17: new-api not attached to ${NETWORK_NAME} (networks: ${NETWORKS})"
+
+if [ "$POOL_MODE" = off ]; then
+  EXECUTORS="$(sudo docker ps -a --format '{{.Names}}' | grep -Eic 'executor|route.?chain' || true)"
+  [ "$EXECUTORS" = "0" ] || die "step 17: ${EXECUTORS} executor/route-chain container(s) present; Pool must stay OFF"
+else
+  pg03_runtime_gate || die "step 17: PG03 Runtime Gate failed"
+fi
+
+[ -f "$CADDYFILE" ] || die "step 17: Caddyfile ${CADDYFILE} missing"
+CADDY_MD5="$(md5sum "$CADDYFILE" | cut -d' ' -f1)"
+[ "$CADDY_MD5" = "$CADDYFILE_MD5" ] || die "step 17: Caddyfile md5 ${CADDY_MD5} does not match frozen edge baseline ${CADDYFILE_MD5}"
+
+systemctl is-active --quiet "$BACKUP_TIMER" || die "step 17: ${BACKUP_TIMER} not active after deploy"
+log "step 17: runtime negative gates PASS (env, binding, PG ports, network, pool, Caddyfile, backup timer)"
+
+if [ "$LAUNCH_BASELINE" = commercial ]; then
+  verify_commercial_billing
+fi
+
+# ===========================================================================
+# 18. billing invariants (read-only, least-privileged app role)
+# ===========================================================================
+POLICY_MODE="$(psql_q "SELECT value FROM options WHERE key='${POLICY_MODE_KEY}';")"
+[ "$POLICY_MODE" = "enforce" ] || die "step 18: ${POLICY_MODE_KEY}='${POLICY_MODE}' expected 'enforce'"
+
+REVIEW_ROWS="$(psql_q "SELECT reserved||'/'||target||'/'||applied FROM billing_reservations WHERE state='needs_review' ORDER BY reserved, id;")"
+ACTUAL_SORTED="$(printf '%s\n' "$REVIEW_ROWS" | sort | tr '\n' ' ' | sed 's/ $//')"
+EXPECTED_SORTED="$(printf '%s\n' $EXPECT_REVIEW_ROWS | sort | tr '\n' ' ' | sed 's/ $//')"
+[ "$ACTUAL_SORTED" = "$EXPECTED_SORTED" ] || die "step 18: needs_review reservations '${ACTUAL_SORTED}' expected '${EXPECTED_SORTED}'"
+
+for ch in $(printf '%s' "$EXPECT_CHANNELS" | tr ',' ' '); do
+  status="$(psql_q "SELECT status FROM channels WHERE id=${ch};")"
+  [ "$status" = "2" ] || die "step 18: channel ${ch} status='${status}' expected 2 (disabled)"
+done
+
+U_STATUS="$(psql_q "SELECT status FROM users WHERE id=${EXPECT_USER_ID};")"
+[ "$U_STATUS" = "2" ] || die "step 18: user id ${EXPECT_USER_ID} status='${U_STATUS}' expected 2 (disabled)"
+
+for tok in $(printf '%s' "$EXPECT_TOKEN_IDS" | tr ',' ' '); do
+  t_status="$(psql_q "SELECT status FROM tokens WHERE id=${tok};")"
+  [ "$t_status" = "2" ] || die "step 18: token id ${tok} status='${t_status}' expected 2 (disabled)"
+done
+
+for tbl in $(printf '%s' "$EXPECT_EMPTY_TABLES" | tr ',' ' '); do
+  # Product emptiness is proven by the versioned runtime view, never by a
+  # raw table count or a self-approved static product fingerprint.
+  [ "$tbl" != store_products ] || continue
+  cnt="$(psql_q "SELECT count(*) FROM ${tbl};")"
+  [ "$cnt" = "0" ] || die "step 18: table ${tbl} row count=${cnt} expected 0"
+done
+
+POOL_ROWS="$(psql_q "SELECT count(*) FROM options WHERE key ILIKE '${POOL_OPTION_PATTERN}';")"
+[ "$POOL_ROWS" = "0" ] || die "step 18: ${POOL_ROWS} pool option row(s) present; Pool must stay OFF"
+log "step 18: billing invariants PASS (mode=enforce, needs_review set frozen, channels/user/token disabled, order tables empty, runtime product gate, no pool rows)"
+if [ "$LEGACY_TRANSITION" = 1 ]; then
+  legacy_transition_phase postflight || die 'new process Runtime, accounting or Pool invariants BLOCKED'
+  legacy_transition_phase release-edge || die 'verified public edge release failed'
+  health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray" || die 'maintenance public HTTPS health with CF-Ray failed'
+fi
+
+}
+
+if [ "$FAILED_RECOVERY_EXECUTE" = 1 ]; then
+  [ "$(id -u)" = 0 ] && [ "$POOL_MODE" = pg03 ] \
+    && [ "$CONTROLLED_LAUNCH$LEGACY_TRANSITION$VERIFY_ONLY$RESTART_ONLY$RECONCILE_ONLY" = 00000 ] \
+    && [ "$APP_DIR" = /opt/clearapi/app ] && [ -z "$GHCR_TOKEN_STDIN$DIGEST$COMMIT$WORKFLOW_RUN" ] \
+    && [ "$(sha256sum "$FAILED_RECOVERY_TOOL" | cut -d' ' -f1)" = "$FAILED_RECOVERY_TOOL_SHA" ] \
+    || { echo 'REFUSING: invalid failed controlled recovery entry point' >&2; exit 2; }
+  python3 -I "$FAILED_RECOVERY_TOOL" recover <&3
+  exit $?
+fi
+
+if [ "$FAILED_RECOVERY_VERIFY" = 1 ]; then
+  [ "$POOL_MODE" = pg03 ] && [ "$CONTROLLED_LAUNCH$LEGACY_TRANSITION$RESTART_ONLY$RECONCILE_ONLY" = 0000 ] \
+    && [ "$APP_DIR" = /opt/clearapi/app ] && [ "$MANIFEST" = /opt/clearapi/app/release-manifest.json ] \
+    || { echo 'REFUSING: failed recovery verification is read-only PG03 only' >&2; exit 2; }
+fi
 
 pg03_configure || { echo 'REFUSING: deployment mode prerequisites failed; no deployment performed' >&2; exit 2; }
 if [ "$CONTROLLED_LAUNCH" = 1 ]; then
@@ -1281,6 +1396,12 @@ if [ "$VERIFY_ONLY" = "1" ]; then
       exit 1
     fi
     pg03_runtime_gate || die 'PG03 Runtime Gate BLOCKED during verification'
+    if [ "$FAILED_RECOVERY_VERIFY" = 1 ]; then
+      python3 -I "$TRAFFIC_HOLD_TOOL" check "$WORKFLOW_RUN" "$DIGEST" "$COMMIT" || die 'failed recovery ingress isolation mismatch'
+      health_retry "$LOCAL_HEALTH_URL" 3 2 || die 'failed recovery local health unavailable'
+      verify_postflight "$PREV_IMAGE_ID"
+      python3 -I "$TRAFFIC_HOLD_TOOL" check "$WORKFLOW_RUN" "$DIGEST" "$COMMIT" || die 'failed recovery ingress changed'
+    fi
     audit "verify" "ok" "running == compose effective == manifest current; Runtime Gate PASS"
     exit 0
   fi
@@ -1792,89 +1913,7 @@ fi
 # ===========================================================================
 # 17. runtime negative gates
 # ===========================================================================
-NEW_ID="$(service_id)"
-[ -n "$NEW_ID" ] || die "step 17: ${SERVICE} container missing after replace"
-cenv() { compose exec -T "$SERVICE" printenv "$1"; }
-
-for pair in $EXPECT_ENV_KEYS; do
-  key="${pair%%=*}"; expected="${pair#*=}"
-  actual="$(cenv "$key")" || die "step 17: required env key ${key} unavailable"
-  [ "$actual" = "$expected" ] || die "step 17: env gate ${key}='${actual}' expected '${expected}'"
-done
-verify_launch_baseline
-verify_stop_policy
-verify_runtime_gate after "$CANDIDATE_IMAGE_ID" || die 'Runtime Integrity Gate BLOCKED after replacement'
-pg03_runtime_gate || die 'PG03 Runtime Gate BLOCKED after replacement'
-
-PORTS_3000="$(sudo docker port "$NEW_ID" 3000/tcp 2>/dev/null || true)"
-[ "$PORTS_3000" = "127.0.0.1:3000" ] || die "step 17: new-api must bind 127.0.0.1:3000 only (got: ${PORTS_3000:-<unpublished>})"
-
-PG_ID="$(compose ps -q "$PG_SERVICE")"
-[ -n "$PG_ID" ] || die "step 17: postgres container missing"
-PG_PORTS="$(sudo docker port "$PG_ID" 2>/dev/null || true)"
-[ -z "$PG_PORTS" ] || die "step 17: postgres must not publish ports (got: ${PG_PORTS})"
-
-NETWORKS="$(sudo docker inspect --format '{{range $k, $_ := .NetworkSettings.Networks}}{{$k}} {{end}}' "$NEW_ID")"
-printf '%s' "$NETWORKS" | grep -qw "$NETWORK_NAME" || die "step 17: new-api not attached to ${NETWORK_NAME} (networks: ${NETWORKS})"
-
-if [ "$POOL_MODE" = off ]; then
-  EXECUTORS="$(sudo docker ps -a --format '{{.Names}}' | grep -Eic 'executor|route.?chain' || true)"
-  [ "$EXECUTORS" = "0" ] || die "step 17: ${EXECUTORS} executor/route-chain container(s) present; Pool must stay OFF"
-else
-  pg03_runtime_gate || die "step 17: PG03 Runtime Gate failed"
-fi
-
-[ -f "$CADDYFILE" ] || die "step 17: Caddyfile ${CADDYFILE} missing"
-CADDY_MD5="$(md5sum "$CADDYFILE" | cut -d' ' -f1)"
-[ "$CADDY_MD5" = "$CADDYFILE_MD5" ] || die "step 17: Caddyfile md5 ${CADDY_MD5} does not match frozen edge baseline ${CADDYFILE_MD5}"
-
-systemctl is-active --quiet "$BACKUP_TIMER" || die "step 17: ${BACKUP_TIMER} not active after deploy"
-log "step 17: runtime negative gates PASS (env, binding, PG ports, network, pool, Caddyfile, backup timer)"
-
-if [ "$LAUNCH_BASELINE" = commercial ]; then
-  verify_commercial_billing
-fi
-
-# ===========================================================================
-# 18. billing invariants (read-only, least-privileged app role)
-# ===========================================================================
-POLICY_MODE="$(psql_q "SELECT value FROM options WHERE key='${POLICY_MODE_KEY}';")"
-[ "$POLICY_MODE" = "enforce" ] || die "step 18: ${POLICY_MODE_KEY}='${POLICY_MODE}' expected 'enforce'"
-
-REVIEW_ROWS="$(psql_q "SELECT reserved||'/'||target||'/'||applied FROM billing_reservations WHERE state='needs_review' ORDER BY reserved, id;")"
-ACTUAL_SORTED="$(printf '%s\n' "$REVIEW_ROWS" | sort | tr '\n' ' ' | sed 's/ $//')"
-EXPECTED_SORTED="$(printf '%s\n' $EXPECT_REVIEW_ROWS | sort | tr '\n' ' ' | sed 's/ $//')"
-[ "$ACTUAL_SORTED" = "$EXPECTED_SORTED" ] || die "step 18: needs_review reservations '${ACTUAL_SORTED}' expected '${EXPECTED_SORTED}'"
-
-for ch in $(printf '%s' "$EXPECT_CHANNELS" | tr ',' ' '); do
-  status="$(psql_q "SELECT status FROM channels WHERE id=${ch};")"
-  [ "$status" = "2" ] || die "step 18: channel ${ch} status='${status}' expected 2 (disabled)"
-done
-
-U_STATUS="$(psql_q "SELECT status FROM users WHERE id=${EXPECT_USER_ID};")"
-[ "$U_STATUS" = "2" ] || die "step 18: user id ${EXPECT_USER_ID} status='${U_STATUS}' expected 2 (disabled)"
-
-for tok in $(printf '%s' "$EXPECT_TOKEN_IDS" | tr ',' ' '); do
-  t_status="$(psql_q "SELECT status FROM tokens WHERE id=${tok};")"
-  [ "$t_status" = "2" ] || die "step 18: token id ${tok} status='${t_status}' expected 2 (disabled)"
-done
-
-for tbl in $(printf '%s' "$EXPECT_EMPTY_TABLES" | tr ',' ' '); do
-  # Product emptiness is proven by the versioned runtime view, never by a
-  # raw table count or a self-approved static product fingerprint.
-  [ "$tbl" != store_products ] || continue
-  cnt="$(psql_q "SELECT count(*) FROM ${tbl};")"
-  [ "$cnt" = "0" ] || die "step 18: table ${tbl} row count=${cnt} expected 0"
-done
-
-POOL_ROWS="$(psql_q "SELECT count(*) FROM options WHERE key ILIKE '${POOL_OPTION_PATTERN}';")"
-[ "$POOL_ROWS" = "0" ] || die "step 18: ${POOL_ROWS} pool option row(s) present; Pool must stay OFF"
-log "step 18: billing invariants PASS (mode=enforce, needs_review set frozen, channels/user/token disabled, order tables empty, runtime product gate, no pool rows)"
-if [ "$LEGACY_TRANSITION" = 1 ]; then
-  legacy_transition_phase postflight || die 'new process Runtime, accounting or Pool invariants BLOCKED'
-  legacy_transition_phase release-edge || die 'verified public edge release failed'
-  health_retry "$PUBLIC_HEALTH_URL" 10 3 "CF-Ray" || die 'maintenance public HTTPS health with CF-Ray failed'
-fi
+verify_postflight "$CANDIDATE_IMAGE_ID"
 
 # ===========================================================================
 # 19. mark deployment success
