@@ -1,0 +1,91 @@
+{
+  "schema": "clearapi.isolated-actions-rehearsal/v1",
+  "nonce": "fb640d8c62404e668bb5288621bab327",
+  "control_commit": "1e155bc49c942ec72a30995670a720101fdaf7c8",
+  "workflow_ref": "a3225865526-wq/Clear-API/.github/workflows/pg03-isolated-rehearsal.yml@refs/heads/main",
+  "run_id": "39514525897",
+  "run_attempt": "1",
+  "candidate_source": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "candidate_image": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "rc_run": "39511197302",
+  "rc_attempt": 1,
+  "artifact_id": "12305532882",
+  "archive_sha256": "b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7",
+  "baseline_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+  "production_observation_verified": false,
+  "production_acceptance": "not_run",
+  "rehearsal": "not_run",
+  "control_sha256": {
+    "scripts/ci/pg03-isolated-rehearsal.py": "6cd435a132d1999d1f40c62dbc6f9f1d865abba4dbe3f58b871989b8429cd556",
+    "scripts/pg03-successor-plan.py": "6b9c1a1570debd337b08dc018031f9650ccd1af833468e402c10118945e56ea7",
+    "scripts/pg03-schema-rehearsal.py": "4effa723e30d2ff4900c0f38b11e0523117d47b29404914393139a25506ac0dc",
+    "scripts/ci/assemble-release-proof.py": "d19b5079bc89eb64866cdab43548a56453f7a810db46e8d12c5a180c5f7d3628",
+    "scripts/ci/test-pg03-successor-plan.py": "d7fe0eb05af1975baff2b7a821f2b6a2fdec753fa4f80cefceb7ffb974be3e58",
+    ".github/workflows/pg03-isolated-rehearsal.yml": "bf70bd5cd86dd48d47e7425549f6038c594ea1814b92b342f47536076ca8533d"
+  },
+  "steps": {
+    "prepare": "passed",
+    "baseline": "passed",
+    "pull": "passed",
+    "rehearse": "failed",
+    "finalize": "failed"
+  },
+  "baseline_verified": true,
+  "image_store": "containerd",
+  "images_pulled": true,
+  "auth_removed": true,
+  "observation": {
+    "startups": [
+      {
+        "pass_number": 1,
+        "before_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+        "create_exit_code": 0,
+        "start_exit_code": null,
+        "healthy": false,
+        "stop_exit_code": null,
+        "after_schema_sha256": null,
+        "process": null,
+        "container_id": "6a0e6aac63ab0561c3d6a319abaebf84cd5d0b96944405c45e4ceccb6f7be761"
+      }
+    ],
+    "cleanup": [
+      {
+        "container_id": "6a0e6aac63ab0561c3d6a319abaebf84cd5d0b96944405c45e4ceccb6f7be761",
+        "removed": true
+      },
+      {
+        "container_id": "2625dece559898d04f0e822ec77cf04d505d5eeb7b5be2f93b02fb302b98254c",
+        "removed": true
+      },
+      {
+        "container_id": "1391dcce3bb44bccefdbd6fd0458db73fe6acc621468e95c09a1f9435ee2c458",
+        "removed": true
+      }
+    ],
+    "cleanup_complete": true,
+    "phase": "start_pass_1",
+    "candidate": {
+      "image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+      "binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5",
+      "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+      "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778"
+    },
+    "postgres": {
+      "container_id": "2625dece559898d04f0e822ec77cf04d505d5eeb7b5be2f93b02fb302b98254c",
+      "image_ref": "postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+      "version_num": "170006"
+    },
+    "failure": {
+      "phase": "start_pass_1",
+      "command_exit_code": 1,
+      "timed_out": false
+    }
+  },
+  "final_cleanup": {
+    "containers": [],
+    "complete": true
+  },
+  "conclusion": "failure_or_unknown",
+  "prior_job_status": "failure",
+  "success_receipt_present": false
+}
