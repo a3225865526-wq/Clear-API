@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 
 sys.dont_write_bytecode = True
@@ -18,13 +19,13 @@ SPEC = importlib.util.spec_from_file_location('isolated_successor', SCRIPTS / 'p
 PLAN = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PLAN)
 REPO = 'a3225865526-wq/Clear-API'
-SOURCE = '69a66431646b5cc8912bf97a739e08de07316443'
-IMAGE = 'ghcr.io/a3225865526-wq/clearapi@sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a'
-RC = '39357150402'
-ARTIFACT = '12235966400'
-ARCHIVE_SHA = 'ac7c42fc5a3549773f2c59080b503d6d5201f7442c9c20a955eb542f97ffb09b'
+SOURCE = '799a608d1b5a79df0f2ef8031a7885f414125778'
+IMAGE = 'ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f'
+RC = '39511197302'
+ARTIFACT = '12305532882'
+ARCHIVE_SHA = 'b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7'
 BASELINE = '3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035'
-BINARY = '40ebc70665bf7f45c7a201c4fdd82a90913a1873b2c7ca0debda1829983eee4b'
+BINARY = '37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5'
 
 
 def execute(args, raw=None, extra_env=None, include_stderr=False):
@@ -125,6 +126,124 @@ def cleanup(root, nonce):
     return dict(containers=results, complete=not remaining and all(item['removed'] for item in results))
 
 
+def rehearse_read_only_failure(root, state):
+    """Prove actual candidate rejection on a fresh, isolated read-only database.
+
+    Logs identify a negative SQLSTATE only. They never prove migration success.
+    A failed container's tmpfs proof cannot be recovered after exit; do not claim
+    absence of a file that was not observable. Such a start is never eligible for
+    the positive health + fresh completion contract.
+    """
+    nonce, owned = state['nonce'], []
+    result = dict(status='unknown', enforced_read_only=False, cleanup_complete=False,
+                  sqlstate=None, candidate_image=IMAGE, success_receipt_eligible=False,
+                  proof_capture='unavailable_after_tmpfs_exit', cleanup=[])
+    state['negative_migration'] = result
+    try:
+        pg = docker(root, ['create', '--pull', 'never', '--label', 'clearapi.schema-rehearsal='+nonce,
+            '--network', 'none', '--read-only', '--memory', '512m', '--pids-limit', '128',
+            '--tmpfs', '/var/lib/postgresql/data:rw,nosuid,nodev,size=512m',
+            '--tmpfs', '/var/run/postgresql:rw,nosuid,nodev,size=16m', '--tmpfs', '/tmp:rw,nosuid,nodev,size=16m',
+            '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_DB=rehearsal', PLAN.SCHEMA.POSTGRES])
+        PLAN.require(re.fullmatch(r'[a-f0-9]{64}', pg), 'invalid negative database identity')
+        owned.append(pg)
+        docker(root, ['start', pg])
+        for _ in range(60):
+            try:
+                if docker(root, ['exec', pg, 'pg_isready', '-U', 'postgres', '-d', 'rehearsal']): break
+            except subprocess.CalledProcessError:
+                pass
+            time.sleep(1)
+        else:
+            raise ValueError('negative test database unavailable')
+        docker(root, ['exec', pg, 'psql', '-U', 'postgres', '-d', 'rehearsal', '-Xq',
+            '-v', 'ON_ERROR_STOP=1', '-c', 'ALTER ROLE postgres SET default_transaction_read_only = on'])
+        readonly = docker(root, ['exec', pg, 'psql', '-U', 'postgres', '-d', 'rehearsal', '-XAtqc',
+                                 'SHOW default_transaction_read_only'])
+        PLAN.require(readonly == 'on', 'negative database guard not active')
+        result['enforced_read_only'] = True
+        gateway = docker(root, ['create', '--pull', 'never', '--label', 'clearapi.schema-rehearsal='+nonce,
+            '--network', 'container:'+pg, '--read-only', '--cap-drop', 'ALL',
+            '--security-opt', 'no-new-privileges', '--memory', '1g', '--pids-limit', '256',
+            '--tmpfs', '/data:rw,nosuid,nodev,size=128m', '--tmpfs', '/tmp:rw,nosuid,nodev,size=64m',
+            '--log-driver', 'json-file', '--log-opt', 'max-size=-1', '--log-opt', 'mode=blocking',
+            '-e', 'SQL_DSN=postgres://postgres@127.0.0.1:5432/rehearsal?sslmode=disable',
+            '-e', 'LOG_SQL_DSN=', '-e', 'SESSION_SECRET=synthetic-negative-'+nonce,
+            '-e', 'NODE_TYPE=master', '-e', 'CLEARAPI_PRODUCTION=false',
+            '-e', 'CLEARAPI_CLOSED_LAUNCH=true', '-e', 'CLEARAPI_POOL_ENABLED=false',
+            '-e', 'BATCH_UPDATE_ENABLED=false', '-e', 'CLEARAPI_MIGRATION_PROOF_CHALLENGE='+uuid.uuid4().hex+uuid.uuid4().hex,
+            '--entrypoint', '/new-api', IMAGE])
+        PLAN.require(re.fullmatch(r'[a-f0-9]{64}', gateway), 'invalid negative Gateway identity')
+        owned.append(gateway)
+        docker(root, ['start', gateway])
+        for _ in range(30):
+            process = json.loads(docker(root, ['inspect', '--format', '{{json .State}}', gateway]))
+            if process.get('Running') is False: break
+            time.sleep(1)
+        else:
+            raise ValueError('candidate did not reject read-only migration')
+        result['process'] = {key: process.get(key) for key in ('Status', 'Running', 'ExitCode', 'OOMKilled')}
+        result['process']['error_present'] = bool(process.get('Error'))
+        PLAN.require(process.get('Status') == 'exited' and process.get('Running') is False
+                     and type(process.get('ExitCode')) is int and process['ExitCode'] != 0
+                     and process.get('OOMKilled') is False and not process.get('Error'),
+                     'negative candidate exit is not a conclusive SQL rejection')
+        logs = docker(root, ['logs', '--timestamps', gateway])
+        PLAN.require(logs and len(logs.encode()) <= 2097152
+                     and re.search(r'\bSQLSTATE\s+25006\b', logs), 'negative SQLSTATE evidence unavailable')
+        result.update(status='expected_migration_failure_detected', sqlstate='25006',
+                      log_sha256=hashlib.sha256(logs.encode()).hexdigest())
+    finally:
+        for cid in reversed(owned):
+            item = dict(container_id=cid, removed=False)
+            result['cleanup'].append(item)
+            try:
+                label = docker(root, ['inspect', '--format', '{{index .Config.Labels "clearapi.schema-rehearsal"}}', cid])
+                PLAN.require(label == nonce, 'negative cleanup owner mismatch')
+                docker(root, ['rm', '-f', '-v', cid])
+                item['removed'] = True
+            except Exception:
+                pass
+        result['cleanup_complete'] = all(item['removed'] for item in result['cleanup'])
+        PLAN.require(result['cleanup_complete'], 'negative probe cleanup incomplete')
+
+
+def validate_negative_probe(value):
+    process, cleaned = value.get('process', {}), value.get('cleanup', [])
+    PLAN.require(value.get('status') == 'expected_migration_failure_detected'
+                 and value.get('enforced_read_only') is True and value.get('sqlstate') == '25006'
+                 and value.get('candidate_image') == IMAGE and value.get('cleanup_complete') is True
+                 and value.get('success_receipt_eligible') is False
+                 and value.get('proof_capture') == 'unavailable_after_tmpfs_exit'
+                 and re.fullmatch(r'[a-f0-9]{64}', value.get('log_sha256', ''))
+                 and process.get('Status') == 'exited' and process.get('Running') is False
+                 and type(process.get('ExitCode')) is int and process['ExitCode'] != 0
+                 and process.get('OOMKilled') is False and process.get('error_present') is False
+                 and type(cleaned) is list and len(cleaned) == 2
+                 and all(type(item) is dict and set(item) == {'container_id', 'removed'}
+                         and re.fullmatch(r'[a-f0-9]{64}', item['container_id']) and item['removed'] is True
+                         for item in cleaned)
+                 and cleaned[0]['container_id'] != cleaned[1]['container_id'],
+                 'actual negative migration probe incomplete')
+
+
+def validate_persisted_migrations(observation):
+    startups = observation.get('startups', [])
+    PLAN.require(type(startups) is list and len(startups) == 2, 'two durable migration receipts required')
+    challenges, containers = set(), set()
+    for startup in startups:
+        value = startup.get('migration', {})
+        raw, challenge, cid = value.get('completion_receipt_json'), value.get('challenge'), startup.get('container_id')
+        PLAN.require(value.get('status') == 'success' and value.get('source_commit') == SOURCE
+                     and value.get('container_id') == cid
+                     and type(raw) is str and value.get('proof_sha256') == hashlib.sha256(raw.encode()).hexdigest(),
+                     'durable migration receipt missing or conflicting')
+        PLAN.SCHEMA.validate_completion_proof(raw, cid, challenge, BINARY)
+        challenges.add(challenge)
+        containers.add(cid)
+    PLAN.require(len(challenges) == len(containers) == 2, 'fresh independent starts required')
+
+
 def sync_directory(path):
     # The execution target is Linux. Unsupported directory fsync must fail,
     # never silently downgrade the evidence persistence contract.
@@ -189,6 +308,8 @@ def verify_public(root):
         PLAN.require(result.get('conclusion') == 'success' and result.get('success_receipt_present') is True
                      and success_path.is_file() and not success_path.is_symlink(), 'incomplete success bundle')
         receipt = json.loads(success_path.read_text(encoding='utf-8'), object_pairs_hook=PLAN.unique)
+        validate_negative_probe(result.get('negative_migration', {}))
+        validate_persisted_migrations(result['observation'])
         PLAN.SCHEMA.validate_receipt(receipt, dict(image_id=result['observation']['candidate']['image_id'],
             binary_sha256=BINARY, commit=SOURCE), BASELINE)
     else:
@@ -224,7 +345,9 @@ def finalize(root, state):
     receipt = None
     if success:
         try:
+            validate_negative_probe(state.get('negative_migration', {}))
             observation = state['observation']
+            validate_persisted_migrations(observation)
             PLAN.require(observation.get('cleanup_complete') is True
                          and len(observation['startups']) == 2, 'incomplete startup evidence')
             for index, startup in enumerate(observation['startups'], start=1):
@@ -340,6 +463,7 @@ def main():
             PLAN.rehearse_successor_schema(root / 'rc.zip', ARCHIVE_SHA, BASELINE,
                 root / 'schema.json', observation, state['nonce'],
                 command=lambda args, raw=None: docker(root, args, raw))
+            rehearse_read_only_failure(root, state)
             state['rehearsal'] = 'passed'
         state['steps'][args.mode] = 'passed'
     except Exception:

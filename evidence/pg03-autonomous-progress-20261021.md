@@ -53,3 +53,27 @@ CI package-read同时在同仓main push运行，防止source CI的skipped job触
 ## CI39469656112结果与备份测试执行身份修正
 
 f23c6839777214c3beae1be46e2f5ed30bbc54a4：Backend、Frontend、三库及包读取均success；Secret scan job在26个备份测试的新增stopped全备份完成校验失败（unsafe backup directory）。该校验刻意要求根目录链由当前root持有，本地WSL root执行通过，而原CI以runner非root调用；不放宽生产文件资格，改该备份测试命令为sudo，与既有部署/Runtime安全文件测试一致。其余检查和断言完整保留，最新head仍须正常CI通过。
+
+## PR78正常合并及注册
+
+CI39509230715/1a57f501a9414abfdaaf3c865e90bf4501600ff2全部7个job success。新鲜 premerge-boundary-20261021T2242Z 取证九workflow原字节/两false开关/strict三required checks/enforce admins，required approving reviews=0；ready后使用--merge --match-head-commit正常合并，未admin bypass。PR78 merge799a608d1b5a79df0f2ef8031a7885f414125778，2026-10-20T22:44:15Z（北京时间21日06:44）。已注册新workflow，不运行旧固定RC。当前main push CI39510261549进行中，新RC尚未触发；postmerge-rc-boundary记录10份workflow与同样false/strict控制。
+
+当前工作区在同一目录创建后续控制分支 codex/pg03-exact-rc-acceptance-20261021，保留未提交/未跟踪旧工作。备份26项Linux root回归exit0；新增successor kernel及reader9方法通过，独立审查先发现lease尾部/重启证据时序/布尔类型，均修复并复核；另保护请求对象与基线不被adapter误改。测试是合成IO/实际临时文件持久化，不是生产执行器或真实超时截止验证，实际adapter仍NOT IMPLEMENTED。
+
+
+## 新RC实际构建与控制验收增量
+
+main push CI39510261549全部7项SUCCESS后，按新鲜false开关/严格保护/触发图，仅手动dispatch release-pg03-gateway.yml，RC39511197302/1 SUCCESS。source799a608d1b5a79df0f2ef8031a7885f414125778，完整镜像sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f，binary37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5。原始ZIP25194bytes/SHA b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7与GitHub artifact12305532882 digest一致，5个受限条目/4个payload hash及source/OCI/CI/schema/binary核验通过。原始ZIP及verification清单保留。
+
+RC的真实pull/legacy双启动已成功，但未启用新challenge凭证，不当专用P2-2验收。专用控制脚本改固定新身份；增加空白PostgreSQL17.6只读库（SHOW实际on）探测真实SQLSTATE25006、非零明确退出、无OOM/Docker错误、无成功凭证资格及独立两容器清理。负向日志只证明迁移拒绝，tmpfs退出后凭证不可采集明确记unknown；不是成功依据。finalize和回读同时要求负向完整合格。
+
+实际命令：WSL root python3 scripts/ci/test-pg03-successor-plan.py，62项全PASS/exit0；Windows python scripts/ci/test-pg03-successor-plan.py IsolatedActionsTest MigrationEvidenceTest SuccessorRequestTest，24项中22PASS/2 POSIX skip/exit0。新RC固定后发现4个旧夹具失败，按legacy source语义修复3处，不改旧日志/凭证拒绝合同，重跑上述受影响回归通过。三份Python AST及git diff --check exit0。successor CI改sudo运行，确保9项root kernel方法真实执行；不把替身IO视作生产操作或实际超时中断。
+
+独立driver_proof_review复核当前固定值/负向隔离与清理/finalize及回读/CI身份/legacy夹具，未发现阻断缺陷；未代跑容器/测试。successor_readiness_review复核kernel和完成reader通过；生产adapter、只读完整投影和连续全writer门禁仍NOT IMPLEMENTED，不能声称只剩部署审批。真实专用演练0次、修复重跑0/2。
+
+
+## 凭证持久化独立复核补强
+
+PR79/f51f6cf0d创建后，独立审查指出artifact只有proof摘要，无法独立重算其9字段。控制端现在只对已严格验证的成功凭证保留原始非秘密JSON、预期challenge及原SHA；抽出专用凭证校验函数，finalize和verify-public重验字段/hash/container/binary/source，并要求两次不同container/challenge。无效/失败/未知不保存可用成功凭证；不使用合成日志回读。无需重建RC，候选799a未改。
+
+实际增量验证：Windows MigrationEvidenceTest 14项PASS/exit0；Linux root集中63项PASS/exit0，随后新增producer/reader篡改拒绝后仅重跑EvidencePublicationTest 8项PASS/exit0。前63加新增1方法形成64项，完整64待PR正常CI观察；不将组合本地记录冒充已运行完整64。

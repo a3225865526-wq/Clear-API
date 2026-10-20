@@ -254,7 +254,7 @@ jobs:
           DEPLOY_SOURCE=scripts/production-deploy-v2.sh python3 scripts/ci/test-production-deploy.py WrapperModesTest WorkflowStdinTest
           sudo python3 scripts/ci/test-pg03-release.py
           sudo python3 scripts/ci/test-failed-recovery.py
-          python3 scripts/ci/test-pg03-successor-plan.py
+          sudo python3 scripts/ci/test-pg03-successor-plan.py
           sudo python3 scripts/ci/test-runtime-boot-recovery.py
           sudo visudo --check --file scripts/pg03-deploy.sudoers
           sudo python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest

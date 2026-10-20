@@ -105,6 +105,23 @@ def structured_migration_evidence(proof, logs, container_id, source, challenge, 
     if source == LEGACY_MIGRATION_SOURCE or not proof or len(proof.encode()) > 16384:
         return evidence
 
+    try:
+        validate_completion_proof(proof, container_id, challenge, binary)
+    except (ValueError, TypeError):
+        evidence['reason'] = 'invalid_structured_proof'
+        return evidence
+    evidence.update(status='success', reason='candidate_completed_startup_migrations',
+                    proof_sha256=hashlib.sha256(proof.encode()).hexdigest(),
+                    completion_receipt_json=proof, challenge=challenge)
+    return evidence
+
+
+def validate_completion_proof(proof, container_id, challenge, binary):
+    """Validate a bounded candidate receipt without inventing log evidence."""
+    if (type(proof) is not str or not 0 < len(proof.encode()) <= 16384
+            or not re.fullmatch(r'[a-f0-9]{64}', container_id)
+            or not re.fullmatch(r'[a-f0-9]{64}', binary)):
+        raise ValueError('invalid completion receipt binding')
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -113,28 +130,22 @@ def structured_migration_evidence(proof, logs, container_id, source, challenge, 
             result[key] = value
         return result
 
-    evidence['proof_sha256'] = hashlib.sha256(proof.encode()).hexdigest()
-    try:
-        receipt = json.loads(proof, object_pairs_hook=unique)
-        if (not isinstance(receipt, dict) or set(receipt) != {
-                'schema', 'status', 'challenge', 'hostname', 'pid', 'binary_sha256',
-                'phases', 'main_database', 'log_database'}
-                or receipt['schema'] != 'clearapi.startup-migration-proof/v1'
-                or receipt['status'] != 'success'
-                or receipt['challenge'] != challenge
-                or not re.fullmatch(r'[a-f0-9]{64}', challenge)
-                or receipt['hostname'] != container_id[:12]
-                or type(receipt['pid']) is not int or receipt['pid'] != 1
-                or receipt['binary_sha256'] != binary
-                or receipt['phases'] != ['main_database', 'retired_options', 'log_database']
-                or receipt['main_database'] != 'postgres'
-                or receipt['log_database'] != 'postgres'):
-            raise ValueError('proof contract mismatch')
-    except (ValueError, TypeError):
-        evidence['reason'] = 'invalid_structured_proof'
-        return evidence
-    evidence.update(status='success', reason='candidate_completed_startup_migrations')
-    return evidence
+    receipt = json.loads(proof, object_pairs_hook=unique)
+    if (not isinstance(receipt, dict) or set(receipt) != {
+            'schema', 'status', 'challenge', 'hostname', 'pid', 'binary_sha256',
+            'phases', 'main_database', 'log_database'}
+            or receipt['schema'] != 'clearapi.startup-migration-proof/v1'
+            or receipt['status'] != 'success'
+            or receipt['challenge'] != challenge
+            or not re.fullmatch(r'[a-f0-9]{64}', challenge)
+            or receipt['hostname'] != container_id[:12]
+            or type(receipt['pid']) is not int or receipt['pid'] != 1
+            or receipt['binary_sha256'] != binary
+            or receipt['phases'] != ['main_database', 'retired_options', 'log_database']
+            or receipt['main_database'] != 'postgres'
+            or receipt['log_database'] != 'postgres'):
+        raise ValueError('proof contract mismatch')
+    return receipt
 
 
 def rehearse(candidate, commit, schema, output, command=None, observation=None,

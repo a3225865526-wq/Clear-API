@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "component": "gateway",
+  "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "candidate_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "source_repository": "https://github.com/a3225865526-wq/Clear-API",
+  "image_repository": "ghcr.io/a3225865526-wq/clearapi",
+  "image_digest": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "oci_revision": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "platform": "linux/amd64",
+  "image_store": "containerd",
+  "new_api_image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "binary_path": "/new-api",
+  "binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5",
+  "legacy_retire_binary_sha256": "934fbcc46df9d11f54a549be73c5fe5050c72395ee451e52b70a3cc317b2b90b",
+  "dockerfile_sha256": "c5747d176f9e6a546207912e182075dd0b767abd9e5deeaed5727f2595586ef9",
+  "workflow_run": "39511197302",
+  "workflow_run_attempt": "1",
+  "workflow_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "workflow_ref": "a3225865526-wq/Clear-API/.github/workflows/release-pg03-gateway.yml@refs/heads/main",
+  "workflow_run_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39511197302",
+  "created_at": "2026-10-20T22:52:39Z",
+  "runtime_identity": {
+    "image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+    "binary_path": "/new-api",
+    "binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5"
+  },
+  "source_ci_runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 39510261549,
+      "headSha": "799a608d1b5a79df0f2ef8031a7885f414125778",
+      "status": "completed"
+    }
+  ],
+  "wrapper_sha256": "2ad1385a5259f2f4ab1257ef76e33f4c89aaab4c543d63413e0dc54fb7cb386c",
+  "v2_wrapper_sha256": "dd4e2fbedff508588b203d3736b6104e1fcd5557c05182f5ef47db8a3ed34d85",
+  "schema_transition": {
+    "schema_version": "pg03-schema-rehearsal-v1",
+    "profile": "isolated_schema_only_master_single_postgres",
+    "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+    "candidate_image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+    "candidate_binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5",
+    "postgres_image_ref": "postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+    "postgres_version_num": "170006",
+    "startup_passes": 2,
+    "source_schema_sha256": "578bc6f83dfafb47056c74324d13833a6333152685f4500316b0cd67f88333fd",
+    "target_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035"
+  },
+  "verification": {
+    "schema_rehearsal": "passed",
+    "legacy_retirement_source_tests": "passed",
+    "source_commit": "passed",
+    "targeted_accountpool_routechain_tests": "passed",
+    "deployment_binaries": "passed",
+    "platform": "passed",
+    "oci_revision": "passed",
+    "digest_pull": "passed",
+    "binary_roundtrip": "passed"
+  },
+  "deployment_compatible": true,
+  "missing_deployment_binaries": [],
+  "production_ready": false,
+  "production_acceptance": "not_run",
+  "sbom": null,
+  "provenance": null
+}
