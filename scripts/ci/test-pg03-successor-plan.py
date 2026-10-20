@@ -375,6 +375,8 @@ class IsolatedStartupTest(unittest.TestCase):
             if 'wget' in args:
                 return json.dumps(dict(success=self.fail_pass != self.pass_number))
         if args[0] == 'inspect':
+            if args[2] == '{{json .HostConfig.LogConfig}}':
+                return json.dumps(dict(Type='json-file', Config=dict(mode='blocking')))
             if args[2] == '{{.State.Running}}':
                 return 'false'
             if args[2] == '{{json .State}}':
@@ -477,6 +479,30 @@ def completed_startup_fixture(startup, number):
 
 
 class IsolatedActionsTest(unittest.TestCase):
+    def test_log_capture_refuses_rotation_dropping_or_unsupported_driver(self):
+        PLAN.SCHEMA.validate_log_config(json.dumps(dict(Type='json-file', Config=dict(mode='blocking'))))
+        for value in (dict(Type='local',Config={}),dict(Type='json-file',Config=dict(mode='non-blocking')),
+                      dict(Type='json-file',Config={'mode':'blocking','max-size':'4m'})):
+            with self.assertRaises(ValueError): PLAN.SCHEMA.validate_log_config(json.dumps(value))
+
+    def test_unqualified_or_unavailable_log_inspect_never_starts_gateway(self):
+        for configuration in ('{}', None):
+            fixture = IsolatedStartupTest()
+            fixture.setUp()
+            self.addCleanup(fixture.doCleanups)
+            original = fixture.command
+            def command(args, raw=None):
+                if args[:3] == ['inspect','--format','{{json .HostConfig.LogConfig}}']:
+                    if configuration is None: raise OSError('SYNTHETIC_LOG_INSPECT_FAILURE')
+                    return configuration
+                return original(args,raw)
+            with self.assertRaises((ValueError,OSError)):
+                PLAN.SCHEMA.rehearse(ACTION.IMAGE,fixture.source,fixture.schema,fixture.output,
+                    command=command,observation=fixture.observation,nonce=fixture.nonce,require_migration_evidence=True)
+            self.assertNotIn(['start',fixture.created[-1]],fixture.calls)
+            self.assertFalse(fixture.output.exists())
+            self.assertTrue(fixture.observation['cleanup_complete'])
+
     def test_negative_migration_uses_only_a_new_read_only_database_and_cleans_both_containers(self):
         self.negative_probe('')
 
@@ -500,6 +526,8 @@ class IsolatedActionsTest(unittest.TestCase):
                 self.assertEqual(args[-1], 'ALTER ROLE postgres SET default_transaction_read_only = on')
                 return ''
             if args[0] == 'inspect':
+                if args[2] == '{{json .HostConfig.LogConfig}}':
+                    return json.dumps(dict(Type='json-file', Config=dict(mode='blocking')))
                 if args[2] == '{{json .State}}':
                     return json.dumps(dict(Status='exited', Running=False, ExitCode=0 if fault=='exit' else 1,
                                            OOMKilled=False, Error=''))

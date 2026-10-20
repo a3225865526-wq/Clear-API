@@ -148,6 +148,14 @@ def validate_completion_proof(proof, container_id, challenge, binary):
     return receipt
 
 
+def validate_log_config(raw):
+    # Explicit negative max-size is invalid; default unlimited is selected only
+    # when Docker confirms no inherited rotation options on this container.
+    value = json.loads(raw)
+    if value != dict(Type='json-file', Config=dict(mode='blocking')):
+        raise ValueError('complete blocking json-file capture required')
+
+
 def rehearse(candidate, commit, schema, output, command=None, observation=None,
              nonce=None, expected_identity=None, expected_schema=None,
              require_migration_evidence=False):
@@ -240,8 +248,7 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
             if expected_schema is not None and startup['before_schema_sha256'] != expected_schema:
                 raise ValueError('startup baseline changed')
             observation['phase'] = 'create_pass_'+str(index+1)
-            log_options = ['--log-driver', 'json-file', '--log-opt', 'max-size=-1',
-                           '--log-opt', 'mode=blocking'] if require_migration_evidence else []
+            log_options = ['--log-driver', 'json-file', '--log-opt', 'mode=blocking'] if require_migration_evidence else []
             challenge = uuid.uuid4().hex + uuid.uuid4().hex
             proof_options = ['-e', 'CLEARAPI_MIGRATION_PROOF_CHALLENGE='+challenge] if require_migration_evidence else []
             gateway = command(['create', '--label', 'clearapi.schema-rehearsal='+nonce,
@@ -261,6 +268,8 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
                 raise ValueError('invalid isolated Gateway identity')
             owned.append(gateway)
             startup.update(container_id=gateway, create_exit_code=0)
+            if require_migration_evidence:
+                validate_log_config(command(['inspect', '--format', '{{json .HostConfig.LogConfig}}', gateway]))
             observation['phase'] = 'start_pass_'+str(index+1)
             command(['start', gateway])
             startup['start_exit_code'] = 0
@@ -334,6 +343,12 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
         observation['failure'] = dict(phase=observation['phase'],
             command_exit_code=error.returncode if isinstance(error, subprocess.CalledProcessError) else None,
             timed_out=isinstance(error, subprocess.TimeoutExpired))
+        stderr = getattr(error, 'stderr', None)
+        if type(stderr) is bytes:
+            observation['failure']['stderr_sha256'] = hashlib.sha256(stderr).hexdigest()
+            observation['failure']['error_kind'] = ('invalid_log_size' if
+                b'max-size must be a positive number' in stderr or b"invalid size: '-1'" in stderr
+                else 'command_failed_unclassified')
         raise
     finally:
         # Discard only containers created by this invocation, with matching label.

@@ -77,3 +77,14 @@ RC的真实pull/legacy双启动已成功，但未启用新challenge凭证，不�
 PR79/f51f6cf0d创建后，独立审查指出artifact只有proof摘要，无法独立重算其9字段。控制端现在只对已严格验证的成功凭证保留原始非秘密JSON、预期challenge及原SHA；抽出专用凭证校验函数，finalize和verify-public重验字段/hash/container/binary/source，并要求两次不同container/challenge。无效/失败/未知不保存可用成功凭证；不使用合成日志回读。无需重建RC，候选799a未改。
 
 实际增量验证：Windows MigrationEvidenceTest 14项PASS/exit0；Linux root集中63项PASS/exit0，随后新增producer/reader篡改拒绝后仅重跑EvidencePublicationTest 8项PASS/exit0。前63加新增1方法形成64项，完整64待PR正常CI观察；不将组合本地记录冒充已运行完整64。
+
+
+## PR79正常合并与首次真实隔离失败
+
+CI39513279138/41c58069a七jobs全部success（包含Linux root完整64集中测试）；新鲜保护/开关/10-workflow字节取证后正常合并PR79，merge1e155bc49c942ec72a30995670a720101fdaf7c8。未绕过review/required checks。仅dispatch专用pg03-isolated-rehearsal.yml main一次，run39514525897/1；该时main push CI39514438745自动进行中，PR保护必需CI已全success。
+
+首次真实run FAIL于start_pass_1：新digest精确packages:read pull、image/binary/OCI、PG170006及schema baseline通过；Gateway create0/start1，迁移UNKNOWN，第二次/负向NOT RUN。3个owned容器全部清理、auth移除；finalizer失败/verify-public成功/只上传failure result。API artifact digest/大小/原始ZIP/allowlist/control文件hash逐项核验，因实际producer失败而明确不接受成功，collector按设计断言拒绝并保留verification failure_or_unknown。证据见pg03-isolated-39514525897，不删除或改写成PASS。
+
+初步根因推断：Docker jsonfilelog默认capval=-1表示unlimited，但显式max-size经go-units拒负数且logger.New要求正值；现脚本显式max-size=-1。官方源码 https://github.com/moby/moby/blob/master/daemon/logger/jsonfilelog/jsonfilelog.go 和 https://github.com/docker/go-units/blob/master/size.go 支持该推断；不是首次原始stderr实测。修复删非法参数，保留json-file/blocking，每容器start前严格回读HostConfig.LogConfig无任何rotation等附加选项，否则阻断。后续命令错误仅保留stderr SHA及固定枚举分类，不记录raw环境/错误。
+
+修复后WSL root集中71项PASS（含未提交adapter6项）；随后新增inspect失效禁止start后Windows IsolatedActionsTest11项中9PASS/2平台skip，exit0。修复PR只含控制修复和原有集中方法，不纳入尚在准备的adapter6项；修复重跑目前0/2，正常CI和独立复核仍须满足再dispatch。候选source799a/digest729fdd不变。

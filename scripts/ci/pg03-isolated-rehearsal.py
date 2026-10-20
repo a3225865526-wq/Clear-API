@@ -166,7 +166,7 @@ def rehearse_read_only_failure(root, state):
             '--network', 'container:'+pg, '--read-only', '--cap-drop', 'ALL',
             '--security-opt', 'no-new-privileges', '--memory', '1g', '--pids-limit', '256',
             '--tmpfs', '/data:rw,nosuid,nodev,size=128m', '--tmpfs', '/tmp:rw,nosuid,nodev,size=64m',
-            '--log-driver', 'json-file', '--log-opt', 'max-size=-1', '--log-opt', 'mode=blocking',
+            '--log-driver', 'json-file', '--log-opt', 'mode=blocking',
             '-e', 'SQL_DSN=postgres://postgres@127.0.0.1:5432/rehearsal?sslmode=disable',
             '-e', 'LOG_SQL_DSN=', '-e', 'SESSION_SECRET=synthetic-negative-'+nonce,
             '-e', 'NODE_TYPE=master', '-e', 'CLEARAPI_PRODUCTION=false',
@@ -175,6 +175,7 @@ def rehearse_read_only_failure(root, state):
             '--entrypoint', '/new-api', IMAGE])
         PLAN.require(re.fullmatch(r'[a-f0-9]{64}', gateway), 'invalid negative Gateway identity')
         owned.append(gateway)
+        PLAN.SCHEMA.validate_log_config(docker(root, ['inspect', '--format', '{{json .HostConfig.LogConfig}}', gateway]))
         docker(root, ['start', gateway])
         for _ in range(30):
             process = json.loads(docker(root, ['inspect', '--format', '{{json .State}}', gateway]))

@@ -1,6 +1,16 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
 
+## 2026-10-21 — 首次真实隔离失败已保留；日志配置修复待CI（最新权威）
+
+- PR79/head41c58069ae77914a09e757176d65e30d92651958 的CI39513279138全部7 jobs SUCCESS，独立审查通过后正常合并为control1e155bc49c942ec72a30995670a720101fdaf7c8。两false开关、10 workflow原字节/触发图及strict保护已新鲜复核，未绕过人工或CI门禁。
+- 专用真实run39514525897/1（唯一workflow_dispatch）FAIL：packages:read已实际获取新精确digest729fdd…；RC ZIP、image ID/OCI/binary37bb…、PostgreSQL17.6及启动前schema3c1c…一致。Gateway第一次create成功、docker start退出1，尚未进入迁移；第二次启动与负向探针NOT RUN。全部3个owned容器清理成功、registry auth已移除、finalizer拒绝success且失败回读/上传成功。无成功receipt。原始artifact及验证元数据保留在evidence/pg03-isolated-39514525897/。
+- 已发现显式max-size=-1违反Docker logger的正数参数解析，符合start阶段失败的源码解释；因原始stderr未保留，不伪造实测报错。拟删除该非法参数，并在每次正/负容器start前严格核验实际日志配置只有json-file+blocking、无继承轮转；错配置/inspect失败即拒绝并清理。候选应用源码未改，不需重建RC。
+- P2-1本地PASS；P2-2源码机制/三库回归PASS，但真实镜像验收仍BLOCKED。真实初次演练1次FAIL，修复重跑尚0/2；修复正常CI/独立复核通过后最多再2次专用演练，不使用rerun旧控制。
+- 阶段D继续本地R2 gate/单次observer/adapter基础和严格scope/restore合同准备；门禁未安装或激活，完整生产adapter及新鲜身份/全writer窗口/获准写入/真实备份恢复仍BLOCKED。生产操作均未执行。
+
+
+
 ## 2026-10-21 — 新RC身份核验完成；专用真实隔离验收待运行（最新权威）
 
 本节取代下方历史“当前”状态；原记录及失败证据全部保留。PR78正常合并，main/source 799a608d1b5a79df0f2ef8031a7885f414125778 的完整 CI39510261549 七个job全部success，三库实际版本见 evidence/pg03-source-ci-39510261549.json。

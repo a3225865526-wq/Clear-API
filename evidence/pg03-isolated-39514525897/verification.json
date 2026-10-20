@@ -1,0 +1,146 @@
+{
+  "schema": "clearapi.pg03.isolated-artifact-verification/v1",
+  "observed_utc": "2026-10-20T23:23:21.559518+00:00",
+  "run": {
+    "id": 39514525897,
+    "run_attempt": 1,
+    "head_sha": "1e155bc49c942ec72a30995670a720101fdaf7c8",
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "failure",
+    "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+    "html_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39514525897"
+  },
+  "jobs": [
+    {
+      "id": 118943382650,
+      "name": "rehearse",
+      "status": "completed",
+      "conclusion": "failure",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:22:03Z",
+          "completed_at": "2026-10-20T23:22:04Z"
+        },
+        {
+          "name": "Bind isolated directory after runner allocation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:22:04Z",
+          "completed_at": "2026-10-20T23:22:04Z"
+        },
+        {
+          "name": "Checkout reviewed control source independently of candidate source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:22:04Z",
+          "completed_at": "2026-10-20T23:22:06Z"
+        },
+        {
+          "name": "Bind control identity and initialize private evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T23:22:06Z",
+          "completed_at": "2026-10-20T23:22:07Z"
+        },
+        {
+          "name": "Run offline isolation regression contracts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T23:22:07Z",
+          "completed_at": "2026-10-20T23:22:07Z"
+        },
+        {
+          "name": "Read fixed RC and validate original schema archive",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T23:22:07Z",
+          "completed_at": "2026-10-20T23:22:09Z"
+        },
+        {
+          "name": "Require containerd image store on this disposable hosted runner",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T23:22:09Z",
+          "completed_at": "2026-10-20T23:22:10Z"
+        },
+        {
+          "name": "Pull only fixed digests and erase temporary registry credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-20T23:22:10Z",
+          "completed_at": "2026-10-20T23:22:22Z"
+        },
+        {
+          "name": "Run two isolated starts and reject migration on a separate read-only database",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 9,
+          "started_at": "2026-10-20T23:22:22Z",
+          "completed_at": "2026-10-20T23:22:33Z"
+        },
+        {
+          "name": "Contain remaining owned resources and finalize sanitized evidence",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 10,
+          "started_at": "2026-10-20T23:22:33Z",
+          "completed_at": "2026-10-20T23:22:33Z"
+        },
+        {
+          "name": "Verify the published bundle against finalizer outcome",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-20T23:22:33Z",
+          "completed_at": "2026-10-20T23:22:33Z"
+        },
+        {
+          "name": "Preserve allowlisted evidence only",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-20T23:22:33Z",
+          "completed_at": "2026-10-20T23:22:34Z"
+        },
+        {
+          "name": "Post Checkout reviewed control source independently of candidate source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-10-20T23:22:34Z",
+          "completed_at": "2026-10-20T23:22:34Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-10-20T23:22:34Z",
+          "completed_at": "2026-10-20T23:22:34Z"
+        }
+      ]
+    }
+  ],
+  "artifact_count": 1,
+  "acceptance": "failure_or_unknown",
+  "production_acceptance": "not_run",
+  "artifact": {
+    "id": 12307756435,
+    "name": "pg03-isolated-schema-39514525897-1",
+    "digest": "sha256:8ce7eb6ec12927fbb93cede4fe2e6d1ed02a68e528d65e31f20a564ab0ac3695",
+    "size_in_bytes": 1595
+  },
+  "verification_error_type": "AssertionError"
+}
