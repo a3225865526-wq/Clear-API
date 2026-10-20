@@ -363,6 +363,7 @@ class IsolatedStartupTest(unittest.TestCase):
         if args[0] == 'start':
             return args[-1]
         if args[0] == 'exec':
+            if args[-1] == 'hostname': return args[1][:12]
             if 'pg_dump' in args:
                 return self.sql + ('-- drift\n' if self.drift_pass == self.pass_number else '')
             if 'pg_isready' in args:
@@ -375,6 +376,7 @@ class IsolatedStartupTest(unittest.TestCase):
             if 'wget' in args:
                 return json.dumps(dict(success=self.fail_pass != self.pass_number))
         if args[0] == 'inspect':
+            if args[2] == '{{.Config.Hostname}}': return args[-1][:12]
             if args[2] == '{{json .HostConfig.LogConfig}}':
                 return json.dumps(dict(Type='json-file', Config=dict(mode='blocking')))
             if args[2] == '{{.State.Running}}':
@@ -475,7 +477,8 @@ def completed_startup_fixture(startup, number):
         phases=['main_database', 'retired_options', 'log_database'], main_database='postgres', log_database='postgres'))
     migration = dict(status='success', source_commit=ACTION.SOURCE, container_id=cid,
         completion_receipt_json=raw, challenge=challenge, proof_sha256=hashlib.sha256(raw.encode()).hexdigest())
-    return dict(startup, pass_number=number, container_id=cid, migration=migration)
+    return dict(startup, pass_number=number, container_id=cid, migration=migration,
+                hostname=cid[:12], configured_hostname=cid[:12])
 
 
 class IsolatedActionsTest(unittest.TestCase):
@@ -865,7 +868,7 @@ class MigrationEvidenceTest(unittest.TestCase):
     def structured(self, document, logs=None, source='d'*40, after='a'*64):
         return PLAN.SCHEMA.structured_migration_evidence(document,
             self.log('database migration started') if logs is None else logs,
-            'b'*64, source, 'e'*64, 'c'*64, 'a'*64, after)
+            'b'*64, source, 'e'*64, 'c'*64, 'a'*64, after, 'b'*12)
 
     def test_candidate_completion_binds_fresh_instance_binary_and_all_migration_phases(self):
         evidence = self.structured(json.dumps(self.proof()))
@@ -916,6 +919,39 @@ class MigrationEvidenceTest(unittest.TestCase):
         self.assertEqual(self.structured(proof,
             logs=self.log('failed to seed default vip levels: SYNTHETIC_SECRET'))['status'], 'failure')
         self.assertEqual(self.structured(proof, after='c'*64)['status'], 'failure')
+
+    def test_network_container_hostname_is_bound_to_live_and_configured_value(self):
+        for mismatch in (False, True):
+            fixture=IsolatedStartupTest()
+            fixture.setUp()
+            self.addCleanup(fixture.doCleanups)
+            original=fixture.command
+            challenge=None
+            def command(args, raw=None):
+                nonlocal challenge
+                if args[0]=='create' and '--entrypoint' in args and args[args.index('--entrypoint')+1]=='/new-api':
+                    challenge=next(a.split('=',1)[1] for a in args if a.startswith('CLEARAPI_MIGRATION_PROOF_CHALLENGE='))
+                if args[:3]==['inspect','--format','{{.Config.Hostname}}']:return 'shared-database-host'
+                if args[0]=='exec' and args[-1]=='hostname':return 'wrong-live-host' if mismatch else 'shared-database-host'
+                if args[0]=='exec' and 'head' in args:
+                    value=self.proof(args[1],challenge,fixture.binary)
+                    value['hostname']='shared-database-host'
+                    return json.dumps(value)
+                if args[0]=='logs':return self.log('database migration started')
+                return original(args,raw)
+            if mismatch:
+                with self.assertRaisesRegex(ValueError,'hostname conflict'):
+                    PLAN.SCHEMA.rehearse(ACTION.IMAGE,fixture.source,fixture.schema,fixture.output,
+                        command=command,observation=fixture.observation,nonce=fixture.nonce,require_migration_evidence=True)
+                self.assertFalse(fixture.output.exists())
+            else:
+                PLAN.SCHEMA.rehearse(ACTION.IMAGE,fixture.source,fixture.schema,fixture.output,
+                    command=command,observation=fixture.observation,nonce=fixture.nonce,require_migration_evidence=True)
+                for startup in fixture.observation['startups']:
+                    self.assertEqual(startup['hostname'],'shared-database-host')
+                    self.assertNotEqual(startup['hostname'],startup['container_id'][:12])
+                    self.assertEqual(startup['migration']['status'],'success')
+            self.assertTrue(fixture.observation['cleanup_complete'])
 
     def test_two_proof_enabled_starts_require_each_live_container_receipt(self):
         fixture = IsolatedStartupTest()

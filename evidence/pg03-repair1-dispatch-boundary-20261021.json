@@ -1,0 +1,136 @@
+{
+  "schema": "clearapi.pg03.fresh-release-boundary/v1",
+  "observed_utc": "2026-10-20T23:36:32.189819+00:00",
+  "main": "97765d27f98889eda43484d813ed146b1f4dc823",
+  "workflow_source": "97765d27f98889eda43484d813ed146b1f4dc823",
+  "variables": {
+    "CLEARAPI_AUTO_RC_ENABLED": {
+      "name": "CLEARAPI_AUTO_RC_ENABLED",
+      "value": "false",
+      "created_at": "2026-10-16T20:46:46Z",
+      "updated_at": "2026-10-19T15:19:02Z"
+    },
+    "CLEARAPI_AUTO_PRODUCTION_ENABLED": {
+      "name": "CLEARAPI_AUTO_PRODUCTION_ENABLED",
+      "value": "false",
+      "created_at": "2026-10-18T21:25:08Z",
+      "updated_at": "2026-10-19T14:16:55Z"
+    }
+  },
+  "protection": {
+    "url": "https://api.github.com/repos/a3225865526-wq/Clear-API/branches/main/protection",
+    "required_status_checks": {
+      "url": "https://api.github.com/repos/a3225865526-wq/Clear-API/branches/main/protection/required_status_checks",
+      "strict": true,
+      "contexts": [
+        "Backend vet, build, test, migration binaries",
+        "Frontend typecheck and test",
+        "Secret scan and forbidden files"
+      ],
+      "contexts_url": "https://api.github.com/repos/a3225865526-wq/Clear-API/branches/main/protection/required_status_checks/contexts",
+      "checks": [
+        {
+          "context": "Backend vet, build, test, migration binaries",
+          "app_id": 15368
+        },
+        {
+          "context": "Frontend typecheck and test",
+          "app_id": 15368
+        },
+        {
+          "context": "Secret scan and forbidden files",
+          "app_id": 15368
+        }
+      ]
+    },
+    "required_pull_request_reviews": {
+      "url": "https://api.github.com/repos/a3225865526-wq/Clear-API/branches/main/protection/required_pull_request_reviews",
+      "dismiss_stale_reviews": false,
+      "require_code_owner_reviews": false,
+      "require_last_push_approval": false,
+      "required_approving_review_count": 0
+    },
+    "required_signatures": {
+      "url": "https://api.github.com/repos/a3225865526-wq/Clear-API/branches/main/protection/required_signatures",
+      "enabled": false
+    },
+    "enforce_admins": {
+      "url": "https://api.github.com/repos/a3225865526-wq/Clear-API/branches/main/protection/enforce_admins",
+      "enabled": true
+    },
+    "required_linear_history": {
+      "enabled": false
+    },
+    "allow_force_pushes": {
+      "enabled": false
+    },
+    "allow_deletions": {
+      "enabled": false
+    },
+    "block_creations": {
+      "enabled": false
+    },
+    "required_conversation_resolution": {
+      "enabled": true
+    },
+    "lock_branch": {
+      "enabled": false
+    },
+    "allow_fork_syncing": {
+      "enabled": false
+    }
+  },
+  "workflows": [
+    {
+      "path": ".github/workflows/automatic-deploy.yml",
+      "blob_sha": "094510390d7d75b15cd8a77a704b2969ae91ad65",
+      "sha256": "a5c613c889dd30590af44b18db7a4d56cecb8622766f1953d26f99044184b350"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "blob_sha": "cac9bda86a955f3e382ae747261c4207eede0322",
+      "sha256": "79c224327bd0e525860d5d55afc505c4dc3ef731392a806cbf4af2ea661c2634"
+    },
+    {
+      "path": ".github/workflows/deploy-production.yml",
+      "blob_sha": "5808715e7d5f28477d697df65b89adf05404b8ce",
+      "sha256": "d0b464eadd42ec2cddc8df9bc9854403aa91793a3bae7cdd6019fce87c74bb6b"
+    },
+    {
+      "path": ".github/workflows/deployment-rehearsal.yml",
+      "blob_sha": "a086410f1a27da5fd16a48704f0992d5782fd4ae",
+      "sha256": "47d94e26f41a078c2b61ac51c2d09017832c69f80e1bc6f408e5e29e9e0b9222"
+    },
+    {
+      "path": ".github/workflows/failed-production-recovery.yml",
+      "blob_sha": "1ca955a88cda9b698ced1a68a9ae8c447c77f016",
+      "sha256": "a2e358fc9c5b885125f9b766495bc56ec6cec72cb3cc54eda7b3577e22412e00"
+    },
+    {
+      "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+      "blob_sha": "e44427c2725bc1ef4cad84f8db1570084863438b",
+      "sha256": "f1385f40ca37276e9dcf5d78861d5a69b6af8b71b00f0b4da827c7ce73dad7fe"
+    },
+    {
+      "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+      "blob_sha": "6a919293e4a883c446de59f8fd229afed0d89c0a",
+      "sha256": "bf70bd5cd86dd48d47e7425549f6038c594ea1814b92b342f47536076ca8533d"
+    },
+    {
+      "path": ".github/workflows/release-candidate.yml",
+      "blob_sha": "a6c1fe57a984a4d767e1371816ca01138e45e2f0",
+      "sha256": "6cd204b8f849c3e6f82a07081471f185f4f069f015af3adf7728fc102475a303"
+    },
+    {
+      "path": ".github/workflows/release-pg03-gateway.yml",
+      "blob_sha": "23baa47b3204ef015fb3d8217f8f5ba69c162e96",
+      "sha256": "7765a55b1ce69868a978d8fe55e0b3a4a3a5c1b3f85f17c24c152c59806d63a0"
+    },
+    {
+      "path": ".github/workflows/release-state-audit.yml",
+      "blob_sha": "b980773f36c260f2f2ea73af05f94a0eee706774",
+      "sha256": "315089f860aa5f7eaa1fdec0dff091acd96be3bb431200c2655e0088594c7ec7"
+    }
+  ],
+  "production_operations_performed": false
+}

@@ -1,0 +1,109 @@
+{
+  "schema": "clearapi.isolated-actions-rehearsal/v1",
+  "nonce": "8ec9c07e88d848399c5d4abf9d283a7d",
+  "control_commit": "97765d27f98889eda43484d813ed146b1f4dc823",
+  "workflow_ref": "a3225865526-wq/Clear-API/.github/workflows/pg03-isolated-rehearsal.yml@refs/heads/main",
+  "run_id": "39516153502",
+  "run_attempt": "1",
+  "candidate_source": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "candidate_image": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "rc_run": "39511197302",
+  "rc_attempt": 1,
+  "artifact_id": "12305532882",
+  "archive_sha256": "b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7",
+  "baseline_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+  "production_observation_verified": false,
+  "production_acceptance": "not_run",
+  "rehearsal": "not_run",
+  "control_sha256": {
+    "scripts/ci/pg03-isolated-rehearsal.py": "4b37995f589c046975351d9a7810fbc3c398ad7fb23c0242c4e49194bae43c9b",
+    "scripts/pg03-successor-plan.py": "6b9c1a1570debd337b08dc018031f9650ccd1af833468e402c10118945e56ea7",
+    "scripts/pg03-schema-rehearsal.py": "6b3198ac43255c21f24476904ed4425b01ac7e58c1bbfb6b78307fe51f15cc99",
+    "scripts/ci/assemble-release-proof.py": "d19b5079bc89eb64866cdab43548a56453f7a810db46e8d12c5a180c5f7d3628",
+    "scripts/ci/test-pg03-successor-plan.py": "94870fdc146b9a153093c49f7a7b96297fdd725b3245d8e349d81186d7665b18",
+    ".github/workflows/pg03-isolated-rehearsal.yml": "bf70bd5cd86dd48d47e7425549f6038c594ea1814b92b342f47536076ca8533d"
+  },
+  "steps": {
+    "prepare": "passed",
+    "baseline": "passed",
+    "pull": "passed",
+    "rehearse": "failed",
+    "finalize": "failed"
+  },
+  "baseline_verified": true,
+  "image_store": "containerd",
+  "images_pulled": true,
+  "auth_removed": true,
+  "observation": {
+    "startups": [
+      {
+        "pass_number": 1,
+        "before_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+        "create_exit_code": 0,
+        "start_exit_code": 0,
+        "healthy": true,
+        "stop_exit_code": 0,
+        "after_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+        "process": {
+          "Status": "exited",
+          "Running": false,
+          "ExitCode": 0,
+          "OOMKilled": false,
+          "error_present": false
+        },
+        "container_id": "56c9c7fbaba59e11dbb625ac90a302db344d24562773f57978daacd910243da4",
+        "migration": {
+          "schema": "clearapi.migration-observation/v1",
+          "container_id": "56c9c7fbaba59e11dbb625ac90a302db344d24562773f57978daacd910243da4",
+          "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+          "status": "unknown",
+          "reason": "invalid_structured_proof",
+          "capture_complete": false,
+          "error_kinds": [],
+          "parsed_records": 14,
+          "log_sha256": "1e83d73546f8b924ff10a0ac0acd45a7eea7f8f738ae9d1a411b07a6c392acf9",
+          "proof_sha256": null
+        }
+      }
+    ],
+    "cleanup": [
+      {
+        "container_id": "56c9c7fbaba59e11dbb625ac90a302db344d24562773f57978daacd910243da4",
+        "removed": true
+      },
+      {
+        "container_id": "f0894fb30773ee93a564d9ad88e1bf037021e687402710f42e152f0c2254a89f",
+        "removed": true
+      },
+      {
+        "container_id": "d8b94847cb7d295cf804fd428118681026608ff364654869efae00b3a55ab631",
+        "removed": true
+      }
+    ],
+    "cleanup_complete": true,
+    "phase": "migration_evidence_pass_1",
+    "candidate": {
+      "image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+      "binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5",
+      "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+      "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778"
+    },
+    "postgres": {
+      "container_id": "f0894fb30773ee93a564d9ad88e1bf037021e687402710f42e152f0c2254a89f",
+      "image_ref": "postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+      "version_num": "170006"
+    },
+    "failure": {
+      "phase": "migration_evidence_pass_1",
+      "command_exit_code": null,
+      "timed_out": false
+    }
+  },
+  "final_cleanup": {
+    "containers": [],
+    "complete": true
+  },
+  "conclusion": "failure_or_unknown",
+  "prior_job_status": "failure",
+  "success_receipt_present": false
+}

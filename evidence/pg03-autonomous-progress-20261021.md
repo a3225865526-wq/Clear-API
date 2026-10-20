@@ -88,3 +88,21 @@ CI39513279138/41c58069a七jobs全部success（包含Linux root完整64集中测�
 初步根因推断：Docker jsonfilelog默认capval=-1表示unlimited，但显式max-size经go-units拒负数且logger.New要求正值；现脚本显式max-size=-1。官方源码 https://github.com/moby/moby/blob/master/daemon/logger/jsonfilelog/jsonfilelog.go 和 https://github.com/docker/go-units/blob/master/size.go 支持该推断；不是首次原始stderr实测。修复删非法参数，保留json-file/blocking，每容器start前严格回读HostConfig.LogConfig无任何rotation等附加选项，否则阻断。后续命令错误仅保留stderr SHA及固定枚举分类，不记录raw环境/错误。
 
 修复后WSL root集中71项PASS（含未提交adapter6项）；随后新增inspect失效禁止start后Windows IsolatedActionsTest11项中9PASS/2平台skip，exit0。修复PR只含控制修复和原有集中方法，不纳入尚在准备的adapter6项；修复重跑目前0/2，正常CI和独立复核仍须满足再dispatch。候选source799a/digest729fdd不变。
+
+
+## 日志修复正常合并与第1轮重跑
+
+PR80/head5024c6f4f65756aff128e71df95fcded71a3aac0 / CI39515073600全部7 jobs SUCCESS（修复PR集中66项，不含本地adapter6项）。独立只读复核实际暂存差异通过；新鲜main1e155/保护/无required approving/两false开关复核后正常--merge --match-head-commit，merge97765d27f98889eda43484d813ed146b1f4dc823，2026-10-20T23:35:43Z。main1e155的自动CI39514438745也全部7jobs SUCCESS，元数据单独保存。
+
+再以新main97765的10份workflow实际字节、两false开关与strict保护取证，仅dispatch专用pg03-isolated-rehearsal.yml，run39516153502/1（2026-10-20T23:36:45Z），修复重跑1/2。候选799a/RC39511197302/digest729fdd保持，不是旧候选07fd。实际结果待运行完成，不提前PASS。
+
+CI79 job日志专用下载接口曾exit1，未取得原始日志；未把该采集失败视为测试失败或伪造日志。后改仅保存实际API run/jobs/steps元数据，捕获CI39513279138/39514438745/39515073600七success，无重复执行CI。正常必需CI由PR/保护自然触发，没有手动重跑无关测试。
+
+
+## 第1轮重跑失败及最后hostname控制修复
+
+run39516153502/1 FAIL：实际logger回读/容器start已通过，Gateway第一次healthy=true、stop0、process exited0非OOM/无error、前后schema一致；migration invalid_structured_proof，第二次及负向NOT RUN。没有用这些外围成功冒充迁移成功。3owned全部清理/auth移除，finalizer拒绝success，失败回读和artifact上传成功；原ZIP/API digest/control hashes逐项核验后保存pg03-isolated-39516153502，collector实际producer失败故exit1并记录failure_or_unknown。
+
+官方固定Moby v27.1.1 https://github.com/moby/moby/blob/v27.1.1/daemon/container_operations.go#L881-L895 确认container:网络会将Gateway Config.Hostname设为donor hostname；原CID前缀假设错误。未保存该次raw receipt，不能把具体字段或内容补写成实测。最小修复在healthy运行中从相同精确CID inspect Config.Hostname与exec hostname取得独立期望，严格格式+相等后传入receipt校验；finalize/回读重复该合同，完整CID/challenge/pid/binary/phases/DB仍强制，两次不同CID/challenge不可省，允许shared hostname。不修改候选Go/Dockerfile，不需重建RC。
+
+实际Windows MigrationEvidenceTest15 PASS；Linux root整个集中73 PASS/exit0（6个local adapter准备方法未纳入修复PR，正常CI预期67个）。新增共享非CID hostname双启动成功/live-vs-config冲突拒绝和清理；旧未知/冲突/重复凭证门禁保留。git diff --check exit0。独立只读复核实际差异PASS，未代跑测试。修复重跑1/2，下一次是最后一次，仍须正常CI和fresh保护/开关/触发图再dispatch。
