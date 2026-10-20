@@ -72,7 +72,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Exercise real Wget and failed recovery safety cases
-        run: sudo python3 scripts/ci/test-failed-recovery.py
+        run: |
+          sudo python3 scripts/ci/test-failed-recovery.py
+          sudo python3 scripts/ci/test-runtime-boot-recovery.py
       - name: Record exact successful recovery rehearsal
         env:
           ASSETS_RC: ${{ inputs.assets_rc_run }}

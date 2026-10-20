@@ -171,7 +171,7 @@ CONTROLLED_LAUNCH=0
 FAILED_RECOVERY_VERIFY=0
 FAILED_RECOVERY_EXECUTE=0
 FAILED_RECOVERY_TOOL=/opt/clearapi/bin/pg03-failed-recovery.py
-FAILED_RECOVERY_TOOL_SHA=9afbc67d04235d069be56cc249c84a2b1d7fd811355d4fe41d3f5fafb14c9500
+FAILED_RECOVERY_TOOL_SHA=6f280c63c83884bc0d22c802d7c8a26e4bb280a9e71f1d0eb21c89f2d0d182de
 TRAFFIC_HOLD_TOOL=/opt/clearapi/bin/controlled-traffic-hold.py
 TRAFFIC_HOLD_SHA=b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90
 
@@ -219,7 +219,8 @@ if [ "$GHCR_TOKEN_STDIN" = "1" ]; then
     exit 2
   fi
 fi
-exec 3<&-
+# Failed recovery consumes its separate authorization record at the guarded entry.
+if [ "$FAILED_RECOVERY_EXECUTE" != 1 ]; then exec 3<&-; fi
 
 # ---------------------------------------------------------------------------
 # Helpers (all defined before any step executes)
@@ -1331,7 +1332,7 @@ if [ "$FAILED_RECOVERY_EXECUTE" = 1 ]; then
     && [ "$APP_DIR" = /opt/clearapi/app ] && [ -z "$GHCR_TOKEN_STDIN$DIGEST$COMMIT$WORKFLOW_RUN" ] \
     && [ "$(sha256sum "$FAILED_RECOVERY_TOOL" | cut -d' ' -f1)" = "$FAILED_RECOVERY_TOOL_SHA" ] \
     || { echo 'REFUSING: invalid failed controlled recovery entry point' >&2; exit 2; }
-  python3 -I "$FAILED_RECOVERY_TOOL" recover <&3
+  python3 -I "$FAILED_RECOVERY_TOOL" recover <&3 3<&-
   exit $?
 fi
 

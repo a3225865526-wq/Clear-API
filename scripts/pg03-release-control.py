@@ -27,7 +27,7 @@ IMAGE = 'ghcr.io/a3225865526-wq/clearapi'
 EXECUTOR = 'ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58'
 EXECUTOR_REVISION = 'b6e5a90fce6c0b3fa231d43ab07a65622f981be2'
 EXECUTOR_BINARY = 'e99b4dceee9b857c67e7b2b5101552511dbce60c789b2bec3c8fdd6bb5a33523'
-V2_SHA = 'd0a97b601716a35467df6f3a7f7994435820830771d62c7023890ce52eaa0490'
+V2_SHA = 'd6e682ee8e749c0e71afc8c67ba91475239e5fdce3feb0ed9a494d24c5434942'
 TARGET = Path('/opt/clearapi/app/pg03-target-manifest.json')
 
 

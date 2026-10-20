@@ -7,6 +7,13 @@ as `/dev/stdin` is rejected. The regular private config fix is exercised with
 real GNU Wget, including authentication failure, redirect rejection and cleanup.
 The upstream implementation is [GNU Wget main.c](https://raw.githubusercontent.com/mirror/wget/v1.21.3/src/main.c).
 
+The host subsequently rebooted. The configured identity bind source is
+`/run/clearapi` on tmpfs, created only during deployment, without a boot creator.
+Docker could not restart the same Gateway (exit127, missing bind source).
+Recovery now also accepts that exact stopped-container error; other stopped
+states, image changes or mounts are rejected. The wrapper retains its dedicated
+authorization stdin until the recovery helper consumes it.
+
 ## Existing rollback assessment
 
 The previous image is still available and the candidate's original encrypted
@@ -38,7 +45,7 @@ recover another incident or change the expected financial baseline.
    Only successful real transport and recovery safety tests publish the exact
    same-source recovery rehearsal artifact.
 3. After explicit production approval, audit-install the wrapper, its updated
-   control pin and the new recovery helper. Preserve the previous root assets.
+   control pin, recovery helper and runtime boot assets. Preserve the previous root assets.
    No sudoers changes are required: the existing wrapper entry remains allowlisted.
 4. Owner-dispatch `mode=recover`, the same assets RC, successful recovery
    rehearsal and `confirmation=RECOVER_FAILED_CONTROLLED`. The authorization job
@@ -46,9 +53,14 @@ recover another incident or change the expected financial baseline.
    attempt1, production environment policy, same-source CI/RC, exact rehearsal
    artifact and installed source bytes. The original failed run remains failed.
 5. Under the existing deployment lock, verify the frozen incident and durable
-   ingress hold, then invoke the wrapper's read-only failed postflight mode. This
+   ingress hold. If the exact diagnosed Gateway is stopped, first append an
+   exclusive start-attempt record, verify the installed boot assets, prepare the
+   protected directory using the existing identity helper, start the same exact
+   container, reconcile its newly observed process identity and wait for local
+   health. Then invoke the wrapper's failed postflight mode. This
    shares the complete existing Runtime, pair, binding, backup-timer, catalog and
-   billing postflight. It cannot run replacement, migrations or edge-release code.
+   billing postflight. It cannot replace images or release the edge. Starting
+   the application does run its existing startup migrations and background workers.
 6. Recheck the incident and append a root0600/fsynced, exclusive recovery receipt
    at `failed-recovery-39347012653.json`. Keep the original FAILED manifest,
    attempt, job, target, isolation journal and logs byte-for-byte unchanged.
@@ -61,10 +73,17 @@ is added.
 
 ## Impact, fallback and evidence
 
-Production writes are limited to installing reviewed root assets, the existing
-verification audit, a short-lived private probe config and the new recovery
-receipt. Gateway/Executor processes, images, database rows and Caddy state are
-unchanged. Every failed prerequisite stops without publishing a success receipt;
+Production writes include installing reviewed root/boot assets, recreating the
+protected runtime directory and identity, starting the same Gateway when needed,
+the existing verification audit, a short-lived private probe config and new
+append-only attempt/recovery records. Startup may run AutoMigrate, auth artifact
+cleanup, system task/instance updates, finance sync, completion/outbox processing
+and route ledger recovery. Existing same-image double-start evidence is reused;
+review counts and schema must match before and after. No manual financial write,
+image replacement, database restore or Caddy start is performed. Every failed
+prerequisite stops without publishing a success receipt; a Gateway started by
+this attempt is stopped on subsequent failure. The start-attempt latch prevents
+automatic replay even after interruption. The
 the isolated edge and original failed evidence remain. Existing root assets can
 be restored from the audited installation archive if installation or verification
 fails; doing so does not change services or financial data. A completed receipt

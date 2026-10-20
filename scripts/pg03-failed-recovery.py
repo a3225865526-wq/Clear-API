@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Incident-bound postflight recovery; never replace services or edit FAILED evidence."""
+"""Incident-bound recovery of the exact Gateway; retain FAILED and isolated edge."""
 import base64
 from datetime import datetime, timezone
 import hashlib
@@ -40,7 +40,8 @@ FROZEN = {
 }
 WORKFLOW = '.github/workflows/failed-production-recovery.yml'
 ASSETS = ('production-deploy-v2.sh', 'pg03-release-control.py', 'pg03-failed-recovery.py',
-          'controlled-traffic-hold.py', 'pg03-legacy-transition.py', 'pg03-schema-rehearsal.py')
+          'controlled-traffic-hold.py', 'pg03-legacy-transition.py', 'pg03-schema-rehearsal.py',
+          'runtime-identity-refresh.py', 'runtime-boot-recovery.py')
 
 
 def require(value, message):
@@ -118,7 +119,7 @@ class Recovery:
         require(result.returncode == 0, 'recovery postflight command failed; retain isolation and FAILED evidence')
         return result.stdout.strip()
 
-    def snapshot(self):
+    def snapshot(self, allow_stopped=False):
         require(not self.receipt.exists() and not self.receipt.is_symlink(), 'recovery already recorded; do not replay')
         for name, expected in FROZEN.items():
             require(hashlib.sha256(LIFECYCLE.read_file(self.app / name, private=False)).hexdigest() == expected,
@@ -128,9 +129,7 @@ class Recovery:
                 and current['candidate_commit'] == COMMIT and current['image_digest'] == DIGEST, 'not the failed incident')
         hold = TRAFFIC.TrafficHold(self.app, self.command)
         hold.verify(hold.binding(FAILED_RUN, DIGEST, COMMIT))
-        gateway = json.loads(self.command(['docker', 'inspect', 'clearapi-new-api-1']))[0]
-        require(gateway['Id'] == GATEWAY and gateway['Image'] == DIGEST and gateway['State']['Running']
-                and not gateway['State'].get('Restarting') and gateway['RestartCount'] == 0, 'Gateway changed')
+        self.gateway(allow_stopped)
         executor = CONTROL.executor_identity(lambda *args: self.command(['docker', *args]))
         require(executor['container_id'] == EXECUTOR, 'Executor changed')
         schema = load('pg03-schema-rehearsal')
@@ -159,17 +158,67 @@ ROLLBACK;"""
         return {'failed_manifest_sha256': FROZEN['release-manifest.json'], 'gateway': GATEWAY, 'executor': EXECUTOR,
                 'target_sha256': FROZEN['pg03-target-manifest.json']}
 
+    def gateway(self, allow_stopped=False):
+        gateway = json.loads(self.command(['docker', 'inspect', 'clearapi-new-api-1']))[0]
+        require(gateway['Id'] == GATEWAY and gateway['Image'] == DIGEST
+                and gateway['Config']['Image'] == 'ghcr.io/a3225865526-wq/clearapi@' + DIGEST
+                and not gateway['State'].get('Restarting') and gateway['RestartCount'] == 0, 'Gateway changed')
+        state = gateway['State']
+        if not state['Running']:
+            require(allow_stopped and state['Status'] == 'exited' and state['ExitCode'] == 127
+                    and not state.get('OOMKilled')
+                    and 'open /run/clearapi: no such file or directory' in state.get('Error', ''),
+                    'Gateway is not the diagnosed missing-runtime-directory incident')
+        mounts = [m for m in gateway['Mounts'] if m.get('Destination') == '/run/clearapi']
+        require(len(mounts) == 1 and mounts[0].get('Type') == 'bind'
+                and mounts[0].get('Source') == '/run/clearapi' and mounts[0].get('RW') is False,
+                'runtime identity mount changed')
+        return gateway
+
     def complete(self, authorization):
-        before = self.snapshot()
-        self.command(['/opt/clearapi/bin/production-deploy-v2.sh', '--verify-failed-controlled', '--pool-mode', 'pg03',
-                      '--workflow-run', FAILED_RUN, '--digest', DIGEST, '--commit', COMMIT])
-        require(self.snapshot() == before, 'incident changed during postflight')
+        attempt = self.app / ('failed-recovery-start-' + FAILED_RUN + '.json')
+        require(not attempt.exists() and not attempt.is_symlink(), 'start already attempted; operator review required')
+        before = self.snapshot(allow_stopped=True)
+        gateway = self.gateway(allow_stopped=True)
+        started = False
+        try:
+            if not gateway['State']['Running']:
+                # Persist authority before any mutation. A failed/interrupted attempt
+                # is never automatically retried, even if no final receipt exists.
+                LIFECYCLE.publish(attempt, dict(schema='clearapi.failed-recovery-start/v1',
+                    authorization=authorization, incident=before, original_state='exited_127_missing_runtime',
+                    recorded_at=datetime.now(timezone.utc).isoformat(), public_traffic='blocked'))
+                self.command(['/usr/bin/python3', '-I', '/opt/clearapi/bin/runtime-boot-recovery.py',
+                              'check-installed'])
+                self.command(['/opt/clearapi/bin/runtime-identity-refresh.py', '--prepare-only',
+                              '--directory', '/run/clearapi'])
+                started = True  # A failed docker start may still have changed runtime state.
+                self.command(['docker', 'start', GATEWAY])
+                self.command(['/opt/clearapi/bin/runtime-identity-refresh.py', '--reconcile',
+                              '--container', GATEWAY, '--image-ref',
+                              'ghcr.io/a3225865526-wq/clearapi@' + DIGEST,
+                              '--expected-revision', COMMIT, '--directory', '/run/clearapi'])
+                self.command(['curl', '--noproxy', '*', '--fail', '--silent', '--output', '/dev/null',
+                              '--retry', '30', '--retry-delay', '1', '--retry-connrefused', '--retry-max-time', '90',
+                              '--max-time', '3', 'http://127.0.0.1:3000/api/status'])
+            self.command(['/opt/clearapi/bin/production-deploy-v2.sh', '--verify-failed-controlled', '--pool-mode', 'pg03',
+                          '--workflow-run', FAILED_RUN, '--digest', DIGEST, '--commit', COMMIT])
+            require(self.snapshot() == before, 'incident changed during postflight')
+        except Exception:
+            if started:
+                self.command(['docker', 'stop', '--time', '150', GATEWAY])
+            raise
         receipt = {'schema': 'clearapi.failed-controlled-recovery/v1', 'status': 'postflight_recovered_ingress_isolated',
                    'authorization': authorization, 'incident': before, 'recorded_at': datetime.now(timezone.utc).isoformat(),
                    'original_deployment_status': 'failed', 'public_traffic': 'blocked',
                    'provider_acceptance': 'deferred_to_owner_after_deployment', 'circuit_cleared': False,
-                   'images_replaced': False, 'database_restored': False}
-        LIFECYCLE.publish(self.receipt, receipt)
+                   'images_replaced': False, 'database_restored': False, 'same_gateway_started': started}
+        try:
+            LIFECYCLE.publish(self.receipt, receipt)
+        except Exception:
+            if started:
+                self.command(['docker', 'stop', '--time', '150', GATEWAY])
+            raise
         return receipt
 
 

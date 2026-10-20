@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -108,6 +109,49 @@ class RealWgetProbeTest(unittest.TestCase):
         self.assertEqual(self.requests, [])
 
 
+class RecoveryWrapperStdinTest(unittest.TestCase):
+    def setUp(self):
+        self.assertEqual(os.geteuid(), 0, 'run wrapper regression as root in an isolated test environment')
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        config = self.root / 'deploy.env'
+        config.write_text('DEPLOY_APP_DIR=/opt/clearapi/app\n')
+        config.chmod(0o600)
+        self.record = self.root / 'authorization.json'
+        helper = self.root / 'recovery.py'
+        helper.write_text('import os,sys\nfrom pathlib import Path\n'
+                          'Path(os.environ["RECOVERY_INPUT"]).write_bytes(sys.stdin.buffer.read())\n'
+                          'sys.exit(int(os.environ["RECOVERY_EXIT"]))\n')
+        source = (SCRIPTS / 'production-deploy-v2.sh').read_text()
+        pin = source.split('FAILED_RECOVERY_TOOL_SHA=', 1)[1].splitlines()[0]
+        # Execute the full wrapper and its real argument/FD handling. Only the
+        # operator file and pinned helper are redirected into this fixture.
+        source = source.replace('/opt/clearapi/config/deploy.env', str(config))
+        source = source.replace('FAILED_RECOVERY_TOOL=/opt/clearapi/bin/pg03-failed-recovery.py',
+                                'FAILED_RECOVERY_TOOL=' + shlex.quote(str(helper)))
+        source = source.replace('FAILED_RECOVERY_TOOL_SHA=' + pin,
+                                'FAILED_RECOVERY_TOOL_SHA=' + hashlib.sha256(helper.read_bytes()).hexdigest())
+        self.wrapper = self.root / 'wrapper.sh'
+        self.wrapper.write_text(source)
+        self.payload = b'{"token":"synthetic-recovery-secret","run":"123"}\n'
+
+    def run_recovery(self, exit_code):
+        result = subprocess.run(['bash', str(self.wrapper), '--pool-mode', 'pg03', '--recover-failed-controlled'],
+                                input=self.payload, capture_output=True, timeout=10,
+                                env=dict(os.environ, RECOVERY_INPUT=str(self.record), RECOVERY_EXIT=str(exit_code)))
+        self.assertTrue(self.record.exists(), result.stderr.decode())
+        self.assertEqual(self.record.read_bytes(), self.payload)
+        self.assertEqual(result.returncode, exit_code)
+        self.assertNotIn(b'synthetic-recovery-secret', result.stdout + result.stderr)
+
+    def test_authorization_reaches_pinned_helper_via_stdin(self):
+        self.run_recovery(0)
+
+    def test_helper_failure_is_preserved_without_credential_output(self):
+        self.run_recovery(31)
+
+
 class RecoveryReceiptTest(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
@@ -118,7 +162,27 @@ class RecoveryReceiptTest(unittest.TestCase):
         self.manifest.write_bytes(self.original)
         self.binding = {'failed_manifest_sha256': hashlib.sha256(self.original).hexdigest()}
         self.commands = []
-        self.recovery = RECOVERY.Recovery(self.app, lambda args: self.commands.append(args) or '')
+        self.gateway = dict(Id=RECOVERY.GATEWAY, Image=RECOVERY.DIGEST, RestartCount=0,
+                            Config={'Image': 'ghcr.io/a3225865526-wq/clearapi@' + RECOVERY.DIGEST},
+                            State=dict(Running=True, Restarting=False),
+                            Mounts=[dict(Destination='/run/clearapi', Type='bind', Source='/run/clearapi', RW=False)])
+        self.failure = None
+        self.recovery = RECOVERY.Recovery(self.app, self.command)
+
+    def command(self, args):
+        self.commands.append(args)
+        if args[:2] == ['docker', 'inspect']:
+            return json.dumps([self.gateway])
+        if self.failure and self.failure in args:
+            RECOVERY.require(False, 'actual postflight failure')
+        if args[:2] == ['docker', 'start']:
+            attempt = self.app / ('failed-recovery-start-' + RECOVERY.FAILED_RUN + '.json')
+            self.assertTrue(attempt.exists(), 'authority must be durable before start')
+        return ''
+
+    def stopped(self):
+        self.gateway['State'] = dict(Running=False, Restarting=False, Status='exited', ExitCode=127,
+                                    OOMKilled=False, Error='failed: open /run/clearapi: no such file or directory')
 
     def test_success_only_appends_receipt_and_retains_failed_manifest(self):
         with patch.object(self.recovery, 'snapshot', return_value=self.binding):
@@ -130,15 +194,66 @@ class RecoveryReceiptTest(unittest.TestCase):
         self.assertFalse(receipt['circuit_cleared'])
         self.assertFalse(receipt['images_replaced'])
         self.assertFalse(receipt['database_restored'])
-        self.assertEqual(len(self.commands), 1)
-        self.assertIn('--verify-failed-controlled', self.commands[0])
+        self.assertEqual(len(self.commands), 2)
+        self.assertIn('--verify-failed-controlled', self.commands[1])
 
     def test_failed_postflight_cannot_publish_success(self):
-        self.recovery.command = lambda args: RECOVERY.require(False, 'actual postflight failure')
+        self.failure = '--verify-failed-controlled'
         with patch.object(self.recovery, 'snapshot', return_value=self.binding):
             with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'actual postflight'):
                 self.recovery.complete({})
         self.assertFalse(self.recovery.receipt.exists())
+
+    def test_stopped_incident_starts_only_exact_gateway_and_reconciles_before_postflight(self):
+        self.stopped()
+        with patch.object(self.recovery, 'snapshot', return_value=self.binding):
+            receipt = self.recovery.complete({'recovery_run': '123'})
+        self.assertTrue(receipt['same_gateway_started'])
+        self.assertEqual([c for c in self.commands if c[:2] == ['docker', 'start']],
+                         [['docker', 'start', RECOVERY.GATEWAY]])
+        prepare = next(i for i, c in enumerate(self.commands) if '--prepare-only' in c)
+        start = next(i for i, c in enumerate(self.commands) if c[:2] == ['docker', 'start'])
+        reconcile = next(i for i, c in enumerate(self.commands) if '--reconcile' in c)
+        postflight = next(i for i, c in enumerate(self.commands) if '--verify-failed-controlled' in c)
+        self.assertLess(prepare, start)
+        self.assertLess(start, reconcile)
+        self.assertLess(reconcile, postflight)
+        self.assertEqual(self.manifest.read_bytes(), self.original)
+        self.assertFalse(any('clearapi-edge-caddy' in c for c in self.commands))
+
+    def test_start_reconcile_or_postflight_failure_stops_new_gateway_and_prevents_replay(self):
+        self.stopped()
+        for failure in ('start', '--reconcile', '--verify-failed-controlled'):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as name:
+                self.recovery = RECOVERY.Recovery(Path(name), self.command)
+                # The fixture's authority assertion tracks this attempt location.
+                self.app = Path(name)
+                self.failure = failure
+                self.commands.clear()
+                with patch.object(self.recovery, 'snapshot', return_value=self.binding):
+                    with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'actual postflight'):
+                        self.recovery.complete({})
+                    with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'start already attempted'):
+                        self.recovery.complete({})
+                self.assertEqual(self.commands[-1], ['docker', 'stop', '--time', '150', RECOVERY.GATEWAY])
+                self.assertFalse(self.recovery.receipt.exists())
+
+    def test_other_exit_drift_or_mount_change_never_permits_start(self):
+        self.stopped()
+        original = copy.deepcopy(self.gateway)
+        changes = [dict(Id='a' * 64), dict(RestartCount=1),
+                   dict(State=dict(self.gateway['State'], ExitCode=1)),
+                   dict(State=dict(self.gateway['State'], Error='unrelated error')),
+                   dict(State=dict(self.gateway['State'], OOMKilled=True)), dict(Mounts=[])]
+        for change in changes:
+            self.gateway = dict(original, **change)
+            with self.subTest(change=change), self.assertRaises(RECOVERY.CONTROL.ReleaseBlocked):
+                self.recovery.gateway(allow_stopped=True)
+        self.gateway = original
+        with self.assertRaises(RECOVERY.CONTROL.ReleaseBlocked):
+            self.recovery.gateway()
+        self.assertEqual(self.recovery.gateway(allow_stopped=True)['Id'], RECOVERY.GATEWAY)
+        self.assertTrue(all(c[:2] == ['docker', 'inspect'] for c in self.commands))
         self.assertEqual(self.manifest.read_bytes(), self.original)
 
     def test_changed_incident_cannot_publish_success(self):
