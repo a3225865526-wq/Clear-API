@@ -291,6 +291,10 @@ def main():
             require(directory_state() == 'ready', 'runtime directory not prepared')
             print('Runtime directory ready; no container operation performed')
         else:
+            # A Docker inspection can socket-activate a stopped daemon. Refuse
+            # before contacting its socket so check/reconcile never starts it.
+            subprocess.run(['systemctl', 'is-active', '--quiet', 'docker.service'],
+                           check=True, capture_output=True, timeout=5)
             helper, expected = load_helper(), approved_identity()
             if args.mode == 'check':
                 directory = directory_state()

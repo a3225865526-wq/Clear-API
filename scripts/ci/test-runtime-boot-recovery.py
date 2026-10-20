@@ -26,6 +26,16 @@ REF = 'ghcr.io/a3225865526-wq/clearapi@' + DIGEST
 
 @unittest.skipUnless(hasattr(os, 'geteuid') and os.geteuid() == 0, 'Linux root required')
 class BootRecoveryTest(unittest.TestCase):
+    def test_inactive_docker_is_rejected_before_inspection_or_socket_activation(self):
+        for mode in ('check', 'reconcile'):
+            with self.subTest(mode=mode), patch.object(sys, 'argv', ['boot', mode]), \
+                    patch.object(BOOT.subprocess, 'run', side_effect=subprocess.CalledProcessError(3, 'systemctl')) as command, \
+                    patch.object(BOOT, 'load_helper') as helper, self.assertRaises(SystemExit):
+                BOOT.main()
+            helper.assert_not_called()
+            command.assert_called_once_with(['systemctl', 'is-active', '--quiet', 'docker.service'],
+                                             check=True, capture_output=True, timeout=5)
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix='clearapi-boot-test-')
         self.addCleanup(self.temporary.cleanup)
