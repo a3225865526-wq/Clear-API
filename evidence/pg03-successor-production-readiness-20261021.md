@@ -12,9 +12,9 @@
 
 ## 完整 successor 执行器的前置依赖
 
-现 `pg03-successor-plan.py` 仅离线 admission，execution_allowed 恒 false；现 Deploy V2 要求 running predecessor，不能直接接收 failed/stopped 的事故源，也不能篡改 failed 为 success。仓库尚无完整 successor 生产执行器，不以备份组件或离线提案冒充已完成。
+现 `pg03-successor-plan.py` 仅离线 admission，execution_allowed 恒 false；另已形成本地 `pg03-successor-transaction.py` 严格request/观测合同和一次性有限状态机，9项Linux集中定向测试通过；无生产adapter或mutation CLI，不代表完整executor。现 Deploy V2 要求 running predecessor，不能直接接收 failed/stopped 的事故源，也不能篡改 failed 为 success。仓库尚无完整 successor 生产执行器，不以备份组件或离线提案冒充已完成。
 
-实现最终 apply 必须绑定真实有效配置的启动写入范围、停止态全部 writer 资格、备份/恢复结果及新的一次性生产审批协议。当前没有新鲜生产资格/配置/状态，继续猜测并连接生产进行推断会超出授权。下述是具体待核实合同；不注册或调用生产入口来补证。
+本地kernel已覆盖不可覆盖持久claim、固定阶段、逐步auth/lease复核、两次不同进程/challenge、保护投影、失败contain/UNKNOWN与禁止重试；trusted adapter接口强制把server认证/证据来源/真实观测留为显式依赖，未提供假默认实现。完整adapter、实际生产绑定及apply仍待实施和审查，不能把缺生产事实当作所有本地实现的障碍，也不能注册或调用生产入口来补证。最终必须绑定真实配置的列级启动写入范围、全部writer资格、备份/恢复和新的生产一次性审批。
 
 1. 新、独立的 owner 手动生产审批，服务端认证 current-main/仓库/actor/triggering_actor/精确 attempt、保护及实际批准，不继承旧失败 workflow 或聊天消息。绑定 request hash、候选 source/digest/binary、RC run/attempt、隔离 artifact hash、备份及恢复 hash、写入范围 hash、UTC期限、一次性 nonce。
 2. root 持有现有 deployment_lock 至完整收敛；在任何可能变更前 fsync 不可覆盖的 attempt，断连/超时/UNKNOWN 消耗额度，禁止自动重放。保留 failed manifest/target/hold/overlay 原始字节副本和 previous_success；Executor 原容器/epoch 不变、Caddy 仍 stopped/restart=no。
@@ -48,9 +48,9 @@
 
 ## 最小人工动作及资格证明
 
-沿用 `CLEARAPI_READONLY_IDENTITY_ADMIN_CHECKLIST.md` 的受限只读身份设计及R2审查；历史账号/窗口已过期，不能复用。管理员需确认所选A方案、安装/核验一次性服务端门禁、专用SSH/最小sudo链、固定helper hash/属主/权限/host-key，签发单次UTC300秒授权与新身份期限，并经安全通道注入凭据。本会话不安装、不SSH、不修改账号/sudo。
+沿用 `CLEARAPI_READONLY_IDENTITY_ADMIN_CHECKLIST.md` 的受限只读身份设计及R2审查；历史账号/窗口已过期，不能复用。R2的一次性gate及observer接线目前NOT IMPLEMENTED，没有可直接安装的实物；需先单独明确该身份实现范围、完成本地代码/测试/审查，再由管理员另批安装/核验专用SSH/最小sudo链、helper hash/属主/权限/host-key，签发单次UTC300秒授权与新身份期限，经安全通道注入凭据。本会话不安装、不SSH、不修改账号/sudo。
 
-批准后的只读采集必须给出：完整身份/有效期/无写权限审计、GitHub所有refs队列与生产开关、部署锁/无其他writer、Gateway exited127和restart=no、Executor原ID/epoch/健康、Caddy无公网listener、failed所有冻结hash、有效配置布尔投影、主/日志DB版本与schema/受保护金融hash和上述待处理计数。缺失即BLOCKED，不通过扩权/PAT/管理员SSH补齐。
+现有 recovery-tool-vps-helper.py 可交付工具库存、进程/容器最小状态与锁等投影；它不执行DB/schema/金融查询，不交付完整配置或Executor epoch资格。R2 A至多一次调用也不能证明连续独占窗口。应分别设计并审查后，另批以下最小渠道和窗口：DB/schema/受保护金融hash/待处理计数及配置布尔的无秘密只读投影；完整Executor身份/epoch/健康；覆盖GitHub所有refs队列/开关与VPS全部writer的连续独占核验。不能把安装现helper当作这些完整证据。缺失即BLOCKED，不通过扩权/PAT/管理员SSH补齐。
 
 随后单独批准：停止态加密备份及独占窗口；离线私钥恢复环境/数据库隔离；最终 successor 代码/安装资产、写入范围及一次生产执行；最后另批开放入口。每个批准绑定新 RC 和当次证据，不能由本任务的安全非生产授权推导。
 
@@ -59,3 +59,5 @@
 部署前核对 candidate/RC/control/artifact整链、source CI与审查、双启动证据、最新冻结状态/资格/窗口、备份和真实恢复、startup写入范围、runtime/boot安装hash、Executor身份及Caddy隔离。生产后优先验证新进程/迁移证据/Runtime认证/Executor通道和所有保护投影，再验证获准重启恢复；公网开放、真实login/model调用和扣费只能另行批准并如实记录。
 
 回滚默认是停止新增Gateway、Caddy保持隔离、保存失败证据并人工评估：旧failed仍failed；previous_success只是历史引用，不代表与当前schema/账务可直接回退。数据库、Pool高水位/receipts不可自动覆盖或恢复；需要真实新备份、兼容性和单独授权。未验证项仍UNKNOWN，禁止把本地模拟标成生产验收。
+
+本地kernel依据OWASP Transaction Authorization（服务器验证、交易绑定、限时与一次性消费）、Authentication/Session Management指引分离认证与数据校验；当前生产adapter未实现，未声明ASVS5.0.0合规。官方参考：https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html 、https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html 、https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html 。

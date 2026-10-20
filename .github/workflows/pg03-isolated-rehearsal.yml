@@ -75,7 +75,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/ci/pg03-isolated-rehearsal.py pull
 
-      - name: Run two isolated starts on the same fixed target schema database
+      - name: Run two isolated starts and reject migration on a separate read-only database
         run: python3 scripts/ci/pg03-isolated-rehearsal.py rehearse
 
       - name: Contain remaining owned resources and finalize sanitized evidence

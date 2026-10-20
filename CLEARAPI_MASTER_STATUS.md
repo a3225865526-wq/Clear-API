@@ -1,5 +1,30 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+
+## 2026-10-21 — 新RC身份核验完成；专用真实隔离验收待运行（最新权威）
+
+本节取代下方历史“当前”状态；原记录及失败证据全部保留。PR78正常合并，main/source 799a608d1b5a79df0f2ef8031a7885f414125778 的完整 CI39510261549 七个job全部success，三库实际版本见 evidence/pg03-source-ci-39510261549.json。
+
+- P2-1：Linux本地PASS。P2-2：候选源码机制和真实三库定向回归PASS；新镜像专用迁移凭证双启动验收仍NOT RUN，不由日志、退出码或schema相同替代。
+- 新RC39511197302/1构建SUCCESS。source 799a608d1b5a79df0f2ef8031a7885f414125778；image ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f；binary SHA256 37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5。原始artifact ZIP/API digest、payload hashes、OCI/source/CI/二进制/目标DDL一致性均已核验，见 evidence/pg03-rc-39511197302/verification.json；旧69a/07fd候选不用于修复验收。
+- RC runner已实际拉取该新digest并执行legacy schema两次启动；该步骤未启用本次challenge迁移凭证，不能当专用真实验收PASS。下一次专用runner的packages:read精确获取、凭证双启动、空白只读库迁移拒绝及证据持久化仍NOT RUN，真实演练修复重跑0/2。
+- 控制增量已固定新RC并增加独立只读测试库负向探针；完整Linux root集中回归62项PASS，Windows受影响24项中22PASS/2平台skip；独立复核无阻断项。9项successor本地kernel合同/事务方法包含在62项中，无生产adapter/mutation CLI，不冒充完整执行器。生产只读资格、全writer窗口、列级写入投影、真实备份恢复及adapter仍BLOCKED。
+- 当前控制分支 codex/pg03-exact-rc-acceptance-20261021 待提交/正常CI/条件合并；只改变控制脚本、测试和证据，候选应用源码/Dockerfile/依赖不变。控制commit与候选source分别记录，不把控制变更冒充镜像源码。
+
+继续正常PR及必需CI，动态复核触发链/两个false开关/保护后，仅运行专用隔离workflow。生产SSH、配置/权限/数据/容器、正式部署及公网操作未授权、未执行。PG03整体仍BLOCKED。
+
+
+## 2026-10-21 06:50 — 阶段A/B：PR78已合并，等待main CI后构建新RC（当前）
+
+- PR78 已在 strict required checks 与管理员保护下正常合并，未绕过审查。head 1a57f501a9414abfdaaf3c865e90bf4501600ff2 / CI39509230715 的7个job全部success；merge source 799a608d1b5a79df0f2ef8031a7885f414125778。三库实际版本/覆盖和P2修复证据见下文，P2-1/P2-2本地机制验证PASS。
+- 新鲜10-workflow图/原始字节、两个false发布开关和strict保护核验通过；专用隔离workflow已注册，但仍绑定旧RC，绝不dispatch旧候选。main push CI39510261549仍进行中，须成功后才手动触发专用RC构建；生产操作未授权、未执行。
+- 备份26项Linux root完整回归通过（真实GPG/归档，DB/Docker替身）。新增successor严格request/观测/结果合同、一次性持久claim/固定阶段/异常收敛内核形成，9项Linux root方法通过并独立审查修复闭环；该增量当前仅本地，生产adapter/server认证/有界调用/全writer和列级范围未实现，不能冒充完整生产执行器。
+- 报告已修正现有只读helper能力：它不采DB/schema/金融/完整配置/epoch；R2 gate/observer接线尚无实现，不能让管理员安装不存在的实物。真实生产资格/连续独占窗口/备份恢复和最终apply仍BLOCKED。
+- 新RC/完整digest/新镜像获取、专用真实双启动均NOT RUN，真实演练修复重跑0/2；PG03整体BLOCKED。
+
+继续main CI→新RC→精确身份→更新控制固定值/正常CI合并→仅专用隔离workflow。现有工作区/失败记录全部保留，不执行生产SSH/部署/恢复公网。
+
+
 ## 2026-10-21 — 多阶段最新状态：三库迁移凭证通过，完整CI/新RC/真实隔离待完成
 
 本节为当前状态，以下历史证据保留。PR #78 / codex/pg03-migration-proof-20261021 正常验证中，不绕过required checks；本轮非生产提交/推送/合并注册/隔离运行授权按最新用户任务执行，生产权限不扩大。

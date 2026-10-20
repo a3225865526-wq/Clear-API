@@ -1,0 +1,17 @@
+{
+  "schema": "clearapi.pg03.new-candidate-identity/v1",
+  "verified_utc": "2026-10-20T22:58:28.397395+00:00",
+  "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "rc_run": 39511197302,
+  "rc_attempt": 1,
+  "artifact_id": 12305532882,
+  "archive_sha256": "b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7",
+  "github_artifact_digest": "sha256:b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7",
+  "artifact_bytes": 25194,
+  "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5",
+  "source_ci": 39510261549,
+  "target_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+  "production_acceptance": "not_run"
+}

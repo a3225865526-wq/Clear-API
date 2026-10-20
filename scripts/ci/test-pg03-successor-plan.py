@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline successor evidence binding and failure-closed regression cases."""
 import copy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import hashlib
 import importlib.util
 import json
@@ -13,6 +13,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import zipfile
+from contextlib import contextmanager
 
 sys.dont_write_bytecode = True
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -22,6 +23,17 @@ SPEC.loader.exec_module(PLAN)
 ACTION_SPEC = importlib.util.spec_from_file_location('isolated_actions', SCRIPTS / 'ci/pg03-isolated-rehearsal.py')
 ACTION = importlib.util.module_from_spec(ACTION_SPEC)
 ACTION_SPEC.loader.exec_module(ACTION)
+TX_SPEC = importlib.util.spec_from_file_location('successor_transaction', SCRIPTS / 'pg03-successor-transaction.py')
+TX = importlib.util.module_from_spec(TX_SPEC)
+TX_SPEC.loader.exec_module(TX)
+
+
+def negative_probe_fixture():
+    return dict(status='expected_migration_failure_detected', enforced_read_only=True,
+        sqlstate='25006', candidate_image=ACTION.IMAGE, cleanup_complete=True,
+        success_receipt_eligible=False, proof_capture='unavailable_after_tmpfs_exit', log_sha256='f'*64,
+        process=dict(Status='exited', Running=False, ExitCode=1, OOMKilled=False, error_present=False),
+        cleanup=[dict(container_id=str(i)*64, removed=True) for i in (1, 2)])
 
 
 class SuccessorPlanTest(unittest.TestCase):
@@ -455,6 +467,51 @@ class IsolatedStartupTest(unittest.TestCase):
 
 
 class IsolatedActionsTest(unittest.TestCase):
+    def test_negative_migration_uses_only_a_new_read_only_database_and_cleans_both_containers(self):
+        self.negative_probe('')
+
+    def test_missing_wrong_or_conflicting_negative_evidence_never_passes(self):
+        for fault in ('guard', 'exit', 'missing_log', 'sqlstate', 'cleanup'):
+            with self.subTest(fault=fault): self.negative_probe(fault)
+
+    def negative_probe(self, fault):
+        state, created, removed = dict(nonce='a'*32), [], []
+        def command(root, args):
+            if args[0] == 'create':
+                cid = str(len(created)+1)*64
+                created.append(cid)
+                self.assertIn(args[args.index('--network')+1], ('none', 'container:'+'1'*64))
+                for forbidden in ('-p', '-v', '--mount'): self.assertNotIn(forbidden, args)
+                return cid
+            if args[0] == 'start': return args[-1]
+            if args[0] == 'exec':
+                if 'pg_isready' in args: return 'ready'
+                if args[-1] == 'SHOW default_transaction_read_only': return 'off' if fault == 'guard' else 'on'
+                self.assertEqual(args[-1], 'ALTER ROLE postgres SET default_transaction_read_only = on')
+                return ''
+            if args[0] == 'inspect':
+                if args[2] == '{{json .State}}':
+                    return json.dumps(dict(Status='exited', Running=False, ExitCode=0 if fault=='exit' else 1,
+                                           OOMKilled=False, Error=''))
+                return state['nonce']
+            if args[0] == 'logs':
+                return '' if fault=='missing_log' else ('SQLSTATE 42P01' if fault=='sqlstate'
+                                                      else 'SQLSTATE 25006 SYNTHETIC_SECRET')
+            if args[0] == 'rm':
+                removed.append(args[-1])
+                if fault=='cleanup' and args[-1]=='2'*64: raise OSError('SYNTHETIC_SECRET')
+                return ''
+            self.fail('unexpected negative probe transport')
+        with patch.object(ACTION, 'docker', side_effect=command):
+            if fault:
+                with self.assertRaises(ValueError): ACTION.rehearse_read_only_failure(Path('unused'), state)
+                with self.assertRaises(ValueError): ACTION.validate_negative_probe(state['negative_migration'])
+            else:
+                ACTION.rehearse_read_only_failure(Path('unused'), state)
+                ACTION.validate_negative_probe(state['negative_migration'])
+        self.assertEqual(set(removed), set(created))
+        self.assertNotIn('SYNTHETIC_SECRET', json.dumps(state))
+
     def test_fixed_rc_rejects_attempt_source_digest_archive_and_expiry_mismatch(self):
         run = dict(id=int(ACTION.RC), run_attempt=1, head_sha=ACTION.SOURCE, head_branch='main',
             status='completed', conclusion='success', path='.github/workflows/release-pg03-gateway.yml',
@@ -517,7 +574,7 @@ class IsolatedActionsTest(unittest.TestCase):
             after_schema_sha256=ACTION.BASELINE, create_exit_code=0, start_exit_code=0, stop_exit_code=0,
             process=dict(Status='exited', Running=False, ExitCode=0, OOMKilled=False, error_present=False),
             migration=dict(status='success'))
-        state = dict(nonce='a'*32, rehearsal='passed', observation=dict(cleanup_complete=True,
+        state = dict(nonce='a'*32, rehearsal='passed', negative_migration=negative_probe_fixture(), observation=dict(cleanup_complete=True,
             candidate=dict(image_id='sha256:'+'b'*64),
             startups=[dict(startup, pass_number=i) for i in (1, 2)]))
         receipt = dict(schema_version=PLAN.SCHEMA.SCHEMA, postgres_image_ref=PLAN.SCHEMA.POSTGRES,
@@ -525,11 +582,12 @@ class IsolatedActionsTest(unittest.TestCase):
             profile='isolated_schema_only_master_single_postgres', source_schema_sha256=ACTION.BASELINE,
             target_schema_sha256=ACTION.BASELINE, source_commit=ACTION.SOURCE,
             candidate_image_id='sha256:'+'b'*64, candidate_binary_sha256=ACTION.BINARY)
-        for drift in (None, 'healthy', 'after_schema_sha256', 'stop_exit_code', 'process', 'migration'):
+        for drift in (None, 'healthy', 'after_schema_sha256', 'stop_exit_code', 'process', 'migration', 'negative_migration'):
             with self.subTest(drift=drift), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 current = copy.deepcopy(state)
-                if drift:
+                if drift == 'negative_migration': current['negative_migration'] = {}
+                elif drift:
                     current['observation']['startups'][1][drift] = None
                 (root / 'schema.json').write_text(json.dumps(receipt))
                 with patch.dict(os.environ, PRIOR_STATUS='success'), patch.object(ACTION, 'cleanup',
@@ -610,7 +668,7 @@ class EvidencePublicationTest(unittest.TestCase):
         startup = dict(healthy=True, before_schema_sha256=ACTION.BASELINE, after_schema_sha256=ACTION.BASELINE,
             create_exit_code=0, start_exit_code=0, stop_exit_code=0, migration=dict(status='success'),
             process=dict(Status='exited', Running=False, ExitCode=0, OOMKilled=False, error_present=False))
-        self.state = dict(nonce='a'*32, rehearsal='passed', observation=dict(cleanup_complete=True,
+        self.state = dict(nonce='a'*32, rehearsal='passed', negative_migration=negative_probe_fixture(), observation=dict(cleanup_complete=True,
             candidate=dict(image_id='sha256:'+'b'*64),
             startups=[dict(startup, pass_number=i) for i in (1, 2)]))
         receipt = dict(schema_version=PLAN.SCHEMA.SCHEMA, postgres_image_ref=PLAN.SCHEMA.POSTGRES,
@@ -768,7 +826,7 @@ class MigrationEvidenceTest(unittest.TestCase):
         for proof in (None, '', '{', '[]', valid[:-1]+',"status":"success"}', 'x'*16385):
             with self.subTest(kind=type(proof).__name__):
                 self.assertEqual(self.structured(proof)['status'], 'unknown')
-        self.assertEqual(self.structured(valid, source=ACTION.SOURCE)['status'], 'unknown')
+        self.assertEqual(self.structured(valid, source=PLAN.SCHEMA.LEGACY_MIGRATION_SOURCE)['status'], 'unknown')
 
     def test_structured_success_cannot_override_log_failure_missing_capture_or_schema_conflict(self):
         proof = json.dumps(self.proof())
@@ -840,7 +898,7 @@ class MigrationEvidenceTest(unittest.TestCase):
         return '2026-10-20T16:00:00.000000001Z [SYS] 2026/10/20 - 16:00:00 | '+message+' \n'
 
     def inspect(self, text, before='a'*64, after='a'*64):
-        return PLAN.SCHEMA.migration_evidence(text, 'b'*64, ACTION.SOURCE, before, after)
+        return PLAN.SCHEMA.migration_evidence(text, 'b'*64, PLAN.SCHEMA.LEGACY_MIGRATION_SOURCE, before, after)
 
     def test_complete_legacy_startup_capture_cannot_claim_migration_success(self):
         evidence = self.inspect(self.log('database migration started')+self.log('server exited'))
@@ -880,7 +938,7 @@ class MigrationEvidenceTest(unittest.TestCase):
         fixture = IsolatedStartupTest()
         fixture.setUp()
         self.addCleanup(fixture.doCleanups)
-        fixture.source = ACTION.SOURCE
+        fixture.source = PLAN.SCHEMA.LEGACY_MIGRATION_SOURCE
         original = fixture.command
 
         def command(args, raw=None):
@@ -923,6 +981,254 @@ class MigrationEvidenceTest(unittest.TestCase):
         with patch.object(subprocess, 'run', return_value=result):
             self.assertEqual(ACTION.execute(['docker', 'logs', 'synthetic'], include_stderr=True),
                              b'ordinary log\nmigration error\n')
+
+
+class SuccessorRequestTest(unittest.TestCase):
+    def setUp(self):
+        self.now = datetime(2026, 10, 21, tzinfo=timezone.utc)
+        self.request = dict(schema='clearapi.successor-transaction-request/v1',
+            transaction_id='1'*32, issued_at_utc='2026-10-21T00:00:00Z',
+            expires_at_utc='2026-10-21T00:05:00Z', control_commit='2'*40,
+            candidate=dict(source_commit='3'*40, image_digest='sha256:'+'4'*64,
+                image_ref='ghcr.io/a3225865526-wq/clearapi@sha256:'+'4'*64,
+                image_id='sha256:'+'5'*64, binary_sha256='6'*64, rc_run_id=123, rc_attempt=1),
+            evidence_sha256={name: '7'*64 for name in TX.EVIDENCE}, baseline_schema_sha256='8'*64,
+            operations=list(TX.OPERATIONS), failed_run=PLAN.FAILED_RUN,
+            frozen_sha256=PLAN.FROZEN.copy(), previous_success=dict(source_commit=PLAN.PREVIOUS_COMMIT,
+                                                                     image_digest=PLAN.PREVIOUS_DIGEST))
+
+    def test_strict_request_does_not_accept_commands_legacy_authority_or_long_leases(self):
+        TX.validate_request(TX.encoded(self.request), self.now)
+        cases = [('operations', ['replace_gateway']), ('expires_at_utc', '2026-10-21T00:05:01Z'),
+                 ('issued_at_utc', '2026-10-21T00:00:01Z'), ('frozen_sha256', {}),
+                 ('failed_run', '123'), ('token', 'SYNTHETIC_SECRET')]
+        for key, value in cases:
+            with self.subTest(key=key):
+                changed = dict(self.request, **{key: value})
+                with self.assertRaises(ValueError): TX.validate_request(TX.encoded(changed), self.now)
+        changed = copy.deepcopy(self.request)
+        changed['candidate']['rc_attempt'] = True
+        with self.assertRaises(ValueError): TX.validate_request(TX.encoded(changed), self.now)
+        with self.assertRaises(ValueError): TX.validate_request(TX.encoded(self.request), self.now + timedelta(seconds=300))
+        with self.assertRaisesRegex(ValueError, 'duplicate'):
+            TX.validate_request(TX.encoded(self.request)[:-1] + b',"failed_run":"123"}', self.now)
+
+    def test_no_default_production_adapter_or_mutation_cli(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(subprocess, 'run',
+                side_effect=AssertionError('no shell or network permitted')):
+            with self.assertRaisesRegex(ValueError, 'adapter not implemented'):
+                TX.Transaction(Path(directory), now=lambda: self.now).execute(TX.encoded(self.request))
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+
+class TransactionFixture:
+    """Trusted-adapter substitute; only test-owned files and no Docker/network."""
+    def __init__(self, case):
+        self.case, self.calls, self.fail, self.live = case, [], None, None
+        self.bad_evidence = self.bad_authority = self.containment_failure = False
+        self.expire_on_auth = None
+        self.expire_after = None
+        self.numeric_containment = False
+        self.tamper = None
+        self.auth_count = 0
+
+    @contextmanager
+    def deployment_lock(self):
+        import fcntl
+        with (self.case.app / 'test-deploy.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try: yield
+            finally: fcntl.flock(lock, fcntl.LOCK_UN)
+
+    def authenticate(self, request, request_sha):
+        self.auth_count += 1
+        self.case.assertEqual(request_sha, TX.sha(TX.encoded(self.case.request)))
+        if self.expire_on_auth == self.auth_count: self.case.now += timedelta(seconds=301)
+        if self.bad_authority: raise ValueError('SYNTHETIC_SECRET')
+
+    def verify_evidence(self, request):
+        if self.bad_evidence: raise ValueError('SYNTHETIC_SECRET')
+
+    def observe(self, request):
+        if self.live is not None and self.expire_after == 'observe_commit':
+            self.case.now += timedelta(seconds=301)
+        return copy.deepcopy(self.live or self.case.before)
+
+    def mutation(self, phase):
+        self.case.assertTrue(next(self.case.app.glob('*-attempt.json')).is_file(), 'durable claim before mutation')
+        self.calls.append(phase)
+        if self.fail == phase: raise TimeoutError('SYNTHETIC_SECRET')
+        if self.expire_after == phase: self.case.now += timedelta(seconds=301)
+
+    def prepare_runtime(self, request, context):
+        self.mutation('prepare_runtime')
+        if self.tamper == 'request': request['candidate']['source_commit'] = 'f'*40
+
+    def replace_gateway(self, request, context):
+        self.mutation('replace_gateway')
+        return '9'*64
+
+    def postflight(self, request, context, restarted):
+        phase = 'verify_restart' if restarted else 'verify_startup'
+        self.mutation(phase)
+        value = dict(self.case.before, gateway_container_id='9'*64, gateway_running=True,
+            candidate_identity=copy.deepcopy(request['candidate']), process_started_ticks='102' if restarted else '101',
+            migration_challenge=context['migration_challenge'], migration_proof_sha256=TX.sha(context['migration_challenge'].encode()),
+            runtime_evidence_sha256='a'*64, restart_evidence_sha256='b'*64 if restarted else None)
+        if self.tamper == 'protected': value['protected_state_sha256'] = 'c'*64
+        if self.tamper == 'challenge': value['migration_challenge'] = 'd'*64
+        if self.tamper == 'process' and restarted: value['process_started_ticks'] = '101'
+        self.live = copy.deepcopy(value)
+        return value
+
+    def verify_startup(self, request, context): return self.postflight(request, context, False)
+
+    def verify_restart(self, request, context): return self.postflight(request, context, True)
+
+    def commit_successor(self, request, context):
+        self.mutation('commit_successor')
+        if self.tamper == 'commit_process': self.live['process_started_ticks'] = '777'
+        return 'e'*64
+
+    def contain(self, request, context):
+        self.calls.append('contain')
+        self.case.assertEqual(request['candidate'], self.case.request['candidate'])
+        if self.containment_failure: raise RuntimeError('SYNTHETIC_SECRET')
+        result = dict(frozen_sha256=PLAN.FROZEN.copy(), executor_container_id=PLAN.EXECUTOR_CONTAINER,
+                    executor_process_epoch=self.case.before['executor_process_epoch'],
+                    ingress='isolated_stopped_restart_no', public_web_listeners=[],
+                    successor_gateway_stopped=True, database_restored=False, executor_started=False)
+        if self.numeric_containment:
+            result.update(successor_gateway_stopped=1, database_restored=0, executor_started=0)
+        return result
+
+
+@unittest.skipUnless(os.name == 'posix' and os.geteuid() == 0, 'root-owned POSIX durable transaction fixtures')
+class SuccessorTransactionTest(unittest.TestCase):
+    def setUp(self):
+        SuccessorRequestTest.setUp(self)
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.app = Path(temporary.name)
+        self.before = dict(schema='clearapi.successor-live-projection/v1', observed_at_utc='2026-10-21T00:00:00Z',
+            frozen_sha256=PLAN.FROZEN.copy(), gateway_container_id=TX.GATEWAY, gateway_running=False,
+            executor_container_id=PLAN.EXECUTOR_CONTAINER, executor_process_epoch='a'*32,
+            ingress='isolated_stopped_restart_no', public_web_listeners=[],
+            database_schema_sha256=self.request['baseline_schema_sha256'], protected_state_sha256='b'*64,
+            startup_write_scope_sha256=self.request['evidence_sha256']['startup_write_scope'],
+            candidate_identity=None, process_started_ticks=None, migration_challenge=None,
+            migration_proof_sha256=None, runtime_evidence_sha256=None, restart_evidence_sha256=None)
+        self.request['evidence_sha256']['production_observation'] = TX.sha(TX.encoded(self.before))
+        for name in PLAN.FROZEN: (self.app / name).write_bytes(b'preserve historical fixture')
+        self.io = TransactionFixture(self)
+
+    def execute(self):
+        return TX.Transaction(self.app, self.io, now=lambda: self.now).execute(TX.encoded(self.request))
+
+    def test_success_is_ordered_one_use_and_preserves_incident_bytes(self):
+        result = self.execute()
+        self.assertEqual(self.io.calls, list(TX.OPERATIONS))
+        self.assertEqual(result['original_deployment_status'], 'failed')
+        self.assertEqual(result['public_traffic'], 'blocked')
+        self.assertEqual(len(list(self.app.glob('*-result.json'))), 1)
+        reader = TX.Transaction(self.app, self.io, now=lambda: self.now)
+        inspected = reader.read_result(TX.encoded(self.request), 0)
+        self.assertIs(inspected['execution_allowed'], False)
+        for code in (None, False, 1):
+            with self.assertRaises(ValueError): reader.read_result(TX.encoded(self.request), code)
+        saved = next(self.app.glob('*-2-replace_gateway.json'))
+        prior = saved.read_bytes()
+        saved.write_text('{"status":"completed"}')
+        with self.assertRaises(ValueError): reader.read_result(TX.encoded(self.request), 0)
+        saved.write_bytes(prior)
+        for name in PLAN.FROZEN: self.assertEqual((self.app / name).read_bytes(), b'preserve historical fixture')
+        count = len(self.io.calls)
+        with self.assertRaisesRegex(ValueError, 'consumed'): self.execute()
+        self.assertEqual(len(self.io.calls), count)
+
+    def test_each_failure_consumes_attempt_contains_and_never_retries(self):
+        for phase in TX.OPERATIONS:
+            with self.subTest(phase=phase):
+                self.setUp()
+                self.io.fail = phase
+                with self.assertRaises(ValueError): self.execute()
+                self.assertEqual(self.io.calls[-1], 'contain')
+                self.assertEqual(list(self.app.glob('*-result.json')), [])
+                failure = json.loads(next(self.app.glob('*-failure.json')).read_text())
+                self.assertTrue(failure['containment_verified'])
+                self.assertFalse(failure['automatic_retry'])
+                self.assertNotIn('SYNTHETIC_SECRET', next(self.app.glob('*-failure.json')).read_text())
+                with self.assertRaisesRegex(ValueError, 'consumed'): self.execute()
+
+    def test_unverified_authority_receipts_or_observation_never_reserve_or_mutate(self):
+        for field in ('bad_authority', 'bad_evidence', 'observation'):
+            with self.subTest(field=field):
+                self.setUp()
+                if field == 'observation': self.before['gateway_running'] = True
+                else: setattr(self.io, field, True)
+                with self.assertRaises(ValueError): self.execute()
+                self.assertEqual(self.io.calls, [])
+                self.assertEqual(list(self.app.glob('*-attempt.json')), [])
+
+    def test_expiry_during_authority_refresh_prevents_mutation_but_keeps_claim(self):
+        self.io.expire_on_auth = 2
+        with self.assertRaises(ValueError): self.execute()
+        self.assertEqual(self.io.calls, [])
+        self.assertEqual(len(list(self.app.glob('*-attempt.json'))), 1)
+        for phase in ('commit_successor', 'observe_commit'):
+            with self.subTest(phase=phase):
+                self.setUp()
+                self.io.expire_after = phase
+                with self.assertRaises(ValueError): self.execute()
+                self.assertEqual(self.io.calls[-1], 'contain')
+                self.assertEqual(list(self.app.glob('*-result.json')), [])
+        self.setUp()
+        link = os.link
+        def expire_during_result(source, target, **kwargs):
+            link(source, target, **kwargs)
+            if str(target).endswith('-result.json'): self.now += timedelta(seconds=301)
+        with patch.object(os, 'link', side_effect=expire_during_result):
+            with self.assertRaises(ValueError): self.execute()
+        self.assertEqual(self.io.calls[-1], 'contain')
+        self.assertEqual(len(list(self.app.glob('*-failure.json'))), 1)
+        with self.assertRaisesRegex(ValueError, 'conflicting failure'):
+            TX.Transaction(self.app, self.io, now=lambda: self.now).read_result(TX.encoded(self.request), 0)
+
+    def test_protected_state_challenge_and_restart_replay_fail_closed(self):
+        for kind in ('protected', 'challenge', 'process', 'commit_process', 'request'):
+            with self.subTest(kind=kind):
+                self.setUp()
+                self.io.tamper = kind
+                with self.assertRaises(ValueError): self.execute()
+                self.assertEqual(self.io.calls[-1], 'contain')
+                self.assertEqual(list(self.app.glob('*-result.json')), [])
+
+    def test_unknown_containment_never_reports_blocked_ingress_as_verified(self):
+        self.io.fail = 'replace_gateway'
+        self.io.containment_failure = True
+        with self.assertRaises(ValueError): self.execute()
+        failure = json.loads(next(self.app.glob('*-failure.json')).read_text())
+        self.assertFalse(failure['containment_verified'])
+        self.assertEqual(failure['public_traffic'], 'UNKNOWN')
+        self.setUp()
+        self.io.fail = 'replace_gateway'
+        self.io.numeric_containment = True
+        with self.assertRaises(ValueError): self.execute()
+        failure = json.loads(next(self.app.glob('*-failure.json')).read_text())
+        self.assertFalse(failure['containment_verified'])
+
+    def test_claim_sync_failure_and_lock_contention_never_mutate(self):
+        with patch.object(os, 'fsync', side_effect=OSError('SYNTHETIC_SECRET')):
+            with self.assertRaises(OSError): self.execute()
+        self.assertEqual(self.io.calls, [])
+        with self.io.deployment_lock():
+            with self.assertRaises(BlockingIOError): self.execute()
+        self.assertEqual(self.io.calls, [])
+        partial = self.app / ('pg03-successor-' + self.request['transaction_id'] + '-1-prepare_runtime.json')
+        partial.write_bytes(b'preserve old stage evidence')
+        with self.assertRaisesRegex(ValueError, 'consumed'): self.execute()
+        self.assertEqual(self.io.calls, [])
+        self.assertEqual(partial.read_bytes(), b'preserve old stage evidence')
 
 
 if __name__ == '__main__':
