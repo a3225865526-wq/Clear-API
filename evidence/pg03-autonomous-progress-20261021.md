@@ -19,3 +19,11 @@ Windows 便携 Go1.26.1 来自官方归档，SHA256 9b68112c913f45b7aebbf13c0367
 本地 origin 指向 QuantumNous/new-api，production 指向用户指定 Clear-API。已明确从 Clear-API fetch main，核实其 tree 与原本地 HEAD 相同后，在当前工作区创建 codex/pg03-migration-proof-20261021 分支，保留所有未提交改动。没有创建额外 worktree。
 
 P2-1 继续 Linux 本地 PASS；P2-2 正向实现待实际 Linux/三库验证，PG03 仍 BLOCKED。新 RC/镜像尚未构建；真实隔离重跑轮次 0/2。生产操作未执行。
+
+## 第一份 PR / CI 实际记录
+
+已创建草稿 PR #78，首次提交 ac3996b10858457d28e7dcb64ddc3c439556a3bd，正常 CI run 39465768745 正在执行。新增 packages:read/contents:none 能力 job 已 success，证明该次同仓 token 可读取历史完整 digest；仍不等于新候选验收。必需检查未全部完成，不合并。
+
+GitHub workflow validation run 39465661995 失败（未执行 job）：job-level env 不允许 runner.temp 上下文。已把目录绑定移到 runner 分配后的首个 shell step，通过 GITHUB_ENV 传递；新增静态断言禁止 job env 使用 runner 上下文。此项为注册前配置修复，不是真实演练，演练修复重跑仍 0/2。
+
+WSL 临时目录在后续调用中不可用，改稳定任务目录后 tar 提取在 DrvFS 慢 I/O；中断该提取并保留半成品，改由 Windows 原生提取已验 hash 的 Linux SDK。此前两次失败发生于环境准备，未执行 Go 测试。新的 Linux 定向进程已启动，尚不声称通过。

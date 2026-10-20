@@ -577,6 +577,8 @@ class IsolatedActionsTest(unittest.TestCase):
         job = workflow['jobs']['rehearse']
         self.assertEqual(job['permissions'], required)
         self.assertEqual(job['runs-on'], 'ubuntu-24.04')
+        self.assertNotIn('runner.', json.dumps(job.get('env', {})),
+                         'runner context is unavailable in job-level env')
         self.assertNotIn('environment', job)
         self.assertNotIn('uses', job)
         text = json.dumps(workflow)
