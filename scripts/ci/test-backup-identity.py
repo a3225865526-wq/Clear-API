@@ -5,6 +5,7 @@ Full backup tests use real tar, SHA256 and GPG with an ephemeral test-only key.
 No production socket, credentials, database or container is accessed.
 """
 import hashlib
+from datetime import datetime, timezone
 import io
 import importlib.util
 import json
@@ -15,6 +16,7 @@ import tarfile
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 
 SCRIPTS = Path(__file__).resolve().parents[1]
@@ -30,8 +32,10 @@ p = Path(os.environ["TEST_STATE"])
 s = json.loads(p.read_text())
 a = sys.argv[1:]
 with open(os.environ["TEST_TRACE"], "a") as f: f.write(json.dumps(a) + "\\n")
-if a[0] == "compose" and a[-3:] == ["ps", "-q", "new-api"]:
+if a[0] == "compose" and (a[-3:] == ["ps", "-q", "new-api"] or a[-4:] == ["ps", "-a", "-q", "new-api"]):
     print("container")
+elif a[:2] == ["ps", "-q"]:
+    print(s.get("other_writer", ""))
 elif a[0] == "compose" and a[-3:] == ["config", "--format", "json"]:
     print(json.dumps({"services": {"new-api": {"image": s["reference"]}}}))
 elif a[0] == "compose" and a[-4:] == ["config", "--no-consistency", "--format", "json"]:
@@ -176,7 +180,45 @@ class BackupIdentityTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("changed during backup", result.stderr)
 
-    def full_backup(self, drift=False, pg03=False, pg03_drift=False, legacy=False, preserve=False):
+    def stopped_gateway(self):
+        cid = "f" * 64
+        self.state['container'].update(Id=cid,
+            State=dict(Status='exited', Running=False, Paused=False, Restarting=False,
+                       ExitCode=127, StartedAt='2026-10-20T00:00:00Z', FinishedAt='2026-10-20T00:00:01Z'),
+            HostConfig=dict(RestartPolicy=dict(Name='no', MaximumRetryCount=0)))
+        self.current.update(status='failed', deployment_attempt=dict(status='failed'))
+        self.write_release()
+        return cid
+
+    def test_stopped_backup_is_explicit_and_rechecks_writer_isolation(self):
+        cid = self.stopped_gateway()
+        self.assertNotEqual(self.tool().returncode, 0, 'default backup must still require a running Gateway')
+        result = self.tool('capture', '--stopped-gateway', cid)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        frozen = self.root / 'stopped.json'
+        frozen.write_text(result.stdout)
+        identity = json.loads(result.stdout)
+        self.assertEqual(identity['identity_mode'], 'stopped_failed_gateway')
+        self.assertEqual(identity['container_id'], cid)
+        self.state['other_writer'] = 'unapproved-running-writer'
+        self.assertNotEqual(self.tool('capture', '--stopped-gateway', cid).returncode, 0)
+        del self.state['other_writer']
+        self.state['container']['State']['FinishedAt'] = '2026-10-21T00:00:00Z'
+        self.assertNotEqual(self.tool('check', '--stopped-gateway', cid,
+                                     '--snapshot', str(frozen)).returncode, 0)
+
+    def test_stopped_backup_rejects_restart_or_incident_drift(self):
+        cid = self.stopped_gateway()
+        self.assertNotEqual(self.tool('capture', '--stopped-gateway', 'e' * 64).returncode, 0)
+        self.state['container']['HostConfig']['RestartPolicy']['Name'] = 'always'
+        self.assertNotEqual(self.tool('capture', '--stopped-gateway', cid).returncode, 0)
+        self.state['container']['HostConfig']['RestartPolicy']['Name'] = 'no'
+        self.current['status'] = 'success'
+        self.write_release()
+        self.assertNotEqual(self.tool('capture', '--stopped-gateway', cid).returncode, 0)
+
+    def full_backup(self, drift=False, pg03=False, pg03_drift=False, legacy=False, preserve=False,
+                    stopped=False, cleanup_failure=False):
         base = self.root / "opt/clearapi/backups"
         (base / "bin").mkdir(parents=True)
         (base / "manifests").mkdir()
@@ -214,6 +256,8 @@ class BackupIdentityTest(unittest.TestCase):
                 path.parent.mkdir(parents=True)
                 path.write_bytes(b'existing encrypted backup')
                 historical[path] = path.read_bytes()
+        if stopped:
+            self.env['CLEARAPI_BACKUP_STOPPED_GATEWAY'] = self.stopped_gateway()
         (self.root / "log").mkdir()
         helper = base / "bin/backup-identity.py"
         helper.write_text((SCRIPTS / "backup-identity.py").read_text().replace(
@@ -259,10 +303,14 @@ class BackupIdentityTest(unittest.TestCase):
         source = source.replace("/run/lock/clearapi-backup.lock", str(self.root / "backup.lock"))
         source = source.replace(" -C / ", " -C " + str(self.root) + " ")
         source = source.replace("D675187C7097EF9D8C3BFF966B1439F896043FFD", fingerprint)
+        if cleanup_failure:
+            source = source.replace('if ! find "$STAGE" -type f -exec shred -u {} +; then rc=1; fi',
+                                    'if ! false; then rc=1; fi')
         script = self.root / "backup.sh"
         script.write_text(source)
         self.state["drift_on_dump"] = drift
         self.state_path.write_text(json.dumps(self.state))
+        invocation_started = datetime.now(timezone.utc)
         result = subprocess.run(["bash", str(script)], env=env, capture_output=True,
                                 text=True, timeout=45)
         self.assertEqual(old_bytes, (old_manifest.read_bytes(), old_bundle.read_bytes()))
@@ -271,11 +319,76 @@ class BackupIdentityTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(manifests, [])
             return
+        if cleanup_failure:
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(len(manifests), 1, 'legacy manifest can exist despite EXIT cleanup failure')
+            spec = importlib.util.spec_from_file_location('backup_identity', SCRIPTS / 'backup-identity.py')
+            identity_tool = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(identity_tool)
+            frozen = json.loads(manifests[0].read_text())['stopped_writer_identity']
+            with self.assertRaisesRegex(ValueError, 'invocation'):
+                identity_tool.successor_completion(base, manifests[0], frozen, invocation_started, result.returncode)
+            return
         self.assertEqual(result.returncode, 0, result.stderr)
         for path, expected in historical.items():
             self.assertEqual(path.read_bytes(), expected, 'release backup must not prune existing backups')
         self.assertEqual(len(manifests), 1)
         manifest = json.loads(manifests[0].read_text())
+        if stopped:
+            self.assertEqual(manifest['backup_identity_schema_version'], 2)
+            self.assertNotIn('running_identity', manifest)
+            self.assertEqual(manifest['stopped_writer_identity']['container_id'], 'f' * 64)
+            spec = importlib.util.spec_from_file_location('backup_identity', SCRIPTS / 'backup-identity.py')
+            identity_tool = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(identity_tool)
+            frozen = manifest['stopped_writer_identity']
+            verified = identity_tool.successor_completion(base, manifests[0], frozen,
+                                                           invocation_started, result.returncode)
+            self.assertEqual(verified['plaintext_cleanup'], 'verified_absent')
+            self.assertEqual(verified['restore_acceptance'], 'not_run')
+            self.assertIs(verified['production_execution_allowed'], False)
+            for code in (None, False, 1, -15):
+                with self.assertRaisesRegex(ValueError, 'invocation'):
+                    identity_tool.successor_completion(base, manifests[0], frozen, invocation_started, code)
+            leftover = base / 'staging' / manifest['backup_id']
+            leftover.mkdir()
+            with self.assertRaisesRegex(ValueError, 'cleanup'):
+                identity_tool.successor_completion(base, manifests[0], frozen, invocation_started, 0)
+            leftover.rmdir()
+            cipher = base / 'encrypted' / manifest['backup_id'] / manifest['encryption']['encrypted_artifact']['name']
+            original_cipher = cipher.read_bytes()
+            cipher.write_bytes(original_cipher + b'tamper')
+            with self.assertRaisesRegex(ValueError, 'artifact'):
+                identity_tool.successor_completion(base, manifests[0], frozen, invocation_started, 0)
+            cipher.write_bytes(original_cipher)
+            # Hashing an already-open descriptor must not authorize a replaced
+            # pathname, or a manifest modified in-place during that hash.
+            original_manifest = manifests[0].read_bytes()
+            digest_file = identity_tool.hashlib.file_digest
+            for target in (manifests[0], cipher):
+                def tamper_during_hash(stream, algorithm):
+                    value = digest_file(stream, algorithm)
+                    if target == manifests[0]:
+                        target.write_bytes(original_manifest + b' ')
+                    else:
+                        replacement = target.with_suffix('.replacement')
+                        replacement.write_bytes(original_cipher)
+                        replacement.chmod(0o600)
+                        replacement.replace(target)
+                    return value
+                with patch.object(identity_tool.hashlib, 'file_digest', side_effect=tamper_during_hash):
+                    with self.assertRaisesRegex(ValueError, 'changed'):
+                        identity_tool.successor_completion(base, manifests[0], frozen, invocation_started, 0)
+                manifests[0].write_bytes(original_manifest)
+                cipher.write_bytes(original_cipher)
+            staging = base / 'staging'
+            moved_staging = base / 'staging-history'
+            staging.rename(moved_staging)
+            staging.symlink_to(moved_staging, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, 'staging directory'):
+                identity_tool.successor_completion(base, manifests[0], frozen, invocation_started, 0)
+            staging.unlink()
+            moved_staging.rename(staging)
         self.assertEqual(manifest["candidate_commit"], self.current["candidate_commit"])
         self.assertEqual(manifest["new_api_image_id"], self.current["new_api_image_id"])
         self.assertEqual(manifest["ghcr_repo_digest"], self.current["image_ref"])
@@ -381,6 +494,12 @@ class BackupIdentityTest(unittest.TestCase):
 
     def test_release_backup_preserves_history_beyond_the_retention_limit(self):
         self.full_backup(preserve=True)
+
+    def test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history(self):
+        self.full_backup(pg03=True, preserve=True, stopped=True)
+
+    def test_published_legacy_manifest_cannot_hide_backup_exit_cleanup_failure(self):
+        self.full_backup(pg03=True, preserve=True, stopped=True, cleanup_failure=True)
 
     def test_backup_drift_fails_without_publishing_manifest(self):
         self.full_backup(drift=True)

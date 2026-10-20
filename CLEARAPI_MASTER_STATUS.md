@@ -1,5 +1,19 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-21 — 多阶段最新状态：三库迁移凭证通过，完整CI/新RC/真实隔离待完成
+
+本节为当前状态，以下历史证据保留。PR #78 / codex/pg03-migration-proof-20261021 正常验证中，不绕过required checks；本轮非生产提交/推送/合并注册/隔离运行授权按最新用户任务执行，生产权限不扩大。
+
+- P2-1：Linux本地 PASS，原子发布/失败回读门禁不降低。
+- P2-2：机制定向验证 PASS：Linux Go两包通过，真实 SQLite3.50.4、MySQL8.4.6、PostgreSQL17.6 三库CI通过，主/独立日志库重复启动及数据保留覆盖；CI Go1.25.1、本地Go1.26.1。driver错误、Row.Err/延迟读取/Close/事务/非SQL吞错、坏旧选项、凭证发布失败和严格控制端解析均有针对性覆盖。新RC真实镜像验收仍NOT RUN，不继承旧digest成功。
+- 独立审查：源码/驱动转换/Result能力、旧schema夹具适配、包读取CI无skip接入均复核通过。完整CI曾因旧夹具失败，已修复且Linux单项通过；新head全部required CI尚待，不能合并。
+- 包读取：Actions packages:read 已实际读取旧精确镜像，证明该次仓库token能力，不是新候选验收。新source/digest/RC、两次真实隔离启动仍NOT RUN，真实演练修复/重跑0/2。
+- 阶段D：停止态failed Gateway备份及完成校验本地增量完成，6个定向测试方法通过，独立审查发现后修复并复核通过；真实GPG加密/归档但DB/Docker替身，不冒充真实备份/恢复。生产启动写入面、身份/有效期/审计、部署前后/回滚及最小管理员动作记录于 evidence/pg03-successor-production-readiness-20261021.md。
+- 完整successor生产执行器仍BLOCKED：现只有离线admission及备份组件，缺新鲜生产资格/有效配置与准确允许写入投影、全writer独占窗口、真实停止态加密备份和离线真实恢复、独立的一次性生产审批协议。不能把failed改success或直接调用旧V2/恢复入口替换镜像。
+
+继续完成当前CI、正常PR注册、新RC精确身份及专用隔离演练；其他缺生产证据的步骤停于其边界。PG03整体仍BLOCKED，不执行生产部署/SSH/数据库或容器操作。详情见 evidence/pg03-autonomous-progress-20261021.md。
+
+
 ## 2026-10-21 — 自主多阶段推进中：阶段 A/B 验证与 PR 准备（当前）
 
 本轮最新授权覆盖安全分支/提交/推送/PR、必要 CI，以及满足全部门禁后的隔离工作流注册和运行；不再沿用历史“这些操作一律待批”的停止条件，生产禁止项完整保留。详见 `evidence/pg03-autonomous-progress-20261021.md`。

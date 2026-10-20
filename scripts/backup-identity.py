@@ -2,10 +2,13 @@
 """Freeze verified running identity for backups; never pull or change containers."""
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
 import re
+import os
+import stat
 import subprocess
 import sys
 
@@ -15,7 +18,7 @@ def docker(*args):
     return result.stdout.strip()
 
 
-def capture(app_dir):
+def capture(app_dir, stopped_gateway=None):
     app = Path(app_dir)
     override = app / "compose-candidate.yaml"
     manifest = app / "release-manifest.json"
@@ -25,11 +28,25 @@ def capture(app_dir):
     current = json.loads(manifest_bytes)["releases"]["current"]
     compose = ("compose", "--project-directory", str(app), "-f",
                str(app / "docker-compose.prod.yml"), "-f", str(override))
-    containers = docker(*compose, "ps", "-q", "new-api").splitlines()
+    selection = ("ps", "-a", "-q", "new-api") if stopped_gateway else ("ps", "-q", "new-api")
+    containers = docker(*compose, *selection).splitlines()
     if len(containers) != 1:
         raise ValueError("expected exactly one running new-api container")
     container = json.loads(docker("inspect", containers[0]))[0]
-    if not container["State"]["Running"]:
+    if stopped_gateway:
+        if (not re.fullmatch(r"[a-f0-9]{64}", stopped_gateway)
+                or container["Id"] != stopped_gateway
+                or container["State"].get("Running") is not False
+                or container["State"].get("Paused") is not False
+                or container["State"].get("Restarting") is not False
+                or container["State"].get("Status") != "exited"
+                or container["HostConfig"].get("RestartPolicy") != {"Name": "no", "MaximumRetryCount": 0}
+                or current.get("status") != "failed"
+                or current.get("deployment_attempt", {}).get("status") != "failed"
+                or docker("ps", "-q", "--filter", "label=com.docker.compose.project=clearapi",
+                          "--filter", "label=com.docker.compose.service=new-api")):
+            raise ValueError("stopped failed Gateway or writer isolation mismatch")
+    elif not container["State"]["Running"]:
         raise ValueError("container is not running")
     image_id = container["Image"]
     if not re.fullmatch(r"sha256:[0-9a-f]{64}", image_id):
@@ -60,12 +77,111 @@ def capture(app_dir):
         raise ValueError("release manifest / running identity mismatch")
     # Include the files and container incarnation: a redeploy during a dump
     # invalidates the backup even if it uses the same revision and image.
-    return {"oci_revision": revision, "docker_image_id": image_id,
+    identity = {"oci_revision": revision, "docker_image_id": image_id,
             "ghcr_repo_digest": effective, "ghcr_digest": digest,
             "container_id": container["Id"], "container_created": container["Created"],
             "release_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
             "compose_base_sha256": hashlib.sha256((app / "docker-compose.prod.yml").read_bytes()).hexdigest(),
             "compose_override_sha256": hashlib.sha256(override.read_bytes()).hexdigest()}
+    if stopped_gateway:
+        identity.update(identity_mode="stopped_failed_gateway",
+                        gateway_state={key: container["State"].get(key) for key in
+                                       ("Status", "Running", "Paused", "Restarting", "ExitCode", "StartedAt", "FinishedAt")},
+                        restart_policy=container["HostConfig"]["RestartPolicy"])
+    return identity
+
+
+def successor_completion(base, manifest_path, stopped_identity, invocation_started, returncode):
+    """Check a finished invocation, never infer completion from a legacy marker.
+
+    Called by the future authorized successor under its deployment lock, using
+    its own subprocess result and start time. This is evidence validation only;
+    it neither authenticates the caller nor grants production permission.
+    """
+    if type(returncode) is not int or returncode != 0:
+        raise ValueError("backup invocation did not complete successfully")
+    if (invocation_started.tzinfo is None
+            or stopped_identity.get('identity_mode') != 'stopped_failed_gateway'):
+        raise ValueError("exact stopped-writer invocation required")
+    path = Path(manifest_path)
+    stamp = path.stem
+    base = Path(base)
+    if (not re.fullmatch(r'\d{8}T\d{6}Z', stamp)
+            or path != base / 'manifests' / (stamp + '.json')):
+        raise ValueError("backup manifest path mismatch")
+    # Reuse the deployment subsystem's secure root-owned reader/publication
+    # contract without importing it into this otherwise standalone backup tool.
+    for parent in path.parents:
+        info = parent.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
+            raise ValueError("unsafe backup directory")
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        info_manifest = info
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_nlink != 1 or info.st_mode & 0o027):
+            raise ValueError("unsafe backup manifest")
+        raw = stream.read(1048577)
+        read_complete = os.fstat(stream.fileno())
+    attributes = ('st_dev', 'st_ino', 'st_mode', 'st_uid', 'st_nlink', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+    if any(getattr(info_manifest, key) != getattr(read_complete, key) for key in attributes):
+        raise ValueError("backup manifest changed while reading")
+    if len(raw) > 1048576:
+        raise ValueError("oversized backup manifest")
+    manifest = json.loads(raw)
+    created = datetime.fromisoformat(manifest['created_at_utc'].replace('Z', '+00:00'))
+    now = datetime.now(timezone.utc)
+    if (created.tzinfo is None or not invocation_started.replace(microsecond=0) <= created <= now
+            or manifest.get('backup_id') != stamp
+            or manifest.get('backup_identity_schema_version') != 2
+            or manifest.get('stopped_writer_identity') != stopped_identity
+            or 'running_identity' in manifest
+            or manifest.get('pg03_recovery', {}).get('consistency') != 'unchanged_across_dump_and_bundle'
+            or any(not re.fullmatch(r'[a-f0-9]{64}', manifest.get('artifacts', {}).get(key, {}).get('sha256', ''))
+                   for key in ('database_dump', 'globals', 'config_archive', 'legal_archive', 'edge_archive', 'secrets_archive',
+                               'deploy_control_archive', 'pg03_state_archive', 'pg03_state_snapshot'))):
+        raise ValueError("backup identity, freshness or PG03 inventory mismatch")
+    stage = base / 'staging' / stamp
+    staging_parent = stage.parent.lstat()
+    if (not stat.S_ISDIR(staging_parent.st_mode) or staging_parent.st_uid != os.geteuid()
+            or staging_parent.st_mode & 0o022):
+        raise ValueError("unsafe backup staging directory")
+    if stage.exists() or stage.is_symlink():
+        raise ValueError("backup plaintext staging cleanup incomplete")
+    artifact = manifest['encryption']['encrypted_artifact']
+    if (artifact.get('name') != 'clearapi-backup-' + stamp + '.tar.gz.gpg'
+            or type(artifact.get('bytes')) is not int or artifact['bytes'] <= 0
+            or not re.fullmatch(r'[a-f0-9]{64}', artifact.get('sha256', ''))):
+        raise ValueError("encrypted artifact identity missing")
+    encrypted = base / 'encrypted' / stamp / artifact['name']
+    for parent in (encrypted.parent, encrypted.parent.parent):
+        info = parent.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+                or info.st_mode & 0o022):
+            raise ValueError("unsafe encrypted backup directory")
+    fd = os.open(encrypted, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        before = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(before.st_mode) or before.st_uid != os.geteuid()
+                or before.st_nlink != 1 or stat.S_IMODE(before.st_mode) != 0o600
+                or before.st_size != artifact['bytes']):
+            raise ValueError("unsafe encrypted artifact")
+        actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+        after = os.fstat(stream.fileno())
+    if (actual != artifact['sha256']
+            or any(getattr(before, key) != getattr(after, key) for key in attributes)):
+        raise ValueError("backup bytes changed during verification")
+    for verified_path, frozen in ((path, info_manifest), (encrypted, before)):
+        current = verified_path.lstat()
+        if any(getattr(current, key) != getattr(frozen, key) for key in attributes):
+            raise ValueError("backup path changed during verification")
+    return dict(schema='clearapi.successor-backup-completion/v1', backup_id=stamp,
+                manifest_sha256=hashlib.sha256(raw).hexdigest(), encrypted_sha256=actual,
+                encrypted_bytes=artifact['bytes'], stopped_writer_identity=stopped_identity,
+                invocation_returncode=0, plaintext_cleanup='verified_absent',
+                restore_acceptance='not_run', production_execution_allowed=False)
 
 
 def main():
@@ -76,8 +192,9 @@ def main():
     parser.add_argument("--manifest")
     parser.add_argument("--dump-started")
     parser.add_argument("--dump-completed")
+    parser.add_argument("--stopped-gateway", help="exact failed, exited, restart=no Gateway; separate incident mode")
     args = parser.parse_args()
-    live = capture(args.app_dir)
+    live = capture(args.app_dir, args.stopped_gateway)
     if args.mode == "capture":
         print(json.dumps(live, sort_keys=True))
         return
@@ -99,6 +216,9 @@ def main():
                             "dump_completed_at_utc": args.dump_completed,
                             "dump_sha256": manifest["artifacts"]["database_dump"]["sha256"],
                             "semantics": "pg_dump consistent MVCC snapshot within this interval; not a PITR WAL position"})
+        if args.stopped_gateway:
+            manifest["backup_identity_schema_version"] = 2
+            manifest["stopped_writer_identity"] = manifest.pop("running_identity")
         path.write_text(json.dumps(manifest, indent=2) + "\n")
 
 

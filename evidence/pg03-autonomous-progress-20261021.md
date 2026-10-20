@@ -41,3 +41,11 @@ Linux 本地 Go setup 曾因 WSL 网络无法下载两个固定 Linux 依赖失�
 9ef82f0ac5b359fda2246268a49dae6bfa8f56ca / CI39467424629：真实 SQLite、MySQL、PostgreSQL 矩阵 job 全部 success，包读取能力与前端 success。Linux 定向两包 Go exit0，SQLite3.50.4 真实重复启动通过。独立审查对本次默认参数转换及 Result 能力转发复核通过。
 
 Backend required job 在既有 test-legacy-transition.py 的 schema 夹具失败：共享 helper 现先创建受所有权清理保护的 binary probe，并在两次启动前分别取 schema/启动后核对 process，旧夹具仍模拟旧 run 路径。更新夹具保留原真实合同（首次 schema 升级、第二次幂等、失败不发布与全部清理），Linux 单个相关用例 exit0（内部3场景）。不修改门禁降低要求。完整 CI 需在该差异后重新通过。
+
+## 阶段D安全本地准备
+
+新增停止态Gateway备份模式（默认running不变）、保留历史策略和 successor_completion 校验，详见 pg03-successor-production-readiness-20261021.md。WSL定向验证6个独立测试方法通过：两项停止态身份拒绝/漂移、新停止态真实GPG合成备份/完成校验、EXIT清理失败即使legacy marker存在也拒绝、默认running全加密备份、历史保留。测试中Docker/dump/TOC为替身，未验真实数据库恢复。完成校验覆盖未知/布尔/非零退出、残留staging、密文篡改、hash时manifest原地修改/cipher路径替换、staging父链接。
+
+独立审查先发现文件稳定性、路径和inventory缺口，已修复并复核通过。完整生产successor仍缺新鲜生产配置/写入范围、停止态全writer独占证明、真实备份恢复和新的生产一次性审批协议，不能把该本地组件标成完整执行器或生产PASS。现有生产身份配置清单已复用，无生产SSH或账号/权限修改。
+
+CI package-read同时在同仓main push运行，防止source CI的skipped job触发既有release-control拒绝；权限仍contents:none/packages:read，只pull旧完整digest，无容器启动/发布。与旧schema夹具修复均经独立复核通过。
