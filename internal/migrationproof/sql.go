@@ -132,6 +132,9 @@ func (c proofConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 	return c.Begin()
 }
 
+// driver.Result capability errors (for example PostgreSQL LastInsertId) are
+// forwarded to GORM, not treated as failed SQL execution. GORM deliberately
+// tolerates unsupported LastInsertId when RETURNING is available.
 func (c proofConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	execer, ok := c.Conn.(driver.ExecerContext)
 	if !ok {
@@ -142,7 +145,7 @@ func (c proofConn) ExecContext(ctx context.Context, query string, args []driver.
 	if err != nil {
 		return nil, err
 	}
-	return proofResult{result}, nil
+	return result, nil
 }
 
 func (c proofConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
@@ -204,7 +207,7 @@ func (s proofStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (d
 		if err != nil {
 			return nil, err
 		}
-		return proofResult{result}, nil
+		return result, nil
 	}
 	values, err := statementValues(ctx, args)
 	if err != nil {
@@ -268,7 +271,7 @@ func (s proofStmt) Exec(args []driver.Value) (driver.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	return proofResult{result}, nil
+	return result, nil
 }
 
 func (s proofStmt) Query(args []driver.Value) (driver.Rows, error) {
@@ -281,12 +284,25 @@ func (s proofStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 func (s proofStmt) CheckNamedValue(value *driver.NamedValue) error {
+	var err error
 	if checker, ok := s.Stmt.(driver.NamedValueChecker); ok {
-		err := checker.CheckNamedValue(value)
+		err = checker.CheckNamedValue(value)
+	} else {
+		err = s.conn.CheckNamedValue(value)
+	}
+	if !errors.Is(err, driver.ErrSkip) {
 		observe(err)
 		return err
 	}
-	return s.conn.CheckNamedValue(value)
+	if _, ok := s.Stmt.(driver.ColumnConverter); ok {
+		return driver.ErrSkip
+	}
+	// Advertising ColumnConverter changes database/sql's fallback path on Go
+	// 1.25 when NumInput is -1. Preserve default conversion explicitly for a
+	// delegate that did not implement that optional interface (e.g. SQLite).
+	value.Value, err = driver.DefaultParameterConverter.ConvertValue(value.Value)
+	observe(err)
+	return err
 }
 
 type proofTx struct{ driver.Tx }
@@ -301,20 +317,6 @@ func (t proofTx) Rollback() error {
 	err := t.Tx.Rollback()
 	observe(err)
 	return err
-}
-
-type proofResult struct{ driver.Result }
-
-func (r proofResult) LastInsertId() (int64, error) {
-	value, err := r.Result.LastInsertId()
-	observe(err)
-	return value, err
-}
-
-func (r proofResult) RowsAffected() (int64, error) {
-	value, err := r.Result.RowsAffected()
-	observe(err)
-	return value, err
 }
 
 type proofRows struct {

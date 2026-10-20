@@ -27,3 +27,11 @@ P2-1 继续 Linux 本地 PASS；P2-2 正向实现待实际 Linux/三库验证，
 GitHub workflow validation run 39465661995 失败（未执行 job）：job-level env 不允许 runner.temp 上下文。已把目录绑定移到 runner 分配后的首个 shell step，通过 GITHUB_ENV 传递；新增静态断言禁止 job env 使用 runner 上下文。此项为注册前配置修复，不是真实演练，演练修复重跑仍 0/2。
 
 WSL 临时目录在后续调用中不可用，改稳定任务目录后 tar 提取在 DrvFS 慢 I/O；中断该提取并保留半成品，改由 Windows 原生提取已验 hash 的 Linux SDK。此前两次失败发生于环境准备，未执行 Go 测试。新的 Linux 定向进程已启动，尚不声称通过。
+
+## 首次真实三库结果及定向修复
+
+CI 39466058635：MySQL 三库新增步骤 success；SQLite 在 InitDB 返回 sqlite: invalid driver.Value type int；PostgreSQL 实际17.6完成首次shared迁移，但凭证被锁存失败。均保留失败，未记PASS。
+
+已按固定依赖和 Go 标准库定位两项兼容性：Go1.25 的 database/sql 对 NumInput=-1 且存在 ColumnConverter 的路径会跳过默认转换，包装层现在显式保留无原生 converter 驱动的默认参数转换；pgx Exec 返回 driver.RowsAffected，LastInsertId 是不支持的可选能力，GORM 在 RETURNING 模式会正常忽略该能力错误，不能把它当SQL执行失败。结果能力保持原样返回，SQL执行、Trace、Row.Err、延迟读取/关闭、事务错误观察继续保留。集中 driver 夹具增加原生 int 转换和“不支持 LastInsertId 仍为健康执行”回归，随后重跑实际矩阵。
+
+Linux 本地 Go setup 曾因 WSL 网络无法下载两个固定 Linux 依赖失败；通过 Windows 网络恢复同一 go.sum 版本并执行 Linux -deps 加载，增加固定 numcpus 依赖缓存。没有改版本或锁文件；再次验证使用 GOPROXY=off，避免重复网络超时。尚未将该次执行记录为通过。

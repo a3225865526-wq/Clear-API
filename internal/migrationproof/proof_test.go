@@ -111,9 +111,16 @@ func (t fixtureTx) Rollback() error { return nil }
 
 type fixtureStmt struct{ fixture *proofFixture }
 
-func (s fixtureStmt) Close() error                               { return nil }
-func (s fixtureStmt) NumInput() int                              { return -1 }
-func (s fixtureStmt) Exec([]driver.Value) (driver.Result, error) { return driver.RowsAffected(1), nil }
+func (s fixtureStmt) Close() error  { return nil }
+func (s fixtureStmt) NumInput() int { return -1 }
+func (s fixtureStmt) Exec(args []driver.Value) (driver.Result, error) {
+	for _, value := range args {
+		if !driver.IsValue(value) {
+			return nil, errors.New("invalid driver value")
+		}
+	}
+	return driver.RowsAffected(1), nil
+}
 func (s fixtureStmt) Query([]driver.Value) (driver.Rows, error) {
 	return &fixtureRows{fixture: s.fixture}, nil
 }
@@ -161,6 +168,10 @@ func TestMigrationProofDeferredSQLFailures(t *testing.T) {
 			}
 			db := SQL(fixtureConnector{fixture})
 			t.Cleanup(func() { assert.NoError(t, db.Close()) })
+			result, err := db.Exec("synthetic exec", int(7))
+			require.NoError(t, err, "preserve conversion for NumInput=-1 legacy statements")
+			_, err = result.LastInsertId()
+			require.Error(t, err, "unsupported capability is not failed SQL execution")
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			rows, err := db.QueryContext(ctx, "synthetic query")
