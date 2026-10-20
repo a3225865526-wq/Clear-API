@@ -1,6 +1,28 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
 
+## 2026-10-21 — 第1轮重跑迁移凭证校验失败；最后hostname修复待CI（最新权威）
+
+- 专用run39516153502/1 FAIL：新镜像/PG17.6/启动前schema通过；第一次Gateway start/health/SIGTERM正常退出均通过且DDL不变，但结构化迁移凭证invalid_structured_proof，不能以健康/退出/schema判PASS；第二次/负向NOT RUN。3个owned容器/auth清理成功，失败证据持久化回读上传，原始artifact保留。
+- 已确认原控制假设hostname==Gateway CID[:12]不适用于Docker container:网络：Moby会继承donor hostname。原raw不在失败artifact，具体失败字段未实测。最小控制修复改为运行中精确CID的inspect Config.Hostname与exec hostname双源相等验证，再将该期望值用于专用receipt与回读；CID+fresh challenge+pid+binary+阶段/DB门禁均保留。两次不同CID/challenge仍必需，hostname允许因同网络相同。
+- 相关Windows15项与Linux root集中73项PASS（含本地adapter6项）；独立审查通过。此次仍仅控制修复，应用799a/RC39511197302/digest729fdd不变，不需重建。
+- 修复重跑已经1/2，最后第2轮尚未触发；须先正常CI/保护/当前触发链与两false开关复核。P2-2真实镜像验收和PG03仍BLOCKED。
+
+生产current-main资格、身份/连续writer窗口、获准写入投影、真实备份恢复及完整adapter缺口保留，不生产部署。
+
+
+
+## 2026-10-21 — 日志修复已正常合并，真实隔离第1轮修复重跑进行中（最新权威）
+
+- 修复PR80/head5024c6f4f65756aff128e71df95fcded71a3aac0，完整CI39515073600七jobs SUCCESS，独立审查通过。正常merge97765d27f98889eda43484d813ed146b1f4dc823，未绕过保护/required checks。新鲜10-workflow/两false开关/strict保护再次通过后，仅手动dispatch专用run39516153502/1。
+- 第1轮修复重跑已触发（1/2），本次仍为候选source799a / RC39511197302 / digest729fdd；仅控制日志参数/回读修复，未变更应用。首次run39514525897 FAIL及完整原始失败artifact保留；新run未完成前不判迁移或隔离PASS。
+- R2 gate/OneShot与successor adapter基础合同已完成安全本地代码、针对性测试与独立复核，详见production-readiness报告及local-components字节清单；无生产安装/激活/凭据或执行入口。完整production adapter NOT IMPLEMENTED。
+- 已明确额外生产资格阻塞：旧生产release-control仍要求candidate/RC source为实时main，799a与控制merge分离的隔离验收不自动满足该门禁。不得降低current-main检查；最终源码冻结重建/验收，或另批并实现source/control分离的一次性successor审批协议。
+
+当前继续收集实际演练结果；生产身份/全writer连续窗口/准确获准写入/真实备份恢复及最终adapter仍BLOCKED，不进入生产部署。
+
+
+
 ## 2026-10-21 — 首次真实隔离失败已保留；日志配置修复待CI（最新权威）
 
 - PR79/head41c58069ae77914a09e757176d65e30d92651958 的CI39513279138全部7 jobs SUCCESS，独立审查通过后正常合并为control1e155bc49c942ec72a30995670a720101fdaf7c8。两false开关、10 workflow原字节/触发图及strict保护已新鲜复核，未绕过人工或CI门禁。

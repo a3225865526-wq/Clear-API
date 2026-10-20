@@ -1,0 +1,577 @@
+{
+  "schema": "clearapi.pg03.ci-observed/v1",
+  "observed_utc": "2026-10-20T23:36:35.284685+00:00",
+  "run": {
+    "id": 39515073600,
+    "run_attempt": 1,
+    "head_sha": "5024c6f4f65756aff128e71df95fcded71a3aac0",
+    "head_branch": "codex/pg03-successor-preparation-20261021",
+    "event": "pull_request",
+    "path": ".github/workflows/ci.yml",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39515073600"
+  },
+  "jobs": [
+    {
+      "id": 118945156810,
+      "name": "Secret scan and forbidden files",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:26:54Z",
+          "completed_at": "2026-10-20T23:26:55Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:26:55Z",
+          "completed_at": "2026-10-20T23:26:57Z"
+        },
+        {
+          "name": "Scan tracked files for secrets and forbidden artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:26:57Z",
+          "completed_at": "2026-10-20T23:26:58Z"
+        },
+        {
+          "name": "Validate deployment wrapper modes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T23:26:58Z",
+          "completed_at": "2026-10-20T23:34:48Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-20T23:34:48Z",
+          "completed_at": "2026-10-20T23:34:48Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-20T23:34:48Z",
+          "completed_at": "2026-10-20T23:34:48Z"
+        }
+      ]
+    },
+    {
+      "id": 118945156976,
+      "name": "Frontend typecheck and test",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:26:54Z",
+          "completed_at": "2026-10-20T23:26:55Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:26:55Z",
+          "completed_at": "2026-10-20T23:26:57Z"
+        },
+        {
+          "name": "Set up Bun",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:26:57Z",
+          "completed_at": "2026-10-20T23:26:58Z"
+        },
+        {
+          "name": "Install dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T23:26:58Z",
+          "completed_at": "2026-10-20T23:27:05Z"
+        },
+        {
+          "name": "Test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T23:27:05Z",
+          "completed_at": "2026-10-20T23:33:54Z"
+        },
+        {
+          "name": "Production build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T23:33:54Z",
+          "completed_at": "2026-10-20T23:34:09Z"
+        },
+        {
+          "name": "Post Set up Bun",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-10-20T23:34:09Z",
+          "completed_at": "2026-10-20T23:34:09Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-20T23:34:09Z",
+          "completed_at": "2026-10-20T23:34:09Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-20T23:34:09Z",
+          "completed_at": "2026-10-20T23:34:09Z"
+        }
+      ]
+    },
+    {
+      "id": 118945156992,
+      "name": "PG03 isolated package read capability",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:26:55Z",
+          "completed_at": "2026-10-20T23:26:55Z"
+        },
+        {
+          "name": "Verify repository token package read without starting a container",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:26:55Z",
+          "completed_at": "2026-10-20T23:27:03Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:27:03Z",
+          "completed_at": "2026-10-20T23:27:03Z"
+        }
+      ]
+    },
+    {
+      "id": 118945157034,
+      "name": "Commercial DB matrix \u2014 sqlite",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:26:55Z",
+          "completed_at": "2026-10-20T23:26:56Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:26:56Z",
+          "completed_at": "2026-10-20T23:27:39Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:27:39Z",
+          "completed_at": "2026-10-20T23:27:42Z"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T23:27:42Z",
+          "completed_at": "2026-10-20T23:28:00Z"
+        },
+        {
+          "name": "Verify commercial HTTP lifecycle on isolated database",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T23:28:00Z",
+          "completed_at": "2026-10-20T23:29:26Z"
+        },
+        {
+          "name": "Prepare dedicated migration proof databases",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-10-20T23:29:26Z",
+          "completed_at": "2026-10-20T23:29:26Z"
+        },
+        {
+          "name": "Verify real startup migration proof and repeated startup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T23:29:26Z",
+          "completed_at": "2026-10-20T23:30:18Z"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-20T23:30:18Z",
+          "completed_at": "2026-10-20T23:30:18Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-20T23:30:18Z",
+          "completed_at": "2026-10-20T23:30:19Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-20T23:30:19Z",
+          "completed_at": "2026-10-20T23:30:20Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-20T23:30:20Z",
+          "completed_at": "2026-10-20T23:30:20Z"
+        }
+      ]
+    },
+    {
+      "id": 118945157050,
+      "name": "Backend vet, build, test, migration binaries",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:26:54Z",
+          "completed_at": "2026-10-20T23:26:55Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:26:55Z",
+          "completed_at": "2026-10-20T23:26:57Z"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:26:57Z",
+          "completed_at": "2026-10-20T23:27:13Z"
+        },
+        {
+          "name": "Create frontend embed placeholder",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T23:27:13Z",
+          "completed_at": "2026-10-20T23:27:13Z"
+        },
+        {
+          "name": "Build root module",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T23:27:13Z",
+          "completed_at": "2026-10-20T23:27:36Z"
+        },
+        {
+          "name": "Build relaykit independently",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T23:27:36Z",
+          "completed_at": "2026-10-20T23:27:37Z"
+        },
+        {
+          "name": "Build bootstrap and migration binaries",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T23:27:37Z",
+          "completed_at": "2026-10-20T23:27:42Z"
+        },
+        {
+          "name": "Test root and relaykit modules (baseline-aware)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-10-20T23:27:42Z",
+          "completed_at": "2026-10-20T23:31:19Z"
+        },
+        {
+          "name": "Verify one-use legacy maintenance and V2 failure contracts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-10-20T23:31:19Z",
+          "completed_at": "2026-10-20T23:31:54Z"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-10-20T23:31:54Z",
+          "completed_at": "2026-10-20T23:31:54Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-10-20T23:31:54Z",
+          "completed_at": "2026-10-20T23:31:54Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-10-20T23:31:54Z",
+          "completed_at": "2026-10-20T23:31:55Z"
+        }
+      ]
+    },
+    {
+      "id": 118945157056,
+      "name": "Commercial DB matrix \u2014 postgres",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:26:54Z",
+          "completed_at": "2026-10-20T23:26:56Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:26:56Z",
+          "completed_at": "2026-10-20T23:27:36Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:27:36Z",
+          "completed_at": "2026-10-20T23:27:39Z"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T23:27:39Z",
+          "completed_at": "2026-10-20T23:27:56Z"
+        },
+        {
+          "name": "Verify commercial HTTP lifecycle on isolated database",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T23:27:56Z",
+          "completed_at": "2026-10-20T23:29:18Z"
+        },
+        {
+          "name": "Prepare dedicated migration proof databases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T23:29:18Z",
+          "completed_at": "2026-10-20T23:29:18Z"
+        },
+        {
+          "name": "Verify real startup migration proof and repeated startup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T23:29:18Z",
+          "completed_at": "2026-10-20T23:30:15Z"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-20T23:30:15Z",
+          "completed_at": "2026-10-20T23:30:15Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-20T23:30:15Z",
+          "completed_at": "2026-10-20T23:30:15Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-20T23:30:15Z",
+          "completed_at": "2026-10-20T23:30:17Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-20T23:30:17Z",
+          "completed_at": "2026-10-20T23:30:17Z"
+        }
+      ]
+    },
+    {
+      "id": 118945157071,
+      "name": "Commercial DB matrix \u2014 mysql",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-10-20T23:26:54Z",
+          "completed_at": "2026-10-20T23:26:55Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-10-20T23:26:55Z",
+          "completed_at": "2026-10-20T23:27:27Z"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-10-20T23:27:27Z",
+          "completed_at": "2026-10-20T23:27:29Z"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-10-20T23:27:29Z",
+          "completed_at": "2026-10-20T23:27:45Z"
+        },
+        {
+          "name": "Verify commercial HTTP lifecycle on isolated database",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-10-20T23:27:45Z",
+          "completed_at": "2026-10-20T23:29:02Z"
+        },
+        {
+          "name": "Prepare dedicated migration proof databases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-10-20T23:29:02Z",
+          "completed_at": "2026-10-20T23:29:02Z"
+        },
+        {
+          "name": "Verify real startup migration proof and repeated startup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-10-20T23:29:02Z",
+          "completed_at": "2026-10-20T23:29:49Z"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-10-20T23:29:49Z",
+          "completed_at": "2026-10-20T23:29:49Z"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-10-20T23:29:49Z",
+          "completed_at": "2026-10-20T23:29:49Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-10-20T23:29:49Z",
+          "completed_at": "2026-10-20T23:29:51Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-10-20T23:29:51Z",
+          "completed_at": "2026-10-20T23:29:51Z"
+        }
+      ]
+    }
+  ]
+}

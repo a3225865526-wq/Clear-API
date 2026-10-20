@@ -86,7 +86,7 @@ def migration_evidence(document, container_id, source, before_schema, after_sche
 
 
 def structured_migration_evidence(proof, logs, container_id, source, challenge, binary,
-                                  before_schema, after_schema):
+                                  before_schema, after_schema, expected_hostname):
     """Bind candidate-produced completion to this fresh container and binary.
 
     Logs supply only veto evidence. Neither quiet logs, health, process exit nor
@@ -105,8 +105,9 @@ def structured_migration_evidence(proof, logs, container_id, source, challenge, 
     if source == LEGACY_MIGRATION_SOURCE or not proof or len(proof.encode()) > 16384:
         return evidence
 
+    evidence['proof_sha256'] = hashlib.sha256(proof.encode()).hexdigest()
     try:
-        validate_completion_proof(proof, container_id, challenge, binary)
+        validate_completion_proof(proof, container_id, challenge, binary, expected_hostname)
     except (ValueError, TypeError):
         evidence['reason'] = 'invalid_structured_proof'
         return evidence
@@ -116,11 +117,13 @@ def structured_migration_evidence(proof, logs, container_id, source, challenge, 
     return evidence
 
 
-def validate_completion_proof(proof, container_id, challenge, binary):
+def validate_completion_proof(proof, container_id, challenge, binary, expected_hostname):
     """Validate a bounded candidate receipt without inventing log evidence."""
     if (type(proof) is not str or not 0 < len(proof.encode()) <= 16384
             or not re.fullmatch(r'[a-f0-9]{64}', container_id)
-            or not re.fullmatch(r'[a-f0-9]{64}', binary)):
+            or not re.fullmatch(r'[a-f0-9]{64}', binary)
+            or type(expected_hostname) is not str
+            or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,252}', expected_hostname)):
         raise ValueError('invalid completion receipt binding')
     def unique(pairs):
         result = {}
@@ -138,7 +141,7 @@ def validate_completion_proof(proof, container_id, challenge, binary):
             or receipt['status'] != 'success'
             or receipt['challenge'] != challenge
             or not re.fullmatch(r'[a-f0-9]{64}', challenge)
-            or receipt['hostname'] != container_id[:12]
+            or receipt['hostname'] != expected_hostname
             or type(receipt['pid']) is not int or receipt['pid'] != 1
             or receipt['binary_sha256'] != binary
             or receipt['phases'] != ['main_database', 'retired_options', 'log_database']
@@ -292,6 +295,12 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
             # cannot recover its contents after stop. Bound the read at source.
             proof = None
             if require_migration_evidence and commit != LEGACY_MIGRATION_SOURCE:
+                startup['configured_hostname'] = command(['inspect', '--format', '{{.Config.Hostname}}', gateway])
+                startup['hostname'] = command(['exec', gateway, 'hostname'])
+                if (not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,252}', startup['hostname'])
+                        or startup['hostname'] != startup['configured_hostname']):
+                    raise ValueError('live and configured hostname conflict')
+            if require_migration_evidence and commit != LEGACY_MIGRATION_SOURCE:
                 try:
                     proof = command(['exec', gateway, 'head', '-c', '16385', MIGRATION_PROOF_PATH])
                 except Exception:
@@ -323,7 +332,7 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
                         startup['before_schema_sha256'], current)
                     if commit != LEGACY_MIGRATION_SOURCE:
                         startup['migration'] = structured_migration_evidence(proof, logs, gateway,
-                            commit, challenge, binary, startup['before_schema_sha256'], current)
+                            commit, challenge, binary, startup['before_schema_sha256'], current, startup['hostname'])
                 except Exception:
                     # Preserve UNKNOWN and the normal outer cleanup path.
                     raise ValueError('migration log evidence unavailable') from None

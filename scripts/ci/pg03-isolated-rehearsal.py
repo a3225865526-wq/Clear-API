@@ -239,7 +239,8 @@ def validate_persisted_migrations(observation):
                      and value.get('container_id') == cid
                      and type(raw) is str and value.get('proof_sha256') == hashlib.sha256(raw.encode()).hexdigest(),
                      'durable migration receipt missing or conflicting')
-        PLAN.SCHEMA.validate_completion_proof(raw, cid, challenge, BINARY)
+        PLAN.require(startup.get('hostname') == startup.get('configured_hostname'), 'hostname evidence conflict')
+        PLAN.SCHEMA.validate_completion_proof(raw, cid, challenge, BINARY, startup.get('hostname'))
         challenges.add(challenge)
         containers.add(cid)
     PLAN.require(len(challenges) == len(containers) == 2, 'fresh independent starts required')
