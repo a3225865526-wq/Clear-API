@@ -1,0 +1,103 @@
+{
+  "schema": "clearapi.pg03-migration-proof-preparation/v1",
+  "date": "2026-10-21",
+  "state": "blocked",
+  "working_head": "ff6e0f4b2f5096d12717a01afbb3f5d90d28b801",
+  "previous_candidate": {
+    "source_commit": "69a66431646b5cc8912bf97a739e08de07316443",
+    "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a",
+    "rc_run": "39357150402",
+    "attempt": 1,
+    "migration_completion_contract": false,
+    "acceptance": "blocked"
+  },
+  "new_candidate": {
+    "required": true,
+    "source_commit": null,
+    "image_digest": null,
+    "image_id": null,
+    "binary_sha256": null,
+    "rc_run": null,
+    "artifact_id": null,
+    "rc_zip_sha256": null,
+    "built": false,
+    "production_ready": false
+  },
+  "proof_contract": {
+    "schema": "clearapi.startup-migration-proof/v1",
+    "path": "/tmp/clearapi-migration-proof.json",
+    "activation": "CLEARAPI_MIGRATION_PROOF_CHALLENGE",
+    "phases": [
+      "main_database",
+      "retired_options",
+      "log_database"
+    ],
+    "bindings": [
+      "fresh per-start challenge",
+      "container hostname",
+      "PID 1",
+      "actual executable SHA256",
+      "actual DB dialects"
+    ],
+    "publication": "exclusive create, file sync/close, parent directory sync; failure blocks startup",
+    "controller_read": "live owned container, at most 16385 bytes; validate limit 16384",
+    "log_policy": "logs may veto; missing capture blocks; logs never manufacture success",
+    "unobservable_row_results": "fail closed unconditionally; positive migration completion remains blocked until deferred read errors propagate"
+  },
+  "source_sha256": {
+    "main.go": "6dfc6126053963cbac0ebc365c0ec234a2bfea8aa87b90e376545f97cc1e6348",
+    "model/main.go": "36d93b1c283adc263ad9a32782ed0e812a5d9b449f9f0e3adb53b77538ee8101",
+    "model/frontend_option_migration.go": "df6e7cf44ff210f499a47290d2cce1b9d878bdb0cdd7b30a5a493688b1c3f359",
+    "model/gorm_logger.go": "d1df21e11c540ead93d0974f60afc806408f552c78a7524d6a3fcce43d00b66f",
+    "internal/migrationproof/proof.go": "53571d906a9ccc0720537086e2a879a035fcb87923b41d027e79d69d7cf0a5a9",
+    "internal/migrationproof/proof_test.go": "46662714211ebefe25c57b54d7b3b07a989dd01b07b9bf693c8e0b4e6207b4fc",
+    "model/gorm_logger_test.go": "efcc0f34473f2f88a953b7f642e7453eefc4d935a5438945e08d3196a77afe57",
+    "model/frontend_option_migration_test.go": "dfc5c27f18ecdd01603695a578d5c72674de6569126ded4767637ef9a279da7b",
+    "scripts/pg03-schema-rehearsal.py": "e3178c486bc6b62dbbf1bfbae5d27c7120f4c89d6690a5d35ce0162c414432a9",
+    "scripts/pg03-successor-plan.py": "6b9c1a1570debd337b08dc018031f9650ccd1af833468e402c10118945e56ea7",
+    "scripts/ci/test-pg03-successor-plan.py": "00c701f4ed47750855a4dbae7116f8960f168d6f1a7f7540f8fd0d184c452e24"
+  },
+  "validation": {
+    "linux_offline": {
+      "tests": 51,
+      "passed": 51,
+      "skipped": 0
+    },
+    "windows_offline": {
+      "tests": 51,
+      "passed": 42,
+      "skipped": 9
+    },
+    "go_tests": "not_run_toolchain_unavailable",
+    "gofmt": "not_run_toolchain_unavailable",
+    "sqlite_mysql_postgres_matrix": "not_run",
+    "real_candidate_start_1": "not_run",
+    "real_candidate_start_2": "not_run",
+    "image_read": "not_run"
+  },
+  "required_next_checks": [
+    "Resolve deferred Row/Rows read-error propagation with focused real tests; do not remove guard or treat current source as a completed positive fix",
+    "Provide an existing approved Go >=1.25.1 toolchain; gofmt modified Go files and run focused tests",
+    "Run real SQLite/MySQL/PostgreSQL startup migration regression matrix, including separate log DB; record exact engine versions and commands",
+    "Review, then separately authorize commit/push/RC build; preserve required checks and recheck release trigger graph and switches",
+    "Bind new source/digest/image ID/binary/RC/artifact/ZIP hash and schema transition; retain previous RC unmodified",
+    "Re-pin local adapter only to independently verified new RC; never substitute new binary under the old digest",
+    "Separately authorize workflow registration and one isolated run with exact control ref, runner, window and synthetic DB write scope",
+    "Read exact image via authorized package route, verify identity and run both fresh Gateways on one proven-isolated database; no production access"
+  ],
+  "authorization": {
+    "local_edits_tests_review_evidence": true,
+    "commit_push_merge": false,
+    "register_workflow": false,
+    "dispatch_real_rehearsal": false,
+    "production_operations": false
+  },
+  "isolated_actions_adapter": "still pinned to previous candidate; not ready for registration/execution",
+  "independent_review": {
+    "agent": "review_migration_proof",
+    "finding": "P2 missing Uptime failure latch; additional Row/Rows deferred error observation gap",
+    "disposition": "Uptime fixed and re-reviewed; Row/Rows guard reviewed and fail-closed; positive completion gap unresolved",
+    "go_and_database_execution": "not_verified"
+  },
+  "positive_completion_gap": "GORM Row/Rows Next/Scan may fail after Trace; normal migration is expected to hit the conservative guard, not yet actually run"
+}

@@ -15,6 +15,12 @@ case "${CLEARAPI_BACKUP_PRESERVE_EXISTING:-false}" in
   true|false) ;;
   *) echo 'invalid backup preservation policy' >&2; exit 1 ;;
 esac
+IDENTITY_ARGS=()
+if [ -n "${CLEARAPI_BACKUP_STOPPED_GATEWAY:-}" ]; then
+  [[ "$CLEARAPI_BACKUP_STOPPED_GATEWAY" =~ ^[a-f0-9]{64}$ ]]
+  [[ "${CLEARAPI_BACKUP_PRESERVE_EXISTING:-false}" == true ]]
+  IDENTITY_ARGS=(--stopped-gateway "$CLEARAPI_BACKUP_STOPPED_GATEWAY")
+fi
 
 log() { echo "$(date -u +%FT%TZ) $*" >> /var/log/clearapi/backup.log; }
 
@@ -49,7 +55,7 @@ chmod 700 "$STAGE" "$ENC"
 
 # Freeze the old running release, never the candidate about to be deployed.
 IDENTITY_TOOL=/opt/clearapi/backups/bin/backup-identity.py
-python3 "$IDENTITY_TOOL" capture > "$STAGE/running-identity.json"
+python3 "$IDENTITY_TOOL" capture "${IDENTITY_ARGS[@]}" > "$STAGE/running-identity.json"
 PG03_TOOL=/opt/clearapi/backups/bin/pg03-backup-state.py
 PG03_ARTIFACTS=()
 if [ -e /opt/clearapi/app/compose-pg03.yaml ] || [ -e /data/clearapi/pool-executor ]; then
@@ -158,7 +164,7 @@ cat > "$STAGE/manifest.json" <<EOF
   }
 }
 EOF
-python3 "$IDENTITY_TOOL" finalize --snapshot "$STAGE/running-identity.json" \
+python3 "$IDENTITY_TOOL" finalize "${IDENTITY_ARGS[@]}" --snapshot "$STAGE/running-identity.json" \
   --manifest "$STAGE/manifest.json" --dump-started "$DUMP_STARTED" --dump-completed "$DUMP_COMPLETED"
 if [ "${#PG03_ARTIFACTS[@]}" -gt 0 ]; then
   python3 "$PG03_TOOL" check --root / --snapshot "$STAGE/pg03-state-$TS.json"
@@ -194,12 +200,10 @@ if [ -f "$OFFSITE_CONF" ]; then
   fi
 fi
 
-# 8. publish the completion marker LAST.
-# The manifest under manifests/ is the only signal that a backup finished. It is
-# written and fsynced in staging, then linked into place atomically, so a reader
-# can never observe a manifest whose encrypted artifact, offsite copy and
-# retention step have not all completed. Staging files are never accepted as a
-# completed backup by the deploy gate.
+# 8. publish the encrypted artifact inventory. This legacy manifest does NOT
+# prove retention/EXIT cleanup succeeded. Incident successor admission additionally
+# requires the invoking process outcome, absent staging, verified encrypted bytes,
+# and its own final durable completion receipt. Staging is never accepted.
 python3 - "$STAGE/manifest.json" "$BASE/manifests/$TS.json" <<'PYCOMMIT'
 import os, pathlib, sys
 source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])

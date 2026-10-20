@@ -1,0 +1,104 @@
+name: PG03 isolated exact-image schema rehearsal
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+  # Only fixed RC metadata and its original ZIP; no dispatch/rerun API.
+  actions: read
+
+concurrency:
+  group: pg03-isolated-exact-schema
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+      actions: read
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      CONTROL_SHA: ${{ github.workflow_sha }}
+    steps:
+      - name: Bind isolated directory after runner allocation
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'REHEARSAL_ROOT=%s/pg03-isolated-%s-%s\n' "$RUNNER_TEMP" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+
+      - name: Checkout reviewed control source independently of candidate source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+
+      - name: Bind control identity and initialize private evidence
+        run: python3 scripts/ci/pg03-isolated-rehearsal.py prepare
+
+      - name: Run offline isolation regression contracts
+        run: python3 scripts/ci/test-pg03-successor-plan.py
+
+      - name: Read fixed RC and validate original schema archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/pg03-isolated-rehearsal.py baseline
+
+      - name: Require containerd image store on this disposable hosted runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! docker info --format '{{json .DriverStatus}}' | python3 -c 'import json,sys; sys.exit(0 if ["driver-type", "io.containerd.snapshotter.v1"] in json.load(sys.stdin) else 1)'; then
+            sudo python3 - <<'PY'
+          import json, pathlib
+          path = pathlib.Path('/etc/docker/daemon.json')
+          config = json.loads(path.read_text()) if path.exists() else {}
+          config.setdefault('features', {})['containerd-snapshotter'] = True
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(config) + '\n')
+          PY
+            sudo systemctl restart docker
+          fi
+          docker info --format '{{json .DriverStatus}}' | python3 -c 'import json,sys; assert ["driver-type", "io.containerd.snapshotter.v1"] in json.load(sys.stdin)'
+
+      - name: Pull only fixed digests and erase temporary registry credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/pg03-isolated-rehearsal.py pull
+
+      - name: Run two isolated starts on the same fixed target schema database
+        run: python3 scripts/ci/pg03-isolated-rehearsal.py rehearse
+
+      - name: Contain remaining owned resources and finalize sanitized evidence
+        id: finalize
+        if: always()
+        env:
+          PRIOR_STATUS: ${{ job.status }}
+        run: python3 scripts/ci/pg03-isolated-rehearsal.py finalize
+
+      - name: Verify the published bundle against finalizer outcome
+        if: always()
+        id: evidence
+        env:
+          FINALIZE_OUTCOME: ${{ steps.finalize.outcome }}
+        run: python3 scripts/ci/pg03-isolated-rehearsal.py verify-public
+
+      - name: Preserve allowlisted evidence only
+        if: always() && steps.evidence.outcome == 'success' && steps.evidence.outputs.evidence_ready == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pg03-isolated-schema-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.REHEARSAL_ROOT }}/public/result.json
+            ${{ env.REHEARSAL_ROOT }}/public/success.json
+          if-no-files-found: error
+          retention-days: 7

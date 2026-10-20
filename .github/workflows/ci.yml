@@ -16,6 +16,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  pg03-package-read:
+    name: PG03 isolated package read capability
+    if: >-
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.actor == github.repository_owner))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: none
+      packages: read
+    steps:
+      - name: Verify repository token package read without starting a container
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          auth_dir=$(mktemp -d "$RUNNER_TEMP/pg03-package-read.XXXXXX")
+          export DOCKER_CONFIG="$auth_dir"
+          trap 'docker logout ghcr.io >/dev/null 2>&1; rm -f "$auth_dir/config.json"; rmdir "$auth_dir"' EXIT
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io --username a3225865526-wq --password-stdin
+          unset GH_TOKEN
+          # Transport capability only: this historical image is never executed
+          # and cannot serve as acceptance for the new migration-proof source.
+          docker pull --platform linux/amd64 ghcr.io/a3225865526-wq/clearapi@sha256:07fd58272b4fc62bcc52a3ad1d20e0dac357ba93de9e91a6a797d5e8fe3e8e7a
+
   backend:
     name: Backend vet, build, test, migration binaries
     runs-on: ubuntu-latest
@@ -133,6 +161,30 @@ jobs:
       - name: Verify commercial HTTP lifecycle on isolated database
         run: go test -race -count=1 -timeout=5m -v ./e2e/commercial
 
+      - name: Prepare dedicated migration proof databases
+        if: matrix.dialect != 'sqlite'
+        env:
+          DIALECT: ${{ matrix.dialect }}
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          set -euo pipefail
+          if [ "$DIALECT" = mysql ]; then
+            docker exec -e MYSQL_PWD=clearapi_test "$MYSQL_CONTAINER" mysql -uroot -e "CREATE DATABASE pg03_proof_main CHARACTER SET utf8mb4; CREATE DATABASE pg03_proof_log CHARACTER SET utf8mb4; GRANT ALL ON pg03_proof_main.* TO 'clearapi'@'%'; GRANT ALL ON pg03_proof_log.* TO 'clearapi'@'%';"
+          else
+            docker exec "$POSTGRES_CONTAINER" createdb -U clearapi pg03_proof_main
+            docker exec "$POSTGRES_CONTAINER" createdb -U clearapi pg03_proof_log
+          fi
+
+      - name: Verify real startup migration proof and repeated startup
+        env:
+          TEST_PG03_DIALECT: ${{ matrix.dialect }}
+          TEST_PG03_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/pg03_proof_main?charset=utf8mb4&parseTime=true&loc=Local
+          TEST_PG03_MYSQL_LOG_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/pg03_proof_log?charset=utf8mb4&parseTime=true&loc=Local
+          TEST_PG03_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/pg03_proof_main?sslmode=disable
+          TEST_PG03_POSTGRES_LOG_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/pg03_proof_log?sslmode=disable
+        run: go test -count=1 -timeout=5m -v ./internal/migrationproof ./model -run 'TestMigrationProof|TestRetiredOptionsCannotPublishCompletion'
+
   frontend:
     name: Frontend typecheck and test
     runs-on: ubuntu-latest
@@ -202,11 +254,12 @@ jobs:
           DEPLOY_SOURCE=scripts/production-deploy-v2.sh python3 scripts/ci/test-production-deploy.py WrapperModesTest WorkflowStdinTest
           sudo python3 scripts/ci/test-pg03-release.py
           sudo python3 scripts/ci/test-failed-recovery.py
+          python3 scripts/ci/test-pg03-successor-plan.py
           sudo python3 scripts/ci/test-runtime-boot-recovery.py
           sudo visudo --check --file scripts/pg03-deploy.sudoers
           sudo python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest
           bash -n scripts/production-backup.sh
           shellcheck --severity=warning scripts/production-backup.sh
-          python3 scripts/ci/test-backup-identity.py
+          sudo python3 scripts/ci/test-backup-identity.py
           python3 scripts/ci/test-automatic-release.py
           python3 scripts/ci/test-rehearsal-producer.py

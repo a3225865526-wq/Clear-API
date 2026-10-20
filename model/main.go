@@ -1,16 +1,21 @@
 package model
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/internal/migrationproof"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/clickhouse"
@@ -146,6 +151,9 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error)
 	dsn := os.Getenv(envName)
 	if dsn != "" {
 		if isClickHouseDSN(dsn) {
+			if migrationproof.Enabled() {
+				return nil, "", fmt.Errorf("migration proof supports SQLite, MySQL and PostgreSQL only")
+			}
 			if !isLog {
 				return nil, "", fmt.Errorf("%s does not support ClickHouse; use SQLite, MySQL, or PostgreSQL for the primary database and LOG_SQL_DSN for ClickHouse logs", envName)
 			}
@@ -158,15 +166,35 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error)
 			common.SysLog("using PostgreSQL as database")
 			// 同时关闭 pgx 隐式与 GORM 显式预处理语句:命名 prepared statement 与
 			// 事务池代理(PgBouncer/Neon/Supabase)不兼容,会触发 FATAL 08P01/42P05。
-			db, err := gorm.Open(postgresMigrationDialector{postgres.Dialector{Config: &postgres.Config{
+			var pool *sql.DB
+			if migrationproof.Enabled() {
+				config, err := pgx.ParseConfig(dsn)
+				if err != nil {
+					return nil, "", err
+				}
+				config.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+				zone := regexp.MustCompile(`(time_zone|TimeZone)=(.*?)($|&| )`).FindStringSubmatch(dsn)
+				if len(zone) > 2 {
+					config.RuntimeParams["timezone"] = zone[2]
+				}
+				pool = migrationproof.SQL(stdlib.GetConnector(*config))
+			}
+			config := &postgres.Config{
 				DSN:                  dsn,
 				PreferSimpleProtocol: true,
-			}}}, newGormConfig(false))
+			}
+			if pool != nil {
+				config.Conn = pool
+			}
+			db, err := gorm.Open(postgresMigrationDialector{postgres.Dialector{Config: config}}, newGormConfig(false))
+			if err != nil && pool != nil {
+				_ = pool.Close()
+			}
 			return db, common.DatabaseTypePostgreSQL, err
 		}
 		if strings.HasPrefix(dsn, "local") {
 			common.SysLog("SQL_DSN not set, using SQLite as database")
-			db, err := gorm.Open(sqlite.Open(common.SQLitePath), newGormConfig(true))
+			db, err := openSQLiteDatabase()
 			return db, common.DatabaseTypeSQLite, err
 		}
 		// Use MySQL
@@ -179,18 +207,52 @@ func chooseDB(envName string, isLog bool) (*gorm.DB, common.DatabaseType, error)
 				dsn += "?parseTime=true"
 			}
 		}
-		db, err := gorm.Open(mysqlMigrationDialector{mysql.Dialector{Config: &mysql.Config{DSN: dsn}}}, newGormConfig(true))
+		config := &mysql.Config{DSN: dsn}
+		var pool *sql.DB
+		if migrationproof.Enabled() {
+			var err error
+			pool, err = migrationproof.Open("mysql", dsn)
+			if err != nil {
+				return nil, "", err
+			}
+			config.Conn = pool
+		}
+		db, err := gorm.Open(mysqlMigrationDialector{mysql.Dialector{Config: config}}, newGormConfig(true))
+		if err != nil && pool != nil {
+			_ = pool.Close()
+		}
 		return db, common.DatabaseTypeMySQL, err
 	}
 	// Use SQLite
 	common.SysLog("SQL_DSN not set, using SQLite as database")
-	db, err := gorm.Open(sqlite.Open(common.SQLitePath), newGormConfig(true))
+	db, err := openSQLiteDatabase()
 	return db, common.DatabaseTypeSQLite, err
+}
+
+func openSQLiteDatabase() (*gorm.DB, error) {
+	dialector := &sqlite.Dialector{DSN: common.SQLitePath}
+	var pool *sql.DB
+	if migrationproof.Enabled() {
+		var err error
+		pool, err = migrationproof.Open("sqlite", common.SQLitePath)
+		if err != nil {
+			return nil, err
+		}
+		dialector.Conn = pool
+	}
+	db, err := gorm.Open(dialector, newGormConfig(true))
+	if err != nil && pool != nil {
+		_ = pool.Close()
+	}
+	return db, err
 }
 
 func InitDB() (err error) {
 	db, dbType, err := chooseDB("SQL_DSN", false)
 	if err == nil {
+		if err := observeMigrationQueries(db); err != nil {
+			return err
+		}
 		common.SetMainDatabaseType(dbType)
 		if os.Getenv("LOG_SQL_DSN") == "" {
 			common.SetLogDatabaseType(dbType)
@@ -244,6 +306,9 @@ func InitLogDB() (err error) {
 	}
 	db, dbType, err := chooseDB("LOG_SQL_DSN", true)
 	if err == nil {
+		if err := observeMigrationQueries(db); err != nil {
+			return err
+		}
 		common.SetLogDatabaseType(dbType)
 		initCol()
 		if common.DebugEnabled {
@@ -336,6 +401,7 @@ func migrateDB() error {
 		return err
 	}
 	if err := migrateOptionPrimaryKey(DB); err != nil {
+		migrationproof.Fail()
 		common.SysError("failed to migrate options primary key: " + err.Error())
 	}
 
@@ -401,9 +467,11 @@ func migrateDB() error {
 	// 商城充值相关迁移均为幂等 best-effort：失败记录日志不阻断启动，
 	// 缺失数据时兑换侧按 0% 加赠/空商品列表兜底。
 	if err := seedDefaultVIPLevels(); err != nil {
+		migrationproof.Fail()
 		common.SysError("failed to seed default vip levels: " + err.Error())
 	}
 	if err := backfillOfflineOrderRedemptionSources(); err != nil {
+		migrationproof.Fail()
 		common.SysError("failed to backfill offline order redemption sources: " + err.Error())
 	}
 	if err := InitializeUserAuthVersions(); err != nil {
@@ -638,6 +706,7 @@ func migrateTokenModelLimitsToText() error {
 		if err := DB.Raw(`SELECT data_type FROM information_schema.columns
 			WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
 			tableName, columnName).Scan(&dataType).Error; err != nil {
+			migrationproof.Fail()
 			common.SysLog(fmt.Sprintf("Warning: failed to query metadata for %s.%s: %v", tableName, columnName, err))
 		} else if dataType == "text" {
 			return nil
@@ -648,6 +717,7 @@ func migrateTokenModelLimitsToText() error {
 		if err := DB.Raw(`SELECT COLUMN_TYPE FROM information_schema.columns
 				WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
 			tableName, columnName).Scan(&columnType).Error; err != nil {
+			migrationproof.Fail()
 			common.SysLog(fmt.Sprintf("Warning: failed to query metadata for %s.%s: %v", tableName, columnName, err))
 		} else if strings.ToLower(columnType) == "text" {
 			return nil
@@ -659,6 +729,7 @@ func migrateTokenModelLimitsToText() error {
 
 	if alterSQL != "" {
 		if err := DB.Exec(alterSQL).Error; err != nil {
+			migrationproof.Fail()
 			return fmt.Errorf("failed to migrate %s.%s to text: %w", tableName, columnName, err)
 		}
 		common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to text", tableName, columnName))
@@ -695,6 +766,7 @@ func migrateSubscriptionPlanPriceAmount() {
 		if err := DB.Raw(`SELECT data_type FROM information_schema.columns
 			WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`,
 			tableName, columnName).Scan(&dataType).Error; err != nil {
+			migrationproof.Fail()
 			common.SysLog(fmt.Sprintf("Warning: failed to query metadata for %s.%s: %v", tableName, columnName, err))
 		} else if dataType == "numeric" {
 			return // Already decimal/numeric
@@ -707,6 +779,7 @@ func migrateSubscriptionPlanPriceAmount() {
 		if err := DB.Raw(`SELECT COLUMN_TYPE FROM information_schema.columns
 				WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`,
 			tableName, columnName).Scan(&columnType).Error; err != nil {
+			migrationproof.Fail()
 			common.SysLog(fmt.Sprintf("Warning: failed to query metadata for %s.%s: %v", tableName, columnName, err))
 		} else if strings.HasPrefix(strings.ToLower(columnType), "decimal") {
 			return // Already decimal
@@ -719,6 +792,7 @@ func migrateSubscriptionPlanPriceAmount() {
 
 	if alterSQL != "" {
 		if err := DB.Exec(alterSQL).Error; err != nil {
+			migrationproof.Fail()
 			common.SysLog(fmt.Sprintf("Warning: failed to migrate %s.%s to decimal: %v", tableName, columnName, err))
 		} else {
 			common.SysLog(fmt.Sprintf("Successfully migrated %s.%s to decimal(10,6)", tableName, columnName))

@@ -617,20 +617,24 @@ class SchemaRehearsalTest(unittest.TestCase):
                     if args[:2] == ['image', 'inspect']:
                         return json.dumps([{'Id':'sha256:'+'7'*64,'Os':'linux','Architecture':'amd64',
                             'Config':{'Labels':{'org.opencontainers.image.revision':'b'*40}}}])
-                    if args[0] == 'run':
-                        return 'd'*64+'  /new-api'
                     if args[0] == 'create':
                         cid = str(len(labels)+1)*64
                         labels[cid] = args[args.index('--label')+1].split('=',1)[1]
                         self.assertNotIn('--mount', args)
                         self.assertNotIn('-v', args)
                         self.assertNotIn('-p', args)
-                        self.assertIn(args[args.index('--network')+1], ('none','container:'+'1'*64))
+                        self.assertIn(args[args.index('--network')+1], ('none','container:'+'2'*64))
                         return cid
+                    if args[:2] == ['start', '-a']:
+                        self.assertEqual(args[-1], '1'*64)
+                        return 'd'*64+'  /new-api'
                     if args[0] in ('start','stop','rm'):
                         self.assertIn(args[-1], labels)
                         return ''
                     if args[0] == 'inspect':
+                        if args[2] == '{{json .State}}':
+                            return json.dumps(dict(Status='exited', Running=False, ExitCode=0,
+                                                   OOMKilled=False, Error=''))
                         return 'false' if args[2]=='{{.State.Running}}' else labels[args[-1]]
                     if args[0] == 'exec':
                         if args[-1] == 'SHOW server_version_num': return '170006'
@@ -641,8 +645,8 @@ class SchemaRehearsalTest(unittest.TestCase):
                         if 'pg_dump' in args:
                             dumps += 1
                             result = source.read_text()
-                            if dumps > 1: result += 'CREATE TABLE pg03_table(id int);\n'
-                            if dumps == 3 and fault=='second-schema-change': result += 'CREATE TABLE drift(id int);\n'
+                            if dumps > 2: result += 'CREATE TABLE pg03_table(id int);\n'
+                            if dumps == 5 and fault=='second-schema-change': result += 'CREATE TABLE drift(id int);\n'
                             return result
                         if 'wget' in args:
                             if fault=='startup': raise subprocess.CalledProcessError(1,['fixture'])
