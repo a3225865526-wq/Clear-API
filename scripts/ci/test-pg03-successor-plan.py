@@ -466,6 +466,16 @@ class IsolatedStartupTest(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
 
+def completed_startup_fixture(startup, number):
+    cid, challenge = str(number)*64, str(number+2)*64
+    raw = json.dumps(dict(schema='clearapi.startup-migration-proof/v1', status='success',
+        challenge=challenge, hostname=cid[:12], pid=1, binary_sha256=ACTION.BINARY,
+        phases=['main_database', 'retired_options', 'log_database'], main_database='postgres', log_database='postgres'))
+    migration = dict(status='success', source_commit=ACTION.SOURCE, container_id=cid,
+        completion_receipt_json=raw, challenge=challenge, proof_sha256=hashlib.sha256(raw.encode()).hexdigest())
+    return dict(startup, pass_number=number, container_id=cid, migration=migration)
+
+
 class IsolatedActionsTest(unittest.TestCase):
     def test_negative_migration_uses_only_a_new_read_only_database_and_cleans_both_containers(self):
         self.negative_probe('')
@@ -576,7 +586,7 @@ class IsolatedActionsTest(unittest.TestCase):
             migration=dict(status='success'))
         state = dict(nonce='a'*32, rehearsal='passed', negative_migration=negative_probe_fixture(), observation=dict(cleanup_complete=True,
             candidate=dict(image_id='sha256:'+'b'*64),
-            startups=[dict(startup, pass_number=i) for i in (1, 2)]))
+            startups=[completed_startup_fixture(startup, i) for i in (1, 2)]))
         receipt = dict(schema_version=PLAN.SCHEMA.SCHEMA, postgres_image_ref=PLAN.SCHEMA.POSTGRES,
             postgres_version_num='170006', startup_passes=2,
             profile='isolated_schema_only_master_single_postgres', source_schema_sha256=ACTION.BASELINE,
@@ -670,13 +680,34 @@ class EvidencePublicationTest(unittest.TestCase):
             process=dict(Status='exited', Running=False, ExitCode=0, OOMKilled=False, error_present=False))
         self.state = dict(nonce='a'*32, rehearsal='passed', negative_migration=negative_probe_fixture(), observation=dict(cleanup_complete=True,
             candidate=dict(image_id='sha256:'+'b'*64),
-            startups=[dict(startup, pass_number=i) for i in (1, 2)]))
+            startups=[completed_startup_fixture(startup, i) for i in (1, 2)]))
         receipt = dict(schema_version=PLAN.SCHEMA.SCHEMA, postgres_image_ref=PLAN.SCHEMA.POSTGRES,
             postgres_version_num='170006', startup_passes=2,
             profile='isolated_schema_only_master_single_postgres', source_schema_sha256=ACTION.BASELINE,
             target_schema_sha256=ACTION.BASELINE, source_commit=ACTION.SOURCE,
             candidate_image_id='sha256:'+'b'*64, candidate_binary_sha256=ACTION.BINARY)
         (self.root / 'schema.json').write_text(json.dumps(receipt))
+
+    def test_raw_proof_conflict_denies_both_publication_and_readback(self):
+        for key in ('completion_receipt_json', 'proof_sha256', 'challenge', 'container_id'):
+            with self.subTest(key=key), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / 'schema.json').write_bytes((self.root / 'schema.json').read_bytes())
+                invalid = copy.deepcopy(self.state)
+                invalid['observation']['startups'][1]['migration'][key] = 'f'*64
+                with self.assertRaises(ValueError): ACTION.finalize(root, invalid)
+                self.assertFalse((root / 'public/success.json').exists())
+        ACTION.finalize(self.root, self.state)
+        path = self.root / 'public/result.json'
+        raw = path.read_bytes()
+        for key in ('completion_receipt_json', 'proof_sha256', 'challenge', 'container_id'):
+            changed = json.loads(raw)
+            changed['observation']['startups'][1]['migration'][key] = 'f'*64
+            path.write_text(json.dumps(changed))
+            with patch.dict(os.environ, FINALIZE_OUTCOME='success'), self.assertRaises(ValueError):
+                ACTION.verify_public(self.root)
+        path.write_bytes(raw)
+        with patch.dict(os.environ, FINALIZE_OUTCOME='success'): ACTION.verify_public(self.root)
 
     def test_all_required_evidence_is_durable_before_public_success(self):
         calls = []
@@ -813,6 +844,28 @@ class MigrationEvidenceTest(unittest.TestCase):
         self.assertEqual(evidence['status'], 'success')
         self.assertEqual(evidence['reason'], 'candidate_completed_startup_migrations')
         self.assertTrue(evidence['proof_sha256'])
+        self.assertEqual(evidence['completion_receipt_json'], json.dumps(self.proof()))
+        self.assertEqual(evidence['challenge'], 'e'*64)
+
+    def test_persisted_migration_receipt_rejects_missing_tampered_and_replayed_bindings(self):
+        observation = dict(startups=[completed_startup_fixture({}, i) for i in (1, 2)])
+        ACTION.validate_persisted_migrations(observation)
+        for key, value in (('completion_receipt_json', '{}'), ('proof_sha256', 'f'*64),
+                           ('challenge', 'f'*64), ('container_id', 'f'*64), ('source_commit', 'f'*40)):
+            with self.subTest(key=key):
+                changed = copy.deepcopy(observation)
+                changed['startups'][1]['migration'][key] = value
+                with self.assertRaises(ValueError): ACTION.validate_persisted_migrations(changed)
+        for key in ('binary_sha256', 'hostname', 'pid'):
+            changed = copy.deepcopy(observation)
+            migration = changed['startups'][1]['migration']
+            raw = json.loads(migration['completion_receipt_json'])
+            raw[key] = True if key == 'pid' else 'f'*64
+            migration['completion_receipt_json'] = json.dumps(raw)
+            migration['proof_sha256'] = hashlib.sha256(json.dumps(raw).encode()).hexdigest()
+            with self.assertRaises(ValueError): ACTION.validate_persisted_migrations(changed)
+        observation['startups'][1] = copy.deepcopy(observation['startups'][0])
+        with self.assertRaises(ValueError): ACTION.validate_persisted_migrations(observation)
 
     def test_stale_wrong_binary_partial_failed_and_duplicate_proofs_are_unknown(self):
         for key, value in (('challenge', 'f'*64), ('hostname', 'c'*12), ('pid', True),

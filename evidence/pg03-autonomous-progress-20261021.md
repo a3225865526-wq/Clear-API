@@ -70,3 +70,10 @@ RC的真实pull/legacy双启动已成功，但未启用新challenge凭证，不�
 实际命令：WSL root python3 scripts/ci/test-pg03-successor-plan.py，62项全PASS/exit0；Windows python scripts/ci/test-pg03-successor-plan.py IsolatedActionsTest MigrationEvidenceTest SuccessorRequestTest，24项中22PASS/2 POSIX skip/exit0。新RC固定后发现4个旧夹具失败，按legacy source语义修复3处，不改旧日志/凭证拒绝合同，重跑上述受影响回归通过。三份Python AST及git diff --check exit0。successor CI改sudo运行，确保9项root kernel方法真实执行；不把替身IO视作生产操作或实际超时中断。
 
 独立driver_proof_review复核当前固定值/负向隔离与清理/finalize及回读/CI身份/legacy夹具，未发现阻断缺陷；未代跑容器/测试。successor_readiness_review复核kernel和完成reader通过；生产adapter、只读完整投影和连续全writer门禁仍NOT IMPLEMENTED，不能声称只剩部署审批。真实专用演练0次、修复重跑0/2。
+
+
+## 凭证持久化独立复核补强
+
+PR79/f51f6cf0d创建后，独立审查指出artifact只有proof摘要，无法独立重算其9字段。控制端现在只对已严格验证的成功凭证保留原始非秘密JSON、预期challenge及原SHA；抽出专用凭证校验函数，finalize和verify-public重验字段/hash/container/binary/source，并要求两次不同container/challenge。无效/失败/未知不保存可用成功凭证；不使用合成日志回读。无需重建RC，候选799a未改。
+
+实际增量验证：Windows MigrationEvidenceTest 14项PASS/exit0；Linux root集中63项PASS/exit0，随后新增producer/reader篡改拒绝后仅重跑EvidencePublicationTest 8项PASS/exit0。前63加新增1方法形成64项，完整64待PR正常CI观察；不将组合本地记录冒充已运行完整64。

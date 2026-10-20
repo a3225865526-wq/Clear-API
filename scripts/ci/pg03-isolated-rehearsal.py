@@ -227,6 +227,23 @@ def validate_negative_probe(value):
                  'actual negative migration probe incomplete')
 
 
+def validate_persisted_migrations(observation):
+    startups = observation.get('startups', [])
+    PLAN.require(type(startups) is list and len(startups) == 2, 'two durable migration receipts required')
+    challenges, containers = set(), set()
+    for startup in startups:
+        value = startup.get('migration', {})
+        raw, challenge, cid = value.get('completion_receipt_json'), value.get('challenge'), startup.get('container_id')
+        PLAN.require(value.get('status') == 'success' and value.get('source_commit') == SOURCE
+                     and value.get('container_id') == cid
+                     and type(raw) is str and value.get('proof_sha256') == hashlib.sha256(raw.encode()).hexdigest(),
+                     'durable migration receipt missing or conflicting')
+        PLAN.SCHEMA.validate_completion_proof(raw, cid, challenge, BINARY)
+        challenges.add(challenge)
+        containers.add(cid)
+    PLAN.require(len(challenges) == len(containers) == 2, 'fresh independent starts required')
+
+
 def sync_directory(path):
     # The execution target is Linux. Unsupported directory fsync must fail,
     # never silently downgrade the evidence persistence contract.
@@ -292,6 +309,7 @@ def verify_public(root):
                      and success_path.is_file() and not success_path.is_symlink(), 'incomplete success bundle')
         receipt = json.loads(success_path.read_text(encoding='utf-8'), object_pairs_hook=PLAN.unique)
         validate_negative_probe(result.get('negative_migration', {}))
+        validate_persisted_migrations(result['observation'])
         PLAN.SCHEMA.validate_receipt(receipt, dict(image_id=result['observation']['candidate']['image_id'],
             binary_sha256=BINARY, commit=SOURCE), BASELINE)
     else:
@@ -329,6 +347,7 @@ def finalize(root, state):
         try:
             validate_negative_probe(state.get('negative_migration', {}))
             observation = state['observation']
+            validate_persisted_migrations(observation)
             PLAN.require(observation.get('cleanup_complete') is True
                          and len(observation['startups']) == 2, 'incomplete startup evidence')
             for index, startup in enumerate(observation['startups'], start=1):
