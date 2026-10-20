@@ -22,7 +22,8 @@ wrapper explicitly forbids automatic PG03 rollback. The database is already at
 the candidate schema `3c1c77f3...`, whereas the old release used `578bc6f8...`.
 The proved isolated rollback restores the database as well as the old image;
 the image-only automatic rollback is not a supported recovery for this incident.
-Do not invoke it, restore data, or reopen Caddy under this recovery procedure.
+Do not invoke it or restore data under this procedure. Caddy can only be reopened
+by the separately authorized `restore` operation described below.
 
 ## Approved development scope and production boundary
 
@@ -68,8 +69,33 @@ recover another incident or change the expected financial baseline.
 The receipt states `postflight_recovered_ingress_isolated`; Provider acceptance
 remains deferred. It does not claim that the old workflow succeeded or clear its
 circuit. Ordinary deployment/restart/reconcile remain blocked by the existing
-controlled hold and original FAILED record. No automatic public-opening action
-is added.
+controlled hold and original FAILED record. Recovery itself never opens ingress.
+
+## Separately authorized website restoration
+
+The same workflow's `mode=restore`, confirmation `RESTORE_FAILED_WEBSITE`, is a
+separate owner dispatch with the same reviewed assets RC and recovery rehearsal.
+It requires the successful isolated recovery receipt and fresh full Runtime,
+Executor, accounting, backup and incident checks. It verifies the original Caddy
+container, exact pinned image, command, host network, read-only configuration
+mount and Caddyfile SHA256. It then exclusively publishes an opening attempt,
+restores the original restart policy and starts only that exact edge container.
+
+Fresh public HTTPS through Cloudflare must serve application pages and a healthy
+API status. This checks availability only: real user login, an authenticated
+admin browser session and Provider usage/billing remain untested. Success writes
+a separate website-restoration result. A normal failure or handled termination
+attempts both Caddy stop and `restart=no`, verifies isolation and publishes a
+failure result; unverifiable containment is recorded UNKNOWN. SIGKILL or host
+loss cannot be handled; the persistent attempt prevents automatic replay and
+requires a fresh inspection. The original FAILED and isolation journal bytes
+remain as historical evidence; the new result describes later ingress state.
+
+An owner-approved host reboot can be tested between isolated recovery and
+website restoration. Caddy remains stopped with `restart=no`; boot must recreate
+the directory before Docker, restart the same configured Gateway and reconcile
+its actual new identity. Restoration rechecks the post-reboot Runtime and all
+other gates. No real VPS reboot has been performed during development.
 
 ## Impact, fallback and evidence
 
@@ -80,7 +106,8 @@ append-only attempt/recovery records. Startup may run AutoMigrate, auth artifact
 cleanup, system task/instance updates, finance sync, completion/outbox processing
 and route ledger recovery. Existing same-image double-start evidence is reused;
 review counts and schema must match before and after. No manual financial write,
-image replacement, database restore or Caddy start is performed. Every failed
+image replacement or database restore is performed. The separate `restore`
+operation changes the original Caddy restart policy and process. Every failed
 prerequisite stops without publishing a success receipt; a Gateway started by
 this attempt is stopped on subsequent failure. The start-attempt latch prevents
 automatic replay even after interruption. The
@@ -89,11 +116,12 @@ be restored from the audited installation archive if installation or verificatio
 fails; doing so does not change services or financial data. A completed receipt
 must never be deleted or rewritten to conceal an outcome.
 
-Public service is still unavailable while the hold remains. Provider business
-acceptance and any customer-traffic release require the owner's subsequent
-decision and a separately reviewed opening operation. Restoring the old public
-service would need an explicitly approved database-and-image recovery procedure;
-this minimal postflight operation does not silently perform that larger change.
+Public service remains unavailable until separately authorized restoration
+succeeds. Provider business acceptance remains deferred to the owner. Final PG03
+candidate deployment still needs a new incident-successor contract: ordinary
+deployment rejects the retained FAILED predecessor and hold. Website restoration
+does not claim that the original deployment succeeded or clear the automatic
+release circuit. No database-and-image rollback is silently performed.
 
 Authentication references reviewed: [OWASP Authentication](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html),
 [Session Management](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)

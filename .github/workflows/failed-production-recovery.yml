@@ -7,7 +7,7 @@ on:
       mode:
         type: choice
         required: true
-        options: [rehearse, recover]
+        options: [rehearse, recover, restore]
       assets_rc_run:
         description: Successful reviewed-main RC for recovery assets
         type: string
@@ -17,7 +17,7 @@ on:
         type: string
         required: false
       confirmation:
-        description: REHEARSE_FAILED_RECOVERY or RECOVER_FAILED_CONTROLLED
+        description: REHEARSE_FAILED_RECOVERY, RECOVER_FAILED_CONTROLLED, or RESTORE_FAILED_WEBSITE
         type: string
         required: true
 
@@ -51,7 +51,7 @@ jobs:
           test "$GITHUB_REPOSITORY" = a3225865526-wq/Clear-API
           test "$GITHUB_REF" = refs/heads/main
           case "$RECOVERY_MODE:$CONFIRMATION" in
-            rehearse:REHEARSE_FAILED_RECOVERY|recover:RECOVER_FAILED_CONTROLLED) ;;
+            rehearse:REHEARSE_FAILED_RECOVERY|recover:RECOVER_FAILED_CONTROLLED|restore:RESTORE_FAILED_WEBSITE) ;;
             *) exit 1 ;;
           esac
           python3 - <<'PY' | python3 scripts/pg03-failed-recovery.py authorize
@@ -94,8 +94,8 @@ jobs:
           if-no-files-found: error
 
   recover:
-    name: Recover failed controlled postflight
-    if: inputs.mode == 'recover'
+    name: Recover incident or restore verified website
+    if: inputs.mode == 'recover' || inputs.mode == 'restore'
     needs: authorize
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -140,13 +140,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ASSETS_RC: ${{ inputs.assets_rc_run }}
           RECOVERY_REHEARSAL: ${{ inputs.rehearsal_run }}
+          RECOVERY_MODE: ${{ inputs.mode }}
         run: |
           set -euo pipefail
           python3 - <<'PY' | ssh clearapi-recovery 'sudo /opt/clearapi/bin/production-deploy-v2.sh --pool-mode pg03 --recover-failed-controlled'
           import json, os
           print(json.dumps(dict(token=os.environ['GH_TOKEN'], run=os.environ['GITHUB_RUN_ID'],
               commit=os.environ['GITHUB_SHA'], rc_run=os.environ['ASSETS_RC'],
-              rehearsal_run=os.environ['RECOVERY_REHEARSAL'], mode='recover')))
+              rehearsal_run=os.environ['RECOVERY_REHEARSAL'], mode=os.environ['RECOVERY_MODE'])))
           PY
       - name: Remove job SSH material
         if: always()

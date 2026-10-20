@@ -9,8 +9,11 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import subprocess
 import sys
+import time
+import urllib.request
 import zipfile
 
 sys.dont_write_bytecode = True
@@ -52,7 +55,7 @@ def require(value, message):
 def authority(data, get, download, executing=False):
     """Fresh owner authority is separate from the failed deployment's authority."""
     require(set(data) == {'run', 'commit', 'rc_run', 'rehearsal_run', 'mode'}, 'unexpected recovery input')
-    require(data['mode'] in ('rehearse', 'recover'), 'invalid recovery mode')
+    require(data['mode'] in ('rehearse', 'recover', 'restore'), 'invalid recovery mode')
     require(re.fullmatch(r'[a-f0-9]{40}', data['commit']), 'invalid assets commit')
     require(all(re.fullmatch(r'[1-9][0-9]*', str(data[k])) for k in ('run', 'rc_run')), 'invalid recovery run')
     run = get('actions/runs/' + str(data['run']))
@@ -80,7 +83,7 @@ def authority(data, get, download, executing=False):
     rc_data['digest'] = candidate['image_digest']
     manifest, _ = CONTROL.release_manifest(rc_data, rc, artifacts, lambda ident: raw if ident == matches[0]['id'] else download(ident))
     require(manifest['v2_wrapper_sha256'] == CONTROL.V2_SHA, 'recovery assets RC wrapper mismatch')
-    if data['mode'] == 'recover':
+    if data['mode'] in ('recover', 'restore'):
         require(re.fullmatch(r'[1-9][0-9]*', str(data['rehearsal_run'])), 'recovery rehearsal required')
         rehearsal = get('actions/runs/' + str(data['rehearsal_run']))
         require(rehearsal['path'] == WORKFLOW and rehearsal['head_sha'] == data['commit']
@@ -99,7 +102,7 @@ def authority(data, get, download, executing=False):
     else:
         require(not data['rehearsal_run'], 'unexpected rehearsal reference')
     if executing:
-        require(data['mode'] == 'recover', 'rehearsal cannot mutate production')
+        require(data['mode'] in ('recover', 'restore'), 'rehearsal cannot mutate production')
         jobs = get(f"actions/runs/{data['run']}/attempts/1/jobs?per_page=100")['jobs']
         jobs = [j for j in jobs if j['name'] == 'Authenticate failed recovery']
         require(len(jobs) == 1 and jobs[0]['conclusion'] == 'success', 'recovery authorization job missing')
@@ -119,8 +122,13 @@ class Recovery:
         require(result.returncode == 0, 'recovery postflight command failed; retain isolation and FAILED evidence')
         return result.stdout.strip()
 
-    def snapshot(self, allow_stopped=False):
-        require(not self.receipt.exists() and not self.receipt.is_symlink(), 'recovery already recorded; do not replay')
+    def snapshot(self, allow_stopped=False, restore=False, ingress_open=False):
+        require(not ingress_open or restore, 'open ingress is only checked by restoration')
+        if restore:
+            require(not allow_stopped, 'restoration requires a running Gateway')
+            LIFECYCLE.read_file(self.receipt)
+        else:
+            require(not self.receipt.exists() and not self.receipt.is_symlink(), 'recovery already recorded; do not replay')
         for name, expected in FROZEN.items():
             require(hashlib.sha256(LIFECYCLE.read_file(self.app / name, private=False)).hexdigest() == expected,
                     'failed incident evidence changed')
@@ -128,7 +136,8 @@ class Recovery:
         require(current['status'] == 'failed' and current['deployment_attempt']['status'] == 'failed'
                 and current['candidate_commit'] == COMMIT and current['image_digest'] == DIGEST, 'not the failed incident')
         hold = TRAFFIC.TrafficHold(self.app, self.command)
-        hold.verify(hold.binding(FAILED_RUN, DIGEST, COMMIT))
+        if not ingress_open:
+            hold.verify(hold.binding(FAILED_RUN, DIGEST, COMMIT))
         self.gateway(allow_stopped)
         executor = CONTROL.executor_identity(lambda *args: self.command(['docker', *args]))
         require(executor['container_id'] == EXECUTOR, 'Executor changed')
@@ -222,6 +231,157 @@ ROLLBACK;"""
         return receipt
 
 
+class WebsiteRestoration:
+    """One-use opening of the original edge after the exact isolated recovery."""
+    CADDY_ID = '54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf'
+    CADDY_IMAGE = 'sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772'
+    CONFIG = Path('/opt/clearapi/edge/Caddyfile')
+    CONFIG_SHA = '6b1246669fbab3287a5c9e99f041cbcff0c44ebbcedb9c0a751310f7b1b05969'
+
+    def __init__(self, recovery=None, get=None):
+        self.recovery = recovery or Recovery()
+        self.command = self.recovery.command
+        self.get = get
+        self.attempt = self.recovery.app / ('website-restoration-attempt-' + FAILED_RUN + '.json')
+        self.result = self.recovery.app / ('website-restoration-result-' + FAILED_RUN + '.json')
+        self.failure_result = self.recovery.app / ('website-restoration-failure-' + FAILED_RUN + '.json')
+
+    def edge(self, running):
+        # Do not retrieve the container environment or raw Caddy configuration.
+        projection = ('{"Id":{{json .Id}},"Image":{{json .Image}},'
+                      '"Ref":{{json .Config.Image}},"Entrypoint":{{json .Config.Entrypoint}},'
+                      '"Cmd":{{json .Config.Cmd}},"Running":{{json .State.Running}},'
+                      '"Paused":{{json .State.Paused}},"Restarting":{{json .State.Restarting}},'
+                      '"RestartPolicy":{{json .HostConfig.RestartPolicy}},'
+                      '"NetworkMode":{{json .HostConfig.NetworkMode}},"Mounts":{{json .Mounts}}}')
+        edge = json.loads(self.command(['docker', 'inspect', '--format', projection, 'clearapi-edge-caddy']))
+        require(edge['Id'] == self.CADDY_ID and edge['Image'] == self.CADDY_IMAGE
+                and edge['Ref'] == 'caddy@' + self.CADDY_IMAGE and edge['Entrypoint'] is None
+                and edge['Cmd'] == ['caddy', 'run', '--config', '/etc/caddy/Caddyfile', '--adapter', 'caddyfile']
+                and edge['Running'] is running and not edge['Paused'] and not edge['Restarting']
+                and edge['NetworkMode'] == 'host'
+                and edge['RestartPolicy'] == {'Name': 'unless-stopped' if running else 'no', 'MaximumRetryCount': 0},
+                'original Caddy identity, process or network changed')
+        mounts = [m for m in edge['Mounts'] if m.get('Destination') == '/etc/caddy/Caddyfile']
+        require(len(mounts) == 1 and mounts[0].get('Type') == 'bind'
+                and mounts[0].get('Source') == str(self.CONFIG) and mounts[0].get('RW') is False,
+                'Caddy configuration mount changed')
+        require(hashlib.sha256(LIFECYCLE.read_file(self.CONFIG, private=False)).hexdigest() == self.CONFIG_SHA,
+                'frozen Caddy configuration changed')
+        state = LIFECYCLE.read_json(self.recovery.app / 'controlled-launch-state.json')
+        require(state['edge']['id'] == self.CADDY_ID and state['edge']['image'] == self.CADDY_IMAGE,
+                'Caddy differs from original isolation journal')
+        return {'container_id': edge['Id'], 'image_id': edge['Image'], 'config_sha256': self.CONFIG_SHA}
+
+    def public_health(self, run):
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), CONTROL.NoRedirect())
+        pages = {}
+        deadline = time.monotonic() + 30
+        for path in ('/api/status', '/', '/login', '/dashboard/overview'):
+            request = urllib.request.Request('https://www.clear999.com' + path + '?clearapi_restore=' + str(run),
+                                             headers={'Cache-Control': 'no-store'})
+            while True:
+                try:
+                    response = opener.open(request, timeout=min(5, max(0.1, deadline - time.monotonic())))
+                    break
+                except OSError:
+                    require(time.monotonic() < deadline, 'public HTTPS startup deadline exceeded')
+                    time.sleep(min(1, max(0, deadline - time.monotonic())))
+            with response:
+                require(response.status == 200 and response.headers.get('CF-Ray'), 'public HTTPS unavailable')
+                body = response.read(262145)
+                require(len(body) <= 262144, 'oversized public response')
+                if path == '/api/status':
+                    require(json.loads(body, object_pairs_hook=CONTROL.unique).get('success') is True,
+                            'public status is not healthy')
+                else:
+                    require('text/html' in response.headers.get('Content-Type', '').lower()
+                            and b'<html' in body.lower() and b'<script' in body.lower()
+                            and any(marker in body for marker in (b'id="root"', b"id='root'", b'id=root')),
+                            'application page unavailable')
+                pages[path] = 'status_https_200_via_cloudflare' if path == '/api/status' else 'application_shell_https_200_via_cloudflare'
+        return {'pages': pages, 'user_login': 'not_tested', 'admin_session': 'not_tested',
+                'provider_acceptance': 'deferred_to_owner_after_deployment'}
+
+    def restore(self, authorization):
+        require(not any(p.exists() or p.is_symlink() for p in (self.attempt, self.result, self.failure_result)),
+                'website opening already attempted; operator review required')
+        raw = LIFECYCLE.read_file(self.recovery.receipt)
+        receipt = json.loads(raw, object_pairs_hook=CONTROL.unique)
+        prior = receipt.get('authorization', {})
+        require(receipt.get('schema') == 'clearapi.failed-controlled-recovery/v1'
+                and receipt.get('status') == 'postflight_recovered_ingress_isolated'
+                and receipt.get('original_deployment_status') == 'failed' and receipt.get('public_traffic') == 'blocked'
+                and receipt.get('circuit_cleared') is False and receipt.get('images_replaced') is False
+                and receipt.get('database_restored') is False
+                and all(prior.get(k) == authorization.get(k) for k in
+                        ('assets_commit', 'assets_rc_run', 'rehearsal_run', 'failed_run'))
+                and prior.get('failed_run') == FAILED_RUN
+                and re.fullmatch(r'[1-9][0-9]*', str(prior.get('recovery_run', '')))
+                and prior['recovery_run'] != authorization.get('recovery_run'),
+                'successful same-assets isolated recovery required')
+        require(self.get is not None, 'fresh recovery workflow verification required')
+        run = self.get('actions/runs/' + str(prior['recovery_run']))
+        require(run['path'] == WORKFLOW and run['head_sha'] == authorization['assets_commit']
+                and run['head_branch'] == 'main' and run['event'] == 'workflow_dispatch'
+                and run['run_attempt'] == 1 and run['status'] == 'completed' and run['conclusion'] == 'success'
+                and run['repository']['full_name'] == CONTROL.REPO
+                and run['head_repository']['full_name'] == CONTROL.REPO, 'recovery workflow not successful')
+        CONTROL.autonomous_authority({'run': prior['recovery_run']}, self.get)
+        jobs = self.get('actions/runs/' + str(prior['recovery_run']) + '/attempts/1/jobs?per_page=100')['jobs']
+        jobs = [j for j in jobs if j['name'] == 'Recover incident or restore verified website']
+        require(len(jobs) == 1 and jobs[0]['status'] == 'completed' and jobs[0]['conclusion'] == 'success',
+                'successful recovery phase job required')
+        before = self.recovery.snapshot(restore=True)
+        require(receipt.get('incident') == before, 'recovery receipt does not identify current incident')
+        self.command(['/usr/bin/python3', '-I', '/opt/clearapi/bin/runtime-boot-recovery.py', 'check-installed'])
+        self.command(['/opt/clearapi/bin/production-deploy-v2.sh', '--verify-failed-controlled', '--pool-mode', 'pg03',
+                      '--workflow-run', FAILED_RUN, '--digest', DIGEST, '--commit', COMMIT])
+        require(self.recovery.snapshot(restore=True) == before, 'incident changed before opening')
+        expected_edge = self.edge(False)
+        base = dict(schema='clearapi.website-restoration/v1', authorization=authorization,
+                    recovery_receipt_sha256=hashlib.sha256(raw).hexdigest(), incident=before,
+                    edge=expected_edge, original_deployment_status='failed', circuit_cleared=False,
+                    provider_acceptance='deferred_to_owner_after_deployment')
+        LIFECYCLE.publish(self.attempt, dict(base, stage='opening', recorded_at=datetime.now(timezone.utc).isoformat()))
+        try:
+            self.command(['docker', 'update', '--restart=unless-stopped', self.CADDY_ID])
+            self.command(['docker', 'start', self.CADDY_ID])
+            require(self.edge(True) == expected_edge, 'Caddy changed during opening')
+            health = self.public_health(authorization['recovery_run'])
+            require(self.recovery.snapshot(restore=True, ingress_open=True) == before, 'incident changed after opening')
+            require(LIFECYCLE.read_file(self.recovery.receipt) == raw, 'isolated recovery record changed')
+            require(self.edge(True) == expected_edge, 'Caddy changed during verification')
+            result = dict(base, status='website_restored', public_traffic='open', health=health,
+                          recorded_at=datetime.now(timezone.utc).isoformat())
+            LIFECYCLE.publish(self.result, result)
+            return result
+        except BaseException:
+            # Both containment commands must be attempted even if one fails.
+            contained = True
+            for args in (['docker', 'stop', '--time', '150', self.CADDY_ID],
+                         ['docker', 'update', '--restart=no', self.CADDY_ID]):
+                try:
+                    self.command(args)
+                except Exception:
+                    contained = False
+            try:
+                hold = TRAFFIC.TrafficHold(self.recovery.app, self.command)
+                hold.verify(hold.binding(FAILED_RUN, DIGEST, COMMIT))
+                self.edge(False)
+            except Exception:
+                contained = False
+            if not self.failure_result.exists() and not self.failure_result.is_symlink():
+                LIFECYCLE.publish(self.failure_result, dict(base, status='website_restoration_failed',
+                    public_traffic='blocked' if contained else 'UNKNOWN', containment_verified=contained,
+                    recorded_at=datetime.now(timezone.utc).isoformat()))
+            raise
+
+
+def restoration_interrupted(signum, frame):
+    raise InterruptedError('website restoration interrupted')
+
+
 def main():
     require(sys.argv[1:] in (['authorize'], ['recover']), 'invalid recovery entry point')
     data = json.loads(sys.stdin.buffer.read(32769), object_pairs_hook=CONTROL.unique)
@@ -238,9 +398,18 @@ def main():
         blob = get('contents/scripts/' + name + '?ref=' + data['commit'])
         require(blob['encoding'] == 'base64' and base64.b64decode(blob['content']) ==
                 LIFECYCLE.read_file(Path(__file__).with_name(name), private=False), 'installed recovery asset mismatch')
+    if data['mode'] == 'restore':
+        for signum in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
+            signal.signal(signum, restoration_interrupted)
     with CONTROL.deployment_lock():
-        Recovery().complete(authorization)
-    print('FAILED evidence retained; controlled postflight recovered; public ingress remains blocked; circuit unchanged')
+        if data['mode'] == 'restore':
+            WebsiteRestoration(get=get).restore(authorization)
+        else:
+            Recovery().complete(authorization)
+    if data['mode'] == 'restore':
+        print('Website HTTPS and application pages verified; real login and Provider acceptance remain untested; FAILED and circuit unchanged')
+    else:
+        print('FAILED evidence retained; controlled postflight recovered; public ingress remains blocked; circuit unchanged')
 
 
 if __name__ == '__main__':

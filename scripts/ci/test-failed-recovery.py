@@ -15,7 +15,7 @@ import tempfile
 import threading
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 import zipfile
 
 
@@ -275,6 +275,195 @@ class RecoveryReceiptTest(unittest.TestCase):
         self.assertFalse(self.recovery.receipt.exists())
 
 
+class WebsiteRestorationTest(unittest.TestCase):
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.app = Path(temp.name)
+        self.calls = []
+        self.running, self.policy = False, 'no'
+        self.failure = None
+        self.recovery = RECOVERY.Recovery(self.app, self.command)
+        self.github = MagicMock()
+        self.restore = RECOVERY.WebsiteRestoration(self.recovery, self.github)
+        self.binding = dict(failed_manifest_sha256='f' * 64, gateway=RECOVERY.GATEWAY,
+                            executor=RECOVERY.EXECUTOR, target_sha256='a' * 64)
+        self.authorization = dict(assets_commit='b' * 40, assets_rc_run='456', rehearsal_run='789',
+                                  failed_run=RECOVERY.FAILED_RUN, recovery_run='124')
+        self.github.side_effect = lambda path: ({'jobs': [dict(name='Recover incident or restore verified website',
+            status='completed', conclusion='success')]} if '/jobs?' in path else dict(
+                path=RECOVERY.WORKFLOW, head_sha=self.authorization['assets_commit'], head_branch='main',
+                event='workflow_dispatch', run_attempt=1, status='completed', conclusion='success',
+                repository={'full_name': RECOVERY.CONTROL.REPO}, head_repository={'full_name': RECOVERY.CONTROL.REPO}))
+        self.prior = dict(schema='clearapi.failed-controlled-recovery/v1',
+                          status='postflight_recovered_ingress_isolated',
+                          authorization=dict(self.authorization, recovery_run='123'), incident=self.binding,
+                          original_deployment_status='failed', public_traffic='blocked',
+                          circuit_cleared=False, images_replaced=False, database_restored=False)
+        RECOVERY.LIFECYCLE.publish(self.recovery.receipt, self.prior)
+        self.config = self.app / 'Caddyfile'
+        self.config.write_text('synthetic frozen configuration\n')
+        self.restore.CONFIG = self.config
+        self.restore.CONFIG_SHA = hashlib.sha256(self.config.read_bytes()).hexdigest()
+        self.edge = dict(Id=self.restore.CADDY_ID, Image=self.restore.CADDY_IMAGE,
+                         Ref='caddy@' + self.restore.CADDY_IMAGE, Entrypoint=None,
+                         Cmd=['caddy', 'run', '--config', '/etc/caddy/Caddyfile', '--adapter', 'caddyfile'],
+                         Running=False, Paused=False, Restarting=False, NetworkMode='host',
+                         RestartPolicy=dict(Name='no', MaximumRetryCount=0),
+                         Mounts=[dict(Destination='/etc/caddy/Caddyfile', Source=str(self.config), Type='bind', RW=False)])
+        RECOVERY.LIFECYCLE.publish(self.app / 'controlled-launch-state.json',
+            {'edge': {'id': self.restore.CADDY_ID, 'image': self.restore.CADDY_IMAGE}, 'stage': 'isolated'})
+        (self.app / 'release-manifest.json').write_text('{"status":"failed"}\n')
+        self.original = {p: p.read_bytes() for p in (self.recovery.receipt,
+                         self.app / 'controlled-launch-state.json', self.app / 'release-manifest.json')}
+        self.addCleanup(patch.stopall)
+        self.snapshot = patch.object(self.recovery, 'snapshot', return_value=self.binding).start()
+        self.health = patch.object(self.restore, 'public_health', return_value={
+            'user_login': 'not_tested', 'admin_session': 'not_tested'}).start()
+        self.hold = patch.object(RECOVERY.TRAFFIC, 'TrafficHold').start()
+        patch.object(RECOVERY.CONTROL, 'autonomous_authority').start()
+
+    def command(self, args):
+        self.calls.append(args)
+        if args[:2] == ['docker', 'inspect']:
+            value = copy.deepcopy(self.edge)
+            value['Running'] = self.running
+            value['RestartPolicy']['Name'] = self.policy
+            return json.dumps(value)
+        if args[:2] in (['docker', 'update'], ['docker', 'start']):
+            self.assertTrue(self.restore.attempt.exists(), 'write opening latch before all edge mutations')
+        if args[:2] == ['docker', 'update']:
+            self.policy = args[2].split('=', 1)[1]
+        if args[:2] == ['docker', 'start']:
+            self.running = True
+        if self.failure and self.failure in args:
+            raise RECOVERY.CONTROL.ReleaseBlocked('synthetic command failure')
+        if args[:2] == ['docker', 'stop']:
+            self.running = False
+        return ''
+
+    def assert_preserved(self):
+        for path, raw in self.original.items():
+            self.assertEqual(path.read_bytes(), raw)
+
+    def test_success_consumes_same_assets_receipt_preserves_failed_and_records_honest_page_checks(self):
+        result = self.restore.restore(self.authorization)
+        self.assertEqual(result['status'], 'website_restored')
+        self.assertEqual(result['public_traffic'], 'open')
+        self.assertFalse(result['circuit_cleared'])
+        self.assertEqual(result['health']['user_login'], 'not_tested')
+        self.assertEqual(self.policy, 'unless-stopped')
+        self.assertTrue(self.running)
+        self.snapshot.assert_any_call(restore=True)
+        self.snapshot.assert_called_with(restore=True, ingress_open=True)
+        self.assertLess(next(i for i, c in enumerate(self.calls) if '--verify-failed-controlled' in c),
+                        next(i for i, c in enumerate(self.calls) if c[:2] == ['docker', 'update']))
+        self.assertEqual(self.restore.result.stat().st_mode & 0o777, 0o600)
+        self.assert_preserved()
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'already attempted'):
+            self.restore.restore(self.authorization)
+
+    def test_wrong_assets_or_receipt_status_never_mutates_edge(self):
+        for changed in (dict(status='failed'), dict(circuit_cleared=True),
+                        dict(authorization=dict(self.authorization, assets_commit='c' * 40, recovery_run='123'))):
+            with self.subTest(changed=changed):
+                self.recovery.receipt.write_text(json.dumps(dict(self.prior, **changed)))
+                self.recovery.receipt.chmod(0o600)
+                with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'same-assets'):
+                    self.restore.restore(self.authorization)
+                self.assertEqual(self.calls, [])
+                self.assertFalse(self.restore.attempt.exists())
+
+    def test_preflight_or_config_drift_blocks_before_opening_latch(self):
+        self.failure = '--verify-failed-controlled'
+        with self.assertRaises(RECOVERY.CONTROL.ReleaseBlocked):
+            self.restore.restore(self.authorization)
+        self.assertFalse(self.restore.attempt.exists())
+        self.failure = None
+        self.config.write_text('changed')
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'configuration changed'):
+            self.restore.restore(self.authorization)
+        self.assertFalse(any(c[:2] == ['docker', 'start'] for c in self.calls))
+        self.assertFalse(self.restore.attempt.exists())
+        self.assert_preserved()
+
+    def test_start_failure_stops_edge_disables_restart_and_records_failure_without_replay(self):
+        self.failure = 'start'
+        with self.assertRaises(RECOVERY.CONTROL.ReleaseBlocked):
+            self.restore.restore(self.authorization)
+        self.assertFalse(self.running)
+        self.assertEqual(self.policy, 'no')
+        result = json.loads(self.restore.failure_result.read_text())
+        self.assertEqual(result['status'], 'website_restoration_failed')
+        self.assertTrue(result['containment_verified'])
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'already attempted'):
+            self.restore.restore(self.authorization)
+        self.assert_preserved()
+
+    def test_public_or_postflight_failure_and_interrupt_return_edge_to_isolation(self):
+        self.health.side_effect = InterruptedError('synthetic signal')
+        with self.assertRaises(InterruptedError):
+            self.restore.restore(self.authorization)
+        self.assertFalse(self.running)
+        self.assertEqual(self.policy, 'no')
+        self.assertEqual(json.loads(self.restore.failure_result.read_text())['public_traffic'], 'blocked')
+        self.assert_preserved()
+
+    def test_failed_containment_is_unknown_and_never_claims_website_restored(self):
+        self.health.side_effect = ValueError('synthetic public failure')
+        self.failure = 'stop'
+        with self.assertRaises(ValueError):
+            self.restore.restore(self.authorization)
+        result = json.loads(self.restore.failure_result.read_text())
+        self.assertEqual(result['status'], 'website_restoration_failed')
+        self.assertEqual(result['public_traffic'], 'UNKNOWN')
+        self.assertFalse(result['containment_verified'])
+        self.assertEqual(self.policy, 'no', 'restart disabling must still run if stop failed')
+        self.assert_preserved()
+
+    def test_public_checks_require_valid_status_cf_and_application_html_without_claiming_login(self):
+        opener = MagicMock()
+        response = opener.open.return_value
+        response.__enter__.return_value = response
+        response.status = 200
+        response.headers = {'CF-Ray': 'synthetic', 'Content-Type': 'text/html'}
+        response.read.side_effect = [b'{"success":true}'] + [b'<html><div id="root"></div><script src="/static/app.js"></script></html>'] * 3
+        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener):
+            result = RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
+        self.assertEqual(result['user_login'], 'not_tested')
+        self.assertEqual(result['admin_session'], 'not_tested')
+        self.assertEqual(len(result['pages']), 4)
+        self.assertTrue(all(c.args[0].full_url.startswith('https://www.clear999.com/') for c in opener.open.call_args_list))
+        response.read.side_effect = None
+        response.read.return_value = b'{"success":false}'
+        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'not healthy'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
+
+    def test_missing_cf_or_generic_html_cannot_claim_application_available(self):
+        opener = MagicMock()
+        response = opener.open.return_value
+        response.status = 200
+        response.headers = {'Content-Type': 'text/html'}
+        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'HTTPS unavailable'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
+        response.headers['CF-Ray'] = 'synthetic'
+        response.read.side_effect = [b'{"success":true}', b'<html><script>challenge()</script></html>']
+        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'page unavailable'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
+
+    def test_public_transport_startup_retry_stops_at_deadline(self):
+        opener = MagicMock()
+        opener.open.side_effect = OSError('synthetic unavailable edge')
+        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
+                patch.object(RECOVERY.time, 'monotonic', side_effect=[0, 0, 31]), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'deadline exceeded'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
+        self.assertEqual(opener.open.call_count, 1)
+
+
 class FailedManifestParserTest(unittest.TestCase):
     def test_failed_manifest_is_only_accepted_in_explicit_readonly_mode(self):
         with tempfile.TemporaryDirectory() as name:
@@ -408,6 +597,23 @@ class RecoveryAuthorityTest(unittest.TestCase):
         source = (SCRIPTS / 'production-deploy-v2.sh').read_text()
         self.assertIn('FAILED_RECOVERY_TOOL_SHA=' + hashlib.sha256((SCRIPTS / 'pg03-failed-recovery.py').read_bytes()).hexdigest(), source)
         self.assertEqual(hashlib.sha256((SCRIPTS / 'production-deploy-v2.sh').read_bytes()).hexdigest(), RECOVERY.CONTROL.V2_SHA)
+
+    def test_restore_requires_same_source_rehearsal_and_successful_authorizer(self):
+        self.data.update(mode='restore', rehearsal_run='789')
+        rehearsal = dict(self.responses['actions/runs/123'], id=789, status='completed', conclusion='success')
+        self.responses['actions/runs/789'] = rehearsal
+        self.responses['actions/runs/789/artifacts?per_page=100'] = {'artifacts': [dict(id=11, name='failed-recovery-rehearsal', expired=False)]}
+        self.responses['actions/runs/123/attempts/1/jobs?per_page=100'] = {'jobs': [dict(name='Authenticate failed recovery', conclusion='success')]}
+        self.archives[11] = archive({'recovery-rehearsal.json': dict(schema='clearapi.failed-recovery-rehearsal/v1',
+            source=self.source, rc_run='456', failed_run=RECOVERY.FAILED_RUN, tests='passed', v2_sha256=RECOVERY.CONTROL.V2_SHA)})
+        self.assertEqual(self.authorize(executing=True)['assets_commit'], self.source)
+        self.responses['actions/runs/789']['head_sha'] = 'b' * 40
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'not successful'):
+            self.authorize(executing=True)
+        self.responses['actions/runs/789']['head_sha'] = self.source
+        self.responses['actions/runs/123/attempts/1/jobs?per_page=100']['jobs'][0]['conclusion'] = 'failure'
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'authorization job missing'):
+            self.authorize(executing=True)
 
 
 if __name__ == '__main__':
