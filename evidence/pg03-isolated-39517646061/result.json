@@ -1,0 +1,172 @@
+{
+  "schema": "clearapi.isolated-actions-rehearsal/v1",
+  "nonce": "f3e7019359054ef0a6beaec48168dc2c",
+  "control_commit": "f02528c351d4812336980fd56810658a6339b05c",
+  "workflow_ref": "a3225865526-wq/Clear-API/.github/workflows/pg03-isolated-rehearsal.yml@refs/heads/main",
+  "run_id": "39517646061",
+  "run_attempt": "1",
+  "candidate_source": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "candidate_image": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "rc_run": "39511197302",
+  "rc_attempt": 1,
+  "artifact_id": "12305532882",
+  "archive_sha256": "b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7",
+  "baseline_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+  "production_observation_verified": false,
+  "production_acceptance": "not_run",
+  "rehearsal": "passed",
+  "control_sha256": {
+    "scripts/ci/pg03-isolated-rehearsal.py": "07d7d7f1c9352d09133db3093f3cbe68a51fd370989c442b7f8c48c3caa96b11",
+    "scripts/pg03-successor-plan.py": "6b9c1a1570debd337b08dc018031f9650ccd1af833468e402c10118945e56ea7",
+    "scripts/pg03-schema-rehearsal.py": "f0ebce2eb787f35079543879fa1394ccd8bcdd8e1688b3779b60dc01b3a25ac5",
+    "scripts/ci/assemble-release-proof.py": "d19b5079bc89eb64866cdab43548a56453f7a810db46e8d12c5a180c5f7d3628",
+    "scripts/ci/test-pg03-successor-plan.py": "1fab0e96f5af2eb29988279e490583dcb12427856dd7e22fed2f9e576595faf6",
+    ".github/workflows/pg03-isolated-rehearsal.yml": "bf70bd5cd86dd48d47e7425549f6038c594ea1814b92b342f47536076ca8533d"
+  },
+  "steps": {
+    "prepare": "passed",
+    "baseline": "passed",
+    "pull": "passed",
+    "rehearse": "passed",
+    "finalize": "passed"
+  },
+  "baseline_verified": true,
+  "image_store": "containerd",
+  "images_pulled": true,
+  "auth_removed": true,
+  "observation": {
+    "startups": [
+      {
+        "pass_number": 1,
+        "before_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+        "create_exit_code": 0,
+        "start_exit_code": 0,
+        "healthy": true,
+        "stop_exit_code": 0,
+        "after_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+        "process": {
+          "Status": "exited",
+          "Running": false,
+          "ExitCode": 0,
+          "OOMKilled": false,
+          "error_present": false
+        },
+        "container_id": "d2ce9d509d41c45279a3799bbbbb3c82f68fb81ce8f1a0069f173f2073c430f6",
+        "configured_hostname": "65537a0e89b7",
+        "hostname": "65537a0e89b7",
+        "migration": {
+          "schema": "clearapi.migration-observation/v1",
+          "container_id": "d2ce9d509d41c45279a3799bbbbb3c82f68fb81ce8f1a0069f173f2073c430f6",
+          "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+          "status": "success",
+          "reason": "candidate_completed_startup_migrations",
+          "capture_complete": false,
+          "error_kinds": [],
+          "parsed_records": 14,
+          "log_sha256": "d5f3ca1d4a7cff9a16bdb75b2fa72030268c556e85c41369354d13b22a1bce3d",
+          "proof_sha256": "e0e510d1b0cf8380331c2ff88b9d44c9b9dcbc8194e199b0108d0082641a3478",
+          "completion_receipt_json": "{\"binary_sha256\":\"37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5\",\"challenge\":\"3ae95ac65156424f84f5413db25ee10c8cf77d1054434635bffa4ad45c5afdd2\",\"hostname\":\"65537a0e89b7\",\"log_database\":\"postgres\",\"main_database\":\"postgres\",\"phases\":[\"main_database\",\"retired_options\",\"log_database\"],\"pid\":1,\"schema\":\"clearapi.startup-migration-proof/v1\",\"status\":\"success\"}",
+          "challenge": "3ae95ac65156424f84f5413db25ee10c8cf77d1054434635bffa4ad45c5afdd2"
+        }
+      },
+      {
+        "pass_number": 2,
+        "before_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+        "create_exit_code": 0,
+        "start_exit_code": 0,
+        "healthy": true,
+        "stop_exit_code": 0,
+        "after_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+        "process": {
+          "Status": "exited",
+          "Running": false,
+          "ExitCode": 0,
+          "OOMKilled": false,
+          "error_present": false
+        },
+        "container_id": "0c355bbcdf151b037ce7dbe3148be6d1272862b21a80cddae04f74656e3b6a96",
+        "configured_hostname": "65537a0e89b7",
+        "hostname": "65537a0e89b7",
+        "migration": {
+          "schema": "clearapi.migration-observation/v1",
+          "container_id": "0c355bbcdf151b037ce7dbe3148be6d1272862b21a80cddae04f74656e3b6a96",
+          "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+          "status": "success",
+          "reason": "candidate_completed_startup_migrations",
+          "capture_complete": false,
+          "error_kinds": [],
+          "parsed_records": 14,
+          "log_sha256": "7196fec789c1250d7d3fa4e90597bdcf4c2643baffdd7c31559e723e79bdba5a",
+          "proof_sha256": "88ef48c257a9c21189e568e9ec743d80c3baa86db81cbe7b0c21206f9d3951d0",
+          "completion_receipt_json": "{\"binary_sha256\":\"37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5\",\"challenge\":\"f5fb589d67bc433892ce9cf58c1a30c7f6923dd49e4644439bc45d6eb9e1eda5\",\"hostname\":\"65537a0e89b7\",\"log_database\":\"postgres\",\"main_database\":\"postgres\",\"phases\":[\"main_database\",\"retired_options\",\"log_database\"],\"pid\":1,\"schema\":\"clearapi.startup-migration-proof/v1\",\"status\":\"success\"}",
+          "challenge": "f5fb589d67bc433892ce9cf58c1a30c7f6923dd49e4644439bc45d6eb9e1eda5"
+        }
+      }
+    ],
+    "cleanup": [
+      {
+        "container_id": "0c355bbcdf151b037ce7dbe3148be6d1272862b21a80cddae04f74656e3b6a96",
+        "removed": true
+      },
+      {
+        "container_id": "d2ce9d509d41c45279a3799bbbbb3c82f68fb81ce8f1a0069f173f2073c430f6",
+        "removed": true
+      },
+      {
+        "container_id": "65537a0e89b738b3d6c23c65591377043a71b7cc037ed15d038f70816a9d84da",
+        "removed": true
+      },
+      {
+        "container_id": "6782687836b3a821a26d46d411e23543944d7f8ee859a94220ba84d983a1214a",
+        "removed": true
+      }
+    ],
+    "cleanup_complete": true,
+    "phase": "startups_complete",
+    "candidate": {
+      "image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+      "binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5",
+      "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+      "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778"
+    },
+    "postgres": {
+      "container_id": "65537a0e89b738b3d6c23c65591377043a71b7cc037ed15d038f70816a9d84da",
+      "image_ref": "postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+      "version_num": "170006"
+    }
+  },
+  "negative_migration": {
+    "status": "expected_migration_failure_detected",
+    "enforced_read_only": true,
+    "cleanup_complete": true,
+    "sqlstate": "25006",
+    "candidate_image": "ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+    "success_receipt_eligible": false,
+    "proof_capture": "unavailable_after_tmpfs_exit",
+    "cleanup": [
+      {
+        "container_id": "8594d934be21c8c1c2addf98e075678979ebf1feffdc39e2463fd71b1b14b4ee",
+        "removed": true
+      },
+      {
+        "container_id": "42b82b75fe25e31394c1b6aee9042b73492d0fc0cb73abb910ec16ddb3de921c",
+        "removed": true
+      }
+    ],
+    "process": {
+      "Status": "exited",
+      "Running": false,
+      "ExitCode": 1,
+      "OOMKilled": false,
+      "error_present": false
+    },
+    "log_sha256": "fd88ad5fefd753dd543d55a0c328583f96de494e11a11d1a09f2311a4e819e3a"
+  },
+  "final_cleanup": {
+    "containers": [],
+    "complete": true
+  },
+  "conclusion": "success",
+  "prior_job_status": "success",
+  "success_receipt_present": true
+}
