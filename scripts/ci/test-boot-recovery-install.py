@@ -553,7 +553,12 @@ class CandidateBundleTest(unittest.TestCase):
     def test_old_inventory_changed_manifest_and_helper_stop_before_installation(self):
         self.build()
         candidate = self.installer()
-        historical = Path(__file__).resolve().parents[2] / 'evidence/boot-recovery-assets-supplement-rc39357150402-attempt1-20261020.json'
+        historical = self.root / 'historical-inventory.json'
+        historical.write_text(json.dumps({
+            'schema': 'clearapi.runtime-assets/v1',
+            'source': {'commit': '69a66431646b5cc8912bf97a739e08de07316443'},
+            'rc': {'run_id': '39357150402', 'attempt': 1},
+        }))
         with self.assertRaisesRegex(candidate.Blocked, 'inventory identity'):
             candidate.payloads(historical, self.output)
         manifest = self.output / 'gateway-image-release.json'
