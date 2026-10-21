@@ -108,3 +108,11 @@ ProductionHost 提供固定本地动作：准备 runtime、仅创建 Gateway（�
 补齐真实临时OpenSSL/execute入口门禁验证：有效签名+durable claim、同授权重放、错误签名、过期和越权拒绝（只创建临时合成密钥，Docker/mount/machine ID为显式替身）。恢复集中现在29项：28 PASS/1真实PG opt-in skip；观察窗口23项PASS，均WSL exit0。签名入口不等于真实生产恢复producer认证。
 
 观察GitHub投影改为未授权active/pending集合为空，允许精确预先获准的唯一只读grant控制活动；不能按workflow名或owner泛排除。完整raw活动仍须audit；request_sha256成为dispatch显式输入和run-name，并由固定producer校验canonical输入匹配，最终artifact/actualreview验证成功前不得seal。否则“窗口内禁止所有workflow”会使合法独立审批本身破坏窗口。此项不允许任何生产写入或生产workflow豁免。
+
+
+第二轮CI39577444624（ebfd132bb）保留FAIL：PID1门禁后已通过SQL/源inventory，真实pg_restore因/restore/main.dump不存在失败，docker cp先前退出0。按 [Docker cp官方tmpfs限制](https://docs.docker.com/reference/cli/docker/container/cp/#corner-cases)，改用固定exec stdin流式写入live tmpfs并独立校验目标SHA256；不扩大挂载/权限。真实PG定向测试移至CI独立只读job，避免等待与其无关的Go构建（三库原有验证均保留）；之后CI为8 jobs。
+
+同轮backend既有未修改测试TestE2EDeadlineInheritanceRealTiming失败：B dispatch expected1/actual0，2.80s。其deadline2s、A延迟1.5s；未改Go/测试断言/应用候选，不将调度解释写成已确认根因。首轮相同应用的backend通过不替代新head检查，后续正常CI仍必须通过。原始backend/postgres日志及hash清单保留。
+
+
+流式tmpfs修复本地独立复核：同fd预hash/rewind→Popen stdin，精确literal shell+位置参数，不插值命令；文件<=16GiB、nofollow/singlelink、消费完整和inode/size/mode/mtime/ctime复核，目标容器内SHA256独立相等后才pg_restore。SQL字节stdin原1MiB限制保留。新增>1MiB真实文件流、错hash/符号/硬链接/截断及目标hash不符回归。32项本地恢复测试为31 PASS/1真实PG opt-in skip，exit0；不据此声明真实Docker修复PASS。

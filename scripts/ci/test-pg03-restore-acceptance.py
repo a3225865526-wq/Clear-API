@@ -289,8 +289,9 @@ class FakeOfflineCommands:
         self.spec, self.calls, self.alive = spec, [], False
         self.break_network, self.fail_restore = False, False
         self.temporary_server_reads = 0
+        self.streamed = {}
 
-    def run(self, argv, stdin=None, hash_only=False):
+    def run(self, argv, stdin=None, hash_only=False, stdin_file=None, expected_sha256=None):
         self.calls.append((argv, stdin))
         args = argv[1:]
         stdout, stderr, code = b'', b'', 0
@@ -315,6 +316,14 @@ class FakeOfflineCommands:
         elif args[0] == 'exec' and args[-2:] == ['cat', '/proc/1/comm']:
             stdout = b'bash\n' if self.temporary_server_reads else b'postgres\n'
             self.temporary_server_reads = max(0, self.temporary_server_reads-1)
+        elif args[:2] == ['exec', '-i'] and args[3:5] == ['sh', '-c']:
+            if args[5] != 'umask 077; cat > "$1"' or args[6] != 'clearapi-restore-copy':
+                raise AssertionError('unexpected container copy command')
+            actual = AUDIT.file_hash(Path(stdin_file).parent,Path(stdin_file).name)[0]
+            if actual != expected_sha256: raise AssertionError('unpinned fake stream')
+            self.streamed[args[-1]] = actual
+        elif args[0] == 'exec' and args[2] == 'sha256sum':
+            stdout = (self.streamed[args[-1]]+'  '+args[-1]+'\n').encode()
         elif args[:2] == ['exec', '-i']:
             sql = stdin.decode().removeprefix(RUNNER.SESSION)
             if sql == 'SHOW server_version_num;': stdout = b'170006\n'
@@ -332,7 +341,7 @@ class FakeOfflineCommands:
             elif 'WHERE i.indisunique' in sql: stdout = b'["public.options_pkey"]\n'
             elif sql.startswith('REINDEX INDEX '): stdout = b''
             else: raise AssertionError('unexpected SQL: '+sql)
-        elif args[0] not in ('start', 'cp', 'exec'):
+        elif args[0] not in ('start', 'exec'):
             raise AssertionError('unexpected command')
         index = len(self.calls)
         return dict(argv=argv, returncode=code, started_at_utc=f'2026-10-21T00:30:{index:02d}Z',
@@ -470,6 +479,59 @@ class OfflineRunnerTest(unittest.TestCase):
             transport = RUNNER.LocalCommands(lease)
             with self.assertRaisesRegex(ValueError, 'lease expired'):
                 transport.run([sys.executable, '-c', 'import time; time.sleep(60)'], stdin=b'x'*1000000)
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX inherited regular file descriptor')
+    def test_dump_file_descriptor_stream_bypasses_sql_limit_without_truncation(self):
+        source = self.fixture.root/'stream.dump'
+        with source.open('wb') as stream:
+            stream.write(b'PGDMP')
+            stream.truncate(1024*1024+1)  # file payload exceeds the separate SQL pipe limit
+        expected = AUDIT.file_hash(source.parent,source.name)[0]
+        with patch.object(RUNNER,'DOCKER',sys.executable):
+            result = RUNNER.LocalCommands(lambda:None).run([sys.executable,'-c',
+                'import hashlib,sys; print(hashlib.file_digest(sys.stdin.buffer,"sha256").hexdigest())'],
+                stdin_file=source,expected_sha256=expected)
+        self.assertEqual(result['returncode'],0)
+        self.assertEqual(result['stdout'].strip(),expected.encode())
+        self.assertEqual(result['stdin_bytes'],1024*1024+1)
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX nofollow/single-link regular file contract')
+    def test_unpinned_linked_or_partially_consumed_dump_stream_is_rejected(self):
+        source = self.fixture.root/'stream.dump'
+        source.write_bytes(b'PGDMP synthetic file payload')
+        expected = AUDIT.file_hash(source.parent,source.name)[0]
+        link = self.fixture.root/'linked.dump'
+        link.symlink_to(source)
+        with patch.object(RUNNER,'DOCKER',sys.executable):
+            transport = RUNNER.LocalCommands(lambda:None)
+            for path,pin in ((source,'0'*64),(link,expected)):
+                with self.subTest(path=path.name), patch.object(RUNNER.subprocess,'Popen',
+                        side_effect=AssertionError('invalid stream must not start a process')):
+                    with self.assertRaises(ValueError):
+                        transport.run([sys.executable,'-c','pass'],stdin_file=path,expected_sha256=pin)
+            with self.assertRaisesRegex(ValueError,'not fully consumed'):
+                transport.run([sys.executable,'-c','import os; os.read(0,5)'],stdin_file=source,expected_sha256=expected)
+            link.unlink()
+            os.link(source,link)
+            with self.assertRaisesRegex(ValueError,'single-link'):
+                transport.run([sys.executable,'-c','pass'],stdin_file=source,expected_sha256=expected)
+
+    @unittest.skipIf(os.name == 'nt', 'Linux live tmpfs payload verification')
+    def test_live_copy_hash_mismatch_never_reaches_pg_restore(self):
+        self.prepare_spec()
+        output = self.fixture.root/'result'
+        output.mkdir(mode=0o700)
+        transport = FakeOfflineCommands(self.spec)
+        original = transport.run
+        def changed(argv,**options):
+            result = original(argv,**options)
+            if 'sha256sum' in argv: result['stdout']=b'0'*64+b'  /restore/main.dump\n'
+            return result
+        transport.run=changed
+        runner=RUNNER.OfflineRestore(self.spec,transport,self.fixture.root,output,lambda:None)
+        with self.assertRaisesRegex(ValueError,'live restore payload hash mismatch'):
+            runner.run()
+        self.assertFalse(any('pg_restore' in argv for argv,_ in transport.calls))
 
 
 @unittest.skipUnless(os.name == 'posix' and getattr(os, 'geteuid', lambda: -1)() == 0,
@@ -675,7 +737,7 @@ class RealPostgresRestoreTest(unittest.TestCase):
                 path = root/(logical+'.dump')
                 RUNNER.write_file(path,dumped['stdout'])
                 self.assertTrue(path.read_bytes().startswith(b'PGDMP'))
-                target.call(['cp',str(path),target.cid+':/restore/'+path.name])
+                target.copy_dump(path,path.name,AUDIT.digest(dumped['stdout']))
                 target.call(['exec',target.cid,'createdb','-U','postgres',target_db])
                 target.call(['exec',target.cid,'pg_restore','--exit-on-error','--no-owner','--no-acl',
                     '-U','postgres','--dbname='+target_db,'/restore/'+path.name])

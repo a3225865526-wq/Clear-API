@@ -53,7 +53,10 @@ docker start "$RESTORE_CID"
 docker exec "$RESTORE_CID" pg_isready -U postgres
 docker exec "$RESTORE_CID" psql -X -U postgres -tAc 'SHOW server_version_num'
 # 仅复制安全预检之后的准确dump；不得装载globals/secrets或生产角色
-docker cp "$VALIDATED_DUMP_PATH" "$RESTORE_CID:/restore/$DUMP_NAME"
+# docker cp不适用于该live tmpfs；固定exec路径写入后必须比较准确SHA256
+docker exec -i "$RESTORE_CID" sh -c 'umask 077; cat > "$1"' \
+  clearapi-restore-copy "/restore/$DUMP_NAME" < "$VALIDATED_DUMP_PATH"
+docker exec "$RESTORE_CID" sha256sum "/restore/$DUMP_NAME"
 docker exec "$RESTORE_CID" createdb -U postgres "$TARGET_DATABASE"
 docker exec "$RESTORE_CID" pg_restore --exit-on-error --no-owner --no-acl \
   -U postgres "--dbname=$TARGET_DATABASE" "/restore/$DUMP_NAME"
@@ -105,3 +108,6 @@ runner每次命令核对lease/撤销/daemon身份；stdin非阻塞、输出有�
 正常完成保存真实命令结果/日志hash、PG03独立恢复和不可覆盖后验audit。失败保留FAIL与真实owned CID/label；租约过期或身份UNKNOWN时cleanup=BLOCKED，可能仍有独立容器/tmpfs，管理员需另批精确CID清理。禁止把BLOCKED清理记PASS或删除旧证据。所有材料需获准seal/export回读后再关闭tmpfs环境；内容PASS仍生产BLOCKED/来源UNKNOWN，不能直接形成successor授权。
 
 最新本地验证：WSL Linux/root `python3 -B scripts/ci/test-pg03-restore-acceptance.py` **26 tests，25 PASS，1 opt-in真实PG skip，exit0**。新增真实PG定向测试只允许GitHub hosted本仓库/root，合成main/log、两个networknone容器，真实custom dump/restore与完整指纹对比；由本轮CI单独执行，结果以最终待批包为准。本机无Docker CLI，未运行真实PG，不冒充真实生产备份恢复验收。
+
+
+CI实证修正：Docker archive cp返回成功不保证写入运行中tmpfs。runner现在只通过已校验、nofollow/singlelink的文件fd作为stdin写入live mount（不把大dump载入内存），结束复核完整消费/原文件稳定性，并核对容器内SHA256，之后才pg_restore。复制失败/错hash/链接/截断均拒绝。最新本地恢复集中32项：31 PASS/1真实PG opt-in skip；真实PG最终结果见待批包。

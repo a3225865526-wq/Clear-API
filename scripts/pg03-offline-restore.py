@@ -134,9 +134,12 @@ class LocalCommands:
         self.lease = lease
         self.daemon_id = daemon_id
 
-    def run(self, argv, stdin=None, hash_only=False):
+    def run(self, argv, stdin=None, hash_only=False, stdin_file=None, expected_sha256=None):
         self.lease()
         AU.require(argv[0] in (DOCKER, OPENSSL), 'unsupported executable')
+        AU.require((stdin_file is None and expected_sha256 is None)
+                   or (stdin is None and stdin_file is not None and AU.valid_hash(expected_sha256)),
+                   'ambiguous or unpinned input stream')
         if self.daemon_id is not None and argv[0] == DOCKER and argv[1:] != ['info', '--format', '{{.ID}}']:
             daemon = self.run([DOCKER, 'info', '--format', '{{.ID}}'])
             AU.require(daemon['returncode'] == 0 and daemon['stdout'].decode().strip() == self.daemon_id,
@@ -144,9 +147,29 @@ class LocalCommands:
         started, deadline = stamp(), time.monotonic()+600
         environment = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent', 'LC_ALL': 'C',
                        'DOCKER_HOST': 'unix:///var/run/docker.sock', 'DOCKER_CONFIG': '/nonexistent'}
-        process = subprocess.Popen(argv, stdin=subprocess.PIPE if stdin is not None else subprocess.DEVNULL,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, close_fds=True,
-            start_new_session=True)
+        input_stream, input_info = None, None
+        try:
+            if stdin_file is not None:
+                path = Path(stdin_file)
+                AU.local_file(path.parent, path.name)
+                descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+                input_stream = os.fdopen(descriptor, 'rb')
+                input_info = os.fstat(descriptor)
+                AU.require(stat.S_ISREG(input_info.st_mode) and input_info.st_nlink == 1
+                           and 0 < input_info.st_size <= AU.MAX_PAYLOAD, 'unsafe input stream')
+                AU.require(hashlib.file_digest(input_stream, 'sha256').hexdigest() == expected_sha256,
+                           'input stream hash mismatch')
+                input_stream.seek(0)
+                self.lease()
+            AU.require(time.monotonic() < deadline, 'offline command timeout before start')
+            process = subprocess.Popen(argv, stdin=input_stream if input_stream is not None else
+                (subprocess.PIPE if stdin is not None else subprocess.DEVNULL),
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment, close_fds=True,
+                start_new_session=True)
+        except BaseException:
+            if input_stream is not None:
+                input_stream.close()
+            raise
         hashes = {'stdout': hashlib.sha256(), 'stderr': hashlib.sha256()}
         contents, sizes = {'stdout': bytearray(), 'stderr': bytearray()}, {'stdout': 0, 'stderr': 0}
         selector = selectors.DefaultSelector()
@@ -192,6 +215,13 @@ class LocalCommands:
                         contents[stream].extend(raw)
             returncode = process.wait(timeout=1)
             AU.require(stdin is None or offset == len(stdin), 'offline command did not consume its input')
+            if input_stream is not None:
+                current = os.fstat(input_stream.fileno())
+                linked = Path(stdin_file).stat(follow_symlinks=False)
+                AU.require(input_stream.tell() == input_info.st_size
+                    and all(getattr(input_info, key) == getattr(current, key) == getattr(linked, key)
+                        for key in ('st_dev', 'st_ino', 'st_mode', 'st_nlink', 'st_size', 'st_mtime_ns', 'st_ctime_ns')),
+                    'input stream changed or was not fully consumed')
         except BaseException:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
@@ -205,10 +235,15 @@ class LocalCommands:
             process.stderr.close()
             if process.stdin is not None and not process.stdin.closed:
                 process.stdin.close()
-        return dict(argv=argv, returncode=returncode, started_at_utc=started, completed_at_utc=stamp(),
+            if input_stream is not None:
+                input_stream.close()
+        record = dict(argv=argv, returncode=returncode, started_at_utc=started, completed_at_utc=stamp(),
                     stdout=bytes(contents['stdout']), stderr=bytes(contents['stderr']),
                     stdout_sha256=hashes['stdout'].hexdigest(), stderr_sha256=hashes['stderr'].hexdigest(),
                     stdout_bytes=sizes['stdout'], stderr_bytes=sizes['stderr'])
+        if input_info is not None:
+            record.update(stdin_sha256=expected_sha256, stdin_bytes=input_info.st_size)
+        return record
 
 
 class OfflineRestore:
@@ -219,9 +254,10 @@ class OfflineRestore:
         self.commands = {}
         self.journal = []
 
-    def call(self, args, stdin=None, hash_only=False, allow_failure=False):
+    def call(self, args, stdin=None, hash_only=False, allow_failure=False, stdin_file=None, expected_sha256=None):
         self.lease()
-        result = self.transport.run([DOCKER, *args], stdin=stdin, hash_only=hash_only)
+        result = self.transport.run([DOCKER, *args], stdin=stdin, hash_only=hash_only,
+                                    stdin_file=stdin_file, expected_sha256=expected_sha256)
         self.journal.append({k:v for k, v in result.items() if k not in ('stdout', 'stderr')})
         write_file(self.output / ('command-%04d.json' % len(self.journal)), encoded(self.journal[-1]))
         AU.require(type(result['returncode']) is int and (allow_failure or result['returncode'] == 0),
@@ -259,6 +295,16 @@ class OfflineRestore:
         result = self.call(['exec', '-i', self.cid, 'psql', '-X', '-qAt', '-v', 'ON_ERROR_STOP=1',
                             '-U', 'postgres', '-d', database], stdin=(SESSION+query).encode(), hash_only=hash_only)
         return result['stdout_sha256'] if hash_only else result['stdout']
+
+    def copy_dump(self, path, dumpname, expected_sha256):
+        """Stream into the live tmpfs; Docker archive copy may bypass that mount."""
+        AU.require(AU.safe_name(dumpname) == dumpname and '/' not in dumpname, 'unsafe dump name')
+        self.inspect_target()
+        target = '/restore/'+dumpname
+        self.call(['exec', '-i', self.cid, 'sh', '-c', 'umask 077; cat > "$1"',
+                   'clearapi-restore-copy', target], stdin_file=path, expected_sha256=expected_sha256)
+        actual = self.call(['exec', self.cid, 'sha256sum', target])['stdout']
+        AU.require(actual == (expected_sha256+'  '+target+'\n').encode(), 'live restore payload hash mismatch')
 
     def inventory(self, database):
         table_query = """SELECT coalesce(json_agg(format('%I.%I',n.nspname,c.relname)
@@ -381,7 +427,7 @@ class OfflineRestore:
         for name, database in self.spec['databases'].items():
             dumpname = artifacts[database['dump_artifact']]['name']
             self.inspect_target()
-            self.call(['cp', str(payload_dir/dumpname), self.cid+':/restore/'+dumpname])
+            self.copy_dump(payload_dir/dumpname, dumpname, artifacts[database['dump_artifact']]['sha256'])
             self.call(['exec', self.cid, 'createdb', '-U', 'postgres', database['target_database']])
             result = self.call(['exec', self.cid, 'pg_restore', '--exit-on-error', '--no-owner', '--no-acl',
                 '-U', 'postgres', '--dbname='+database['target_database'], '/restore/'+dumpname], allow_failure=True)
