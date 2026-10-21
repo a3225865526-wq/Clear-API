@@ -1,0 +1,22 @@
+{
+  "schema_version": "pg03-schema-rehearsal-v1",
+  "profile": "isolated_schema_only_master_single_postgres",
+  "source_commit": "799a608d1b5a79df0f2ef8031a7885f414125778",
+  "candidate_image_id": "sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f",
+  "candidate_binary_sha256": "37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5",
+  "postgres_image_ref": "postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+  "postgres_version_num": "170006",
+  "startup_passes": 2,
+  "source_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+  "target_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+  "successor_baseline": {
+    "schema": "clearapi.successor-schema-baseline/v1",
+    "rc_archive_sha256": "b02e4189c742e50f2d62312dcb80b60033380ae00c3f442bda2990b948e358a7",
+    "schema_source": "verified_rc_target",
+    "observed_schema_sha256": "3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035",
+    "production_observation_verified": false,
+    "production_acceptance": "not_run",
+    "producer_sha256": "6b9c1a1570debd337b08dc018031f9650ccd1af833468e402c10118945e56ea7",
+    "schema_helper_sha256": "f0ebce2eb787f35079543879fa1394ccd8bcdd8e1688b3779b60dc01b3a25ac5"
+  }
+}

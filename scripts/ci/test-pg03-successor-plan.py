@@ -1326,6 +1326,7 @@ class SuccessorTransactionTest(unittest.TestCase):
         with self.assertRaises(ValueError): self.execute()
         failure = json.loads(next(self.app.glob('*-failure.json')).read_text())
         self.assertFalse(failure['containment_verified'])
+
         self.assertEqual(failure['public_traffic'], 'UNKNOWN')
         self.setUp()
         self.io.fail = 'replace_gateway'
@@ -1333,6 +1334,47 @@ class SuccessorTransactionTest(unittest.TestCase):
         with self.assertRaises(ValueError): self.execute()
         failure = json.loads(next(self.app.glob('*-failure.json')).read_text())
         self.assertFalse(failure['containment_verified'])
+
+    def test_guarded_adapter_integrates_with_durable_kernel_and_unknown_containment(self):
+        from types import SimpleNamespace
+        for failed_phase in (None, 'replace_gateway'):
+            with self.subTest(failed_phase=failed_phase):
+                self.setUp()
+                case = AdapterContractTest()
+                case.setUp()
+                case.request, case.now = self.request, self.now
+                q, grant, policy, env, reviews, get, archive = case.production_authority()
+                io = self.io
+                io.fail = failed_phase
+                def invoke(name, request, context, deadline):
+                    return dict(schema='clearapi.successor-host-result/v1', operation=name,
+                        request_sha256=q['request_sha256'], status='PASS',
+                        value=getattr(io, name)(request, context))
+                host = SimpleNamespace(deployment_lock=io.deployment_lock, authorize=lambda *args: True,
+                    verify_dependencies=lambda *args: True, invoke=invoke,
+                    observe=lambda request, deadline: io.observe(request),
+                    contain=lambda request, context, deadline: io.contain(request, context))
+                window = SimpleNamespace(check=lambda request: None,
+                    perform=lambda request, name, action, *args: action(name, *args))
+                adapter = case.adapter.ProductionAdapter(get_json=get, get_bytes=lambda *args: b'',
+                    candidate_policy=lambda: dict(policy_id='c'*32, bindings={}, control_files_sha256={}),
+                    production_policy=lambda: copy.deepcopy(policy), evidence_bindings=lambda: {},
+                    host=host, window=window, qualify=lambda *args, **kwargs: q, now=lambda: self.now)
+                with patch.object(case.adapter, 'verified_artifact', side_effect=lambda *args: archive()), \
+                     patch.object(case.adapter, 'inspect_server_controls', return_value=dict(repository_id=1)), \
+                     patch.object(case.adapter, 'evidence_documents', return_value={}), \
+                     patch.object(case.adapter, 'validate_dependencies', return_value=dict(fixture=True)):
+                    transaction = TX.Transaction(self.app, adapter, now=lambda: self.now)
+                    if failed_phase is None:
+                        result = transaction.execute(TX.encoded(self.request))
+                        self.assertEqual(result['public_traffic'], 'blocked')
+                        self.assertEqual(io.calls, list(TX.OPERATIONS))
+                    else:
+                        with self.assertRaises(ValueError): transaction.execute(TX.encoded(self.request))
+                        self.assertTrue(adapter.failed)
+                        self.assertEqual(io.calls[-1], 'contain')
+                    with self.assertRaisesRegex(ValueError, 'consumed'):
+                        transaction.execute(TX.encoded(self.request))
 
     def test_claim_sync_failure_and_lock_contention_never_mutate(self):
         with patch.object(os, 'fsync', side_effect=OSError('SYNTHETIC_SECRET')):
@@ -1346,6 +1388,353 @@ class SuccessorTransactionTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'consumed'): self.execute()
         self.assertEqual(self.io.calls, [])
         self.assertEqual(partial.read_bytes(), b'preserve old stage evidence')
+
+
+class AdapterContractTest(unittest.TestCase):
+    def setUp(self):
+        SuccessorRequestTest.setUp(self)
+        spec = importlib.util.spec_from_file_location('adapter_contract', SCRIPTS / 'pg03-successor-adapter.py')
+        self.adapter = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.adapter)
+
+    def test_scope_is_exactly_bound_and_never_approves_unbounded_writes(self):
+        observation = dict(fixture='observed state', startup_write_scope_sha256='7'*64)
+        self.request['evidence_sha256']['production_observation'] = TX.sha(TX.encoded(observation))
+        value = dict(schema='clearapi.successor-startup-write-scope/v2', candidate=self.request['candidate'],
+            observed_at_utc='2026-10-21T00:00:00Z', expires_at_utc='2026-10-21T00:04:00Z',
+            effective_configuration_sha256='a'*64, baseline_state_sha256=TX.sha(TX.encoded(dict(fixture='observed state'))),
+            operations=[dict(database='main', table='options', operation='update', columns=['value'],
+                selection_sha256='b'*64, max_rows=1, before_rows_sha256='c'*64, expected_after_rows_sha256='d'*64)],
+            background_writers=[dict(name='auth_cleanup', enabled=False, pending_count=0, approved_effect_sha256='e'*64)],
+            approved_by=self.adapter.OWNER, approval_ref='SYNTHETIC_SCOPE_ONLY')
+        raw = TX.encoded(value)
+        self.request['evidence_sha256']['startup_write_scope'] = TX.sha(raw)
+        observation['startup_write_scope_sha256'] = TX.sha(raw)
+        self.request['evidence_sha256']['production_observation'] = TX.sha(TX.encoded(observation))
+        self.adapter.validate_write_scope(raw, self.request, self.now, observation)
+        wider = copy.deepcopy(value)
+        wider['operations'][0]['max_rows'] = 10000
+        with self.assertRaises(ValueError): self.adapter.validate_write_scope(TX.encoded(wider), self.request, self.now, observation)
+        for key, data in (('columns', ['*']), ('max_rows', True), ('table', 'options;DELETE')):
+            changed = copy.deepcopy(value)
+            changed['operations'][0][key] = data
+            raw = TX.encoded(changed)
+            self.request['evidence_sha256']['startup_write_scope'] = TX.sha(raw)
+            with self.assertRaises(ValueError): self.adapter.validate_write_scope(raw, self.request, self.now, observation)
+
+    def test_restore_contract_rejects_other_backup_production_or_shape_only_success(self):
+        checks = ('decrypt', 'archive_inventory', 'archive_payload_hashes', 'real_pg_restore', 'data', 'indexes',
+                  'constraints', 'uniqueness', 'pg03_state', 'separate_log_database', 'cleanup')
+        value = dict(schema='clearapi.successor-restore-acceptance/v1', candidate=self.request['candidate'],
+            backup_completion_sha256='7'*64, encrypted_archive_sha256='a'*64, plaintext_archive_sha256='b'*64,
+            started_at_utc='2026-10-20T22:00:00Z', completed_at_utc='2026-10-20T22:01:00Z',
+            profile='independent_postgres_restore_no_production_access', postgres_version_num='170006',
+            production_connections=[], network='none', host_mounts=[], private_key_recorded=False,
+            checks={key:'pass' for key in checks}, producer_exit_code=0)
+        raw = TX.encoded(value)
+        self.request['evidence_sha256']['restore_acceptance'] = TX.sha(raw)
+        self.adapter.validate_restore_acceptance(raw, self.request, '7'*64)
+        with self.assertRaises(ValueError): self.adapter.validate_restore_acceptance(raw, self.request, 'a'*64)
+        for key, data in (('production_connections', ['production']), ('host_mounts', ['/opt/clearapi']),
+                          ('producer_exit_code', False), ('checks', {'real_pg_restore':'pass'})):
+            changed = dict(value, **{key:data})
+            raw = TX.encoded(changed)
+            self.request['evidence_sha256']['restore_acceptance'] = TX.sha(raw)
+            with self.assertRaises(ValueError): self.adapter.validate_restore_acceptance(raw, self.request, '7'*64)
+
+    def test_artifact_uses_api_provenance_original_bytes_and_exact_attempt(self):
+        raw = b'original fixture archive bytes'
+        binding = dict(run_id=123, attempt=1, source_commit='3'*40,
+            workflow_path='.github/workflows/pg03-isolated-rehearsal.yml', event='workflow_dispatch',
+            artifact_id=456, artifact_name='fixture-123-1', archive_sha256=TX.sha(raw))
+        run = dict(id=123, run_attempt=1, head_sha='3'*40, head_branch='main', path=binding['workflow_path'],
+            event='workflow_dispatch', status='completed', conclusion='success', repository=dict(full_name=ACTION.REPO),
+            head_repository=dict(full_name=ACTION.REPO), actor=dict(login=self.adapter.OWNER), triggering_actor=dict(login=self.adapter.OWNER))
+        artifact = dict(id=456, expired=False, name=binding['artifact_name'], size_in_bytes=len(raw),
+            digest='sha256:'+TX.sha(raw), workflow_run=dict(id=123,head_sha='3'*40))
+        def get(path): return copy.deepcopy(artifact if '/artifacts/' in path else run)
+        self.assertEqual(self.adapter.verified_artifact(get, lambda path,limit:raw, binding), raw)
+        for key, data in (('run_attempt',2), ('conclusion','failure'), ('head_branch','other')):
+            changed = dict(run, **{key:data})
+            with self.assertRaises(ValueError):
+                self.adapter.verified_artifact(lambda path:artifact if '/artifacts/' in path else changed, lambda path,limit:raw, binding)
+        with self.assertRaises(ValueError): self.adapter.verified_artifact(get, lambda path,limit:b'tampered', binding)
+
+    def test_live_control_snapshot_never_claims_production_authorization(self):
+        protection = dict(required_status_checks=dict(strict=True, contexts=list(self.adapter.REQUIRED)),
+            enforce_admins=dict(enabled=True), allow_force_pushes=dict(enabled=False), allow_deletions=dict(enabled=False))
+        def get(path):
+            if path.endswith('/git/ref/heads/main'): return dict(object=dict(sha=self.request['control_commit']))
+            if path.endswith('/protection'): return protection
+            if '/variables/' in path: return dict(value='false')
+            return dict(full_name=ACTION.REPO, owner=dict(login=self.adapter.OWNER),id=1)
+        result = self.adapter.inspect_server_controls(get, self.request)
+        self.assertIs(result['execution_allowed'], False)
+        protection['enforce_admins']['enabled'] = False
+        with self.assertRaises(ValueError): self.adapter.inspect_server_controls(get, self.request)
+
+    def test_six_documents_require_original_archive_provenance_and_payload_hashes(self):
+        names = dict(production_observation='production-observation.json', schema_rehearsal='schema-rehearsal.json',
+            candidate_gate_bundle='candidate-gate-bundle.json', backup_completion='backup-completion.json',
+            restore_acceptance='restore-acceptance.json', startup_write_scope='startup-write-scope.json')
+        import io
+        stream=io.BytesIO()
+        with zipfile.ZipFile(stream,'w') as archive:
+            for key,name in names.items():
+                raw=TX.encoded(dict(fixture=key))
+                self.request['evidence_sha256'][key]=TX.sha(raw)
+                archive.writestr(name,raw)
+        bindings={key:{} for key in names}
+        with patch.object(self.adapter,'verified_artifact',return_value=stream.getvalue()):
+            result=self.adapter.evidence_documents(None,None,bindings,self.request)
+            self.assertEqual(set(result),set(names))
+            self.request['evidence_sha256']['restore_acceptance']='f'*64
+            with self.assertRaises(ValueError): self.adapter.evidence_documents(None,None,bindings,self.request)
+
+    def test_gateway_plan_has_only_fixed_service_and_no_dependency_or_image_build(self):
+        plan = self.adapter.gateway_command_plan(('/opt/clearapi/app/docker-compose.prod.yml','/opt/clearapi/app/compose-pg03.yaml'))
+        self.assertIs(plan['execution_allowed'], False)
+        for name in ('replace_gateway','restart_gateway','contain_gateway'):
+            self.assertEqual(plan[name][-1], 'new-api')
+            self.assertNotIn('pool-executor', plan[name])
+        self.assertIn('--no-deps', plan['replace_gateway'])
+        self.assertIn('--no-build', plan['replace_gateway'])
+        self.assertIn('--no-start', plan['replace_gateway'])
+        self.assertEqual(plan['start_gateway'][-1], 'new-api')
+        self.assertEqual(plan['prepare_runtime'][-1], '/run/clearapi')
+        self.assertIn('/opt/clearapi/app', plan['replace_gateway'])
+        self.assertEqual(plan['contain_gateway'][-3:], ['--timeout','150','new-api'])
+        for paths in (('/tmp/x.yml','/opt/clearapi/x.yml'), ('/opt/clearapi/../x.yml','/opt/clearapi/x.yml')):
+            with self.assertRaises(ValueError): self.adapter.gateway_command_plan(paths)
+
+    def production_authority(self):
+        """Synthetic approval service, independently from the fixture host."""
+        import io
+        candidate_policy = dict(policy_id='c'*32, bindings={}, control_files_sha256={})
+        qualification = dict(schema='clearapi.candidate-qualification/v1', status='PASS', execution_allowed=False,
+            production_authorization='BLOCKED', policy_id=candidate_policy['policy_id'],
+            policy_sha256=TX.sha(TX.encoded(candidate_policy)), request_sha256=TX.sha(TX.encoded(self.request)),
+            transaction_id=self.request['transaction_id'], repository=ACTION.REPO, repository_id=1,
+            candidate=copy.deepcopy(self.request['candidate']), control_commit=self.request['control_commit'],
+            issued_at_utc=self.request['issued_at_utc'], expires_at_utc=self.request['expires_at_utc'],
+            manifest_sha256='d'*64, evidence={}, control_files_sha256={}, production_acceptance='NOT RUN')
+        grant = dict(schema='clearapi.successor-production-grant/v1', repository=ACTION.REPO,
+            request_sha256=qualification['request_sha256'], transaction_id=self.request['transaction_id'],
+            candidate=copy.deepcopy(self.request['candidate']), control_commit=self.request['control_commit'],
+            evidence_sha256=copy.deepcopy(self.request['evidence_sha256']), qualification_policy_sha256=qualification['policy_sha256'],
+            issued_at_utc=self.request['issued_at_utc'], expires_at_utc=self.request['expires_at_utc'],
+            nonce='b'*64, operations=list(TX.OPERATIONS), public_traffic='blocked',
+            executor_start='forbidden', database_restore='forbidden')
+        policy = dict(schema='clearapi.successor-production-policy/v1',
+            request_sha256=qualification['request_sha256'], qualification_policy_sha256=qualification['policy_sha256'],
+            environment_id=7, production_approvers=['independent-reviewer'], revoked=False, consumed=False,
+            approval_artifact=dict(source_commit=self.request['control_commit'],
+                workflow_path='.github/workflows/pg03-successor-approval.yml', event='workflow_dispatch', run_id=789))
+        environment = dict(id=7, name='production',
+            deployment_branch_policy=dict(protected_branches=False, custom_branch_policies=True),
+            protection_rules=[dict(type='required_reviewers', prevent_self_review=True,
+                reviewers=[dict(type='User', reviewer=dict(login='independent-reviewer'))])])
+        approvals = [dict(state='approved', user=dict(login='independent-reviewer'),
+                          environments=[dict(id=7, name='production')])]
+        branches = dict(total_count=1, branch_policies=[dict(name='main', type='branch')])
+        def get(path):
+            if path.endswith('/approvals'): return copy.deepcopy(approvals)
+            if path.endswith('/deployment-branch-policies'): return copy.deepcopy(branches)
+            return copy.deepcopy(environment)
+        def archive():
+            stream = io.BytesIO()
+            with zipfile.ZipFile(stream, 'w') as saved:
+                saved.writestr('production-grant.json', TX.encoded(grant))
+            return stream.getvalue()
+        return qualification, grant, policy, environment, approvals, get, archive
+
+    def test_production_grant_requires_independent_review_and_exact_fresh_request(self):
+        q, grant, policy, env, reviews, get, archive = self.production_authority()
+        with patch.object(self.adapter, 'verified_artifact', side_effect=lambda *args: archive()):
+            self.assertEqual(self.adapter.production_grant(get, None, policy, self.request, q, self.now), grant)
+            for key, value in (('expires_at_utc', self.request['issued_at_utc']), ('request_sha256', 'f'*64),
+                               ('database_restore', 'allowed'), ('nonce', 'old')):
+                saved = grant[key]
+                grant[key] = value
+                with self.assertRaises(ValueError):
+                    self.adapter.production_grant(get, None, policy, self.request, q, self.now)
+                grant[key] = saved
+            reviews.append(dict(state='rejected'))
+            with self.assertRaises(ValueError):
+                self.adapter.production_grant(get, None, policy, self.request, q, self.now)
+            reviews.pop()
+            env['protection_rules'][0]['prevent_self_review'] = False
+            with self.assertRaises(ValueError):
+                self.adapter.production_grant(get, None, policy, self.request, q, self.now)
+
+    def test_grant_revocation_or_approval_change_cannot_be_hidden_by_good_artifact(self):
+        q, grant, policy, env, reviews, get, archive = self.production_authority()
+        with patch.object(self.adapter, 'verified_artifact', side_effect=lambda *args: archive()):
+            for key in ('revoked', 'consumed'):
+                policy[key] = True
+                with self.assertRaises(ValueError):
+                    self.adapter.production_grant(get, None, policy, self.request, q, self.now)
+                policy[key] = False
+            calls = []
+            def changing(path):
+                result = get(path)
+                if path.endswith('/approvals'):
+                    calls.append(path)
+                    if len(calls) > 1: result = []
+                return result
+            with self.assertRaises(ValueError):
+                self.adapter.production_grant(changing, None, policy, self.request, q, self.now)
+
+    def test_grant_producer_cannot_reinterpret_source_or_expiry_after_review(self):
+        spec = importlib.util.spec_from_file_location('grant_producer', SCRIPTS/'ci/pg03-successor-grant.py')
+        producer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(producer)
+        context = dict(GITHUB_REPOSITORY=ACTION.REPO, GITHUB_REF='refs/heads/main',
+            GITHUB_EVENT_NAME='workflow_dispatch', GITHUB_ACTOR=self.adapter.OWNER,
+            GITHUB_TRIGGERING_ACTOR=self.adapter.OWNER, GITHUB_SHA=self.request['control_commit'],
+            GITHUB_WORKFLOW_REF=ACTION.REPO+'/.github/workflows/pg03-successor-approval.yml@refs/heads/main')
+        raw = TX.encoded(self.request)
+        result = producer.build(raw, 'a'*64, context, self.now)
+        self.assertEqual(result['request_sha256'], TX.sha(raw))
+        self.assertEqual(result['expires_at_utc'], self.request['expires_at_utc'])
+        for key, value in (('GITHUB_ACTOR','other'), ('GITHUB_SHA','e'*40), ('GITHUB_EVENT_NAME','push')):
+            with self.assertRaises(ValueError):
+                producer.build(raw, 'a'*64, dict(context, **{key:value}), self.now)
+        with self.assertRaises(ValueError): producer.build(raw, 'a'*64, context, self.now+timedelta(seconds=300))
+        with self.assertRaises(ValueError): producer.build(raw+b'\n', 'a'*64, context, self.now)
+
+    def test_adapter_has_no_config_switch_or_default_production_capability(self):
+        adapter = self.adapter.ProductionAdapter(now=lambda: self.now)
+        with self.assertRaises(ValueError):
+            adapter.authenticate(self.request, TX.sha(TX.encoded(self.request)))
+        self.assertTrue(adapter.failed)
+        with self.assertRaises(TypeError): self.adapter.ProductionAdapter(enable_live=True)
+        with self.assertRaises(ValueError):
+            with adapter.deployment_lock(): self.fail('unbound host must not enter')
+
+    def test_adapter_rejects_unknown_or_expired_qualification_before_host_authority(self):
+        from types import SimpleNamespace
+        for field, value in (('status','UNKNOWN'), ('schema','other'),
+                             ('expires_at_utc', self.request['issued_at_utc'])):
+            with self.subTest(field=field):
+                q, grant, policy, env, reviews, get, archive = self.production_authority()
+                q[field] = value
+                host = SimpleNamespace(authorize=lambda *args: self.fail('invalid qualification reached host'))
+                adapter = self.adapter.ProductionAdapter(get_json=get, get_bytes=lambda *args:b'',
+                    candidate_policy=lambda:dict(policy_id='c'*32, bindings={}, control_files_sha256={}),
+                    production_policy=lambda:policy, evidence_bindings=lambda:{}, host=host,
+                    window=SimpleNamespace(check=lambda *_:self.fail('invalid qualification reached window')),
+                    qualify=lambda *args, **kw:q, now=lambda:self.now)
+                with self.assertRaises(ValueError): adapter.authenticate(self.request, q['request_sha256'])
+                self.assertTrue(adapter.failed)
+
+    def test_dependencies_are_constructible_without_scope_hash_cycle_and_pin_restored_backup(self):
+        observation = dict(schema='clearapi.successor-live-projection/v1', observed_at_utc=self.request['issued_at_utc'],
+            frozen_sha256=PLAN.FROZEN.copy(), gateway_container_id=TX.GATEWAY, gateway_running=False,
+            executor_container_id=PLAN.EXECUTOR_CONTAINER, executor_process_epoch='a'*32,
+            ingress='isolated_stopped_restart_no', public_web_listeners=[],
+            database_schema_sha256=self.request['baseline_schema_sha256'], protected_state_sha256='b'*64,
+            startup_write_scope_sha256=None, candidate_identity=None, process_started_ticks=None,
+            migration_challenge=None, migration_proof_sha256=None, runtime_evidence_sha256=None, restart_evidence_sha256=None)
+        scope = dict(schema='clearapi.successor-startup-write-scope/v2', candidate=self.request['candidate'],
+            observed_at_utc=self.request['issued_at_utc'], expires_at_utc='2026-10-21T00:04:00Z',
+            effective_configuration_sha256='a'*64,
+            baseline_state_sha256=TX.sha(TX.encoded({k:v for k,v in observation.items() if k!='startup_write_scope_sha256'})),
+            operations=[dict(database='main',table='options',operation='update',columns=['value'],selection_sha256='b'*64,
+                max_rows=1,before_rows_sha256='c'*64,expected_after_rows_sha256='d'*64)],
+            background_writers=[dict(name='cleanup',enabled=False,pending_count=0,approved_effect_sha256='e'*64)],
+            approved_by=self.adapter.OWNER,approval_ref='FIXTURE_ONLY')
+        observation['startup_write_scope_sha256'] = TX.sha(TX.encoded(scope))
+        backup = dict(schema='clearapi.successor-backup-completion/v1',backup_id='20261020T220000Z',manifest_sha256='a'*64,
+            encrypted_sha256='b'*64,encrypted_bytes=123,stopped_writer_identity=dict(identity_mode='stopped_failed_gateway'),
+            invocation_returncode=0,plaintext_cleanup='verified_absent',restore_acceptance='not_run',production_execution_allowed=False)
+        restore = dict(schema='clearapi.successor-restore-acceptance/v1',candidate=self.request['candidate'],
+            backup_completion_sha256=TX.sha(TX.encoded(backup)),encrypted_archive_sha256=backup['encrypted_sha256'],
+            plaintext_archive_sha256='c'*64,started_at_utc='2026-10-20T22:00:00Z',completed_at_utc='2026-10-20T22:01:00Z',
+            profile='independent_postgres_restore_no_production_access',postgres_version_num='170006',
+            production_connections=[],network='none',host_mounts=[],private_key_recorded=False,producer_exit_code=0,
+            checks=dict.fromkeys(('decrypt','archive_inventory','archive_payload_hashes','real_pg_restore','data','indexes',
+                'constraints','uniqueness','pg03_state','separate_log_database','cleanup'),'pass'))
+        schema = dict(schema_version=PLAN.SCHEMA.SCHEMA,postgres_image_ref=PLAN.SCHEMA.POSTGRES,
+            postgres_version_num='170006',startup_passes=2,profile='isolated_schema_only_master_single_postgres',
+            source_schema_sha256=self.request['baseline_schema_sha256'],target_schema_sha256=self.request['baseline_schema_sha256'],
+            candidate_image_id=self.request['candidate']['image_id'],candidate_binary_sha256=self.request['candidate']['binary_sha256'],
+            source_commit=self.request['candidate']['source_commit'])
+        gates = {name:dict(schema='clearapi.gate-evidence/v1',gate=name,conclusion='success',
+            source_commit=self.request['candidate']['source_commit'],gateway_digest=self.request['candidate']['image_digest'],
+            rc_run_id=self.request['candidate']['rc_run_id'],rc_run_attempt=self.request['candidate']['rc_attempt']) for name in PLAN.GATES}
+        docs = dict(production_observation=observation,startup_write_scope=scope,backup_completion=backup,
+                    restore_acceptance=restore,schema_rehearsal=schema,candidate_gate_bundle=gates)
+        self.request['evidence_sha256'] = {key:TX.sha(TX.encoded(value)) for key,value in docs.items()}
+        checked = self.adapter.validate_dependencies(docs,self.request,self.now)
+        self.assertEqual(checked['backup']['encrypted_sha256'], checked['restore']['encrypted_archive_sha256'])
+        restore['encrypted_archive_sha256'] = 'e'*64
+        self.request['evidence_sha256']['restore_acceptance'] = TX.sha(TX.encoded(restore))
+        with self.assertRaisesRegex(ValueError,'restore archive'):
+            self.adapter.validate_dependencies(docs,self.request,self.now)
+
+    def test_adapter_failure_is_sticky_and_containment_does_not_need_live_authority(self):
+        from types import SimpleNamespace
+        q, grant, policy, env, reviews, get, archive = self.production_authority()
+        calls = []
+        def invoke(name, *args):
+            calls.append(name)
+            return dict(schema='clearapi.successor-host-result/v1', operation=name,
+                        request_sha256=q['request_sha256'], status='UNKNOWN', value=None)
+        host = SimpleNamespace(authorize=lambda *args: True, invoke=invoke,
+            contain=lambda request, context, deadline: calls.append(deadline) or dict(stopped=True))
+        window = SimpleNamespace(check=lambda request: None,
+            perform=lambda request, name, action, *args: action(name, *args))
+        adapter = self.adapter.ProductionAdapter(get_json=get, get_bytes=lambda *args: b'',
+            candidate_policy=lambda: dict(policy_id='c'*32, bindings={}, control_files_sha256={}),
+            production_policy=lambda: copy.deepcopy(policy),
+            evidence_bindings=lambda: {}, host=host, window=window, qualify=lambda *args, **kw: q,
+            now=lambda: self.now)
+        with patch.object(self.adapter, 'production_grant', return_value=grant), \
+             patch.object(self.adapter, 'inspect_server_controls', return_value=dict(repository_id=1)):
+            adapter.authenticate(self.request, q['request_sha256'])
+            adapter.dependencies = dict(fixture=True)
+            with self.assertRaises(ValueError): adapter.prepare_runtime(self.request, {})
+            self.assertTrue(adapter.failed)
+            with self.assertRaises(ValueError): adapter.prepare_runtime(self.request, {})
+            self.assertEqual(calls, ['prepare_runtime'])
+            policy['revoked'] = True
+            with self.assertRaises(ValueError): adapter.authenticate(self.request, q['request_sha256'])
+            self.assertTrue(adapter.failed)
+            policy['revoked'] = False
+            with self.assertRaises(ValueError): adapter.authenticate(self.request, q['request_sha256'])
+        self.now += timedelta(seconds=301)
+        self.assertEqual(adapter.contain(self.request, {}), dict(stopped=True))
+        self.assertGreater(calls[-1], self.now, 'containment retains a bounded grace after lease expiry')
+
+    @unittest.skipUnless(os.name == 'posix' and os.geteuid() == 0, 'Linux host-mounted launcher fixture')
+    def test_launcher_reads_a_fresh_challenge_each_start_and_never_removes_old_proof(self):
+        # Execute real /bin/sh against fixture paths; neither /run/clearapi nor
+        # the production binary exists in this isolated filesystem projection.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            identity = root/'identity'
+            identity.mkdir(mode=0o750)
+            identity.chmod(0o750)
+            proof = root/'migration-proof.json'
+            receiver = root/'receive.sh'
+            receiver.write_text('#!/bin/sh\nprintf "%s" "$CLEARAPI_MIGRATION_PROOF_CHALLENGE"\n')
+            receiver.chmod(0o750)
+            script = (SCRIPTS/'production-migration-entrypoint.sh').read_text()
+            script = script.replace('/run/clearapi', str(identity)).replace(
+                '/tmp/clearapi-migration-proof.json', str(proof)).replace('/entrypoint-secure.sh', str(receiver))
+            challenge = identity/'migration-challenge'
+            for value in ('a'*64, 'b'*64):
+                challenge.write_text(value+'\n')
+                challenge.chmod(0o600)
+                result = subprocess.run(['/bin/sh', '-c', script], capture_output=True, text=True)
+                self.assertEqual((result.returncode, result.stdout, result.stderr), (0, value, ''))
+            challenge.write_text('c'*64+'\nEXTRA')
+            self.assertNotEqual(subprocess.run(['/bin/sh','-c',script],capture_output=True).returncode, 0)
+            challenge.write_text('c'*64+'\n')
+            proof.write_text('preserve original failure receipt')
+            self.assertNotEqual(subprocess.run(['/bin/sh','-c',script],capture_output=True).returncode, 0)
+            self.assertEqual(proof.read_text(), 'preserve original failure receipt')
 
 
 if __name__ == '__main__':

@@ -1,5 +1,43 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-21 — Production Readiness 自主补齐（本轮最新，生产仍 BLOCKED）
+
+本节取代历史“完整adapter尚未实现”的当前开发状态，历史记录与失败证据保留。正式待批包：`evidence/pg03-production-approval-package-20261021.md`；候选/观测/恢复协议与管理员清单分别见同目录新增报告。
+
+- 固定 source799a / RC39511197302/1 / digest729fdd 的真实隔离39517646061/1继续PASS，本轮未重跑；应用/迁移/依赖/Dockerfile未改，不需重建应用RC。生产资格不自动继承，旧current-main门禁保留。
+- 已新增只读候选资格协议、实际source/control差异与控制字节绑定、到期/撤销/重放拒绝；独立grant工作流只产审批artifact，无生产步骤，本轮未dispatch。
+- 已新增两阶段新鲜采集/60秒连续观察和五阶段ExecutionWindow、独立grant与六类证据协调器、固定ProductionHost动作及每phase持久journal、同CID fresh challenge启动器；默认无现场transport或执行权限。
+- 已新增离线备份材料审计及默认plan的签名授权独立恢复runner。真实备份/密钥/生产DB均未接触；独立日志库若存在而缺dump即拒绝。真实生产producer/源指纹、采集身份、全writer窗口、backup/restore和adapter现场验收仍BLOCKED/UNKNOWN/NOT RUN。
+- 本轮本地测试、独立审查、PR/CI及最终控制commit以待批包末尾最终记录为准。开发变更不能冒充生产验收；未连接生产SSH、安装权限/配置、生产helper/DB/容器操作或正式部署。
+
+剩余最小事项：负责人独立批准source/control policy、准确启动写入范围与一次性grant；管理员按清单证明并绑定真实身份/受限collectors/入口冻结/独占锁，完成真实停止态加密备份和独立恢复，审核精确资产安装与现场端到端验收。当前不具备正式生产部署审批条件；不得自动部署或恢复公网。
+
+
+
+## 2026-10-21 07:55 — 真实隔离验收PASS；生产就绪仍BLOCKED（最终最新权威）
+
+本节取代下方历史“当前/待运行”状态，全部旧工作和失败记录保留。最终报告：evidence/pg03-final-acceptance-20261021.md；生产准备：evidence/pg03-successor-production-readiness-20261021.md。
+
+- **P2-1 PASS**：Linux原子发布/失败回读回归及真实runner最终写入/fsync/finalizer/verify-public/白名单上传均通过；不扩大为断电验收。
+- **P2-2 PASS（固定候选真实隔离）**：新source799a608d1b5a79df0f2ef8031a7885f414125778 / RC39511197302/1 / image ghcr.io/a3225865526-wq/clearapi@sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f / binary37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5。候选侧权威迁移凭证、driver错误锁存及三库定向回归已通过；旧69a/07fd不当新对象。
+- **PG03真实隔离 PASS**：专用run39517646061/1 SUCCESS，control f02528c351d4812336980fd56810658a6339b05c；新digest packages:read实际拉取及运行身份匹配。同一独立PG17.6数据库两次完整启动/健康/正常退出，逐次前后schema和独立challenge/CID的原始9字段迁移receipt通过；另空白只读PG真实迁移拒绝SQLSTATE25006/exit1。6个owned容器全部移除、final无剩余/auth清理、持久化与回读成功。
+- 原始成功artifact12308671421及ZIP SHA816b0127874f3a77d50b33e52353742300c8d01ce4d3e3c0d43ea8779589136b、result/success/verification保存于evidence/pg03-isolated-39517646061/；API来源/digest/control文件hash/全部receipt已本地回验exit0，并经独立只读复核通过。仅schema-only/master/共享main-log单PG及该固定镜像，非生产Runtime/业务数据升级。legacy日志capture_complete=false与负向tmpfs proof不可采集均保持原值，不伪造PASS。
+- PR78/79/80/81正常合并，相关完整CI每次7 jobs SUCCESS；最终main f02528的CI39517515354也已7 jobs SUCCESS，三库实际版本SQLite3.50.4/MySQL8.4.6/PostgreSQL17.6。最新PR81日志集中67项OK/0skip；本地Linux73项PASS（含adapter6项）、R2 gate14项PASS、OneShot3项PASS，独立审查通过。原始失败run39514525897和39516153502全部保留；总3次真实演练、修复重跑2/2结束，不再自动追加。
+- **生产就绪/PG03整体 BLOCKED**：现生产current-main资格不接受旧source799a直接套用新control；新鲜只读身份和全writer连续窗口、准确获准启动写入投影、真实停止态加密备份/离线恢复均未获真实验收。successor kernel/备份组件与R2/adapter本地基础已完成对应范围验证；完整production adapter NOT IMPLEMENTED，未安装/激活，不能称“只剩部署审批”。
+
+最小下一步：负责人先确定生产source/control资格协议（最终main冻结新RC验收，或另批分离协议）、只读采集/连续全writer窗口通道和获准写入范围；管理员另批并核实身份/权限/期限与非秘密现场事实；随后完成完整adapter绑定、获准备份/真实恢复与独立一次性生产审批。现行current-main/身份/迁移/权限门禁不降低。生产SSH/配置/数据/容器、正式部署和公网恢复均未执行。任务按情况B收尾，停止在真实授权/协议/证据边界。
+
+
+
+## 2026-10-21 — 最后第2轮隔离重跑已触发，结果待完成（最新权威）
+
+PR81/head1fc0158e7433e8671541ac4775f850d084dd6fd7的CI39516682473七jobs SUCCESS，日志实证集中67项OK且0skip。独立审查通过，新鲜保护/main/两false开关核验后正常合并control f02528c351d4812336980fd56810658a6339b05c；未绕过必需检查/人工要求。完整10-workflow固定字节再次核验后，仅dispatch专用run39517646061/1。
+
+真实总共已触发3次（初次+2轮修复），当前修复重跑2/2，禁止第三轮自动修复重跑。候选仍source799a / RC39511197302 / digest729fdd；最终真实结果待完成。两份原始失败artifact全部保留；未发布成功凭证前P2-2镜像验收/PG03仍BLOCKED。
+
+生产current-main/身份与连续全writer窗口/准确获准写入/真实备份恢复/完整production adapter阻塞不变；安全本地准备已形成待审差异，没有安装/激活或生产执行。
+
+
 
 ## 2026-10-21 — 第1轮重跑迁移凭证校验失败；最后hostname修复待CI（最新权威）
 

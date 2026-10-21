@@ -185,6 +185,10 @@ jobs:
           TEST_PG03_POSTGRES_LOG_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/pg03_proof_log?sslmode=disable
         run: go test -count=1 -timeout=5m -v ./internal/migrationproof ./model -run 'TestMigrationProof|TestRetiredOptionsCannotPublishCompletion'
 
+      - name: Verify offline restore against real isolated PostgreSQL
+        if: matrix.dialect == 'postgres'
+        run: sudo env PG03_REAL_OFFLINE_RESTORE=true GITHUB_ACTIONS="$GITHUB_ACTIONS" RUNNER_ENVIRONMENT="$RUNNER_ENVIRONMENT" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" python3 scripts/ci/test-pg03-restore-acceptance.py RealPostgresRestoreTest
+
   frontend:
     name: Frontend typecheck and test
     runs-on: ubuntu-latest
@@ -255,6 +259,12 @@ jobs:
           sudo python3 scripts/ci/test-pg03-release.py
           sudo python3 scripts/ci/test-failed-recovery.py
           sudo python3 scripts/ci/test-pg03-successor-plan.py
+          sudo python3 scripts/ci/test-pg03-candidate-qualification.py
+          sudo python3 scripts/ci/test-pg03-observation.py
+          sudo python3 scripts/ci/test-pg03-restore-acceptance.py
+          sudo python3 scripts/ci/test-pg03-successor-host.py
+          sh -n scripts/production-migration-entrypoint.sh
+          shellcheck --severity=warning scripts/production-migration-entrypoint.sh
           sudo python3 scripts/ci/test-runtime-boot-recovery.py
           sudo visudo --check --file scripts/pg03-deploy.sudoers
           sudo python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest

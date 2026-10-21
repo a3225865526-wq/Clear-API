@@ -1,3 +1,5 @@
+> 2026-10-21 本轮更新：本地候选资格、连续/执行窗口、适配器协调器、固定host动作、外部challenge启动器及离线恢复runner已补齐开发，状态与验证以 `pg03-production-approval-package-20261021.md` 为准。下文为既有阶段记录，保留其历史实现和真实证据边界。现场身份/collectors、真实备份恢复、生产授权/验收与正式部署仍 BLOCKED / NOT RUN。
+
 # PG03 successor：生产准备及边界（2026-10-21）
 
 状态：本地准备；生产事实、真实备份/恢复、完整 successor 生产执行器仍 BLOCKED。此报告不是生产授权。候选及真实隔离验收以总控当前记录为准。
@@ -61,3 +63,34 @@
 回滚默认是停止新增Gateway、Caddy保持隔离、保存失败证据并人工评估：旧failed仍failed；previous_success只是历史引用，不代表与当前schema/账务可直接回退。数据库、Pool高水位/receipts不可自动覆盖或恢复；需要真实新备份、兼容性和单独授权。未验证项仍UNKNOWN，禁止把本地模拟标成生产验收。
 
 本地kernel依据OWASP Transaction Authorization（服务器验证、交易绑定、限时与一次性消费）、Authentication/Session Management指引分离认证与数据校验；当前生产adapter未实现，未声明ASVS5.0.0合规。官方参考：https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html 、https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html 、https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html 。
+
+
+## 本轮后续本地准备增量（未安装/未激活/未发布）
+
+以下增量在工作区形成待审差异，未纳入隔离修复PR80，也未把既有未跟踪只读工具整体发布。既有helper/window/readers字节和PINS保留。此节取代上文“gate尚无本地实现”的状态，但不改变身份方案待批及生产禁令。
+
+- `scripts/clearapi-observer-gate.py`：R2 A一次性候选，固定无参root入口、SUDO_UID、root dirfd路径/模式/单链接/ACL/capability、授权实际ext4/XFS/Btrfs存储和相同device、稳定flock；active/boot/UTC-CLOCK_BOOTTIME双锚与≤300秒；claim先于stdin和fork，排他创建/fsync文件+目录。固定helper、绝对期限/输入输出边界、进程组和pidfd、HUP/TERM/INT/PIPE/ALRM异常收敛、发布后再验期限/撤销。无初始化/重置/重放或凭据loader。
+- 回执保守记录HELPER_VERIFIED_DELIVERY_UNKNOWN或UNKNOWN，客户端交付失败不返还claim。任意claim形态永久消耗；SIGKILL/不可中断内核操作/恶意root/磁盘快照回滚不冒称自动收敛，后续批次须管理员先证明旧会话/进程结束。候选脚本不安装，active/授权目录/锁/key均未在生产创建。
+- `scripts/recovery-tool-observer.py`：独立OneShotReader契约，固定gate/UID/auth_id/key指纹/期限/管理员资格引用及代码hash，首次attempt先消耗、任何结果不能第二次read；复用原reader并核对helper/runtime投影。无live默认，输出gate_claim_verified=false、continuous_window_qualified=false、execution_allowed=false。原v1 WindowDriver不变且拒绝R2 schema；A仍不能用于连续60秒窗口，原helper仍没有DB/schema/金融/Executor epoch投影。服务端claim实际来源仍待管理员提供，helper原JSON不冒充claim证明。
+- `scripts/pg03-successor-adapter.py`：注入GET-only transport的live main/strict保护/两false开关核验、successful exact run/attempt/artifact API digest与原ZIP来源、六类payload字节hash与唯一JSON；scope精确列/有界行/选择与前后hash/背景worker合同；真实恢复必须有decrypt/archive/pg_restore/data/index/constraint/unique/PG03/log/cleanup完整合同且绑定本次backup和request。所有内容仍需真实来源，不由JSON中的pass/approval_ref授予权限。
+- 固定Gateway命令只编译待审argv，不执行；沿用事故`/opt/clearapi/app`、`/run/clearapi`与150秒停止合同，仅new-api、no-deps/no-build/pull-never。无SSH、Compose执行、生产workflow/审批协议或完整production adapter；旧failed/source/previous_success不篡改。R2 gate中的bounded runner已实际测试，但尚未与生产adapter接线。
+
+实际验证：Linux root gate14项PASS/exit0，包括真实临时文件持久化、flock、重复请求、claim sync失败、helper输出/时限/错误、pidfd失败、跨期限/撤销及实际HUP/TERM后helper退出。初次input泄漏断言误含合成审批ref，已改唯一输入标识；初次信号测试发现selectors会吞InterruptedError，改为自定义GateAbort后同测试通过。没有删除失败事实。Windows adapter6项合同/来源/精确绑定/命令计划测试PASS；Windows OneShot3项PASS；Linux root原observer全16项PASS（随后strict regex/runtime投影变更已定向3项复跑PASS）。集中successor新增adapter方法在原文件，未新增散落测试。
+
+独立审查发现并修复：gate的发布后期限、auth实际挂载、启动审计、运行中信号收敛；adapter三处raw/backup hash绑定、真实路径与超时；OneShot auth/key正则。最终复核以实际返回记录为准；这些局部PASS不代表完整生产adapter或端到端PASS。
+
+### 仍需负责人决定/管理员事实的最小依赖
+
+1. 为只读生产资格单独选择并批准身份方案；A单次只能获得有限snapshot，连续全writer窗口需要不同的明确协议与获准通道。不能把本地A实现当作负责人已选择A，更不能据此SSH或安装。
+2. 新鲜候选配置/任务和金融状态的无秘密只读投影，明确允许的schema/DML/背景任务与列/行级范围；现在不能自行批准奖励结算、额度清理、策略变更、外联或队列消费。字段合同已准备，真实collector和批准内容仍缺。
+3. 覆盖全部writer的独占窗口承诺与实际连续证明、停止态加密备份授权、离线私钥环境及真实PostgreSQL恢复验收。合成GPG/DB替身不替代这些事实。
+4. 独立的一次性生产审批协议与服务器来源，最终adapter安装资产/文件/SSH/sudo资格及端到端验收。当前只完成基础和kernel，完整production apply adapter NOT IMPLEMENTED；不把“仅剩部署按钮”写为事实。
+
+依赖清晰前保留BLOCKED，不调用旧failed recovery、deploy/VPS或生产SSH补齐。
+
+
+### 候选source与生产current-main门禁
+
+独立只读复核确认：现`pg03-release-control.py`的approved_run/approved_rc都要求候选/部署commit等于实时main；799a候选与后续隔离控制merge已分开。独立隔离PASS（若实际取得）只绑定799a/729fdd，不能因此声明该旧source具备现生产入口资格。本轮修复只改独立控制，不改候选应用Go/Dockerfile，故当前隔离对象仍799a；但生产current-main检查完整保留，不自动降级或沿用过期资格。
+
+生产前选择：最终代码冻结后，以最终main构建并验收新RC；或负责人另行审阅并批准source/control分离的一次性successor授权协议，再实现/审查/验收。该协议尚未决定，完整adapter不能靠自行跳过旧门禁完成。任务安全本地准备组件已独立复核通过，现场及协议缺口仍明确BLOCKED。
