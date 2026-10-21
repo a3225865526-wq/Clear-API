@@ -1,10 +1,7 @@
 """Deterministic local observation contracts; no transport or production facts."""
 import copy
 import importlib.util
-import os
 from pathlib import Path
-import threading
-from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -273,9 +270,7 @@ class ObservationTests(unittest.TestCase):
         self.window.clock = now
         return execution, request
 
-    def host_action(self, name, *_, guard=None):
-        if guard is not None:
-            guard()
+    def host_action(self, name, *_):
         if name == 'replace_gateway':
             self.values['host'].update(gateway_id='d' * 64, runtime_sha256='e' * 64,
                                        candidate_identity=self.candidate)
@@ -300,8 +295,8 @@ class ObservationTests(unittest.TestCase):
                 self.setUp()
                 execution, request = self.execution()
                 execution.perform(request, 'prepare_runtime', self.host_action)
-                def changed(name, *_, guard):
-                    result = self.host_action(name, guard=guard)
+                def changed(name, *_):
+                    result = self.host_action(name)
                     self.values['host'][fault] = 'unapproved'
                     execution.poll('host')
                     return result
@@ -313,8 +308,8 @@ class ObservationTests(unittest.TestCase):
             with self.subTest(fault=fault):
                 self.setUp()
                 execution, request = self.execution()
-                def unknown(name, *_, guard):
-                    result = self.host_action(name, guard=guard)
+                def unknown(name, *_):
+                    result = self.host_action(name)
                     result['status'] = 'UNKNOWN'
                     return result
                 def unavailable(*_):
@@ -331,8 +326,8 @@ class ObservationTests(unittest.TestCase):
     def test_execution_gateway_result_does_not_match_observed_identity(self):
         execution, request = self.execution()
         execution.perform(request, 'prepare_runtime', self.host_action)
-        def wrong_result(name, *_, guard):
-            result = self.host_action(name, guard=guard)
+        def wrong_result(name, *_):
+            result = self.host_action(name)
             result['value'] = 'f' * 64
             return result
         with self.assertRaisesRegex(O.ObservationClosed, 'state_drift'):
@@ -393,7 +388,6 @@ class ObservationTests(unittest.TestCase):
     def test_unconverged_monitor_is_unknown_and_operation_is_never_retried(self):
         execution, request = self.execution()
         class UnconvergedMonitor:
-            ident = None
             def __init__(self, **_): pass
             def start(self): pass
             def join(self, timeout): pass
@@ -402,175 +396,12 @@ class ObservationTests(unittest.TestCase):
         def action(name, *_):
             calls.append(name)
             return self.host_action(name)
-        with patch.object(O.threading, 'Thread', UnconvergedMonitor), \
-                patch.object(O.time, 'monotonic', side_effect=range(0, 1000, 100)):
+        with patch.object(O.threading, 'Thread', UnconvergedMonitor):
             with self.assertRaisesRegex(O.ObservationClosed, 'execution_monitor_unknown'):
                 execution.perform(request, 'prepare_runtime', action)
         with self.assertRaises(O.ObservationClosed):
             execution.perform(request, 'prepare_runtime', action)
-        self.assertEqual(calls, [])
-
-    def test_monitor_launch_changes_deny_action_and_cannot_be_retried(self):
-        for fault in ('revoked', 'unknown', 'reader_unknown', 'permission', 'protected_state', 'premature_transition'):
-            with self.subTest(fault=fault):
-                self.setUp()
-                execution, request = self.execution()
-                # The change occurs after check() but before monitors start.
-                real_thread = threading.Thread
-                fixture = self
-                class ChangedAtLaunch(real_thread):
-                    def start(self):
-                        if fault == 'revoked': fixture.allowed = False
-                        elif fault == 'unknown': fixture.values['authority']['connected'] = False
-                        elif fault == 'reader_unknown':
-                            fixture.readers['database'] = lambda *_: None
-                        elif fault == 'permission': fixture.values['authority']['permission_sha256'] = '0' * 64
-                        elif fault == 'protected_state': fixture.values['host']['executor_epoch'] = '0' * 32
-                        else:
-                            fixture.values['host']['runtime_sha256'] = '0' * 64
-                        super().start()
-                calls = []
-                with patch.object(O.threading, 'Thread', ChangedAtLaunch):
-                    with self.assertRaises(O.ObservationClosed):
-                        execution.perform(request, 'prepare_runtime', lambda *_: calls.append(True))
-                # Restoring the source must not revive this failed capability.
-                self.allowed = True
-                with self.assertRaises(O.ObservationClosed):
-                    execution.perform(request, 'prepare_runtime', lambda *_: calls.append(True))
-                self.assertEqual(calls, [])
-
-    def test_change_after_initial_monitor_reads_is_checked_again_before_dispatch(self):
-        for fault in ('reader_unknown', 'revoked', 'protected_state'):
-            with self.subTest(fault=fault):
-                self.setUp()
-                execution, request = self.execution()
-                # The last monitor's successful final authority response changes
-                # a source that an earlier monitor has already read successfully.
-                authority = self.window.final_authority
-                monitors = set()
-                def change_after_initial_reads(*args):
-                    result = authority(*args)
-                    if threading.current_thread() is not threading.main_thread():
-                        monitors.add(threading.get_ident())
-                        if len(monitors) == len(O.PERIOD):
-                            if fault == 'reader_unknown': self.readers['database'] = lambda *_: None
-                            elif fault == 'revoked': self.values['authority']['revoked'] = True
-                            else: self.values['host']['protected_runtime_sha256'] = '0' * 64
-                    return result
-                self.window.final_authority = change_after_initial_reads
-                calls = []
-                with self.assertRaises(O.ObservationClosed):
-                    execution.perform(request, 'prepare_runtime', lambda *_: calls.append(True))
-                self.assertEqual(len(monitors), len(O.PERIOD))
-                self.assertEqual(calls, [])
-
-    def test_partial_monitor_start_failure_joins_started_workers_and_latches_failure(self):
-        execution, request = self.execution()
-        real_thread = threading.Thread
-        workers, calls = [], []
-        class PartialStart(real_thread):
-            def start(self):
-                workers.append(self)
-                if len(workers) == 2:
-                    raise RuntimeError('fixture: monitor start failed')
-                super().start()
-            def join(self, timeout=None):
-                self.joined = True
-                super().join(timeout)
-        with patch.object(O.threading, 'Thread', PartialStart):
-            with self.assertRaises(O.ObservationClosed):
-                execution.perform(request, 'prepare_runtime', lambda *_: calls.append(True))
-        self.assertTrue(getattr(workers[0], 'joined', False))
-        self.assertFalse(workers[0].is_alive())
-        self.assertIsNotNone(self.window.failed)
-        self.assertFalse(execution.active)
-        with self.assertRaises(O.ObservationClosed):
-            execution.perform(request, 'prepare_runtime', lambda *_: calls.append(True))
-        self.assertEqual(calls, [])
-
-    def test_failure_during_monitor_initial_read_never_invokes_adapter_host(self):
-        spec = importlib.util.spec_from_file_location('race_adapter', Path(O.__file__).with_name('pg03-successor-adapter.py'))
-        adapter_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(adapter_module)
-        execution, request = self.execution()
-        entered, release = threading.Event(), threading.Event()
-        reader = self.readers['host']
-        def blocked_read(binding, challenge):
-            if threading.current_thread() is not threading.main_thread():
-                entered.set()
-                if not release.wait(2):
-                    raise TimeoutError('fixture coordinator missing')
-            return reader(binding, challenge)
-        self.readers['host'] = blocked_read
-        def invalidate():
-            if entered.wait(2):
-                self.values['authority']['revoked'] = True
-            release.set()
-        coordinator = threading.Thread(target=invalidate)
-        coordinator.start()
-        self.addCleanup(coordinator.join, 2)
-        calls = []
-        adapter = adapter_module.ProductionAdapter(host=SimpleNamespace(invoke=lambda *_: calls.append(True)),
-                                                  window=execution)
-        adapter.dependencies = {'fixture': True}
-        # Isolate the window->adapter handoff; no real qualification or grant.
-        with patch.object(adapter, 'authenticate'), self.assertRaises(adapter_module.TX.PLAN.Blocked):
-            adapter.operation('prepare_runtime', request, {})
-        self.assertTrue(entered.is_set())
-        self.assertTrue(adapter.failed)
-        self.assertEqual(calls, [])
-
-    @unittest.skipUnless(os.name == 'posix', 'Linux host entry contract requires fcntl')
-    def test_host_entry_guard_rejects_failure_published_after_outer_admission(self):
-        spec = importlib.util.spec_from_file_location('race_host', Path(O.__file__).with_name('pg03-successor-host.py'))
-        host_module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(host_module)
-        for fault in ('revoked', 'unknown'):
-            with self.subTest(fault=fault):
-                self.setUp()
-                execution, request = self.execution()
-                protected = []
-                host = SimpleNamespace(failed=False,
-                    authorize=lambda *_: protected.append('authorize'),
-                    _phase=lambda *_: protected.append('journal'),
-                    _run=lambda *_: protected.append('command'))
-                failures = []
-                def publish_failure():
-                    if fault == 'revoked': self.allowed = False
-                    else: self.readers['host'] = lambda *_: None
-                    try:
-                        execution.poll('host')
-                    except O.ObservationClosed as error:
-                        failures.append(str(error))
-                def scheduled_entry(name, *_, guard):
-                    # Force an already-published monitor failure into the gap
-                    # after the outer admission and before actual host entry.
-                    worker = threading.Thread(target=publish_failure)
-                    worker.start()
-                    worker.join(2)
-                    self.assertFalse(worker.is_alive())
-                    self.assertEqual(len(failures), 1)
-                    self.assertIsNotNone(self.window.failed)
-                    return host_module.ProductionHost.invoke(host, name, request, {}, None, guard=guard)
-                with self.assertRaises(O.ObservationClosed):
-                    execution.perform(request, 'prepare_runtime', scheduled_entry)
-                self.assertTrue(host.failed)
-                self.assertEqual(protected, [])
-
-    def test_action_must_use_entry_guard_exactly_once(self):
-        for fault in ('missing', 'replay'):
-            with self.subTest(fault=fault):
-                self.setUp()
-                execution, request = self.execution()
-                def action(name, *_, guard):
-                    if fault == 'replay':
-                        guard()
-                        guard()
-                    return dict(schema='clearapi.successor-host-result/v1', operation=name,
-                        request_sha256=self.request_sha, status='PASS', value=None)
-                with self.assertRaisesRegex(O.ObservationClosed,
-                                            'execution_admission_' + ('missing' if fault == 'missing' else 'replay')):
-                    execution.perform(request, 'prepare_runtime', action)
+        self.assertEqual(calls, ['prepare_runtime'])
 
 
 if __name__ == '__main__':

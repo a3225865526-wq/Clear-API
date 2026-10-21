@@ -281,12 +281,8 @@ class ProductionHost:
         self.last_observation = AD.document(TX.encoded(value))
         return value
 
-    def invoke(self, name, request, context, deadline, *, guard=None):
+    def invoke(self, name, request, context, deadline):
         try:
-            # ExecutionWindow supplies its live one-use guard at actual host
-            # entry, before authorization, journal publication or any command.
-            if guard is not None:
-                guard()
             self.authorize(request, self.grant, deadline)
             require(self.dependencies_verified and self.baseline is not None, 'host dependencies or stopped baseline unverified')
             result_path = self._phase(request, name)

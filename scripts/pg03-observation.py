@@ -515,11 +515,7 @@ class ExecutionWindow:
         return self.window.report()
 
     def perform(self, request, name, action, *args):
-        """Run one fixed host operation with live monitoring; never retries it.
-
-        Trusted actions must call the supplied keyword-only guard at their entry,
-        before any protected work. It is one-use and cannot come from request JSON.
-        """
+        """Run one fixed host operation with live monitoring; never retries it."""
         self.window.require(self._operation_lock.acquire(blocking=False), 'concurrent_operation')
         stop, threads, errors = threading.Event(), [], []
         try:
@@ -529,80 +525,28 @@ class ExecutionWindow:
             stage = self.policy['stages'][self.index]
             self.active = True
 
-            def monitor(channel, ready):
+            def monitor(channel):
                 try:
-                    # Thread.start() is not evidence that a monitor has read
-                    # anything. Its first read must still see the exact before
-                    # state, not a transition that only the action may cause.
-                    self._collect(channel, [stage['before']])
-                    self._check_binding(request)
-                    ready.set()
                     while not stop.wait(PERIOD[channel]):
                         self.poll(channel)
                         self._check_binding(request)
                 except BaseException:
+                    errors.append(channel)
                     stop.set()
-                    with self._lock:
-                        errors.append(channel)
-                    ready.set()
 
+            for channel in PERIOD:
+                worker = threading.Thread(target=monitor, args=(channel,), daemon=True)
+                threads.append(worker)
+                worker.start()
             try:
-                ready = []
-                startup_deadline = time.monotonic() + max(TTL.values())
-                for channel in PERIOD:
-                    signal = threading.Event()
-                    ready.append(signal)
-                    worker = threading.Thread(target=monitor, args=(channel, signal), daemon=True)
-                    threads.append(worker)
-                    worker.start()
-                for signal in ready:
-                    self.window.require(signal.wait(timeout=max(0, startup_deadline - time.monotonic())),
-                                        'execution_monitor_unknown')
-                self.window.require(time.monotonic() <= startup_deadline, 'execution_monitor_unknown')
-                # Serialize the final fresh admission reads with monitor reads
-                # and error publication. Initial readiness cannot cover a later
-                # revocation, UNKNOWN or concurrent change while other readers
-                # were starting. Failure remains latched for this capability.
-                with self._lock:
-                    self.window.require(not stop.is_set() and not errors
-                        and all(worker.is_alive() for worker in threads), 'execution_monitor_unknown')
-                    for channel in PERIOD:
-                        self._collect(channel, [stage['before']])
-                    self._check_binding(request)
-                    self.window.require(not stop.is_set() and not errors, 'execution_monitor_unknown')
-                # Revocation after admission still requires the installed host's
-                # bounded authority/fencing contract; polling cannot undo writes.
-                admitted = False
-
-                def guard():
-                    # The trusted action calls this at its actual entry before
-                    # any journal or command. An outer check alone leaves a
-                    # schedulable gap in which a monitor can latch a failure.
-                    nonlocal admitted
-                    with self._lock:
-                        self.window.require(not admitted, 'execution_admission_replay')
-                        self.window.require(not stop.is_set() and not errors
-                            and all(worker.is_alive() for worker in threads), 'execution_monitor_unknown')
-                        for channel in PERIOD:
-                            self._collect(channel, [stage['before']])
-                        self._check_binding(request)
-                        self.window.require(not stop.is_set() and not errors, 'execution_monitor_unknown')
-                        admitted = True
-
-                try:
-                    result = action(name, *args, guard=guard)
-                except BaseException:
-                    self.window.fail('operation_outcome_unknown')
-                self.window.require(admitted, 'execution_admission_missing')
+                result = action(name, *args)
+            except BaseException:
+                self.window.fail('operation_outcome_unknown')
             finally:
                 stop.set()
                 join_deadline = time.monotonic() + 5
                 for worker in threads:
-                    if worker.ident is not None:
-                        try:
-                            worker.join(timeout=max(0, join_deadline - time.monotonic()))
-                        except BaseException:
-                            errors.append('join_unknown')
+                    worker.join(timeout=max(0, join_deadline - time.monotonic()))
             self.window.require(not errors and not any(worker.is_alive() for worker in threads),
                                 'execution_monitor_unknown')
             self.window.require(type(result) is dict and set(result) ==
