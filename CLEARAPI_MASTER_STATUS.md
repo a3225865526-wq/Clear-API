@@ -1,5 +1,105 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-22 — 非 PG03 本地启动资产复核完成；生产仍未授权
+
+续办复核确认：冷启动时 `/opt/clearapi/runtime` 缺失的创建顺序、Compose durable bind source、容器 `/run/clearapi` 目标和 inventory/manifest/helper 身份绑定已在本地形成一致合同。独立只读审查未发现当前冷启动修复或生成 installer 的新阻塞；审查没有重跑测试。更早报告中“路径不一致/旧 inventory 无法安装新资产”的结论保留为历史，已由 2026-10-22 的新实现和隔离证据取代。
+
+- 既有隔离验证继续有效：runtime recovery 16/16、candidate installer 34/34、automatic release policy 44/44、rehearsal producer 9/9、backup tool 28/28；独立 review 确认生成包绑定 tree/RC manifest/image digest/helper/资产 hash。无生产访问或变更。
+- 已完成与当前工作树源码相符的本地 off snapshot build；最终 tree、二进制、OCI 与 runtime bundle 哈希以 `evidence/non-pg03-20261021/RESULT.md` 中本节为准。该 build 仍不是 GitHub RC、GHCR digest 或生产部署身份。
+- off rehearsal 的普通 Provider 和 pool-disabled gate 使用实际本地行为测试；proof 不依赖 PG03 Executor 配对。生产 authorizer 仍拒绝 off：当前 failed/isolated 生产基线、host 模式转换合同以及真实备份/恢复/镜像-数据回退均未具备。不得移除此门禁来绕过现场恢复要求。
+- 正式 commit、受保护 main CI、GitHub RC、GHCR exact-digest roundtrip、真实生产备份与独立恢复、成对回退、现场 boot bundle 安装、线上验收均为 NOT RUN/BLOCKED；现场状态新鲜度 UNKNOWN。未提交、推送、触发 workflow、访问生产或部署。PG03 与账号池保持关闭。
+
+## 2026-10-22 — durable runtime 与候选资产绑定修复；本地镜像已构建
+
+候选 runtime 目录统一为 /opt/clearapi/runtime/new-api，与生产 Compose bind source 一致；容器内挂载目标仍为 /run/clearapi。启动资产先安全创建缺失的 /opt/clearapi/runtime，再由 tmpfiles 确保 runtime 目录 root:root/0750。旧 installer/source/inventory 未被覆盖；新增 bundle builder 从明确的 Git tree 与 RC manifest 生成新 inventory/installer，绑定 manifest SHA、OCI digest、tree、runtime/helper 和六项资产 SHA。旧 inventory、manifest/tree/helper 改动均在隔离测试中被拒绝。历史事故工具/记录保留，并拒绝用新 helper 处理冻结事故镜像。
+
+- test-runtime-boot-recovery.py：16/16 PASS，覆盖冷启动父目录缺失创建、危险父目录拒绝、tmpfiles、身份重建、停止态和镜像/mount 漂移 fail-closed。
+- test-boot-recovery-install.py：34/34 PASS，覆盖新 tree/manifest bundle、旧 inventory/错 RC/helper 哈希拒绝、隔离安装/归档/安装回滚，不启动服务。
+- Release/off gates：自动授权 44/44、rehearsal producer 9/9、backup tool 28/28 PASS；workflow YAML、Python/Bash 语法及 git diff --check PASS。上述不构成真实生产备份、真实恢复或现场兼容证据。
+- 本地 build：source tree f943440be1bab83712f7103c38ec8287c8d7498a（base f2e179ebc8e2d0f29b06603376a49a1058f9d496；不是 commit）；local run local-20261021T211111Z；linux/amd64 digest sha256:fcb733e9761b084c9721279d4e20270ab5cc29db0218e9a90b6c39d490496aad；Gateway binary SHA256 979713027c986fbd3d4f2e95bf74414f0f3db26481d19bc10c4753162bd9c394。source tar/OCI image archive 与 runtime bundle hashes 已记录；资产包绑定同一 digest/tree。产物位于 evidence/non-pg03-20261021/local-off-rc-20261022T-build1/。
+- 不是正式 RC，也不可部署：没有 Git commit、GitHub RC run/artifact、GHCR push/pull roundtrip、已认证 CI 或 main 合并；manifest 明确 source_commit=null、production_ready=false。不能把该本地 digest 提交为生产部署目标。
+- 生产审批包仍不可执行：最新生产状态 UNKNOWN；真实新备份、独立恢复、真实数据库/镜像回退、host 四工具合同升级、boot bundle 实际兼容安装及线上验收均 NOT RUN/BLOCKED。off authorizer 仍 fail-closed；PG03 保持关闭。未访问或变更生产、未触发 workflow/发布/部署。现场执行前需先形成正式 commit/CI/RC/registry identity，然后以该身份重做资产 bundle。
+
+## 2026-10-22 — off gate 证据来源修正；上线仍 BLOCKED
+
+复用独立只读审查发现，将 off rehearsal 的备份/回滚步骤由操作员 JSON 自述改成实际本地合同测试；清除已不可达的自述 Provider/pool-disabled verifier 测试。PG03 对应外部证据门禁未改变，off 生产授权仍在 host admission 前 fail-closed。
+
+- `wsl python3 -B scripts/ci/test-automatic-release.py -v`：44/44 PASS；包括 off 生产授权拒绝。
+- `wsl python3 -B scripts/ci/test-rehearsal-producer.py -v`：9/9 PASS，断言 off backup/rollback、Provider 与 pool gate 调用实际测试。
+- `wsl python3 -B scripts/ci/test-backup-identity.py -v`：28/28 PASS，均为本地临时数据/替身；不代表生产备份或真实恢复。
+- `wsl python3 -B scripts/ci/test-production-deploy.py -k rollback -v`：4/4 PASS，限本地回滚合同用例。rehearsal YAML 解析及相关 `git diff --check` PASS。
+- **仍 BLOCKED**：旧 installer/inventory 固定于旧 RC/source，不能安装当前修改后的 runtime helper；候选 Compose 使用 durable `/opt/clearapi/runtime/new-api`，但启动资产只准备 `/run/clearapi`，两者尚未形成兼容、获审的新绑定包。真实备份、独立恢复、数据与镜像回退均 NOT RUN；失败→off host contract 未验收。当前 `sha256:f93f02ea…fa5b06`不包含本地改动，不能作为本轮候选。生产状态新鲜性 UNKNOWN；未连接或更改生产、未触发 workflow、未部署，PG03 维持关闭。
+
+## 2026-10-22 — 本地隔离复验更新；生产仍 BLOCKED
+
+修正本地boot恢复检查：从准确Gateway inspect读取并核验实际只读bind源，候选允许durable runtime路径，冻结事故仍锁定原volatile路径，未知路径/mount漂移拒绝；仅依据该源处理身份文件，不擅自改Compose。新增对应隔离回归。没有修改生产配置，没有连接生产、操作数据库或容器/服务、安装boot资产、触发workflow或部署。完整逐项状态见[evidence/non-pg03-20261021/RESULT.md](evidence/non-pg03-20261021/RESULT.md)的“2026-10-22”节。
+
+- `wsl python3 -B scripts/ci/test-runtime-boot-recovery.py -v`：14项PASS。验证mounted runtime源绑定、tmpfiles目录恢复、启动顺序及停止态不启动Gateway；不代表生产资产已安装。
+- `wsl python3 -B scripts/ci/test-boot-recovery-install.py -v`：31项PASS。验证本地隔离安装事务/回滚和systemd合同；不代表生产主机已有工具与安装器兼容。
+- `wsl python3 -B scripts/ci/test-backup-identity.py -v`：27项PASS。验证身份、停止态合同、失败码和临时fixture备份/恢复行为；不代表真实生产备份或恢复通过。
+- **生产发布保持 BLOCKED**：Gateway挂载根因为缺失宿主`/run/clearapi`已确认，但生产boot/helper兼容资产、准确新备份、独立真实恢复及旧镜像/数据回退尚未闭环。failed→off模式转换与off真实自动发布链也未验收。远端当前状态未重新读取，保持UNKNOWN；不得将本地演练或旧候选证据表述为当前线上成功。
+- RC `39619413994/1` / `sha256:f93f02ea…fa5b06`仍仅为未部署候选；PG03维持关闭。下一阶段生产操作须另行取得覆盖准确目标和步骤的负责人批准。
+
+## 2026-10-21 23:52 上海 — 获批一次有界只读诊断完成：备份首错与 Gateway 挂载故障已确认；发布仍 BLOCKED（最新权威）
+
+用户已明确批准上轮约定的一次诊断。本轮实际仅1次SSH会话，复用历史私钥路径及严格ED25519 known_hosts；非交互执行stdin只读Python，不在服务器安装脚本。没有重试采集、重跑备份、reset-failed、服务/容器启停、配置/数据写入、解密恢复、部署或workflow触发。PG03未启用，原现场状态未改动。目标上下文仍为source75b0 / RC39619413994/1 / digest`f93f02ea…fa5b06`。
+
+- **备份首个失败 CONFIRMED / 诊断PASS**：同一systemd invocation `3f1a8b289e1e46e4b27d5752bfdfff19`于2026-10-20 `19:31:16.415721 UTC`首先报`backup identity verification failed: expected exactly one running new-api container`。运行中Gateway身份前提不满足，在pg_dump前失败。约50毫秒后再报空密文目录`chmod .../20261020T193116Z/*`不存在；它是次生清理错误，不能取代首因。service仍failed/exit1；本轮没有重跑。
+- **实际工具版本 PASS（绑定事故c50a）**：现场backup script=`0d70b1e1…`、identity helper=`fd6f4fe5…`、pg03-state=`1b974d1d…`、runtime-refresh=`afcefce7…`均精确匹配事故c50a Git原字节，root:root/0750。现场identity helper不支持停止态；上轮本地清理/阶段日志修复未安装。真实新备份/独立恢复与数据+旧镜像回退仍BLOCKED/NOT RUN；旧备份hash证据复用，不把只读诊断写成恢复通过。
+- **Gateway故障 CONFIRMED / 诊断PASS**：准确旧CID `f8f963a7…`、image`22ecaa46…`，exited127、非OOM、非restarting。完整OCI错误为初始化期间`failed to fulfil mount request: open /run/clearapi: no such file or directory`；现场该host路径确实不存在，容器仍只读bind该路径。`/opt/clearapi/runtime/new-api`实际存在且root:root/0750，但不是该容器的mount source。有效启动路径为`/entrypoint-secure.sh`；本次失败发生在OCI初始化、进入应用之前，不是已证实的二进制缺失。目录为何消失仍UNKNOWN，未越界读取重启/删除历史。
+- **剩余阻塞**：缺boot helper与既有兼容工具/恢复门禁仍未闭环；不得凭durable目录存在静默改mount。需另批受控writer窗口/准确停止态备份及工具修复，真实隔离恢复+旧镜像回退验收，再完成failed/isolated→off的现场合同。off本地证明修复及31项验证按原范围复用，生产执行护栏保留。当前main、自动开关、PG03调度值及公网未在本次范围重查，保持UNKNOWN（新鲜性），不沿用旧值冒充新观测。
+
+执行/原始脱敏回执/本地归因分别为`evidence/non-pg03-20261021/bounded-diagnostic-execution.json`、`production-bounded-diagnostic.json`、`bounded-diagnostic-findings.json`；详细结果见[RESULT最新诊断节](evidence/non-pg03-20261021/RESULT.md)。**本次一次性诊断已完成并停止，不继续连接生产，不沿用此批准执行修复或恢复。**
+
+## 2026-10-21 — 非 PG03 本地最小修复已落地：31项定向验证 PASS；生产仍 BLOCKED（最新权威）
+
+继续使用现有工作区、source75b0 / RC39619413994/1 / digest`f93f02ea…fa5b06`作为目标上下文。最新结果见[回执本地修复节](evidence/non-pg03-20261021/RESULT.md)；仅本轮8个代码文件的可审阅差异为`evidence/non-pg03-20261021/local-minimal-repair.patch`。既有用户修改全部保留；未提交/推送、安装依赖、连接生产、执行容器/服务操作或触发workflow，未启用PG03。
+
+- **备份本地缺陷 FIXED / PASS；现场首个失败 UNKNOWN**：已复现身份捕获exit17、dump exit23均被空密文目录的`chmod .../*`清理覆盖为exit1；留存现场安装脚本的c50a精确Git原字节也含该缺陷。改为只处理实际存在的文件，保留原始退出码；新增固定phase失败日志，不记录命令/参数/秘密。不是宣称现场19:31:16的首个失败已确认，也没有在生产安装补丁或重跑备份。
+- **Gateway现场恢复 BLOCKED**：复用同CID的历史missing-runtime-mount诊断和后续`/run/clearapi`缺失/exit127；不把仓库durable路径模板套到现场volatile挂载。现有boot/恢复资产方案保留，不凭缺失新鲜错误、备份恢复和兼容工具证据擅改挂载/启动。
+- **off证明合同本地 FIXED / PASS；完整off自动发布仍 BLOCKED**：producer→assembler→validator新增显式off/v2及所有receipt的mode绑定；保留共同11项集合中9项，将PG03专用2项替换为`pool_disabled`和`ordinary_provider_usage_billing`。旧PG03/v1仍受原全部门禁，不能改标签变off；controlled/v1授权对象保持已部署reader所需精确字段。自动workflow读取已验证的mode输出，去掉硬写PG03。**off真实gate producer/现场恢复与模式转换合同未闭环，authorizer明确拒绝off生产执行，旧host护栏未放宽**；没有新生产授权或启用开关。
+- **实际验证**：Linux证明合同与受影响PG03兼容24项PASS；备份失败/成功加密读取/清理失败3项PASS（Docker为严格替身、GPG为临时测试密钥）；producer/assembler兼容4项PASS；Python AST、Bash语法、YAML解析、diff及补丁反向可应用检查PASS。Windows受影响24项中23通过、1项WinError1314符号链接权限错误，原记录保留；Linux同项通过。没有重跑未变前端/应用/三库/真实RC验收。详细日志及hash见同目录`local-repair-receipt.json`。
+
+**下一个真实阻塞**：需要单独批准有界生产只读诊断，取得该失败backup invocation的脱敏首个错误/phase和准确helper版本，同CID Gateway完整State.Error/时间与非秘密mount/entrypoint元数据；本轮不连接。不要求重新粘贴已有文件。准确当前备份的真实独立恢复+旧镜像回退、兼容资产修复和failed/isolated→off现场合同仍BLOCKED/NOT RUN。f93f的旧成功证据按原范围保留，不能作为本轮新control/未来main资格PASS。生产、PG03及公网状态没有变更；最新现场/远端新鲜性UNKNOWN。
+
+## 2026-10-21 — 非 PG03 续办：三个阻塞本地调查完成；等待准确现场证据，生产仍 BLOCKED（最新权威）
+
+本节取代下方各历史“下一步/最新权威”的当前动作；原记录和已有工作区修改全部保留。仍以 source `75b0f09e2a527c5173c1179a6efe697de4f64f39` / RC `39619413994/1` / digest `sha256:f93f02ea737721e621681771424d3b0fca4fd8d1c8d6e3b7804097b793fa5b06` 为目标。详细结论及精确缺失项：[非 PG03 发布回执续办节](evidence/non-pg03-20261021/RESULT.md)。本轮只更新总控及该证据目录；无生产SSH、容器操作、配置/数据/PG03状态变更、workflow触发、依赖安装、提交或推送。
+
+- **备份：BLOCKED；确切失败原因 UNKNOWN。** 复用22:55上海时间的service exit1/failed与旧备份密文/旧镜像在场记录。本轮证明已安装backup脚本hash精确匹配事故c50a源码，dump前要求running Gateway、不支持停止态；Gateway退出与该契约冲突是有代码依据的假设，缺该次journal/backup.log诊断，不能写成已证实根因。候选停止态契约又要求restart=no，而留存现场为unless-stopped；不能直接重跑备份或改restart。未找到该准确备份的真实隔离恢复/数据与旧镜像回退证明；合成恢复CI不能代替。
+- **启动恢复：BLOCKED；历史挂载诊断有证据，最新完整错误 UNKNOWN。** 2026-10-20同CID回执明确missing_runtime_mount_error=true；10-21缓存仍为exit127、host `/run/clearapi`缺失、该目录只读bind。不能把127单独归因为缺少二进制。仓库Compose模板用durable `/opt/clearapi/runtime/new-api`，生产缓存用volatile `/run/clearapi`；当前off overlay不修复mount。候选entrypoint/binary已有RC限定验证，不替代生产effective entrypoint/挂载检查。两helper、四systemd/tmpfiles资产缺失且旧V2/control依赖不兼容，单补七资产不能闭环恢复。
+- **自动off路径：BLOCKED / NOT IMPLEMENTED；静态原因定位 PASS。** 不仅authorize硬写PG03、proof/rehearsal强制Executor及Provider路径，deploy的off分支还要求无rehearsal ID。旧off wrapper要求健康Runtime、零Executor容器和零pool options；保留现场Executor及PG03资产时不可直接使用。V2明确拒绝未经批准的PG03→off退出。最小安全方案是同一链的mode绑定proof/receipt/authorizer/部署合同，保留所有共同CI/身份/迁移/Runtime/计费/备份真实恢复/回滚/熔断门禁，用实际关闭与普通Channel1业务证据承载off；PG03原合同不降级。设计已记录，未改实现或门禁。
+- **本轮本地 PASS（限定范围）**：5项合成拒绝/错误分类探针；新RC ZIP及四项payload完整性、16个相关源码与精确candidate的CRLF规范化一致性、原28项证据inventory。回执：`evidence/non-pg03-20261021/continuation-local-audit.json`。旧RESULT原字节保存为同目录`RESULT.before-continuation.md`，旧inventory保留为历史快照。旧成功CI/启动/合成恢复按原范围复用，未重跑前端/三库或旧整套测试。
+
+**当前最小下一步及停止点**：由管理员提供脱敏失败backup invocation诊断及工具字节绑定，随后提供同CID完整State.Error/时间/非秘密entrypoint与runtime/secret挂载元数据；若需代理现场采集，须另批受限生产只读访问。此请求不包含重跑备份、改变restart、安装、恢复启动或部署。准确当前备份及真实独立恢复/镜像回退、兼容资产修复、failed/isolated→off的一次性恢复授权仍分别必需。本轮不越界取得这些证据，停止于此；当前远端main/自动开关/生产状态新鲜性UNKNOWN，不能沿用历史值冒充本轮新鲜核验。**PG03生产状态不变；非 PG03尚未上线。**
+
+## 2026-10-21 23:00 — PG03 暂缓；非 PG03 新 RC 完成，生产因恢复/回滚门禁停止（最新权威）
+
+当前目标更新为：**PG03 暂不部署，先上线其余网站功能；当前尚未上线。** 历史开发成果、失败记录及并行任务/已有工作区修改全部保留。完整结果、精确命令/版本/限制：[非 PG03 发布回执](evidence/non-pg03-20261021/RESULT.md)。本轮只更新总控和该证据目录，未提交/推送源码，未进行生产变更。
+
+- **新候选真实构建**：远端 main/source `75b0f09e2a527c5173c1179a6efe697de4f64f39`；新 RC `39619413994/1` SUCCESS；新镜像 `ghcr.io/a3225865526-wq/clearapi@sha256:f93f02ea737721e621681771424d3b0fca4fd8d1c8d6e3b7804097b793fa5b06`；binary SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`。通过既有精确 Gateway RC workflow 构建，workflow 的 PG03 名称不代表启用账号池；未用旧镜像冒充新候选。Artifact `12353708716` 原 ZIP/API digest、四项 inventory、source/OCI/Dockerfile/schema 身份已核验；manifest 仍为 production_ready=false / production_acceptance=not_run。本机额外 pull 因 registry scope 被拒；本轮 RC runner 的真实拉取及 binary roundtrip 成功，未声称本机启动通过。
+- **本轮新验证**：CI `39619405764/1` SUCCESS，7 jobs SUCCESS、1 个仅 PR 使用的 PG03 package-read job 条件 SKIPPED。真实 SQLite3.50.4/MySQL8.4.6/PostgreSQL17.6 商业 HTTP 生命周期、迁移及重复启动 PASS；注册/登录/API Key/usage/精确扣费/拒绝退款/零余额阻断使用隔离合成上游，非线上验收。前端220 files/2379 tests及生产构建 PASS，未运行独立 tsgo。后端 root/relaykit 测试实际exit0。本地 wrapper 91PASS/1SKIP（未请求real producer artifact），automatic-release 36PASS。
+- **关闭 PG03 可分离**：普通非pool渠道不要求Executor；管理入口 `CLEARAPI_POOL_ENABLED=false` 和调度master有效值false须分别验证。候选 `compose.non-pg03.candidate.yaml` 显式false，尚未应用。新RC在显式pool=false、无Executor的独立PG17.6完成schema-only两次启动/健康/正常退出，不冒充生产数据升级/恢复。关闭pool不跳过迁移/后台任务，已有source=pool模型不自动降级API。
+- **新鲜生产只读事实（22:50–22:55 Asia/Shanghai）**：复用原Windows OpenSSH私钥路径/既有known_hosts严格校验成功；master行缺省（有效false），pool route/source/bound channel、启用路由链及池候选均0；仅Channel1启用且1条enabled ability，Channel2/3保持禁用。5个用户/6个token聚合检查负余额计数均0，未读取用户凭据。生产schema hash `3c1c77f3…` 与新RC target一致，不以相同DDL代替数据/恢复证明。
+- **实际生产镜像/线上**：没有运行中的Gateway。现存 `clearapi-new-api-1` 为image/digest `sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02`、source `c50a53c1b89e121bcade7dac41d3f11e53a9832a`，Exited127。原容器管理开关仍true，未谎报已改false；调度master/发布状态保持关闭。Executor `sha256:cfad1b51…` 与PG17.6运行，Caddy exited/restart=no。公网首页及/api/status本轮均HTTP521；真实登录/Key/扣费/上游渠道线上验收 NOT RUN。
+- **生产停止条件已触发**：/run/clearapi和boot/recovery资产仍缺失；backup timer active/enabled，但backup service当前failed、ExecMainStatus=1。原加密备份20261020T002138Z的manifest/加密件hash与旧镜像在场已新鲜复核，真实生产数据+镜像恢复仍未验证。官方只读检查39619582548因V2 wrapper/control/backup脚本三项与main不同而FAIL，未调用Runtime。最近真实部署39347012653原日志新鲜回读，确认为切换后PG03 Gateway→Executor门禁失败、未自动回滚。按本次用户要求停止生产写入，不盲目切换或开放Caddy。
+- **当前自动发布链**：11个workflow已按远端main原字节核验；CI(push)→GatewayRC→Deployment rehearsal→Automatic release的自动authorize仍强制pool_mode=pg03及Executor/provider proof，尚无可直接使用的自动off分支。手动off入口存在且旧wrapper字节匹配，但要求健康baseline，不能绕过事故恢复/隔离/回滚门禁。两个自动开关首尾均false；本轮自动下游SKIPPED，strict保护未改，未触发Deploy Production。
+
+剩余最短条件：先解决备份服务失败，完成准确备份的真实隔离恢复/数据与镜像回退，再按受控流程闭环boot资产和失败baseline；随后以最小mode-aware自动流程承载off，保留当前main/CI/RC/镜像/迁移/普通渠道计费/备份恢复/回滚门禁，再上线并验收。若main改变，重新核实候选资格，不能沿用本轮PASS冒充新源码验证。**PG03独立后置**：候选/control资格审查、全writer窗口、真实备份恢复、adapter现场及Executor→Provider usage/billing验收；不删除其成果或启用账号池。非PG03生产发布仍BLOCKED，本轮在真实恢复/回滚阻塞处停止。
+
+## 2026-10-21 — 当前授权收尾：P1 本地修复与独立针对性审查通过；新 control 未提交，生产仍 BLOCKED
+
+本节为本轮最新权威，取代下方“尚需批准本地修复”的当前动作；历史原始 control、失败和验收记录全部保留。报告：`evidence/pg03-control-race-20261021/REPORT.md`；精确候选：同目录 `candidate-manifest.json`；独立最终复审：`independent-final-review.json`。
+
+- 已确认本地 HEAD `f2e179ebc8e2d0f29b06603376a49a1058f9d496` 与历史 control75b0 同 tree617d16；已有脏工作区修改未清理。仅变更 observation、host 和集中 observation 测试三文件，adapter 原字节不变。监视器先完成首轮有效 before 采样；action 前同步核查；实际 host 入口在授权/journal/命令前执行 one-use live guard；失败锁存、部分启动有界收敛且不可重试。
+- 原实现新增回归26项产生9个失败（含subtest），原始日志/代码已保留。第一版27项虽通过，独立调度探针仍确认“已锁存失效后调用action”的P1；该失败版本及独立BLOCKED记录保留。最终入口guard版本经独立AI针对性复审无新增阻断；不冒充完整control/策略来源审查、GitHub人工review或签发。
+- 实际本地验证：WSL observation29、successor-plan82、host12，共123项OK/0skip；Windows observation28通过/1明确fcntl平台skip。三文件AST及定向diff检查通过。fixture不作生产证据；此前Windows独立入口探针的fcntl ERROR如实保留。应用/source/RC/digest及原隔离控制未变，固定真实隔离39517646061/1的有效范围直接复用，未重跑。
+- 新本地control内容身份：`pg03-control-local-sha256:76f32e2d44b7e59e1936a8ce021328b92bc85459443657c6ba194343314e1019`。它是base tree加三文件overlay，**不是Git commit**；实际工作区其他已有修改不属于该候选。observation SHA256 `2c5ab3be2d9067ec71ac409f59bfe4ab0efd7c85c529d5542e2ab10287e8b5be`，host `b6086ec92c60d2cac741073e739fb38fb93faf29f64fd4ddaa2504e046d70924`，tests `1621353991c3a0d3ac3d6cef35363a3b8febf48b34f17882a355c8101dc3fd29`。
+- 当前授权任务完成后停止：**无提交、推送、CI/Actions触发、外部配置写入或生产操作**。新control的CI NOT RUN、真实资格 BLOCKED/NOT ISSUED；可信策略来源完整独立审查/真实authority与签名根、生产身份/实时独占窗口、真实备份恢复、adapter现场验收及正式部署/线上回滚准备仍未通过。合作guard准入后的在途fencing与远端原子撤销未获现场验证，不能由本地测试代替。
+
+下一步最小操作：负责人另行批准选定本轮三文件及必要证据的正常提交/推送/必需CI（不夹带既有修改），形成真实control commit后绑定新候选并判断资格；随后落实可信来源与真实签发。生产相关权限继续分别审批，不能沿用本轮本地授权。无需重做身份未变且验收范围未受影响的既有成功验收。
+
+
 ## 2026-10-21 — Production Readiness 自主补齐（本轮最新，生产仍 BLOCKED）
 
 本节取代历史“完整adapter尚未实现”的当前开发状态，历史记录与失败证据保留。正式待批包：`evidence/pg03-production-approval-package-20261021.md`；候选/观测/恢复协议与管理员清单分别见同目录新增报告。
@@ -10,7 +110,19 @@
 - 已新增离线备份材料审计及默认plan的签名授权独立恢复runner。真实备份/密钥/生产DB均未接触；独立日志库若存在而缺dump即拒绝。真实生产producer/源指纹、采集身份、全writer窗口、backup/restore和adapter现场验收仍BLOCKED/UNKNOWN/NOT RUN。
 - 本轮本地测试、独立审查、PR/CI及最终控制commit以待批包末尾最终记录为准。开发变更不能冒充生产验收；未连接生产SSH、安装权限/配置、生产helper/DB/容器操作或正式部署。
 
-剩余最小事项：负责人独立批准source/control policy、准确启动写入范围与一次性grant；管理员按清单证明并绑定真实身份/受限collectors/入口冻结/独占锁，完成真实停止态加密备份和独立恢复，审核精确资产安装与现场端到端验收。当前不具备正式生产部署审批条件；不得自动部署或恢复公网。
+## 2026-10-21 - 固定候选资格策略独立复审（BLOCKED）
+
+可信策略来源实现、证据绑定与操作依赖清单见 `evidence/pg03-policy-source-delivery-20261021.md`；固定候选原始绑定见 `evidence/pg03-fixed-candidate-binding-20261021.json`。负责人已批准候选限定策略边界，无需重复申请同一边界；固定control差异独立内容审查发现P1，可信来源原型最终独立复审未完成，故不得签发policy或作候选PASS。
+
+- 负责人已批准的范围仅为仓库 a3225865526-wq/Clear-API 中 source 799a608d1b5a79df0f2ef8031a7885f414125778、RC 39511197302/1、镜像 sha256:729fdd37591fb333c9cefe202d7c2b7ff4486df31a2689a9b2152abdf7f6965f 与 control main 75b0f09e2a527c5173c1179a6efe697de4f64f39 的一次候选资格判断；不包含生产执行授权。
+- GitHub Compare 实际结果：ahead 11、behind 0、merge-base/base 为 candidate source、head 为指定 control main；52 个文件均为 scripts/、.github/workflows/、evidence/ 或总控文件下新增/修改，无删除、重命名或应用源码/依赖/Dockerfile 路径。规范化 compare projection SHA256：265b4fa0b7ec3d963563b7962623c314f58c5bd00befa56983450da8c988fcd3。
+- 独立代码复审完成但结论为 BLOCKED：差异路径范围满足 control-only；策略来源、独立审查到精确 diff 的可信绑定及持久原子防重放不通过。该复审不是 GitHub 人工 review，也不冒充审批签名。
+- 真实来源检查：仓库仅有 production environment（ID 23693288049），仅 branch policy、没有 required reviewers；pg03-qualification environment 不存在；Actions variable PG03_QUALIFICATION_STATE 查询 404。实际 policy、独立签名、review 和资格结果均未签发。
+- 新资格判断仍 BLOCKED。tools/pg03 候选原型已完成本地修复与 27 项定向回归；最终独立审查仍发现指定 control 差异中的 P1 竞态：`scripts/pg03-observation.py` 启动异步监视后直接调用受保护 action，`scripts/pg03-successor-adapter.py` 继承该风险。完整 52 文件内容/字节绑定报告见 `evidence/pg03-fixed-control-independent-review-20261021.json`，结论 BLOCKED；不能通过修改本地副本冒充修复指定 control commit。当前原型字节 hash 为 authority `2bc49018d0bef2fa7c467d2c9e09bb0d9485fe522ce32800f3beca0c4bb5eb8f`、policy source `51c959d1630bde04186f38c7f8a55fc9c026093a315506e722e5964693426235`、tests `257d33ee4afe388d0cf81a94c93c5ae028a7a9b756c2e5f46ce6cf6f6f253f84`。生产 adapter 保持指定 control 原状，不将候选批准扩大成生产集成授权。实际可信服务、独立信任根和真实签发均未提供；未 dispatch workflow，未更改 GitHub environment/variables/权限，未连接生产。
+
+- 开发PR82已正常合并：main `75b0f09e2a527c5173c1179a6efe697de4f64f39`；head f2e 的CI39578824035/2八jobs SUCCESS（只重试frontend一次，首次失败保留）；合并后CI39580985299/1也八jobs SUCCESS；自动RC/演练/生产release三个下游run均SKIPPED，两自动开关仍false。最终回执：`evidence/pg03-readiness-final-receipt-20261021.json`。最终本地交付回执见待批包第11/12节，未为回写结果重复触发CI。
+
+剩余最小事项：候选策略边界批准已取得；但固定control独立审查有P1，且策略原型独立复审尚未完成，禁止签发或资格PASS。负责人需明确是否批准仅本地修复P1并另行形成新control；该决定不自动授权提交、推送或触发CI。随后需独立审查/CI、新control候选范围审批、非生产可信authority和签名根、一次性真实资格判断；再分别取得生产只读身份/观察、准确写入投影、真实备份恢复、adapter现场验收、生产grant/部署及公网恢复的具体授权。当前不具备正式生产部署审批条件；不得自动部署或恢复公网。
 
 
 

@@ -106,3 +106,19 @@ run39516153502/1 FAIL：实际logger回读/容器start已通过，Gateway第一�
 官方固定Moby v27.1.1 https://github.com/moby/moby/blob/v27.1.1/daemon/container_operations.go#L881-L895 确认container:网络会将Gateway Config.Hostname设为donor hostname；原CID前缀假设错误。未保存该次raw receipt，不能把具体字段或内容补写成实测。最小修复在healthy运行中从相同精确CID inspect Config.Hostname与exec hostname取得独立期望，严格格式+相等后传入receipt校验；finalize/回读重复该合同，完整CID/challenge/pid/binary/phases/DB仍强制，两次不同CID/challenge不可省，允许shared hostname。不修改候选Go/Dockerfile，不需重建RC。
 
 实际Windows MigrationEvidenceTest15 PASS；Linux root整个集中73 PASS/exit0（6个local adapter准备方法未纳入修复PR，正常CI预期67个）。新增共享非CID hostname双启动成功/live-vs-config冲突拒绝和清理；旧未知/冲突/重复凭证门禁保留。git diff --check exit0。独立只读复核实际差异PASS，未代跑测试。修复重跑1/2，下一次是最后一次，仍须正常CI和fresh保护/开关/触发图再dispatch。
+
+
+## 最后第2轮真实隔离触发
+
+PR81/head1fc0158e7433e8671541ac4775f850d084dd6fd7 / CI39516682473七jobs SUCCESS；通过gh run view --job --log实际取得脱敏摘要，集中67项OK/0skip，备份26项OK/0skip；其他wrapper92项的2平台skip单列，未把它们标PASS。上一CI80同接口也已实际取到66项摘要，补充了之前jobs/logs接口exit1的采集缺口。
+
+新鲜main97765/两个false开关/strict保护/required审批数0与精确head7jobs均复核，正常--merge --match-head-commit，PR81 merge f02528c351d4812336980fd56810658a6339b05c（2026-10-20T23:49:44Z）。没有新候选应用代码，source799a不变；新控制与候选身份继续分别留证。再次取证10-workflow/mainf02528/开关/保护后，仅dispatch专用run39517646061/1（2026-10-20T23:50:59Z），修复重跑2/2，结果待完成，不允许再自动第三轮。
+
+
+## 最终真实结果及收尾
+
+run39517646061/1 SUCCESS；API/attempt/actor/control/原ZIP digest与大小/allowlist/control hash/精确image-binary-source/两次startup/schema/process/raw proof/负向/cleanup全部本地回验exit0。独立子代理读取三份最终证据确认可判该固定镜像schema-only单PG隔离PASS，明确不推广到生产。artifact12308671421原ZIP3179bytes/SHA816b0127874f3a77d50b33e52353742300c8d01ce4d3e3c0d43ea8779589136b；两份raw proof独立CID/challenge、实际共享hostname65537a0e89b7、PID1/37bb binary/phases/postgres类型一致。负向readonly真实exit1/25006，proof tmpfs不可采集保持unknown；legacy日志capture_complete=false不改成完整解析PASS。4+2容器清理、final无剩余/auth移除、finalizer/readback/上传成功。
+
+P2-1/P2-2固定候选验收与PG03真实隔离PASS；2/2修复重跑结束，无第3轮。生产资格/只读连续window/允许write scope/真实backup-restore/完整adapter仍BLOCKED；本地新增gate/OneShot/adapter基础差异和hash保留，未安装/激活或擅自发布旧untracked依赖。最终报告pg03-final-acceptance-20261021.md，总控已更新，不进入生产。
+
+最终main自动CI39517515354已7jobs SUCCESS并保存API步骤元数据；收尾重新只读核验main=f02528、两自动发布开关false，记录final-boundary。6个本地准备组件AST/hash与git diff --check exit0。最终报告写回首次因Windows默认GBK解码UTF-8失败，改显式UTF-8完成；不是测试或真实演练失败。无额外测试重跑、生产操作或进一步真实演练。
