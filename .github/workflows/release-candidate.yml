@@ -330,13 +330,60 @@ jobs:
           echo "image digest: $DIGEST"
 
       - name: Verify digest pull and provenance labels
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          SOURCE_TREE: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
+          set -euo pipefail
           docker pull "$GHCR_IMAGE@$IMAGE_DIGEST"
           REVISION="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$GHCR_IMAGE@$IMAGE_DIGEST")"
           if [ "$REVISION" != "${GITHUB_SHA}" ]; then
             echo "image revision label '$REVISION' does not match source commit '${GITHUB_SHA}'"
             exit 1
           fi
+          SOURCE_TREE="$(git rev-parse "${GITHUB_SHA}^{tree}")"
+          mkdir -p release
+          CID="$(docker create --network none "$GHCR_IMAGE@$IMAGE_DIGEST")"
+          trap 'docker rm "$CID" >/dev/null' EXIT
+          docker cp "$CID:/new-api" release/new-api
+          BINARY_SHA="$(sha256sum release/new-api | cut -d' ' -f1)"
+          export BINARY_SHA
+          python3 - <<'PY'
+          import json, os, pathlib
+          manifest = {
+              'schema': 'clearapi.release-candidate/v1',
+              'source_kind': 'git-commit',
+              'source_commit': os.environ['SOURCE_COMMIT'],
+              'source_tree': os.environ['SOURCE_TREE'],
+              'workflow_run': os.environ['RUN_ID'],
+              'workflow_run_attempt': int(os.environ['RUN_ATTEMPT']),
+              'pool_mode': 'off',
+              'platform': 'linux/amd64',
+              'image': os.environ['GHCR_IMAGE'],
+              'image_digest': os.environ['IMAGE_DIGEST'],
+              'binary_sha256': os.environ['BINARY_SHA'],
+              'production_ready': False,
+          }
+          pathlib.Path('release/gateway-image-release.json').write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\n')
+          PY
+          python3 scripts/ci/build-runtime-assets.py \
+            --repository . --source-tree "$SOURCE_TREE" \
+            --manifest release/gateway-image-release.json \
+            --output release/runtime-assets
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          root = pathlib.Path('release')
+          paths = [root / 'new-api', root / 'gateway-image-release.json']
+          paths.extend(sorted((root / 'runtime-assets').rglob('*')))
+          hashes = {}
+          for path in paths:
+              if path.is_file() and path.name != 'artifact-hashes.json':
+                  hashes[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+          (root / 'artifact-hashes.json').write_text(json.dumps(hashes, indent=2, sort_keys=True) + '\n')
+          PY
           DOCKERFILE_HASH="$(sha256sum Dockerfile | cut -d' ' -f1)"
           {
             echo "## Release candidate provenance"
@@ -347,9 +394,19 @@ jobs:
             echo "| workflow run | ${GITHUB_RUN_ID} |"
             echo "| image | ${GHCR_IMAGE} |"
             echo "| digest | ${IMAGE_DIGEST} |"
+            echo "| source tree | ${SOURCE_TREE} |"
+            echo "| Gateway binary SHA256 | ${BINARY_SHA} |"
             echo "| Dockerfile sha256 | ${DOCKERFILE_HASH} |"
             echo "| created | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact RC identity and runtime assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clearapi-off-rc-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Logout from GHCR
         if: always()

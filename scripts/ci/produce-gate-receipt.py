@@ -10,13 +10,10 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+from release_proof import OFF_GATES, PG03_GATES, required_gates
 
-GATES = {
-    "runtime_integrity", "billing", "backup_restore", "executor_pairing",
-    "sqlite_upgrade_idempotency", "mysql_upgrade_idempotency",
-    "postgres_upgrade_idempotency", "gateway_executor_provider_usage_billing",
-    "replay_and_duplicate_charge", "state_isolation", "safe_rollback",
-}
+
+GATES = PG03_GATES | OFF_GATES
 
 
 def required(name):
@@ -28,10 +25,13 @@ def required(name):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('--pool-mode', choices=('off', 'pg03'), default='pg03')
     parser.add_argument("--gate", required=True, choices=sorted(GATES))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if args.gate not in required_gates(args.pool_mode):
+        parser.error('gate does not belong to the selected pool mode')
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:
         raise SystemExit("a gate command is required")
@@ -62,7 +62,9 @@ def main():
             rc_attempt = 0
 
     receipt = {
-        "schema": "clearapi.gate-evidence/v1",
+        "schema": ("clearapi.gate-evidence/v2" if args.pool_mode == 'off'
+                   else "clearapi.gate-evidence/v1"),
+        "pool_mode": args.pool_mode,
         "gate": args.gate,
         "conclusion": conclusion,
         "source_commit": source,

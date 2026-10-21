@@ -126,7 +126,7 @@ jobs:
           [[ "$INPUT_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
           case "$INPUT_MIGRATION" in true|false) ;; *) exit 1 ;; esac
           case "$INPUT_POOL_MODE" in
-            off) ;;
+            off) echo 'manual off dispatch requires authenticated release proof and is disabled' >&2; exit 1 ;;
             pg03) [[ "$INPUT_RC_RUN_ID" =~ ^[1-9][0-9]*$ ]] ;;
             *) exit 1 ;;
           esac
@@ -179,7 +179,6 @@ jobs:
           python3 scripts/ci/automatic-release.py authorize \
             --destination "$RUNNER_TEMP/verified-release-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           {
-            echo "pool_mode=pg03"
             echo "legacy_transition_sha256="
           } >> "$GITHUB_OUTPUT"
 

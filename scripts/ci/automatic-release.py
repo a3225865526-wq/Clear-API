@@ -11,6 +11,8 @@ from pathlib import Path
 import re
 import subprocess
 
+from release_proof import PG03_GATES, proof_mode, required_gates, validate_receipt_mode
+
 REPOSITORY = "a3225865526-wq/Clear-API"
 IMAGE = "ghcr.io/a3225865526-wq/clearapi"
 SHA = r"[0-9a-f]{40}"
@@ -20,12 +22,7 @@ REQUIRED_CHECKS = {
     "Frontend typecheck and test",
     "Secret scan and forbidden files",
 }
-PROOF_CHECKS = {
-    "runtime_integrity", "billing", "backup_restore", "executor_pairing",
-    "sqlite_upgrade_idempotency", "mysql_upgrade_idempotency",
-    "postgres_upgrade_idempotency", "gateway_executor_provider_usage_billing",
-    "replay_and_duplicate_charge", "state_isolation", "safe_rollback",
-}
+PROOF_CHECKS = PG03_GATES
 RC_ARTIFACT_FILES = {
     "gateway-image-release.json", "binary-build-info.txt",
     "schema-rehearsal.json", "schema-rehearsal.target.sql",
@@ -144,8 +141,7 @@ def authorize_pr(event):
 
 def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image, controlled=False):
     """The caller must authenticate the artifact's producing workflow through GitHub."""
-    expected_schema = "clearapi.controlled-release/v1" if controlled else "clearapi.automatic-release/v1"
-    require(proof["schema"] == expected_schema, "unsupported proof contract")
+    pool_mode = proof_mode(proof, controlled)
     if controlled:
         require(proof.get("public_traffic") == "blocked"
                 and proof.get("provider_acceptance") == "deferred_to_owner_after_deployment",
@@ -161,16 +157,20 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
     require(proof["gateway_digest"] == manifest["image_digest"], "proof image mismatch")
     require(proof["gateway_binary_sha256"] == manifest["binary_sha256"], "gateway binary mismatch")
     require(re.fullmatch(r"[0-9a-f]{64}", manifest["binary_sha256"]) is not None, "invalid binary hash")
-    executor = proof["executor"]
-    require(re.fullmatch(r"ghcr.io/a3225865526-wq/[a-z0-9._/-]+", executor_image) is not None,
-            "approved immutable Executor image repository must be configured")
-    require(executor["image_repository"] == executor_image, "unapproved Executor image repository")
-    require(executor["source_repository"] == "https://github.com/a3225865526-wq/CLIProxyAPI",
-            "unapproved Executor source repository")
-    require(re.fullmatch(SHA, executor["source_commit"]) is not None, "invalid executor source")
-    require(re.fullmatch(DIGEST, executor["image_digest"]) is not None, "invalid executor digest")
-    require(re.fullmatch(r"[0-9a-f]{64}", executor["binary_sha256"]) is not None, "invalid executor binary")
-    require(executor["paired_gateway_commit"] == source, "executor not paired with gateway")
+    if pool_mode == 'off':
+        require('executor' not in proof, 'off proof must not claim an Executor dependency')
+    else:
+        require(isinstance(proof.get('executor'), dict), 'missing Executor identity')
+        executor = proof["executor"]
+        require(re.fullmatch(r"ghcr.io/a3225865526-wq/[a-z0-9._/-]+", executor_image) is not None,
+                "approved immutable Executor image repository must be configured")
+        require(executor["image_repository"] == executor_image, "unapproved Executor image repository")
+        require(executor["source_repository"] == "https://github.com/a3225865526-wq/CLIProxyAPI",
+                "unapproved Executor source repository")
+        require(re.fullmatch(SHA, executor["source_commit"]) is not None, "invalid executor source")
+        require(re.fullmatch(DIGEST, executor["image_digest"]) is not None, "invalid executor digest")
+        require(re.fullmatch(r"[0-9a-f]{64}", executor["binary_sha256"]) is not None, "invalid executor binary")
+        require(executor["paired_gateway_commit"] == source, "executor not paired with gateway")
     # The proof must state the migration mode that the RC actually rehearsed.
     # PG03 forbids external migration flags, so an upgrading candidate proves
     # itself only through two idempotent startup passes on the same database.
@@ -190,13 +190,15 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
         require(migration.get("source_schema_sha256") == source_schema
                 and migration.get("target_schema_sha256") == target_schema,
                 "migration evidence contradicts the RC schema transition")
+        require(pool_mode == 'pg03',
+                "off schema changes require an off-specific migration rehearsal")
         require(transition.get("schema_version") == "pg03-schema-rehearsal-v1"
                 and transition.get("startup_passes") == 2,
                 "in-place migration requires two idempotent startup passes")
         require(transition.get("source_commit") == source,
                 "in-place migration rehearsal does not bind this candidate")
     require(re.fullmatch(SHA, proof["previous_source_commit"]) is not None, "missing predecessor identity")
-    required_checks = PROOF_CHECKS - {"gateway_executor_provider_usage_billing"} if controlled else PROOF_CHECKS
+    required_checks = required_gates(pool_mode, 'controlled' if controlled else 'commercial')
     require(set(proof["checks"]) == required_checks, "missing/unknown release evidence checks")
     receipt_dir = evidence_dir / "receipts"
     require(not receipt_dir.is_symlink(), "unsafe evidence directory")
@@ -216,8 +218,8 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
         data = path.read_bytes()
         require(hashlib.sha256(data).hexdigest() == check["sha256"], "evidence hash mismatch: " + name)
         receipt = json.loads(data)
-        require(receipt["schema"] == "clearapi.gate-evidence/v1" and receipt["gate"] == name,
-                "wrong gate evidence contract: " + name)
+        validate_receipt_mode(receipt, pool_mode)
+        require(receipt["gate"] == name, "wrong gate evidence contract: " + name)
         require(receipt["conclusion"] == "success", "raw evidence did not pass: " + name)
         require(receipt["source_commit"] == source and receipt["gateway_digest"] == manifest["image_digest"], "stale evidence: " + name)
         require(type(receipt.get("rc_run_id")) is int and receipt["rc_run_id"] == rc_run,
@@ -225,17 +227,23 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
         require(type(receipt.get("rc_run_attempt")) is int
                 and receipt["rc_run_attempt"] == proof["rc_run_attempt"],
                 "stale evidence RC attempt: " + name)
-    return {"release_stage": "controlled" if controlled else "commercial",
+    result = {"release_stage": "controlled" if controlled else "commercial",
             "image_digest": manifest["image_digest"], "expected_commit": source,
             "rc_run_id": rc_run,
-            "executor_image_repository": executor["image_repository"],
-            "executor_image_digest": executor["image_digest"],
-            "executor_binary_sha256": executor["binary_sha256"],
-            "executor_source_commit": executor["source_commit"],
             # Legacy Deploy V2 does not classify rollback-safe failures versus
             # runtime/billing identity failures. Automatic callers must stop on
             # every failure until that distinction is independently verified.
             "previous_source_commit": proof["previous_source_commit"], "migration_compatible": "false"}
+    # The deployed controlled-proof/v1 reader compares the entire object.
+    # Its schema already fixes PG03; preserve that existing wire contract.
+    if not controlled:
+        result['pool_mode'] = pool_mode
+    if pool_mode == 'pg03':
+        result.update(executor_image_repository=executor['image_repository'],
+                      executor_image_digest=executor['image_digest'],
+                      executor_binary_sha256=executor['binary_sha256'],
+                      executor_source_commit=executor['source_commit'])
+    return result
 
 
 def verify_rc_artifact(directory):
@@ -473,6 +481,10 @@ def authorize_release(event, destination, controlled=False):
                 for run in manifest.get("source_ci_runs", [])), "manifest source CI mismatch")
     result = validate_proof(manifest, proof, destination / "proof", source, rc["id"],
                             os.environ.get("CLEARAPI_EXECUTOR_IMAGE_REPOSITORY", ""), controlled=controlled)
+    # Proof preparation is safe locally. The host still lacks a reviewed off
+    # recovery/mode-exit contract; never let a new proof bypass that boundary.
+    require(result.get('pool_mode', 'pg03') == 'pg03',
+            'off production execution blocked: recovered baseline and approved host contract required')
     if controlled:
         require(result["expected_commit"] == inputs["expected_commit"] == current["head_sha"]
                 and result["image_digest"] == inputs["image_digest"]

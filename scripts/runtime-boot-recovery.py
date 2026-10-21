@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore volatile identity prerequisites; never start containers or open ingress.
+"""Restore durable identity prerequisites; never start containers or open ingress.
 
 Default check is read-only. Installation and prepare-directory require separate
 operator authorization. Frozen release/incident evidence is never changed.
@@ -20,7 +20,7 @@ import time
 
 sys.dont_write_bytecode = True
 APP = Path('/opt/clearapi/app')
-DIRECTORY = Path('/run/clearapi')
+DIRECTORY = Path('/opt/clearapi/runtime/new-api')
 HELPER = Path('/opt/clearapi/bin/runtime-identity-refresh.py')
 HELPER_SHA = 'afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e'
 CONTAINER = 'clearapi-new-api-1'
@@ -33,9 +33,10 @@ FROZEN = {
     'controlled-launch-state.json': '57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d',
 }
 ASSETS = {
-    '/etc/tmpfiles.d/clearapi-runtime.conf': 'd /run/clearapi 0750 root root -\n',
+    '/etc/tmpfiles.d/clearapi-runtime.conf': ('d /opt/clearapi/runtime 0755 root root -\n'
+                                               'd /opt/clearapi/runtime/new-api 0750 root root -\n'),
     '/etc/systemd/system/clearapi-runtime-directory.service': '''[Unit]
-Description=Validate ClearAPI volatile runtime directory before Docker
+Description=Validate ClearAPI durable runtime directory before Docker
 DefaultDependencies=no
 Requires=systemd-tmpfiles-setup.service
 After=systemd-tmpfiles-setup.service
@@ -145,6 +146,30 @@ def directory_state(directory=DIRECTORY):
     return 'ready'
 
 
+def prepare_runtime_directory(directory, config, command=subprocess.run):
+    directory = Path(directory)
+    parent = directory.parent
+    safe_parents(parent.parent)
+    if not parent.exists() and not parent.is_symlink():
+        parent.mkdir(mode=0o755)
+        os.chown(parent, 0, 0)
+        os.chmod(parent, 0o755)
+        fd = os.open(parent.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    info = parent.lstat()
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid == 0 and info.st_gid == 0
+            and stat.S_IMODE(info.st_mode) == 0o755, 'unsafe runtime parent')
+    expected = ASSETS[str(Path('/etc/tmpfiles.d/clearapi-runtime.conf'))]
+    if directory != DIRECTORY:
+        expected = expected.replace(str(DIRECTORY), str(directory))
+    require(read_safe(config).decode() == expected, 'tmpfiles configuration drift')
+    command(['/usr/bin/systemd-tmpfiles', '--create', str(config)], check=True, timeout=10)
+    require(directory_state(directory) == 'ready', 'runtime directory not prepared')
+
+
 @contextmanager
 def deployment_lock(path=Path('/run/lock/clearapi-production-deploy.lock')):
     safe_parents(path)
@@ -157,6 +182,22 @@ def deployment_lock(path=Path('/run/lock/clearapi-production-deploy.lock')):
         yield
     finally:
         os.close(fd)
+
+
+def runtime_directory(helper, expected):
+    require(expected[1] != FAILED_COMMIT, 'frozen incident requires its original recovery assets')
+    data = helper.docker_json('inspect', '--format',
+                             '[{"Image":{{json .Image}},"Ref":{{json .Config.Image}},'
+                             '"Mounts":{{json .Mounts}}}]', CONTAINER)[0]
+    require(data['Image'] == expected[2] and data['Ref'] == expected[0], 'container image drift')
+    mounts = [mount for mount in data['Mounts'] if mount.get('Destination') == '/run/clearapi']
+    require(len(mounts) == 1 and mounts[0].get('Type') == 'bind'
+            and mounts[0].get('RW') is False, 'runtime mount must be a single read-only bind')
+    source = mounts[0].get('Source')
+    require(source == str(DIRECTORY), 'runtime mount source mismatch')
+    directory = Path(source)
+    directory_state(directory)
+    return directory
 
 
 def check_image(helper, expected, directory=DIRECTORY):
@@ -284,11 +325,8 @@ def main():
             check_installed()
             print('Installed boot assets PASS; effective ordering and enablement verified; no service started')
         elif args.mode == 'prepare-directory':
-            directory_state()
             config = Path('/etc/tmpfiles.d/clearapi-runtime.conf')
-            require(read_safe(config).decode() == ASSETS[str(config)], 'tmpfiles configuration drift')
-            subprocess.run(['/usr/bin/systemd-tmpfiles', '--create', str(config)], check=True, timeout=10)
-            require(directory_state() == 'ready', 'runtime directory not prepared')
+            prepare_runtime_directory(DIRECTORY, config)
             print('Runtime directory ready; no container operation performed')
         else:
             # A Docker inspection can socket-activate a stopped daemon. Refuse
@@ -296,14 +334,15 @@ def main():
             subprocess.run(['systemctl', 'is-active', '--quiet', 'docker.service'],
                            check=True, capture_output=True, timeout=5)
             helper, expected = load_helper(), approved_identity()
+            mounted_directory = runtime_directory(helper, expected)
             if args.mode == 'check':
-                directory = directory_state()
-                state = check_image(helper, expected)
+                directory = directory_state(mounted_directory)
+                state = check_image(helper, expected, mounted_directory)
                 assets = check_assets()
                 identity = 'unavailable'
                 if directory == 'ready' and state == 'running':
                     try:
-                        helper.refresh(CONTAINER, expected[0], expected[1], DIRECTORY, check=True)
+                        helper.refresh(CONTAINER, expected[0], expected[1], mounted_directory, check=True)
                         identity = 'current'
                     except helper.StaleIdentityError:
                         identity = 'stale'
@@ -311,7 +350,7 @@ def main():
                       + '; assets=' + assets + '; identity=' + identity)
             else:
                 with deployment_lock():
-                    result = reconcile(helper, expected)
+                    result = reconcile(helper, expected, mounted_directory)
                 print('Runtime identity ' + result + '; no container operation performed')
     except Exception as error:
         # No command output or raw evidence is printed, even on failures.

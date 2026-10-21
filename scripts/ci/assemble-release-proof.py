@@ -7,13 +7,10 @@ import json
 from pathlib import Path
 import re
 
+from release_proof import PG03_GATES, required_gates, validate_receipt_mode
 
-GATES = {
-    "runtime_integrity", "billing", "backup_restore", "executor_pairing",
-    "sqlite_upgrade_idempotency", "mysql_upgrade_idempotency",
-    "postgres_upgrade_idempotency", "gateway_executor_provider_usage_billing",
-    "replay_and_duplicate_charge", "state_isolation", "safe_rollback",
-}
+
+GATES = PG03_GATES
 
 
 def main():
@@ -21,24 +18,31 @@ def main():
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--receipts", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--executor-repository", required=True)
-    parser.add_argument("--executor-source-commit", required=True)
-    parser.add_argument("--executor-digest", required=True)
-    parser.add_argument("--executor-binary-sha256", required=True)
+    parser.add_argument("--pool-mode", choices=('off', 'pg03'), default='pg03')
+    parser.add_argument("--executor-repository")
+    parser.add_argument("--executor-source-commit")
+    parser.add_argument("--executor-digest")
+    parser.add_argument("--executor-binary-sha256")
     parser.add_argument("--previous-source-commit", required=True)
     parser.add_argument("--release-stage", choices=("commercial", "controlled"), default="commercial")
     args = parser.parse_args()
+    gates = required_gates(args.pool_mode, args.release_stage)
+    executor_args = (args.executor_repository, args.executor_source_commit,
+                     args.executor_digest, args.executor_binary_sha256)
+    if args.pool_mode == 'pg03' and not all(executor_args):
+        parser.error('PG03 requires all four Executor identity arguments')
+    if args.pool_mode == 'off' and any(value is not None for value in executor_args):
+        parser.error('off proof must not claim an Executor dependency')
     manifest = json.loads(args.manifest.read_text())
     checks = {}
-    for gate in sorted(GATES):
-        if args.release_stage == "controlled" and gate == "gateway_executor_provider_usage_billing":
-            continue
+    for gate in sorted(gates):
         path = args.receipts / f"{gate}.json"
         if not path.is_file() or path.is_symlink():
             raise SystemExit(f"missing receipt: {gate}")
         raw = path.read_bytes()
         receipt = json.loads(raw)
-        if receipt.get("schema") != "clearapi.gate-evidence/v1" or receipt.get("gate") != gate:
+        validate_receipt_mode(receipt, args.pool_mode)
+        if receipt.get("gate") != gate:
             raise SystemExit(f"invalid receipt contract: {gate}")
         if receipt.get("conclusion") != "success":
             raise SystemExit(f"gate failed: {gate}")
@@ -60,6 +64,8 @@ def main():
     if source_schema == target_schema:
         migration = {"mode": "no_schema_change"}
     else:
+        if args.pool_mode == 'off':
+            raise SystemExit("off release schema changes require an off-specific migration rehearsal")
         # PG03 forbids external migration flags: the candidate image applies its
         # own additive migrations during startup. A real upgrade is therefore only
         # provable when the RC rehearsal ran that startup twice on the same
@@ -78,7 +84,9 @@ def main():
         }
     proof = {
         "schema": ("clearapi.controlled-release/v1" if args.release_stage == "controlled"
-                   else "clearapi.automatic-release/v1"),
+                   else ("clearapi.automatic-release/v2" if args.pool_mode == 'off'
+                         else "clearapi.automatic-release/v1")),
+        "pool_mode": args.pool_mode,
         "source_commit": manifest["source_commit"],
         "rc_run_id": int(manifest["workflow_run"]),
         "rc_run_attempt": int(manifest["workflow_run_attempt"]),
@@ -86,16 +94,17 @@ def main():
         "gateway_binary_sha256": manifest["binary_sha256"],
         "previous_source_commit": args.previous_source_commit,
         "migration": migration,
-        "executor": {
+        "checks": checks,
+    }
+    if args.pool_mode == 'pg03':
+        proof['executor'] = {
             "image_repository": args.executor_repository,
             "source_repository": "https://github.com/a3225865526-wq/CLIProxyAPI",
             "source_commit": args.executor_source_commit,
             "image_digest": args.executor_digest,
             "binary_sha256": args.executor_binary_sha256,
             "paired_gateway_commit": manifest["source_commit"],
-        },
-        "checks": checks,
-    }
+        }
     if args.release_stage == "controlled":
         proof["public_traffic"] = "blocked"
         proof["provider_acceptance"] = "deferred_to_owner_after_deployment"

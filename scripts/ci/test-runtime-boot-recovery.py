@@ -81,7 +81,8 @@ class BootRecoveryTest(unittest.TestCase):
 
     def test_actual_tmpfiles_recreates_lost_directory_then_reconciles_new_process(self):
         config = self.root / 'tmpfiles.conf'
-        config.write_text('d ' + str(self.directory) + ' 0750 root root -\n')
+        config.write_text(BOOT.ASSETS['/etc/tmpfiles.d/clearapi-runtime.conf'].replace(
+            str(BOOT.DIRECTORY), str(self.directory)))
         subprocess.run(['systemd-tmpfiles', '--create', str(config)], check=True, capture_output=True)
         self.assertEqual(self.recover(), 'repaired')
         path = self.directory / 'runtime-identity.json'
@@ -98,9 +99,97 @@ class BootRecoveryTest(unittest.TestCase):
         self.assertEqual(path.stat().st_mode & 0o777, 0o400)
         self.assertTrue(all(call[0] in ('inspect', 'image') for call in self.calls))
 
+    def test_cold_boot_creates_missing_parent_before_tmpfiles_nested_directory(self):
+        directory = self.root / 'runtime' / 'new-api'
+        self.assertFalse(directory.parent.exists())
+        config = self.root / 'tmpfiles.conf'
+        content = BOOT.ASSETS['/etc/tmpfiles.d/clearapi-runtime.conf'].replace(
+            str(BOOT.DIRECTORY), str(directory))
+        config.write_text(content)
+        BOOT.prepare_runtime_directory(directory, config)
+        self.assertEqual(directory.stat().st_mode & 0o777, 0o750)
+        self.assertEqual(directory.parent.stat().st_mode & 0o777, 0o755)
+
+    def test_cold_boot_preserves_unsafe_existing_runtime_parent(self):
+        directory = self.root / 'runtime' / 'new-api'
+        directory.parent.mkdir(mode=0o755)
+        directory.parent.chmod(0o777)
+        config = self.root / 'tmpfiles.conf'
+        config.write_text(BOOT.ASSETS['/etc/tmpfiles.d/clearapi-runtime.conf'].replace(
+            str(BOOT.DIRECTORY), str(directory)))
+        with self.assertRaisesRegex(BOOT.Blocked, 'unsafe runtime parent'):
+            BOOT.prepare_runtime_directory(directory, config)
+        self.assertFalse(directory.exists())
+
+    def test_durable_runtime_mount_reconciles_after_process_restart_without_volatile_directory(self):
+        self.directory.mkdir(mode=0o750)
+        volatile = self.root / 'lost-run-directory'
+        expected = BOOT.approved_identity(self.app)
+        frozen = (self.app / 'release-manifest.json').read_bytes()
+        with patch.object(BOOT, 'DIRECTORY', self.directory), \
+                patch.object(BOOT, 'approved_identity', return_value=expected):
+            mounted = BOOT.runtime_directory(self.helper, expected)
+            self.assertEqual(mounted, self.directory)
+            self.assertEqual(BOOT.reconcile(self.helper, expected, mounted, wait_seconds=0), 'repaired')
+            self.container_id = 'e' * 64
+            self.assertEqual(BOOT.reconcile(self.helper, expected, mounted, wait_seconds=0), 'repaired')
+        self.assertEqual(json.loads((self.directory / 'runtime-identity.json').read_text())['container_id'], self.container_id)
+        self.assertFalse(volatile.exists())
+        self.assertEqual((self.app / 'release-manifest.json').read_bytes(), frozen)
+
+    def test_boot_runtime_source_rejects_mount_drift_and_frozen_incident_switch(self):
+        self.directory.mkdir(mode=0o750)
+        expected = BOOT.approved_identity(self.app)
+        baseline = self.docker_json('inspect')[0]
+        cases = [dict(baseline, Image='sha256:' + 'f' * 64),
+                 dict(baseline, Mounts=[]), dict(baseline, Mounts=baseline['Mounts'] * 2)]
+        for change in ({'RW': True}, {'Type': 'volume'}, {'Source': '/tmp/foreign-runtime'}):
+            cases.append(dict(baseline, Mounts=[dict(baseline['Mounts'][0], **change)]))
+        with patch.object(BOOT, 'DIRECTORY', self.directory):
+            for data in cases:
+                with self.subTest(data=data), patch.object(self.helper, 'docker_json', return_value=[data]), \
+                        self.assertRaises(BOOT.Blocked):
+                    BOOT.runtime_directory(self.helper, expected)
+            with self.assertRaisesRegex(BOOT.Blocked, 'frozen incident'):
+                BOOT.runtime_directory(self.helper, (REF, BOOT.FAILED_COMMIT, IMAGE_ID))
+        self.assertFalse((self.directory / 'runtime-identity.json').exists())
+
     def test_read_only_inspection_accepts_stopped_gateway_without_creating_directory(self):
         self.running = False
         self.assertEqual(BOOT.check_image(self.helper, BOOT.approved_identity(self.app), self.directory), 'stopped')
+        self.assertFalse(self.directory.exists())
+
+    def test_reboot_with_stopped_gateway_preserves_ingress_and_never_starts_it(self):
+        hold = self.app / 'controlled-launch-state.json'
+        hold.write_text(json.dumps({'stage': 'isolated', 'edge': {'running': True}}))
+        frozen = {path.name: path.read_bytes() for path in self.app.iterdir()}
+        config = self.root / 'tmpfiles.conf'
+        config.write_text('d ' + str(self.directory) + ' 0750 root root -\n')
+        subprocess.run(['systemd-tmpfiles', '--create', str(config)], check=True, capture_output=True)
+        self.running = False
+        with self.assertRaises(BOOT.Blocked):
+            self.recover()
+        self.assertFalse((self.directory / 'runtime-identity.json').exists())
+        self.assertEqual({path.name: path.read_bytes() for path in self.app.iterdir()}, frozen)
+        self.assertTrue(all(call[0] in ('inspect', 'image') for call in self.calls))
+
+    def test_reviewed_boot_asset_install_is_idempotent_without_starting_services(self):
+        script = self.root / 'runtime-boot-recovery.py'
+        script.write_bytes((SCRIPTS / 'runtime-boot-recovery.py').read_bytes())
+        assets = {str(self.root / name.lstrip('/')): content for name, content in BOOT.ASSETS.items()}
+        for name in assets:
+            Path(name).parent.mkdir(parents=True, exist_ok=True)
+        with patch.object(BOOT, '__file__', str(script)), patch.object(BOOT, 'SCRIPT', str(script)), \
+                patch.object(BOOT, 'ASSETS', assets), patch.object(BOOT, 'load_helper'), \
+                patch.object(BOOT, 'approved_identity'), patch.object(BOOT, 'directory_state'), \
+                patch.object(BOOT.subprocess, 'run') as command:
+            BOOT.install()
+            before = {name: (Path(name).read_bytes(), Path(name).stat().st_mtime_ns) for name in assets}
+            BOOT.install()
+            self.assertEqual(BOOT.check_assets(), 'ready')
+        self.assertEqual({name: (Path(name).read_bytes(), Path(name).stat().st_mtime_ns) for name in assets}, before)
+        expected = [['systemctl', 'daemon-reload'], ['systemctl', 'enable', 'clearapi-runtime-identity.service']]
+        self.assertEqual([call.args[0] for call in command.call_args_list], expected * 2)
         self.assertFalse(self.directory.exists())
 
     def test_directory_symlink_owner_mode_and_identity_link_are_blocked(self):

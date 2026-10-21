@@ -24,8 +24,14 @@ def require(value, message):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--kind", required=True, choices=("executor", "provider", "backup", "rollback"))
+    parser.add_argument("--pool-mode", choices=("off", "pg03"),
+                        default=os.environ.get("REHEARSAL_POOL_MODE", "pg03"))
     parser.add_argument("--manifest", type=Path, required=True)
     args = parser.parse_args()
+    if args.pool_mode not in ("off", "pg03"):
+        parser.error("unsupported release mode")
+    if args.pool_mode == "off" and args.kind in ("executor", "provider"):
+        parser.error("evidence kind does not belong to the release mode")
     manifest = json.loads(args.manifest.read_text())
     source = require(manifest.get("source_commit"), "manifest source missing")
     digest = require(manifest.get("image_digest"), "manifest image digest missing")
@@ -51,7 +57,7 @@ def main():
             raise SystemExit("Executor is not paired with this Gateway source")
     else:
         evidence = require(os.environ.get(f"CLEARAPI_REHEARSAL_{args.kind.upper()}_EVIDENCE"),
-                           f"{args.kind} rehearsal evidence is not configured")
+            f"{args.kind} rehearsal evidence is not configured")
         try:
             data = json.loads(evidence)
         except json.JSONDecodeError:
@@ -62,9 +68,13 @@ def main():
         # This is a trusted operator input, not a cryptographically signed result.
         if data.get("schema") != "clearapi.rehearsal-evidence/v1" or data.get("conclusion") != "success":
             raise SystemExit(f"{args.kind} rehearsal evidence is not a successful operator result")
+        if data.get("pool_mode", "pg03") != args.pool_mode:
+            raise SystemExit(f"{args.kind} rehearsal evidence mode mismatch")
         if data.get("source_commit") != source or data.get("gateway_digest") != digest:
             raise SystemExit(f"{args.kind} rehearsal evidence is stale")
-        if (data.get("kind") != args.kind or type(data.get("rc_run_id")) is not int
+        expected_kind = {"ordinary-provider": "ordinary_provider_usage_billing",
+                         "pool-disabled": "pool_disabled"}.get(args.kind, args.kind)
+        if (data.get("kind") != expected_kind or type(data.get("rc_run_id")) is not int
                 or data["rc_run_id"] != int(manifest["workflow_run"])
                 or type(data.get("rc_run_attempt")) is not int
                 or data["rc_run_attempt"] != int(manifest["workflow_run_attempt"])

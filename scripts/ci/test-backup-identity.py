@@ -321,6 +321,7 @@ class BackupIdentityTest(unittest.TestCase):
             return
         if cleanup_failure:
             self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn('OK backup_id=', (self.root / 'log/backup.log').read_text())
             self.assertEqual(len(manifests), 1, 'legacy manifest can exist despite EXIT cleanup failure')
             spec = importlib.util.spec_from_file_location('backup_identity', SCRIPTS / 'backup-identity.py')
             identity_tool = importlib.util.module_from_spec(spec)
@@ -431,6 +432,71 @@ class BackupIdentityTest(unittest.TestCase):
         point = manifest["database_recovery_point"]
         self.assertEqual(point["dump_sha256"], manifest["artifacts"]["database_dump"]["sha256"])
         self.assertLessEqual(point["dump_started_at_utc"], point["dump_completed_at_utc"])
+
+    def test_early_backup_failure_preserves_exit_and_logs_safe_phase(self):
+        for phase, code in [('identity_capture', 17), ('database_dump', 23)]:
+            with self.subTest(phase=phase):
+                with tempfile.TemporaryDirectory(dir=self.root) as directory:
+                    root = Path(directory)
+                    base = root / 'opt/clearapi/backups'
+                    (base / 'bin').mkdir(parents=True)
+                    (base / 'manifests').mkdir()
+                    (root / 'log').mkdir()
+                    helper = base / 'bin/backup-identity.py'
+                    helper.write_text('import sys\nprint("{}")\nraise SystemExit('
+                                      + str(code if phase == 'identity_capture' else 0) + ')\n')
+                    docker = root / 'docker'
+                    docker.write_text('#!/bin/sh\necho synthetic-private-diagnostic >&2\nexit '
+                                      + str(code) + '\n')
+                    docker.chmod(0o755)
+                    source = (SCRIPTS / 'production-backup.sh').read_text()
+                    source = source.replace('/opt/clearapi', str(root / 'opt/clearapi'))
+                    source = source.replace('/data/clearapi', str(root / 'data/clearapi'))
+                    source = source.replace('/var/log/clearapi', str(root / 'log'))
+                    source = source.replace('/run/lock/clearapi-backup.lock', str(root / 'backup.lock'))
+                    script = root / 'backup.sh'
+                    script.write_text(source)
+                    env = dict(self.env, PATH=str(root) + os.pathsep + self.env['PATH'])
+                    result = subprocess.run(['bash', str(script)], env=env, capture_output=True,
+                                            text=True, timeout=10)
+                    self.assertEqual(result.returncode, code, result.stderr)
+                    log = (root / 'log/backup.log').read_text()
+                    self.assertIn('phase=' + phase + ' rc=' + str(code), log)
+                    self.assertNotIn('synthetic-private-diagnostic', log)
+                    self.assertNotIn('OK backup_id=', log)
+                    self.assertEqual(list((base / 'manifests').glob('*.json')), [])
+                    self.assertEqual(list((base / 'staging').iterdir()), [])
+
+    def test_duplicate_backup_id_does_not_touch_existing_encrypted_bytes(self):
+        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+            root = Path(directory)
+            base = root / 'opt/clearapi/backups'
+            encrypted = base / 'encrypted/20261021T120000Z'
+            encrypted.mkdir(parents=True)
+            (base / 'manifests').mkdir()
+            (root / 'log').mkdir()
+            artifact = encrypted / 'existing.gpg'
+            artifact.write_bytes(b'previous recovery point')
+            manifest = base / 'manifests/20261021T120000Z.json'
+            manifest.write_bytes(b'previous manifest')
+            source = (SCRIPTS / 'production-backup.sh').read_text()
+            source = source.replace('/opt/clearapi', str(root / 'opt/clearapi'))
+            source = source.replace('/data/clearapi', str(root / 'data/clearapi'))
+            source = source.replace('/var/log/clearapi', str(root / 'log'))
+            source = source.replace('/run/lock/clearapi-backup.lock', str(root / 'backup.lock'))
+            source = source.replace('TS="$(date -u +%Y%m%dT%H%M%SZ)"',
+                                    'TS="20261021T120000Z"')
+            script = root / 'backup.sh'
+            script.write_text(source)
+            result = subprocess.run(['bash', str(script)], env=self.env, capture_output=True,
+                                    text=True, timeout=10)
+            self.assertEqual(result.returncode, 76, result.stderr)
+            self.assertEqual(artifact.read_bytes(), b'previous recovery point')
+            self.assertEqual(manifest.read_bytes(), b'previous manifest')
+            self.assertFalse((base / 'staging/20261021T120000Z').exists())
+            log = (root / 'log/backup.log').read_text()
+            self.assertIn('phase=identity_reservation rc=76', log)
+            self.assertNotIn('OK backup_id=', log)
 
     def test_lock_contention_never_publishes_a_backup(self):
         """A skipped run must be a failure, never a silent success."""

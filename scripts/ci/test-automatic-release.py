@@ -9,6 +9,8 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -174,6 +176,7 @@ class ReleaseProofTest(unittest.TestCase):
         result = policy.validate_proof(self.manifest, self.proof, self.root, SOURCE, 123,
                                        EXECUTOR_IMAGE, controlled=True)
         self.assertEqual(result['release_stage'], 'controlled')
+        self.assertNotIn('pool_mode', result, 'existing controlled/v1 consumer requires exact fields')
         for field in ('public_traffic', 'provider_acceptance'):
             proof = deepcopy(self.proof)
             proof.pop(field)
@@ -672,6 +675,172 @@ class CircuitRecoveryTest(unittest.TestCase):
         with patch.object(policy, "RECOVERY_RECORD", self.record_path.parent / "missing.json"):
             with self.assertRaisesRegex(ValueError, "missing reviewed"):
                 policy.verify_circuit_recovery(self.previous, SOURCE)
+
+
+class NonPG03ProofTest(unittest.TestCase):
+    """Synthetic contract tests only; no production evidence or transport."""
+
+    def setUp(self):
+        ReleaseProofTest.setUp(self)
+        self.manifest.update(workflow_run='123', workflow_run_attempt='1')
+        self.proof.update(schema='clearapi.automatic-release/v2', pool_mode='off')
+        self.proof.pop('executor')
+        self.proof['checks'] = {}
+        gates = (policy.PROOF_CHECKS - {'executor_pairing', 'gateway_executor_provider_usage_billing'}
+                 | {'pool_disabled', 'ordinary_provider_usage_billing'})
+        for gate in gates:
+            self.receipt(gate, {'schema': 'clearapi.gate-evidence/v2', 'pool_mode': 'off',
+                               'gate': gate, 'conclusion': 'success', 'source_commit': SOURCE,
+                               'gateway_digest': DIGEST, 'rc_run_id': 123, 'rc_run_attempt': 1})
+
+    def receipt(self, gate, value):
+        raw = json.dumps(value).encode()
+        (self.root / (gate + '.json')).write_bytes(raw)
+        self.proof['checks'][gate] = {'conclusion': 'success', 'file': gate + '.json',
+                                      'sha256': hashlib.sha256(raw).hexdigest()}
+
+    def validate(self, proof=None, controlled=False):
+        return policy.validate_proof(self.manifest, proof or self.proof, self.root, SOURCE, 123,
+                                     '', controlled=controlled)
+
+    def test_off_proof_has_no_executor_and_preserves_common_gates(self):
+        result = self.validate()
+        self.assertEqual(result['pool_mode'], 'off')
+        self.assertEqual(result['image_digest'], DIGEST)
+        self.assertEqual(result['migration_compatible'], 'false')
+        self.assertFalse(any(key.startswith('executor_') for key in result))
+        for gate in self.proof['checks']:
+            bad = deepcopy(self.proof)
+            bad['checks'].pop(gate)
+            with self.subTest(gate=gate), self.assertRaisesRegex(ValueError, 'missing/unknown'):
+                self.validate(bad)
+
+    def test_off_cannot_be_legacy_unknown_or_controlled(self):
+        for schema, mode in [('clearapi.automatic-release/v1', 'off'),
+                             ('clearapi.automatic-release/v2', None),
+                             ('clearapi.automatic-release/v2', 'OFF'),
+                             ('clearapi.automatic-release/v2', True)]:
+            bad = deepcopy(self.proof)
+            bad.update(schema=schema, pool_mode=mode)
+            with self.subTest(schema=schema, mode=mode), self.assertRaises(ValueError):
+                self.validate(bad)
+        with self.assertRaises(ValueError):
+            self.validate(controlled=True)
+        bad = deepcopy(self.proof)
+        bad['executor'] = {'fixture': 'retained Executor is not a release dependency'}
+        with self.assertRaisesRegex(ValueError, 'Executor'):
+            self.validate(bad)
+
+    def test_off_receipts_cannot_be_relabelled_or_downgraded(self):
+        for field, value in [('pool_mode', 'pg03'), ('pool_mode', None),
+                             ('schema', 'clearapi.gate-evidence/v1'),
+                             ('conclusion', 'not_run'), ('rc_run_attempt', 2),
+                             ('source_commit', '0' * 40), ('gateway_digest', 'sha256:' + '0' * 64)]:
+            original = json.loads((self.root / 'backup_restore.json').read_text())
+            changed = dict(original)
+            changed[field] = value
+            self.receipt('backup_restore', changed)
+            with self.subTest(field=field, value=value), self.assertRaises(ValueError):
+                self.validate()
+            self.receipt('backup_restore', original)
+
+    def test_v2_pg03_keeps_executor_and_all_pg03_gates(self):
+        self.proof['pool_mode'] = 'pg03'
+        with self.assertRaises(ValueError):
+            self.validate()
+
+    def test_off_assembler_and_validator_roundtrip_without_executor_arguments(self):
+        manifest = self.root / 'manifest.json'
+        manifest.write_text(json.dumps(self.manifest))
+        output = self.root / 'off-proof.json'
+        command = [sys.executable, '-B', str(Path(__file__).with_name('assemble-release-proof.py')),
+                   '--manifest', str(manifest), '--receipts', str(self.root),
+                   '--output', str(output), '--pool-mode', 'off',
+                   '--previous-source-commit', 'd' * 40]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        proof = json.loads(output.read_text())
+        self.assertEqual(self.validate(proof)['pool_mode'], 'off')
+        (self.root / 'safe_rollback.json').unlink()
+        output.unlink()
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(output.exists(), 'no proof without real gate receipts')
+
+    def test_off_schema_change_requires_mode_specific_rehearsal(self):
+        manifest_path = self.root / 'off-schema-manifest.json'
+        changed = deepcopy(self.manifest)
+        changed['schema_transition']['target_schema_sha256'] = '3' * 64
+        manifest_path.write_text(json.dumps(changed))
+        command = [sys.executable, '-B', str(Path(__file__).with_name('assemble-release-proof.py')),
+                   '--manifest', str(manifest_path), '--receipts', str(self.root),
+                   '--output', str(self.root / 'off-schema-proof.json'), '--pool-mode', 'off',
+                   '--previous-source-commit', 'd' * 40]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('off-specific migration rehearsal', result.stderr)
+        bad = deepcopy(self.proof)
+        bad['migration'] = {'mode': 'in_place_startup_migration',
+                            'source_schema_sha256': '2' * 64,
+                            'target_schema_sha256': '3' * 64}
+        with self.assertRaisesRegex(ValueError, 'off schema changes require an off-specific'):
+            policy.validate_proof(changed, bad, self.root, SOURCE, 123, '')
+
+    def test_off_receipt_producer_binds_mode_and_preserves_command_failure(self):
+        producer = Path(__file__).with_name('produce-gate-receipt.py')
+        output = self.root / 'produced.json'
+        env = dict(os.environ, REHEARSAL_SOURCE_COMMIT=SOURCE, REHEARSAL_GATEWAY_DIGEST=DIGEST,
+                   REHEARSAL_RC_RUN_ID='123', REHEARSAL_RC_RUN_ATTEMPT='1')
+        for code in (0, 7):
+            result = subprocess.run([sys.executable, '-B', str(producer), '--pool-mode', 'off',
+                '--gate', 'pool_disabled', '--output', str(output), '--', sys.executable,
+                '-c', 'raise SystemExit(' + str(code) + ')'], env=env, capture_output=True,
+                text=True, timeout=10)
+            raw = json.loads(output.read_text())
+            self.assertEqual(raw['schema'], 'clearapi.gate-evidence/v2')
+            self.assertEqual(raw['pool_mode'], 'off')
+            self.assertEqual(raw['conclusion'], 'success' if code == 0 else 'failure')
+            self.assertEqual(result.returncode, 0 if code == 0 else 1)
+        output.unlink()
+        result = subprocess.run([sys.executable, '-B', str(producer), '--pool-mode', 'off',
+            '--gate', 'executor_pairing', '--output', str(output), '--', sys.executable, '-c',
+            'raise SystemExit(0)'], env=env, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(output.exists())
+
+    def test_off_production_authorization_still_stops_before_host_admission(self):
+        # Authenticate a full synthetic chain, then stop before host admission.
+        base = {'repository': {'full_name': policy.REPOSITORY},
+                'head_repository': {'full_name': policy.REPOSITORY}, 'head_sha': SOURCE,
+                'head_branch': 'main', 'event': 'workflow_dispatch', 'status': 'completed',
+                'conclusion': 'success', 'run_attempt': 1}
+        rehearsal = dict(base, id=100, path='.github/workflows/deployment-rehearsal.yml')
+        rc = dict(base, id=123, path='.github/workflows/release-pg03-gateway.yml')
+        responses = {'actions/runs/100': rehearsal, 'actions/runs/123': rc,
+                     'git/ref/heads/main': {'object': {'sha': SOURCE}},
+                     f'actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha={SOURCE}&per_page=1': {'workflow_runs': [rc]},
+                     f'actions/workflows/deployment-rehearsal.yml/runs?branch=main&head_sha={SOURCE}&per_page=1': {'workflow_runs': [rehearsal]}}
+
+        def download(*args):
+            destination = Path(args[args.index('--dir') + 1])
+            destination.mkdir(parents=True)
+            if args[2] == '100':
+                (destination / 'release-proof.json').write_text(json.dumps(self.proof))
+                for gate in self.proof['checks']:
+                    name = gate + '.json'
+                    (destination / name).write_bytes((self.root / name).read_bytes())
+            return ''
+
+        with patch.dict(os.environ, {'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_RUN_ID': '900'}), \
+                patch.object(policy, 'api', side_effect=lambda path: deepcopy(responses[path])) as api, \
+                patch.object(policy, 'pages', return_value=[{'workflow_runs': []}]), \
+                patch.object(policy, 'latest_main_ci', return_value={'id': 96}), \
+                patch.object(policy, 'successful_jobs'), patch.object(policy, 'gh', side_effect=download), \
+                patch.object(policy, 'verify_rc_artifact', return_value=self.manifest):
+            with self.assertRaisesRegex(ValueError, 'off.*production.*blocked'):
+                policy.authorize_release({'workflow_run': rehearsal}, self.root / 'blocked')
+            self.assertFalse(any(call.args[0].startswith('compare/') for call in api.call_args_list))
+            self.assertFalse((self.root / 'blocked/recovery-audit.json').exists())
 
 
 class TrustPolicyTest(unittest.TestCase):

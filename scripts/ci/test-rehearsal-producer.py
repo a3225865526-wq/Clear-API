@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 
 
@@ -32,6 +33,53 @@ class ProducerContractTest(unittest.TestCase):
             self.assertIn(f"receipts/{gate}.json", workflow)
         self.assertIn("assemble-release-proof.py", workflow)
         self.assertIn("deployment-proof-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
+
+    def test_off_business_and_pool_gates_execute_real_tests(self):
+        workflow = WORKFLOW.read_text()
+        self.assertIn("--gate backup_restore --output receipts/backup_restore.json -- python3 -B scripts/ci/test-backup-identity.py", workflow)
+        self.assertIn("--gate safe_rollback --output receipts/safe_rollback.json -- python3 -B scripts/ci/test-production-deploy.py -k rollback", workflow)
+        self.assertIn("--gate ordinary_provider_usage_billing", workflow)
+        self.assertIn("go test -count=1 ./e2e/commercial -run '^TestCommercialLifecycle$'", workflow)
+        self.assertIn("--gate pool_disabled", workflow)
+        self.assertIn("go test -count=1 ./model -run '^(TestPoolMasterFailClosed|TestPoolGateMatrix|TestPoolRoutingOptionSyncDoesNotRestoreOlderEnabledRevision)$'", workflow)
+        self.assertNotIn("--kind ordinary-provider", workflow)
+        self.assertNotIn("--kind pool-disabled", workflow)
+
+    def test_off_workflow_selects_its_exact_gates_and_never_claims_executor_pairing(self):
+        workflow = WORKFLOW.read_text()
+        assembly = workflow.split('- name: Assemble proof only after all gates pass', 1)[1]
+        script = textwrap.dedent(assembly.split('run: |', 1)[1].split('      - name:', 1)[0])
+        script = script.replace('scripts/ci/assemble-release-proof.py', str(ASSEMBLER))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'rc').mkdir()
+            (root / 'receipts').mkdir()
+            manifest = {'source_commit': 'a' * 40, 'image_digest': 'sha256:' + 'b' * 64,
+                        'workflow_run': 123, 'workflow_run_attempt': 1, 'binary_sha256': 'c' * 64,
+                        'schema_transition': {'source_schema_sha256': '1' * 64,
+                                              'target_schema_sha256': '1' * 64}}
+            (root / 'rc/gateway-image-release.json').write_text(json.dumps(manifest))
+            gates = {'runtime_integrity', 'billing', 'backup_restore', 'pool_disabled',
+                     'sqlite_upgrade_idempotency', 'mysql_upgrade_idempotency',
+                     'postgres_upgrade_idempotency', 'ordinary_provider_usage_billing',
+                     'replay_and_duplicate_charge', 'state_isolation', 'safe_rollback'}
+            for gate in gates:
+                (root / 'receipts' / (gate + '.json')).write_text(json.dumps({
+                    'schema': 'clearapi.gate-evidence/v2', 'pool_mode': 'off', 'gate': gate,
+                    'conclusion': 'success', 'source_commit': manifest['source_commit'],
+                    'gateway_digest': manifest['image_digest'], 'rc_run_id': 123, 'rc_run_attempt': 1}))
+            environment = dict(os.environ, REHEARSAL_POOL_MODE='off', RELEASE_STAGE='commercial',
+                               PREVIOUS_SOURCE_COMMIT='d' * 40)
+            for name in tuple(environment):
+                if name.startswith('CLEARAPI_EXECUTOR_'):
+                    environment.pop(name)
+            result = subprocess.run(['bash', '-c', script], cwd=root, env=environment,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            proof = json.loads((root / 'release-proof.json').read_text())
+            self.assertEqual(proof['pool_mode'], 'off')
+            self.assertEqual(set(proof['checks']), gates)
+            self.assertNotIn('executor', proof)
 
     def test_failed_command_persists_bound_failure_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
