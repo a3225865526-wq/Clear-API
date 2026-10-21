@@ -366,8 +366,12 @@ class OfflineRestore:
         inspection = self.inspect_target()
         self.call(['start', self.cid])
         for attempt in range(30):
+            # The image starts a temporary socket-only server during initdb.
+            # It can answer pg_isready and then shut down before PID1 execs the
+            # final PostgreSQL process. Do not admit that temporary server.
+            process = self.call(['exec', self.cid, 'cat', '/proc/1/comm'], allow_failure=True)
             ready = self.call(['exec', self.cid, 'pg_isready', '-U', 'postgres'], allow_failure=True)
-            if ready['returncode'] == 0:
+            if process['returncode'] == 0 and process['stdout'].strip() == b'postgres' and ready['returncode'] == 0:
                 break
             AU.require(attempt < 29, 'isolated database not ready')
             time.sleep(0.2)

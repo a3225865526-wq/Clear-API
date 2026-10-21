@@ -21,7 +21,7 @@ ROUTES = frozenset(('actions_all_refs', 'dispatch_rerun_approval', 'upstream_eve
     'external_credentials', 'systemd_cron_at', 'other_agents'))
 FIELDS = {
     'github': frozenset(('workflow_inventory_sha256', 'entry_freeze_sha256',
-                         'control_commit', 'auto_enabled', 'active_runs', 'pending_deployments')),
+                         'control_commit', 'auto_enabled', 'unapproved_active_runs', 'unapproved_pending_deployments')),
     'host': frozenset(('runtime_sha256', 'protected_runtime_sha256', 'candidate_identity',
                        'effective_config_sha256', 'tool_inventory_sha256',
                        'executor_epoch', 'executor_id', 'gateway_id', 'gateway_running',
@@ -298,8 +298,8 @@ class ObservationWindow:
                     self.require(matches(r'[a-f0-9]{64}', item), 'missing_fingerprint')
             if channel == 'github':
                 self.require(value['control_commit'] == self.binding['control_commit']
-                    and value['auto_enabled'] is False and value['active_runs'] == []
-                    and value['pending_deployments'] == [], 'github_not_frozen')
+                    and value['auto_enabled'] is False and value['unapproved_active_runs'] == []
+                    and value['unapproved_pending_deployments'] == [], 'github_not_frozen')
             elif channel == 'host':
                 self.require(matches(r'[a-f0-9]{32}', value['executor_epoch'])
                     and value['executor_id'] == self.binding['executor_id']

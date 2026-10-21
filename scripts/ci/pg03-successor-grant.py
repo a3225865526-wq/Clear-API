@@ -26,6 +26,7 @@ def build(raw, policy_sha, context, now):
         and all(context.get(key) == 'a3225865526-wq' for key in ('GITHUB_ACTOR', 'GITHUB_TRIGGERING_ACTOR'))
         and context.get('GITHUB_SHA') == request['control_commit']
         and context.get('GITHUB_WORKFLOW_REF') == REPO+'/.github/workflows/pg03-successor-approval.yml@refs/heads/main'
+        and context.get('REQUEST_SHA256') == TX.sha(raw)
         and TX.matches(r'[a-f0-9]{64}', policy_sha), 'grant context mismatch')
     TX.PLAN.require(raw == TX.encoded(request), 'canonical request required')
     return dict(schema='clearapi.successor-production-grant/v1', repository=REPO,

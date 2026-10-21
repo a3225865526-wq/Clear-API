@@ -30,7 +30,7 @@ class ObservationTests(unittest.TestCase):
             issued_at=1000, expires_at=1300, coverage={k: sorted(v) for k, v in O.FIELDS.items()})
         self.values = {key: {field: 'a' * 64 for field in fields} for key, fields in O.FIELDS.items()}
         self.values['github'].update(control_commit=self.binding['control_commit'], auto_enabled=False,
-                                     active_runs=[], pending_deployments=[])
+                                     unapproved_active_runs=[], unapproved_pending_deployments=[])
         self.values['host'].update(executor_epoch='b' * 32, executor_id=self.binding['executor_id'],
             gateway_id='c' * 64, gateway_running=False, ingress='isolated_stopped_restart_no',
             candidate_identity=None, public_listeners=[], unique_executor=True,
@@ -169,6 +169,13 @@ class ObservationTests(unittest.TestCase):
                 self.window.start()
                 with self.assertRaises(O.ObservationClosed):
                     self.window.poll(channel)
+
+    def test_grant_workflow_name_and_owner_do_not_exempt_unapproved_activity(self):
+        self.values['github']['unapproved_active_runs'] = [dict(
+            name='PG03 successor independent grant', owner='a3225865526-wq')]
+        self.window.start()
+        with self.assertRaisesRegex(O.ObservationClosed, 'github_not_frozen'):
+            self.window.poll('github')
 
     def test_fingerprint_drift_is_sticky(self):
         self.observe(end=0)

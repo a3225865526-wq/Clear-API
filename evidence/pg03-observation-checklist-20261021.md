@@ -6,7 +6,7 @@
 
 | 项目 | 状态 | 依据和边界 |
 | --- | --- | --- |
-| 60 秒稳定基线、两阶段新鲜请求、执行阶段精确状态迁移的本地合同 | PASS | `python -B scripts/ci/test-pg03-observation.py`，22 项 OK、exit 0；本地替身，不是生产验收 |
+| 60 秒稳定基线、两阶段新鲜请求、执行阶段精确状态迁移的本地合同 | PASS | `python -B scripts/ci/test-pg03-observation.py`，23 项 OK、exit 0；本地替身，不是生产验收 |
 | 实际生产采集身份、权限、期限、持久防重放及受信生产者 | BLOCKED | 本轮未安装、授权或采集，需要管理员独立审批和现场证据 |
 | 实际 schema、受保护数据、待处理业务、配置及受约束 writer | UNKNOWN | 历史快照和旧 helper 不足以证明 |
 | 真实全 writer 连续 60 秒独占观察及实际执行状态迁移 | NOT RUN | 没有执行生产采集、入口冻结或部署 |
@@ -30,7 +30,7 @@
 
 | 通道 | 完整事实 | 前置期合格状态 |
 | --- | --- | --- |
-| GitHub | workflow inventory、入口冻结指纹、control、自动开关、全 ref 活动运行和待部署 | control 精确、auto=false、无活动运行/待部署、指纹稳定 |
+| GitHub | workflow inventory、入口冻结指纹、control、自动开关、全 ref 活动运行和待部署 | control 精确、auto=false、无未授权活动运行/待部署、指纹稳定 |
 | host | Runtime、protected_runtime、精确 candidate_identity、配置/工具、Executor ID/epoch、Gateway ID/running、入口/监听、完整 writer 路由及唯一执行者 | Gateway stopped、隔离入口、无公网监听、唯一 Executor、所有入口 frozen |
 | database | schema、protected_state、pending_work、获准 scope intent、database identity、unapproved_writers | 所有固定指纹稳定、无未授权 writer |
 | authority | 身份/权限指纹、lease、Executor、撤销/连接/锁归属 | 当前未撤销、连接正常、锁归唯一 Executor |
@@ -66,6 +66,12 @@ prepare_runtime 不可提前替换/启动 Gateway；准备 run 目录/challenge 
 
 观察失败：停止读、保留已消费 claim 与 UNKNOWN/FAIL，不进入执行、不 retry。未部署时没有数据库回滚动作。失联/过期后保持隔离，管理员核查锁/进程和撤销，新的观察重新批准。执行失败时由固定 containment 停止 successor 并保持隔离；此协议不证明容器已停止、数据库已恢复，也不授权自动 restore。
 
-初次 12 项测试出现默认真实时钟先拒绝 lease 和 malformed evidence=None 的类型错误；修正错误顺序假设并显式拒绝错误类型。后续增加阶段政策、动态 CID 和两阶段因果顺序/最终资格/范围拒绝回归。最新本地命令 `python -B scripts/ci/test-pg03-observation.py` 22 项 OK、exit 0。未运行真实生产采集、备份、恢复、部署或重复既有真实隔离演练。
+初次 12 项测试出现默认真实时钟先拒绝 lease 和 malformed evidence=None 的类型错误；修正错误顺序假设并显式拒绝错误类型。后续增加阶段政策、动态 CID 和两阶段因果顺序/最终资格/范围拒绝回归。最新本地命令 `python -B scripts/ci/test-pg03-observation.py` 23 项 OK、exit 0。未运行真实生产采集、备份、恢复、部署或重复既有真实隔离演练。
 
 内部 _collect_projection 的 allowed 谓词只由受信任 ExecutionWindow 选择，外部数据不得提供 callback、选择方法或修改 policy/基线。公开 poll(channel) 只能采稳定基线或当前固定阶段，没有外来 allowed 参数；同进程任意 Python 代码并非安全隔离边界。authority 时钟/认证使用串行锁避免四个 monitor 的更新竞争。
+
+## 独立只读 grant 活动的精确例外
+
+GitHub 稳定投影使用 `unapproved_active_runs=[]` 与 `unapproved_pending_deployments=[]`，而非要求任何 workflow 都不存在。当前观察会话本身所需的独立只读 grant 不属于生产 writer；只有受信任 GitHub reader 能确认并排除预先批准意图下的唯一活动：精确 pinned 只读 workflow 文件/字节、仓库及 repository ID、main/control、owner dispatch/triggering actor、唯一 run ID/attempt、transaction/intent/request hash 与当前 observation 会话全部对应。所有 raw runs、队列、pending approvals（包括获准排除项）必须另外完整保存到审计证据，不能静默删除。
+
+不得按 workflow 名称相似、owner 相同、历史成功或请求自报 allow=true 泛排除；普通 deployment/RC/其他 ref/rerun/第二执行者仍然阻断。run-name 中的 request hash 只绑定显示身份，不能伪称已经读取 GitHub API 未提供的 dispatch inputs。固定受审只读 producer 必须校验 canonical REQUEST_JSON 与独立 hash 输入一致；尚待 inputs/producer 证实时记录 UNKNOWN，`final_authority` 必须等精确 artifact、实际独立 environment review、完整 request/policy/资格绑定均核验后才能 seal。任何活动会写生产或不能证明其只读来源时，都留在 unapproved 集合并关闭窗口。没有新增宽松开关或外部 JSON callback。

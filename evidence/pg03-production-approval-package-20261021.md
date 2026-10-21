@@ -97,3 +97,14 @@ ProductionHost 提供固定本地动作：准备 runtime、仅创建 Gateway（�
 补充最终本地记录：restore集中26项（25 PASS / 1 opt-in真实PG skip）exit0；host最终12项exit0；launcher目录统一0750与原runtime prepare保持一致，未要求扩大生产目录权限。恢复批准支持真实备份完成后签发，拒绝超过24小时备份，避免通过回填issued_at满足循环时间约束。
 
 本地WSL Git不能解析Windows worktree gitdir；其secret-scan打印PASS无有效Git输入，因此该次结果INVALID，不计通过。改用原生Git Bash先 `git rev-parse --is-inside-work-tree` 得true，再 `bash scripts/ci/secret-scan.sh` 实际PASS/exit0；没有读取或输出凭据。
+
+
+## 10. PR82 第一轮CI失败及定向修正（保留原始失败）
+
+开发head853f6e09fc841b6e9de28670ba58452740fe4dfb，CI39576186446 的独立真实PostgreSQL测试FAIL：pg_isready返回成功后的首次SHOW server_version_num子进程非零。job119142169666原始日志保存在 `pg03-readiness-ci-39576186446-postgres.log`，原GitHub run保留。该错误不是既有候选隔离验收失败，不重跑39517646061。
+
+原日志没有子进程stderr，初始化临时socket server的短暂ready是待验证根因假设，未写成实测事实。修正为精确检查容器PID1 comm==postgres，再判pg_isready；增加“临时bash即使ready也不得进入SQL”的回归，仅合成真实PG测试追加有界stderr诊断。后续CI结果决定是否通过，不能由本地假Docker替代。
+
+补齐真实临时OpenSSL/execute入口门禁验证：有效签名+durable claim、同授权重放、错误签名、过期和越权拒绝（只创建临时合成密钥，Docker/mount/machine ID为显式替身）。恢复集中现在29项：28 PASS/1真实PG opt-in skip；观察窗口23项PASS，均WSL exit0。签名入口不等于真实生产恢复producer认证。
+
+观察GitHub投影改为未授权active/pending集合为空，允许精确预先获准的唯一只读grant控制活动；不能按workflow名或owner泛排除。完整raw活动仍须audit；request_sha256成为dispatch显式输入和run-name，并由固定producer校验canonical输入匹配，最终artifact/actualreview验证成功前不得seal。否则“窗口内禁止所有workflow”会使合法独立审批本身破坏窗口。此项不允许任何生产写入或生产workflow豁免。

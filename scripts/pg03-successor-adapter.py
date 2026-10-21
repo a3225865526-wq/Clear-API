@@ -270,6 +270,8 @@ def production_grant(get_json, get_bytes, policy, request, qualification, now):
         and any(row.get('state') == 'approved' and row.get('user', {}).get('login') in approvers
             and any(env.get('id') == policy['environment_id'] and env.get('name') == 'production'
                     for env in row.get('environments', [])) for row in reviews), 'production review absent or rejected')
+    require(get_json(root+'/actions/runs/'+str(binding['run_id'])).get('display_title')
+        == 'PG03 grant '+policy['request_sha256'], 'approval activity request mismatch')
     archive = verified_artifact(get_json, get_bytes, binding)
     with zipfile.ZipFile(io.BytesIO(archive)) as saved:
         entries = saved.infolist()

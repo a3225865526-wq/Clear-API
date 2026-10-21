@@ -1,0 +1,15 @@
+{
+  "schema": "clearapi.readiness-ci-failure/v1",
+  "repository": "a3225865526-wq/Clear-API",
+  "run_id": 39576186446,
+  "attempt": 1,
+  "head_commit": "853f6e09fc841b6e9de28670ba58452740fe4dfb",
+  "job_id": 119142169666,
+  "failed_step": "Verify offline restore against real isolated PostgreSQL",
+  "step_conclusion": "failure",
+  "raw_job_log": "pg03-readiness-ci-39576186446-postgres.log",
+  "raw_job_log_sha256": "18630905b8d0a0239fd57908400575f3edaf99f00c659bff233f86dd373454a1",
+  "root_cause": "UNKNOWN; temporary initialization server readiness race is a source-supported hypothesis",
+  "production_execution": false,
+  "existing_candidate_isolation": "PASS reused, not rerun"
+}

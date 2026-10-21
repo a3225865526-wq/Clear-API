@@ -8,11 +8,14 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
 import time
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 sys.dont_write_bytecode = True
@@ -285,6 +288,7 @@ class FakeOfflineCommands:
     def __init__(self, spec):
         self.spec, self.calls, self.alive = spec, [], False
         self.break_network, self.fail_restore = False, False
+        self.temporary_server_reads = 0
 
     def run(self, argv, stdin=None, hash_only=False):
         self.calls.append((argv, stdin))
@@ -308,6 +312,9 @@ class FakeOfflineCommands:
             code = 1 if self.fail_restore else 0
         elif args[0] == 'exec' and 'pg_dump' in args:
             stdout = b'-- schema fixture\n'
+        elif args[0] == 'exec' and args[-2:] == ['cat', '/proc/1/comm']:
+            stdout = b'bash\n' if self.temporary_server_reads else b'postgres\n'
+            self.temporary_server_reads = max(0, self.temporary_server_reads-1)
         elif args[:2] == ['exec', '-i']:
             sql = stdin.decode().removeprefix(RUNNER.SESSION)
             if sql == 'SHOW server_version_num;': stdout = b'170006\n'
@@ -393,6 +400,7 @@ class OfflineRunnerTest(unittest.TestCase):
         output = self.fixture.root/'result'
         output.mkdir(mode=0o700)
         transport = FakeOfflineCommands(self.spec)
+        transport.temporary_server_reads = 1  # temporary server already answers pg_isready
         runner = RUNNER.OfflineRestore(self.spec, transport, self.fixture.root, output, lambda:None)
         pg03 = self.fixture.docs['pg03-restored-inventory.json']
         with patch.object(RUNNER, 'now', return_value=self.fixture.now), \
@@ -408,6 +416,10 @@ class OfflineRunnerTest(unittest.TestCase):
         self.assertEqual(sum('pg_restore' in argv for argv in commands), 1)
         self.assertTrue(all(argv[0] == '/usr/bin/docker' for argv in commands))
         self.assertFalse(any('gpg' in argv or 'ssh' in argv for argv in commands))
+        process_probes = [i for i, argv in enumerate(commands) if argv[-2:] == ['cat', '/proc/1/comm']]
+        first_sql = next(i for i, (_, stdin) in enumerate(transport.calls) if stdin)
+        self.assertEqual(len(process_probes), 2)
+        self.assertGreater(first_sql, process_probes[1], 'temporary initdb server must never admit SQL')
 
     @unittest.skipIf(os.name == 'nt', 'Linux root runner; Windows validates offline contracts only')
     def test_network_drift_stops_before_start_or_restore(self):
@@ -460,6 +472,134 @@ class OfflineRunnerTest(unittest.TestCase):
                 transport.run([sys.executable, '-c', 'import time; time.sleep(60)'], stdin=b'x'*1000000)
 
 
+@unittest.skipUnless(os.name == 'posix' and getattr(os, 'geteuid', lambda: -1)() == 0,
+                     'Linux root detached-signature entrypoint contract')
+class OfflineExecuteAuthorizationTest(unittest.TestCase):
+    """Real temporary OpenSSL signatures; fake Docker and mount metadata only."""
+    def setUp(self):
+        self.fixture = RestoreAuditTest()
+        self.fixture.setUp()
+        self.addCleanup(self.fixture.doCleanups)
+        self.root = self.fixture.root
+        self.instant = self.fixture.now
+        self.openssl = shutil.which('openssl')
+        self.assertIsNotNone(self.openssl, 'OpenSSL is required for this authorization contract')
+        self.key, self.public = self.root/'synthetic-signing.key', self.root/'synthetic-signing.pub'
+        self.signing(['genpkey', '-algorithm', 'ED25519', '-out', str(self.key)])
+        self.key.chmod(0o600)
+        self.signing(['pkey', '-in', str(self.key), '-pubout', '-out', str(self.public)])
+        self.public.chmod(0o600)
+        self.fake_docker = self.root/'fixture-docker'
+        RUNNER.write_file(self.fake_docker, b'fixture only; never executed')
+        self.installed = self.root/'installed'
+        self.installed.mkdir(mode=0o700)
+        for name in ('pg03-offline-restore.py','pg03-restore-acceptance.py','pg03-backup-state.py'):
+            RUNNER.write_file(self.installed/name,(Path(RUNNER.__file__).parent/name).read_bytes())
+        self.inputs, self.outputs, self.claims = (self.root/name for name in ('inputs','outputs','claims'))
+        for directory in (self.inputs, self.outputs, self.claims): directory.mkdir(mode=0o700)
+        self.spec = {k:v for k,v in self.fixture.plan.items() if k not in ('evidence_sha256','target_container_id')}
+        self.spec.update(schema='clearapi.offline-restore-execute-spec/v1', authorization_id='a'*32,
+            postgres_image_ref=RUNNER.PG_IMAGE, input_sha256=dict.fromkeys(
+                ('backup-manifest.json','backup-completion.json','source-inventory.json','predecryption-run.json'), 'b'*64))
+        (self.inputs/self.spec['authorization_id']).mkdir(mode=0o700)
+        self.spec_path, self.authorization, self.signature = (self.root/name for name in ('spec.json','authorization.json','authorization.sig'))
+        RUNNER.write_file(self.spec_path, RUNNER.encoded(self.spec))
+        self.auth = dict(schema='clearapi.offline-restore-authorization/v1', approved_by='a3225865526-wq',
+            action='independent_offline_restore_only', spec_sha256=AUDIT.digest(self.spec_path.read_bytes()),
+            authorization_id=self.spec['authorization_id'], issued_at_utc='2026-10-21T00:59:00Z',
+            expires_at_utc='2026-10-21T01:30:00Z')
+        self.policy_path = self.root/'policy.json'
+        policy = dict(schema='clearapi.offline-restore-policy/v1', environment='isolated_offline_restore',
+            public_key_file=str(self.public), machine_id_sha256=AUDIT.digest(b'synthetic-machine-id'),
+            public_key_sha256=AUDIT.digest(self.public.read_bytes()),
+            docker_binary_sha256=AUDIT.digest(self.fake_docker.read_bytes()),
+            openssl_binary_sha256=AUDIT.file_hash(Path(self.openssl).parent,Path(self.openssl).name)[0],
+            runner_sha256=AUDIT.file_hash(Path(RUNNER.__file__).parent,Path(RUNNER.__file__).name)[0],
+            module_sha256={name:AUDIT.file_hash(Path(RUNNER.__file__).parent,name)[0]
+                for name in ('pg03-restore-acceptance.py','pg03-backup-state.py')}, offline_daemon_id='synthetic-offline-daemon')
+        RUNNER.write_file(self.policy_path,RUNNER.encoded(policy))
+        self.sign_authorization()
+        self.docker_calls = []
+
+    def signing(self, arguments):
+        result = subprocess.run([self.openssl,*arguments],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
+        self.assertEqual(result.returncode,0,'temporary synthetic OpenSSL operation failed')
+
+    def sign_authorization(self):
+        self.authorization.write_bytes(RUNNER.encoded(self.auth))
+        self.authorization.chmod(0o600)
+        self.signing(['pkeyutl','-sign','-rawin','-inkey',str(self.key),'-in',str(self.authorization),'-out',str(self.signature)])
+        self.signature.chmod(0o600)
+
+    def execute(self):
+        args = SimpleNamespace(policy=str(self.policy_path), policy_sha256=AUDIT.digest(self.policy_path.read_bytes()),
+            spec=self.spec_path,spec_sha256=AUDIT.digest(self.spec_path.read_bytes()), authorization=self.authorization,
+            authorization_sha256=AUDIT.digest(self.authorization.read_bytes()),signature=self.signature)
+        original_run = RUNNER.LocalCommands.run
+        original_read_bytes, original_read_text = Path.read_bytes, Path.read_text
+        def read_bytes(path):
+            return b'synthetic-machine-id' if str(path)=='/etc/machine-id' else original_read_bytes(path)
+        def read_text(path,*a,**kw):
+            if str(path)=='/proc/self/mountinfo':
+                return ('1 0 0:1 / / rw - ext4 fixture rw\n'
+                    +'2 1 0:2 / '+str(self.inputs)+' rw - tmpfs fixture rw\n'
+                    +'3 1 0:3 / '+str(self.outputs)+' rw - tmpfs fixture rw\n')
+            return original_read_text(path,*a,**kw)
+        def run(transport,argv,*a,**kw):
+            if argv[0] == self.openssl:
+                return original_run(transport,argv,*a,**kw)
+            self.docker_calls.append(argv)
+            self.assertEqual(argv,[str(self.fake_docker),'info','--format','{{.ID}}'])
+            return dict(returncode=0,stdout=b'synthetic-offline-daemon\n')
+        with patch.multiple(RUNNER,POLICY_PATH=self.policy_path,PUBLIC_KEY=self.public,INPUT_ROOT=self.inputs,
+                OUTPUT_ROOT=self.outputs,CLAIM_ROOT=self.claims,DOCKER=str(self.fake_docker),OPENSSL=self.openssl,
+                __file__=str(self.installed/'pg03-offline-restore.py')), \
+             patch.object(RUNNER,'now',return_value=self.instant), patch.object(Path,'read_bytes',read_bytes), \
+             patch.object(Path,'read_text',read_text), patch.object(RUNNER.LocalCommands,'run',run), \
+             patch.object(RUNNER.OfflineRestore,'run',return_value=dict(status='LOCAL_SIGNATURE_CONTRACT_ONLY')):
+            return RUNNER.execute(args)
+
+    def test_actual_signature_allows_one_claim_and_replay_cannot_replace_it(self):
+        self.assertEqual(self.execute()['status'],'LOCAL_SIGNATURE_CONTRACT_ONLY')
+        claim = self.claims/(self.spec['authorization_id']+'.json')
+        original = claim.read_bytes()
+        with self.assertRaises(FileExistsError): self.execute()
+        self.assertEqual(claim.read_bytes(),original)
+
+    def test_invalid_detached_signature_and_changed_signed_authorization_fail_before_docker(self):
+        signature = self.signature.read_bytes()
+        self.signature.write_bytes(bytes([signature[0]^1])+signature[1:])
+        with self.assertRaisesRegex(ValueError,'signature rejected'): self.execute()
+        self.assertFalse(list(self.claims.iterdir()))
+        self.assertEqual(self.docker_calls,[])
+        self.signature.write_bytes(signature)
+        self.auth['authorization_id']='c'*32
+        self.authorization.write_bytes(RUNNER.encoded(self.auth))
+        with self.assertRaisesRegex(ValueError,'authorization mismatch'): self.execute()
+        self.assertFalse(list(self.claims.iterdir()))
+
+    def test_expired_or_wrong_scope_real_signed_authorization_cannot_claim(self):
+        for field,value in (('expires_at_utc','2026-10-21T00:59:59Z'),('action','production_deploy')):
+            with self.subTest(field=field):
+                original = copy.deepcopy(self.auth)
+                self.auth[field]=value
+                self.sign_authorization()
+                with self.assertRaisesRegex(ValueError,'authorization mismatch'): self.execute()
+                self.assertFalse(list(self.claims.iterdir()))
+                self.assertEqual(self.docker_calls,[])
+                self.auth=original
+
+
+class SyntheticPostgresCommands(RUNNER.LocalCommands):
+    """Diagnostics only for fresh hosted synthetic databases, never real data."""
+    def run(self, argv, **kwargs):
+        result = super().run(argv, **kwargs)
+        if result['returncode'] != 0:
+            print('Synthetic PostgreSQL command failed:', result['returncode'],
+                  result['stderr'][:4096].decode(errors='replace'))
+        return result
+
+
 @unittest.skipUnless(os.environ.get('PG03_REAL_OFFLINE_RESTORE') == 'true', 'opt-in hosted nonproduction PostgreSQL test')
 class RealPostgresRestoreTest(unittest.TestCase):
     def test_real_custom_dump_restore_main_log_full_inventory(self):
@@ -473,7 +613,7 @@ class RealPostgresRestoreTest(unittest.TestCase):
         def lease():
             if time.monotonic() >= deadline:
                 raise ValueError('synthetic restore test deadline')
-        transport = RUNNER.LocalCommands(lease)
+        transport = SyntheticPostgresCommands(lease)
         pull = transport.run([RUNNER.DOCKER, 'pull', RUNNER.PG_IMAGE])
         self.assertEqual(pull['returncode'], 0, 'pinned public PostgreSQL image unavailable')
         nonce = os.urandom(16).hex()
@@ -497,8 +637,9 @@ class RealPostgresRestoreTest(unittest.TestCase):
                 runner.inspect_target()
                 runner.call(['start',runner.cid])
                 for attempt in range(60):
+                    process = runner.call(['exec',runner.cid,'cat','/proc/1/comm'],allow_failure=True)
                     ready = runner.call(['exec',runner.cid,'pg_isready','-U','postgres'],allow_failure=True)
-                    if ready['returncode'] == 0:
+                    if process['returncode'] == 0 and process['stdout'].strip() == b'postgres' and ready['returncode'] == 0:
                         break
                     self.assertLess(attempt,59,'synthetic PostgreSQL not ready')
                     time.sleep(0.2)

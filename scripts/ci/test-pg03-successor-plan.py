@@ -1539,6 +1539,7 @@ class AdapterContractTest(unittest.TestCase):
         branches = dict(total_count=1, branch_policies=[dict(name='main', type='branch')])
         def get(path):
             if path.endswith('/approvals'): return copy.deepcopy(approvals)
+            if path.endswith('/actions/runs/789'): return dict(display_title='PG03 grant '+qualification['request_sha256'])
             if path.endswith('/deployment-branch-policies'): return copy.deepcopy(branches)
             return copy.deepcopy(environment)
         def archive():
@@ -1594,6 +1595,7 @@ class AdapterContractTest(unittest.TestCase):
             GITHUB_TRIGGERING_ACTOR=self.adapter.OWNER, GITHUB_SHA=self.request['control_commit'],
             GITHUB_WORKFLOW_REF=ACTION.REPO+'/.github/workflows/pg03-successor-approval.yml@refs/heads/main')
         raw = TX.encoded(self.request)
+        context['REQUEST_SHA256'] = TX.sha(raw)
         result = producer.build(raw, 'a'*64, context, self.now)
         self.assertEqual(result['request_sha256'], TX.sha(raw))
         self.assertEqual(result['expires_at_utc'], self.request['expires_at_utc'])
@@ -1602,6 +1604,7 @@ class AdapterContractTest(unittest.TestCase):
                 producer.build(raw, 'a'*64, dict(context, **{key:value}), self.now)
         with self.assertRaises(ValueError): producer.build(raw, 'a'*64, context, self.now+timedelta(seconds=300))
         with self.assertRaises(ValueError): producer.build(raw+b'\n', 'a'*64, context, self.now)
+        with self.assertRaises(ValueError): producer.build(raw, 'a'*64, dict(context, REQUEST_SHA256='e'*64), self.now)
 
     def test_adapter_has_no_config_switch_or_default_production_capability(self):
         adapter = self.adapter.ProductionAdapter(now=lambda: self.now)

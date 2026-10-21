@@ -1,11 +1,15 @@
 name: PG03 successor independent grant
-run-name: PG03 grant ${{ github.run_id }} (no production execution)
+run-name: PG03 grant ${{ inputs.request_sha256 }}
 
 on:
   workflow_dispatch:
     inputs:
       request_json:
         description: 'Exact canonical successor request; non-secret hashes and identities only'
+        required: true
+        type: string
+      request_sha256:
+        description: 'Exact SHA256 of canonical request_json, also identifies the frozen read-only approval activity'
         required: true
         type: string
       qualification_policy_sha256:
@@ -36,6 +40,7 @@ jobs:
       - name: Present exact non-secret request before independent review
         env:
           REQUEST_JSON: ${{ inputs.request_json }}
+          REQUEST_SHA256: ${{ inputs.request_sha256 }}
           POLICY_SHA: ${{ inputs.qualification_policy_sha256 }}
         run: python3 scripts/ci/pg03-successor-grant.py inspect
 
@@ -51,6 +56,7 @@ jobs:
       - name: Create exact short-lived grant after environment review
         env:
           REQUEST_JSON: ${{ inputs.request_json }}
+          REQUEST_SHA256: ${{ inputs.request_sha256 }}
           POLICY_SHA: ${{ inputs.qualification_policy_sha256 }}
         run: python3 scripts/ci/pg03-successor-grant.py grant
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
