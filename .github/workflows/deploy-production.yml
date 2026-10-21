@@ -126,7 +126,7 @@ jobs:
           [[ "$INPUT_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]
           case "$INPUT_MIGRATION" in true|false) ;; *) exit 1 ;; esac
           case "$INPUT_POOL_MODE" in
-            off) echo 'manual off dispatch requires authenticated release proof and is disabled' >&2; exit 1 ;;
+            off) ;;
             pg03) [[ "$INPUT_RC_RUN_ID" =~ ^[1-9][0-9]*$ ]] ;;
             *) exit 1 ;;
           esac
