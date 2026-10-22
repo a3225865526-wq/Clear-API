@@ -6,7 +6,9 @@
 - OFF RC `39797527304/1` 基于 main `98a3a1d32ddd078bb0b446ea3b47dab39923c91e` 成功。artifact `clearapi-off-rc-39797527304-1`；镜像 digest `sha256:740d50a5062565d300635dd25bd9bb5223a2bff6a037dea981a06d50a134f759`；二进制 SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`。精确身份 validator 与 artifact hash 检查通过。
 - 隔离 PostgreSQL 17.6 schema 演练两次启动通过并收敛，迁移完成 proof 与 RC digest/binary/commit 绑定；生产 schema 仍 `unverified`。正式 artifact 与独立 diagnostics artifact 均已下载核验。
 - OFF Rehearsal 尚未运行：GitHub workflow dispatch 返回 422，因 choice 列表中裸写 `off` 被解释为布尔值，导致服务端选项拒绝。已修正为引号字符串并加 producer regression；WSL producer 11/11、automatic-release 45/45 通过，workflow YAML parse 与 `git diff --check` 通过，待 PR/CI。由于 commit 绑定，合并后必须在最新 main 重新生成正式 RC，再 dispatch Rehearsal。
-- `CLEARAPI_AUTO_PRODUCTION_ENABLED=false`。没有生产连接、备份/恢复、部署、流量切换或 PG03/账号池/Executor 启用。剩余路径：合并 choice 修复 -> 新 RC -> OFF rehearsal 与逐 gate/proof 核验 -> 负责人/管理员审批并执行真实生产备份、恢复、回滚与部署。
+- OFF Deployment Rehearsal `39804761415/1` 已绑定 RC `39802315993/1`。runtime_integrity、billing、SQLite/MySQL/PostgreSQL upgrade idempotency、ordinary_provider_usage_billing、pool_disabled、replay_and_duplicate_charge、state_isolation、safe_rollback 共 10 项 receipts PASS；PG03-only evidence 按 OFF 模式 skipped。唯一失败是 `backup_restore` 离线回归中的 stopped-incident case：祖先目录安全检查拒绝 root-owned 系统祖先。Assembler 因失败 gate 拒绝最终 proof；artifact `deployment-proof-39804761415-1` 留存，不代表 rehearsal 成功。
+- 已放宽祖先目录检查至 root-owned/current-user-owned 且不可由组/其他用户写入，同时保留目标及产物目录、manifest、staging/encrypted、链接和哈希校验。WSL `test-backup-identity.py` 28/28、`test-rehearsal-producer.py` 11/11 PASS。待 PR/CI；合并后仍须基于最新 main 重建 RC、重跑 OFF rehearsal。
+- `CLEARAPI_AUTO_PRODUCTION_ENABLED=false`。没有生产连接、真实生产备份/恢复、部署、流量切换或 PG03/账号池/Executor 启用。OFF backup gate 为离线测试，不是生产证据。剩余路径：合并修复 -> 新 RC -> 重跑 rehearsal 并取得成功 proof -> 负责人/管理员审批及现场执行真实生产备份、恢复、回滚与部署。
 
 ## 2026-10-22 — 新正式 RC 阻塞与迁移 proof 修复
 

@@ -113,7 +113,7 @@ def successor_completion(base, manifest_path, stopped_identity, invocation_start
     # contract without importing it into this otherwise standalone backup tool.
     for parent in path.parents:
         info = parent.lstat()
-        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in (0, os.geteuid())
                 or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
             raise ValueError("unsafe backup directory")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
