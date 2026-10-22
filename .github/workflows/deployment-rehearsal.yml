@@ -22,7 +22,7 @@ on:
         required: true
         type: choice
         default: pg03
-        options: [off, pg03]
+        options: ["off", "pg03"]
       release_stage:
         description: 'Controlled deployment keeps public traffic blocked until owner Provider acceptance'
         type: choice

@@ -1,5 +1,13 @@
 # ClearAPI 非 PG03 发布准备 — 2026-10-21
 
+## 2026-10-22 — OFF RC 真实通过；演练调度参数待修复
+
+- PR #85 已合并（`98a3a1d32ddd078bb0b446ea3b47dab39923c91e`），8 项必需 CI 全部 PASS，run `39794014652`。
+- OFF RC `39797527304/1` 基于 main `98a3a1d32ddd078bb0b446ea3b47dab39923c91e` 成功。artifact `clearapi-off-rc-39797527304-1`；镜像 digest `sha256:740d50a5062565d300635dd25bd9bb5223a2bff6a037dea981a06d50a134f759`；二进制 SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`。精确身份 validator 与 artifact hash 检查通过。
+- 隔离 PostgreSQL 17.6 schema 演练两次启动通过并收敛，迁移完成 proof 与 RC digest/binary/commit 绑定；生产 schema 仍 `unverified`。正式 artifact 与独立 diagnostics artifact 均已下载核验。
+- OFF Rehearsal 尚未运行：GitHub workflow dispatch 返回 422，因 choice 列表中裸写 `off` 被解释为布尔值，导致服务端选项拒绝。已修正为引号字符串并加 producer regression；WSL producer 11/11、automatic-release 45/45 通过，workflow YAML parse 与 `git diff --check` 通过，待 PR/CI。由于 commit 绑定，合并后必须在最新 main 重新生成正式 RC，再 dispatch Rehearsal。
+- `CLEARAPI_AUTO_PRODUCTION_ENABLED=false`。没有生产连接、备份/恢复、部署、流量切换或 PG03/账号池/Executor 启用。剩余路径：合并 choice 修复 -> 新 RC -> OFF rehearsal 与逐 gate/proof 核验 -> 负责人/管理员审批并执行真实生产备份、恢复、回滚与部署。
+
 ## 2026-10-22 — 新正式 RC 阻塞与迁移 proof 修复
 
 - PR #84 已合并，merge commit `45c819d15855d4c7cbfce3c56d8739b2dd920052`；8 个必需 CI checks 全部 PASS。

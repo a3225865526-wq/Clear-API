@@ -1,5 +1,13 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-22 — OFF RC 成功；Rehearsal dispatch 被 choice 定义阻塞
+
+- PR #85 已合并，merge commit `98a3a1d32ddd078bb0b446ea3b47dab39923c91e`；其 8 项必需 CI 全部 PASS（Actions run `39794014652`），含 SQLite/MySQL/PostgreSQL matrix、backend、frontend、secret scan 与 PG03 isolated restore。
+- 新正式 OFF RC run `39797527304/1` 基于上述 main commit/tree `accd82ccf715e4b33574cce499288bf8ce36e07f` 成功；artifact `clearapi-off-rc-39797527304-1`。镜像 `ghcr.io/a3225865526-wq/clearapi@sha256:740d50a5062565d300635dd25bd9bb5223a2bff6a037dea981a06d50a134f759`，二进制 SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`。本地 validator 对仓库/source/tree/run/attempt/artifact 身份 PASS，artifact hash 与二进制哈希匹配。
+- OFF 隔离 schema receipt 与诊断 observation 均真实存在：PostgreSQL 17.6 隔离实例两次启动成功；第一次从 schema SHA256 `578bc6f83dfafb47056c74324d13833a6333152685f4500316b0cd67f88333fd` 迁移到 `3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035`，第二次保持一致；绑定迁移 proof 成功。生产 schema 明确仍为 `unverified`。
+- 已确认仓库变量 `CLEARAPI_AUTO_PRODUCTION_ENABLED=false`。OFF Rehearsal dispatch `39797527304` 被 GitHub 以 HTTP 422 拒绝：`pool_mode=off` 不在允许选项内。实际 workflow choice 写作未加引号的 `off`，按 YAML 解析为布尔值；未尝试 PG03 替代值，也未启动 Rehearsal。已修复为字符串选项并新增 regression test；WSL producer 11/11、automatic-release 45/45 通过，workflow YAML parse 与 `git diff --check` 通过，待 PR/CI。修复合并后需为最新 main 再建 RC，因为 Rehearsal 严格要求 RC commit 等于当前 main。
+- 未执行 SSH、生产数据库操作、真实备份/恢复、部署、Gateway 替换/重启或流量切换。生产现场操作与最终授权仍是阻塞；PG03、账号池、Executor 保持关闭。
+
 ## 2026-10-22 — PR #84 已合并；OFF RC 首轮 schema 迁移合同阻塞
 
 - PR #84（`faf1a34e78c8aef5dba55ac040e062abf8ea242e`）已合并，merge commit `45c819d15855d4c7cbfce3c56d8739b2dd920052`。8 个必需 CI checks 全部 PASS。

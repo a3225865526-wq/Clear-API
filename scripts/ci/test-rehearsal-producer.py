@@ -21,6 +21,10 @@ VERIFIER = ROOT / "scripts/ci/verify-rehearsal-input.py"
 
 
 class ProducerContractTest(unittest.TestCase):
+    def test_off_dispatch_choice_is_a_string(self):
+        workflow = WORKFLOW.read_text()
+        self.assertIn('options: ["off", "pg03"]', workflow)
+
     def test_workflow_runs_all_consumer_gates_and_assembles_proof(self):
         workflow = WORKFLOW.read_text()
         for gate in (
