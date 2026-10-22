@@ -682,11 +682,17 @@ class NonPG03ProofTest(unittest.TestCase):
 
     def setUp(self):
         ReleaseProofTest.setUp(self)
+        for field in ('image_repository', 'image_ref', 'oci_revision'):
+            self.manifest.pop(field)
+        self.manifest.update(image=policy.IMAGE, source_kind='git-commit', pool_mode='off',
+                             schema='clearapi.release-candidate/v1', production_ready=False,
+                             production_acceptance='not_run', source_tree='a' * 40)
         self.manifest.update(workflow_run='123', workflow_run_attempt='1')
         self.proof.update(schema='clearapi.automatic-release/v2', pool_mode='off')
         self.proof.pop('executor')
         self.proof['checks'] = {}
         self.manifest['schema_transition'].update(pool_mode='off',
+            source_commit=SOURCE,
             candidate_binary_sha256=self.manifest['binary_sha256'],
             candidate_image_digest=self.manifest['image_digest'],
             candidate_image_id='sha256:' + 'e' * 64, production_schema='unverified')
@@ -719,8 +725,8 @@ class NonPG03ProofTest(unittest.TestCase):
         self.proof['checks'][gate] = {'conclusion': 'success', 'file': gate + '.json',
                                       'sha256': hashlib.sha256(raw).hexdigest()}
 
-    def validate(self, proof=None, controlled=False):
-        return policy.validate_proof(self.manifest, proof or self.proof, self.root, SOURCE, 123,
+    def validate(self, proof=None, controlled=False, manifest=None):
+        return policy.validate_proof(manifest or self.manifest, proof or self.proof, self.root, SOURCE, 123,
                                      '', controlled=controlled)
 
     def test_off_proof_has_no_executor_and_preserves_common_gates(self):
@@ -734,6 +740,43 @@ class NonPG03ProofTest(unittest.TestCase):
             bad['checks'].pop(gate)
             with self.subTest(gate=gate), self.assertRaisesRegex(ValueError, 'missing/unknown'):
                 self.validate(bad)
+
+    def test_off_validator_accepts_release_candidate_manifest_shape(self):
+        manifest = deepcopy(self.manifest)
+        manifest.update(image=policy.IMAGE, source_kind='git-commit', pool_mode='off',
+                        schema='clearapi.release-candidate/v1', production_ready=False,
+                        production_acceptance='not_run', workflow_run='123',
+                        workflow_run_attempt=1, source_tree='a' * 40)
+        transition = manifest['schema_transition']
+        transition.update(pool_mode='off', candidate_binary_sha256=manifest['binary_sha256'],
+                          candidate_image_digest=manifest['image_digest'],
+                          candidate_image_id='sha256:' + 'e' * 64,
+                          production_schema='unverified',
+                          profile='isolated_schema_only_master_single_postgres',
+                          postgres_image_ref='postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929',
+                          postgres_version_num='170006')
+        manifest['schema_rehearsal_sha256'] = 'f' * 64
+        proof = deepcopy(self.proof)
+        proof.update(schema='clearapi.automatic-release/v2', pool_mode='off',
+                     repository='a3225865526-wq/Clear-API',
+                     rc_artifact='clearapi-off-rc-123-1',
+                     manifest_sha256=hashlib.sha256(
+                         (json.dumps(manifest, sort_keys=True, indent=2) + '\n').encode()).hexdigest(),
+                     schema_rehearsal_sha256='f' * 64,
+                     migration={'mode': 'off_isolated_startup_migration',
+                                'source_schema_sha256': '2' * 64,
+                                'target_schema_sha256': '2' * 64,
+                                'startup_passes': 2,
+                                'production_schema': 'unverified'})
+        proof.pop('executor', None)
+        for gate in proof['checks']:
+            receipt = json.loads((self.root / (gate + '.json')).read_text())
+            receipt['schema'] = 'clearapi.gate-evidence/v2'
+            receipt['pool_mode'] = 'off'
+            raw = json.dumps(receipt).encode()
+            (self.root / (gate + '.json')).write_bytes(raw)
+            proof['checks'][gate]['sha256'] = hashlib.sha256(raw).hexdigest()
+        self.assertEqual(self.validate(manifest=manifest, proof=proof)['pool_mode'], 'off')
 
     def test_off_proof_binds_repository_rc_artifact_and_schema_receipt(self):
         for field, value in [('repository', 'attacker/repo'),
@@ -776,6 +819,8 @@ class NonPG03ProofTest(unittest.TestCase):
             self.receipt('backup_restore', original)
 
     def test_v2_pg03_keeps_executor_and_all_pg03_gates(self):
+        self.manifest.update(image_repository=policy.IMAGE,
+                             image_ref=policy.IMAGE + "@" + DIGEST, oci_revision=SOURCE)
         self.proof['pool_mode'] = 'pg03'
         with self.assertRaises(ValueError):
             self.validate()
@@ -859,10 +904,11 @@ class NonPG03ProofTest(unittest.TestCase):
                 'head_branch': 'main', 'event': 'workflow_dispatch', 'status': 'completed',
                 'conclusion': 'success', 'run_attempt': 1}
         rehearsal = dict(base, id=100, path='.github/workflows/deployment-rehearsal.yml')
-        rc = dict(base, id=123, path='.github/workflows/release-pg03-gateway.yml')
+        rc = dict(base, id=123, path='.github/workflows/release-candidate.yml')
         responses = {'actions/runs/100': rehearsal, 'actions/runs/123': rc,
                      'git/ref/heads/main': {'object': {'sha': SOURCE}},
-                     f'actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha={SOURCE}&per_page=1': {'workflow_runs': [rc]},
+                     f'git/commits/{SOURCE}': {'tree': {'sha': 'a' * 40}},
+                     f'actions/workflows/release-candidate.yml/runs?branch=main&head_sha={SOURCE}&per_page=1': {'workflow_runs': [rc]},
                      f'actions/workflows/deployment-rehearsal.yml/runs?branch=main&head_sha={SOURCE}&per_page=1': {'workflow_runs': [rehearsal]}}
 
         def download(*args):
@@ -879,10 +925,13 @@ class NonPG03ProofTest(unittest.TestCase):
                 patch.object(policy, 'api', side_effect=lambda path: deepcopy(responses[path])) as api, \
                 patch.object(policy, 'pages', return_value=[{'workflow_runs': []}]), \
                 patch.object(policy, 'latest_main_ci', return_value={'id': 96}), \
-                patch.object(policy, 'successful_jobs'), patch.object(policy, 'gh', side_effect=download), \
-                patch.object(policy, 'verify_rc_artifact', return_value=self.manifest):
+                patch.object(policy, 'successful_jobs'), patch.object(policy, 'gh', side_effect=download) as downloads, \
+                patch.object(policy, 'validate_off_rc_artifact', return_value=self.manifest) as validate_rc:
             with self.assertRaisesRegex(ValueError, 'off.*production.*blocked'):
                 policy.authorize_release({'workflow_run': rehearsal}, self.root / 'blocked')
+            self.assertEqual(downloads.call_count, 2)
+            self.assertEqual(downloads.call_args_list[1].args[6], 'clearapi-off-rc-123-1')
+            validate_rc.assert_called_once_with(self.root / 'blocked/rc', SOURCE, 'a' * 40, 123, 1)
             self.assertFalse(any(call.args[0].startswith('compare/') for call in api.call_args_list))
             self.assertFalse((self.root / 'blocked/recovery-audit.json').exists())
 

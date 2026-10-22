@@ -12,8 +12,8 @@ import re
 import subprocess
 
 from release_proof import (PG03_GATES, proof_mode, required_gates,
-                           validate_off_proof_identity, validate_receipt_mode,
-                           validate_schema_transition)
+                           validate_off_proof_identity, validate_off_rc_artifact,
+                           validate_receipt_mode, validate_schema_transition)
 
 REPOSITORY = "a3225865526-wq/Clear-API"
 IMAGE = "ghcr.io/a3225865526-wq/clearapi"
@@ -152,10 +152,18 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
     require(proof["source_commit"] == source == manifest["source_commit"], "proof/source mismatch")
     require(re.fullmatch(SHA, source) is not None, "invalid source")
     require(proof["rc_run_id"] == rc_run, "proof RC run mismatch")
-    require(manifest["image_repository"] == IMAGE, "foreign image")
-    require(re.fullmatch(DIGEST, manifest["image_digest"]) is not None, "mutable or malformed digest")
-    require(manifest["image_ref"] == IMAGE + "@" + manifest["image_digest"], "image reference mismatch")
-    require(manifest["oci_revision"] == source and manifest["platform"] == "linux/amd64", "OCI identity mismatch")
+    if pool_mode == 'off':
+        require(manifest.get("image") == IMAGE, "foreign image")
+        require(re.fullmatch(DIGEST, manifest.get("image_digest", "")) is not None,
+                "mutable or malformed digest")
+        require(manifest.get("platform") == "linux/amd64"
+                and manifest.get("source_kind") == "git-commit",
+                "OFF RC identity mismatch")
+    else:
+        require(manifest["image_repository"] == IMAGE, "foreign image")
+        require(re.fullmatch(DIGEST, manifest["image_digest"]) is not None, "mutable or malformed digest")
+        require(manifest["image_ref"] == IMAGE + "@" + manifest["image_digest"], "image reference mismatch")
+        require(manifest["oci_revision"] == source and manifest["platform"] == "linux/amd64", "OCI identity mismatch")
     require(proof["gateway_digest"] == manifest["image_digest"], "proof image mismatch")
     require(proof["gateway_binary_sha256"] == manifest["binary_sha256"], "gateway binary mismatch")
     require(re.fullmatch(r"[0-9a-f]{64}", manifest["binary_sha256"]) is not None, "invalid binary hash")
@@ -477,22 +485,32 @@ def authorize_release(event, destination, controlled=False):
        f"deployment-proof-{rehearsal['id']}-{rehearsal['run_attempt']}", "--dir", str(destination / "proof"))
     proof = json.loads((destination / "proof/release-proof.json").read_text())
     require(type(proof["rc_run_id"]) is int and proof["rc_run_id"] > 0, "invalid proof RC run ID")
+    pool_mode = proof_mode(proof, controlled)
+    rc_workflow = "release-candidate.yml" if pool_mode == "off" else "release-pg03-gateway.yml"
+    rc_artifact = (f"clearapi-off-rc-{proof['rc_run_id']}-{{attempt}}"
+                   if pool_mode == "off" else f"pg03-gateway-release-{proof['rc_run_id']}-{{attempt}}")
     rc = api(f"actions/runs/{proof['rc_run_id']}")
-    verified_run(rc, source, "release-pg03-gateway.yml", ("workflow_run", "workflow_dispatch"))
+    verified_run(rc, source, rc_workflow, ("workflow_run", "workflow_dispatch"))
     require(proof["rc_run_attempt"] == rc["run_attempt"], "stale RC attempt")
-    latest_rc = api(f"actions/workflows/release-pg03-gateway.yml/runs?branch=main&head_sha={source}&per_page=1")["workflow_runs"]
+    latest_rc = api(f"actions/workflows/{rc_workflow}/runs?branch=main&head_sha={source}&per_page=1")["workflow_runs"]
     require(bool(latest_rc) and latest_rc[0]["id"] == rc["id"], "superseded RC run")
     latest_rehearsal = api(f"actions/workflows/deployment-rehearsal.yml/runs?branch=main&head_sha={source}&per_page=1")["workflow_runs"]
     require(bool(latest_rehearsal) and latest_rehearsal[0]["id"] == rehearsal["id"], "superseded rehearsal run")
     successful_jobs(rc)
     gh("run", "download", str(rc["id"]), "--repo", REPOSITORY, "--name",
-       f"pg03-gateway-release-{rc['id']}-{rc['run_attempt']}", "--dir", str(destination / "rc"))
-    manifest = verify_rc_artifact(destination / "rc")
+       rc_artifact.format(attempt=rc["run_attempt"]), "--dir", str(destination / "rc"))
+    if pool_mode == "off":
+        source_tree = api(f"git/commits/{source}")["tree"]["sha"]
+        manifest = validate_off_rc_artifact(destination / "rc", source, source_tree,
+                                            rc["id"], rc["run_attempt"])
+    else:
+        manifest = verify_rc_artifact(destination / "rc")
     require(str(manifest["workflow_run"]) == str(rc["id"]), "manifest producer mismatch")
     require(str(manifest["workflow_run_attempt"]) == str(rc["run_attempt"]), "manifest attempt mismatch")
-    require(any(run["databaseId"] == source_ci["id"] and run["headSha"] == source
-                and run["status"] == "completed" and run["conclusion"] == "success"
-                for run in manifest.get("source_ci_runs", [])), "manifest source CI mismatch")
+    if pool_mode == "pg03":
+        require(any(run["databaseId"] == source_ci["id"] and run["headSha"] == source
+                    and run["status"] == "completed" and run["conclusion"] == "success"
+                    for run in manifest.get("source_ci_runs", [])), "manifest source CI mismatch")
     result = validate_proof(manifest, proof, destination / "proof", source, rc["id"],
                             os.environ.get("CLEARAPI_EXECUTOR_IMAGE_REPOSITORY", ""), controlled=controlled)
     # Proof preparation is safe locally. The host still lacks a reviewed off
