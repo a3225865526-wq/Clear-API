@@ -1,5 +1,13 @@
 # ClearAPI 非 PG03 发布准备 — 2026-10-21
 
+## 2026-10-23 — OFF 发布链闭环完成，生产动作仍需独立审批
+
+- PR #87 已合并：`60ea62441e4a628517e8d3e3c8762d30d0a1556b` / tree `6127ddc5e2a3d2c3f20bbf2c7ff27470f410a36c`；保护 CI run `39806922042` 的 8 项检查全部 PASS。
+- 最新正式 RC `39808120659/1` 成功，artifact `clearapi-off-rc-39808120659-1`；镜像 `sha256:0ae055c5ab47a20b27a850491b2de0b7931c73393b3ccbaef891c9b062f561fa`；二进制 SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`。精确 source/tree/run/attempt/artifact/hash 身份 validator PASS。
+- OFF Deployment Rehearsal `39810841937/1` 成功并上传 `deployment-proof-39810841937-1`；最终 proof 本地 SHA256 `d17a8bdfaf873d7a947f2ae2739b8741a39897ce8e23de854d195735845f26c2`。11/11 OFF gates PASS：runtime、billing、backup_restore（离线 backup identity regression）、三数据库升级幂等、普通 Provider usage/billing、pool_disabled、replay/duplicate charge、state isolation、safe rollback。PG03-only gates按模式 skipped，不代表生产验证。
+- schema proof 仍是 isolated-only：PostgreSQL 17.6 两次启动通过并收敛，生产 schema `unverified`。`CLEARAPI_AUTO_PRODUCTION_ENABLED=false`，automatic-deploy 对应 runs skipped。没有生产连接、真实生产备份/恢复、部署、流量切换或 PG03/账号池/Executor 启用。
+- authorizer 兼容修复已在本 PR 实现并由真实 OFF proof 本地独立校验；OFF 精确匹配 `release-candidate.yml`、`clearapi-off-rc-{run_id}-{attempt}`、manifest/schema/runtime hashes，PG03 校验合同保持原样。修复合并后须针对最新 main 新建正式 RC 并重跑 OFF rehearsal。生产执行仍被 `off production execution blocked: recovered baseline and approved host contract required` 阻止；负责人/管理员确认生产恢复基线及 OFF host/mode-exit 合同之前，不做生产适配或操作。真实生产备份、独立恢复、回滚验证、Gateway 部署和流量切换另行审批；不得把隔离证据升级为生产 acceptance。
+
 ## 2026-10-22 — OFF RC 真实通过；演练调度参数待修复
 
 - PR #85 已合并（`98a3a1d32ddd078bb0b446ea3b47dab39923c91e`），8 项必需 CI 全部 PASS，run `39794014652`。
