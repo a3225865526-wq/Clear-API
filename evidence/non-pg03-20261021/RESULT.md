@@ -6,7 +6,7 @@
 - 最新正式 RC `39808120659/1` 成功，artifact `clearapi-off-rc-39808120659-1`；镜像 `sha256:0ae055c5ab47a20b27a850491b2de0b7931c73393b3ccbaef891c9b062f561fa`；二进制 SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`。精确 source/tree/run/attempt/artifact/hash 身份 validator PASS。
 - OFF Deployment Rehearsal `39810841937/1` 成功并上传 `deployment-proof-39810841937-1`；最终 proof 本地 SHA256 `d17a8bdfaf873d7a947f2ae2739b8741a39897ce8e23de854d195735845f26c2`。11/11 OFF gates PASS：runtime、billing、backup_restore（离线 backup identity regression）、三数据库升级幂等、普通 Provider usage/billing、pool_disabled、replay/duplicate charge、state isolation、safe rollback。PG03-only gates按模式 skipped，不代表生产验证。
 - schema proof 仍是 isolated-only：PostgreSQL 17.6 两次启动通过并收敛，生产 schema `unverified`。`CLEARAPI_AUTO_PRODUCTION_ENABLED=false`，automatic-deploy 对应 runs skipped。没有生产连接、真实生产备份/恢复、部署、流量切换或 PG03/账号池/Executor 启用。
-- 当前最短路径：由负责人/服务器管理员单独批准并执行真实生产备份、独立恢复和回滚验收，确认现场 host/tool/assets 与目标身份后，再批准 Gateway 部署和流量切换。不得把 OFF rehearsal proof 或 isolated schema 证据升级为生产 acceptance。
+- 当前最短路径：负责人/管理员先确认生产恢复基线与 OFF host/mode-exit 合同；生产 authorizer 仍限定 PG03 workflow/artifact，且保留 OFF execution blocker，须在合同获批后完成对应生产适配与验收。真实生产备份、独立恢复、回滚验证、Gateway 部署和流量切换另行审批。不得把 OFF rehearsal proof 或 isolated schema 证据升级为生产 acceptance。
 
 ## 2026-10-22 — OFF RC 真实通过；演练调度参数待修复
 
