@@ -1,5 +1,13 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-22 — PR #84 已合并；OFF RC 首轮 schema 迁移合同阻塞
+
+- PR #84（`faf1a34e78c8aef5dba55ac040e062abf8ea242e`）已合并，merge commit `45c819d15855d4c7cbfce3c56d8739b2dd920052`。8 个必需 CI checks 全部 PASS。
+- 基于该 main commit 触发正式 RC run `39754699152`。前端构建、竞态测试、SQLite/MySQL/PostgreSQL matrix 均 PASS；Docker job 已构建并推送镜像 digest `sha256:4db763f26ab72b4f80732c34a48f4c57603084e59f9ef9ce9b5a4ee319c40a2d`，但随后 OFF isolated schema rehearsal 阻塞，无 RC artifact / schema receipt 发布。该 digest 仅为失败 run 的诊断身份，不得作为候选或 rehearsal 输入。
+- 阻塞根因：`structured_migration_evidence()` 把 proof 完整绑定的首轮合法 schema migration 也判为 conflict。已在本地修复并增加针对性回归；schema helper 83/83、rehearsal producer 10/10、release validator 45/45 PASS，Python compile、workflow YAML parse、`git diff --check` PASS。
+- 当前最短路径：提交该最小修复并开 PR；保护 CI 全绿后合并；基于新的 main commit 重新构建 RC；确认新 RC artifact 含两次启动、精确镜像/binary、实际 schema 哈希和完整 proof；然后再由负责人手动触发 OFF Deployment Rehearsal。
+- 真实生产备份、恢复、回退、现场验收、SSH/生产数据库操作、部署与公网流量切换仍未执行且未授权。PG03、账号池和 Executor 继续关闭。旧 RC `39698686281` 及失败 RC `39754699152` 均不可复用。
+
 ## 2026-10-22 — OFF 发布链合同修复完成；旧 RC 不可复用
 
 - 修复 `deployment-rehearsal.yml` 的模式分支：OFF 仅接受 `release-candidate.yml`、artifact `clearapi-off-rc-{run_id}-{attempt}` 与 `clearapi.release-candidate/v1`；PG03 继续使用原 `release-pg03-gateway.yml`、artifact 和 receipt 合同，未降低 PG03 门禁。

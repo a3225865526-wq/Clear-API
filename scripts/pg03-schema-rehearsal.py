@@ -97,7 +97,7 @@ def structured_migration_evidence(proof, logs, container_id, source, challenge, 
                                   before_schema, after_schema)
     evidence.update(source_commit=source, status='unknown', reason='missing_structured_proof',
                     proof_sha256=None)
-    if evidence['error_kinds'] or before_schema != after_schema:
+    if evidence['error_kinds']:
         evidence.update(status='failure', reason='conflicting_migration_evidence')
         return evidence
     if not logs or len(logs.encode()) > 2097152:

@@ -878,6 +878,12 @@ class MigrationEvidenceTest(unittest.TestCase):
         self.assertEqual(evidence['completion_receipt_json'], json.dumps(self.proof()))
         self.assertEqual(evidence['challenge'], 'e'*64)
 
+    def test_candidate_completion_allows_first_startup_schema_change(self):
+        evidence = self.structured(json.dumps(self.proof()), after='f'*64)
+        self.assertEqual(evidence['status'], 'success')
+        self.assertEqual(evidence['reason'], 'candidate_completed_startup_migrations')
+        self.assertEqual(evidence['source_commit'], 'd'*40)
+
     def test_persisted_migration_receipt_rejects_missing_tampered_and_replayed_bindings(self):
         observation = dict(startups=[completed_startup_fixture({}, i) for i in (1, 2)])
         ACTION.validate_persisted_migrations(observation)
@@ -912,13 +918,13 @@ class MigrationEvidenceTest(unittest.TestCase):
                 self.assertEqual(self.structured(proof)['status'], 'unknown')
         self.assertEqual(self.structured(valid, source=PLAN.SCHEMA.LEGACY_MIGRATION_SOURCE)['status'], 'unknown')
 
-    def test_structured_success_cannot_override_log_failure_missing_capture_or_schema_conflict(self):
+    def test_structured_success_allows_schema_change_but_not_log_failure_or_missing_capture(self):
         proof = json.dumps(self.proof())
         self.assertEqual(self.structured(proof, logs='')['status'], 'unknown')
         self.assertEqual(self.structured(proof, logs='x'*2097153)['status'], 'unknown')
         self.assertEqual(self.structured(proof,
             logs=self.log('failed to seed default vip levels: SYNTHETIC_SECRET'))['status'], 'failure')
-        self.assertEqual(self.structured(proof, after='c'*64)['status'], 'failure')
+        self.assertEqual(self.structured(proof, after='c'*64)['status'], 'success')
 
     def test_network_container_hostname_is_bound_to_live_and_configured_value(self):
         for mismatch in (False, True):
