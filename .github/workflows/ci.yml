@@ -273,6 +273,8 @@ jobs:
           sh -n scripts/production-migration-entrypoint.sh
           shellcheck --severity=warning scripts/production-migration-entrypoint.sh
           sudo python3 scripts/ci/test-runtime-boot-recovery.py
+          sudo python3 scripts/ci/test-boot-recovery-install.py
+          sudo python3 scripts/ci/test-caddy-state-reconcile.py
           sudo visudo --check --file scripts/pg03-deploy.sudoers
           sudo python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest
           bash -n scripts/production-backup.sh

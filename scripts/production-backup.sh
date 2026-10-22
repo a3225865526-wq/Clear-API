@@ -36,29 +36,52 @@ fi
 
 cleanup() {
   local rc=$?
-  if [ $rc -ne 0 ]; then log "FAIL backup_id=$TS rc=$rc"; fi
   if [ -d "$STAGE" ]; then
     if ! find "$STAGE" -type f -exec shred -u {} +; then rc=1; fi
-    rm -rf "$STAGE"
+    if ! rm -rf "$STAGE"; then rc=1; fi
   fi
   if [ -d "$ENC" ]; then
-    if ! chmod 600 "$ENC"/*; then rc=1; fi
+    # An empty encryption directory is normal after an earlier failure. A
+    # literal unmatched '*' must not turn the original failure into exit 1.
+    if ! find "$ENC" -maxdepth 1 -type f -exec chmod 600 {} +; then rc=1; fi
+  fi
+  if [ $rc -ne 0 ]; then log "FAIL backup_id=$TS phase=$PHASE rc=$rc"
+  elif [ "$PHASE" = complete ]; then log "OK backup_id=$TS enc_sha=$ENCSHA"
   fi
   log "END backup_id=$TS rc=$rc"
   exit $rc
 }
+PHASE=setup
+mkdir -p "$BASE/staging" "$BASE/encrypted" "$BASE/manifests" /var/log/clearapi
+if [[ -e "$STAGE" || -L "$STAGE" || -e "$ENC" || -L "$ENC" \
+      || -e "$BASE/manifests/$TS.json" || -L "$BASE/manifests/$TS.json" ]]; then
+  log "FAIL backup_id=$TS phase=identity_reservation rc=76"
+  log "END backup_id=$TS rc=76"
+  exit 76
+fi
+if ! mkdir "$STAGE"; then
+  log "FAIL backup_id=$TS phase=identity_reservation rc=76"
+  log "END backup_id=$TS rc=76"
+  exit 76
+fi
+if ! mkdir "$ENC"; then
+  rmdir "$STAGE"
+  log "FAIL backup_id=$TS phase=identity_reservation rc=76"
+  log "END backup_id=$TS rc=76"
+  exit 76
+fi
 trap cleanup EXIT
-
 log "START backup_id=$TS"
-mkdir -p "$STAGE" "$ENC" /var/log/clearapi
 chmod 700 "$STAGE" "$ENC"
 
 # Freeze the old running release, never the candidate about to be deployed.
 IDENTITY_TOOL=/opt/clearapi/backups/bin/backup-identity.py
+PHASE=identity_capture
 python3 "$IDENTITY_TOOL" capture "${IDENTITY_ARGS[@]}" > "$STAGE/running-identity.json"
 PG03_TOOL=/opt/clearapi/backups/bin/pg03-backup-state.py
 PG03_ARTIFACTS=()
 if [ -e /opt/clearapi/app/compose-pg03.yaml ] || [ -e /data/clearapi/pool-executor ]; then
+  PHASE=pg03_capture
   python3 "$PG03_TOOL" capture --root / \
     --archive "$STAGE/clearapi-pg03-$TS.tar.gz" --snapshot "$STAGE/pg03-state-$TS.json"
   PG03_ARTIFACTS=("clearapi-pg03-$TS.tar.gz" "pg03-state-$TS.json")
@@ -66,16 +89,19 @@ fi
 DUMP_STARTED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # 1. consistent logical dump (container-local socket; no password in argv)
+PHASE=database_dump
 docker exec clearapi-postgres-1 pg_dump -U clearapi_admin -d clearapi -Fc \
   > "$STAGE/clearapi-pg-dump-$TS.dump"
 [ -s "$STAGE/clearapi-pg-dump-$TS.dump" ] || { log "FAIL empty dump"; exit 10; }
 DUMP_COMPLETED=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # 2. globals
+PHASE=globals_dump
 docker exec clearapi-postgres-1 pg_dumpall -U clearapi_admin --globals-only \
   > "$STAGE/clearapi-pg-globals-$TS.sql"
 
 # 3. config + legal + secrets archives
+PHASE=archives
 tar -czf "$STAGE/clearapi-config-$TS.tar.gz" -C / opt/clearapi/app/docker-compose.prod.yml opt/clearapi/app/compose-candidate.yaml
 tar -czf "$STAGE/clearapi-legal-$TS.tar.gz" -C / opt/clearapi/legal
 tar -cf  "$STAGE/clearapi-secrets-$TS.tar"  -C / opt/clearapi/secrets
@@ -98,10 +124,12 @@ tar -czf "$STAGE/clearapi-deployctl-$TS.tar.gz" -C / "${DEPLOY_CONTROL[@]}"
 chmod 600 "$STAGE"/*
 
 # 4. TOC parse check of the dump via pinned-image sidecar
+PHASE=dump_toc
 docker run --rm -v "$STAGE:/b:ro" "$PGIMG" \
   pg_restore -l "/b/clearapi-pg-dump-$TS.dump" > /dev/null
 
 # 5. bundle + encrypt (AES256 + OCB AEAD; public key only on this host)
+PHASE=bundle
 if [ "${#PG03_ARTIFACTS[@]}" -gt 0 ]; then
   python3 "$PG03_TOOL" check --root / --snapshot "$STAGE/pg03-state-$TS.json"
 fi
@@ -109,10 +137,12 @@ tar -czf "$STAGE/bundle-$TS.tar.gz" -C "$STAGE" \
   "clearapi-pg-dump-$TS.dump" "clearapi-pg-globals-$TS.sql" \
   "clearapi-config-$TS.tar.gz" "clearapi-edge-$TS.tar.gz" "clearapi-legal-$TS.tar.gz" "clearapi-secrets-$TS.tar" "clearapi-deployctl-$TS.tar.gz" \
   "${PG03_ARTIFACTS[@]}"
+PHASE=encryption
 gpg --batch --yes --trust-model always --recipient "$RECIPIENT" --force-ocb \
   --encrypt --output "$ENC/clearapi-backup-$TS.tar.gz.gpg" "$STAGE/bundle-$TS.tar.gz"
 
 # 6. manifest (no secret values)
+PHASE=manifest
 ENCSHA=$(sha256sum "$ENC/clearapi-backup-$TS.tar.gz.gpg" | awk '{print $1}')
 ENCSZ=$(stat -c %s "$ENC/clearapi-backup-$TS.tar.gz.gpg")
 MKMD5=$(docker exec clearapi-postgres-1 psql -U clearapi_app -d clearapi -tAc \
@@ -164,6 +194,7 @@ cat > "$STAGE/manifest.json" <<EOF
   }
 }
 EOF
+PHASE=identity_finalize
 python3 "$IDENTITY_TOOL" finalize "${IDENTITY_ARGS[@]}" --snapshot "$STAGE/running-identity.json" \
   --manifest "$STAGE/manifest.json" --dump-started "$DUMP_STARTED" --dump-completed "$DUMP_COMPLETED"
 if [ "${#PG03_ARTIFACTS[@]}" -gt 0 ]; then
@@ -188,6 +219,7 @@ python3 -m json.tool "$STAGE/manifest.json" > /dev/null
 # 7. offsite push hook (disabled until a push-capable destination exists;
 #    current offsite is workstation-pull based)
 OFFSITE_CONF=/opt/clearapi/backups/bin/offsite.conf
+PHASE=offsite
 if [ -f "$OFFSITE_CONF" ]; then
   # shellcheck disable=SC1090
   # shellcheck source=/dev/null
@@ -204,6 +236,7 @@ fi
 # prove retention/EXIT cleanup succeeded. Incident successor admission additionally
 # requires the invoking process outcome, absent staging, verified encrypted bytes,
 # and its own final durable completion receipt. Staging is never accepted.
+PHASE=publish
 python3 - "$STAGE/manifest.json" "$BASE/manifests/$TS.json" <<'PYCOMMIT'
 import os, pathlib, sys
 source, target = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
@@ -226,6 +259,7 @@ PYCOMMIT
 chmod 640 "$BASE/manifests/$TS.json"
 
 # 9. retention: keep last 14 daily + last 6 monthly (01-MM), prune only on success
+PHASE=retention
 python3 - "$BASE" "$KEEP_DAILY" "$KEEP_MONTHLY" "${CLEARAPI_BACKUP_PRESERVE_EXISTING:-false}" <<'PYEOF'
 import os, re, shutil, sys
 base, kd, km = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
@@ -243,5 +277,5 @@ for v in victims:
 print(victims if victims else "nothing to prune")
 PYEOF
 
-log "OK backup_id=$TS enc_sha=$ENCSHA"
+PHASE=complete
 exit 0

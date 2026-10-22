@@ -14,9 +14,15 @@ on:
   workflow_dispatch:
     inputs:
       rc_run_id:
-        description: 'Completed successful PG03 RC run id to rehearse'
+        description: 'Completed successful Gateway RC run id to rehearse'
         required: true
         type: string
+      pool_mode:
+        description: 'Release mode; off does not authorize production deployment'
+        required: true
+        type: choice
+        default: pg03
+        options: [off, pg03]
       release_stage:
         description: 'Controlled deployment keeps public traffic blocked until owner Provider acceptance'
         type: choice
@@ -82,6 +88,7 @@ jobs:
       TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
       TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
       REHEARSAL_RC_RUN_ID: ${{ github.event.workflow_run.id || inputs.rc_run_id }}
+      REHEARSAL_POOL_MODE: ${{ inputs.pool_mode || 'pg03' }}
       RELEASE_STAGE: ${{ inputs.release_stage || 'commercial' }}
       REHEARSAL_RC_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt || 1 }}
       REHEARSAL_SOURCE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
@@ -103,6 +110,10 @@ jobs:
           # A dispatched run must name an already completed, successful RC for
           # the current main. Nothing is taken on trust from the input.
           test "$GITHUB_REF" = refs/heads/main
+          if [[ "$REHEARSAL_POOL_MODE" == off && "$RELEASE_STAGE" != commercial ]]; then
+            echo 'off mode requires commercial Provider acceptance' >&2
+            exit 1
+          fi
           RC="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REHEARSAL_RC_RUN_ID")"
           python3 - "$RC" <<'PY'
           import json, os, re, sys
@@ -152,48 +163,71 @@ jobs:
 
       - name: Runtime integrity and Deploy V2 contracts
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate runtime_integrity --output receipts/runtime_integrity.json -- python3 scripts/ci/test-production-deploy.py
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate runtime_integrity --output receipts/runtime_integrity.json -- python3 scripts/ci/test-production-deploy.py
 
       - name: Billing and duplicate settlement contracts
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate billing --output receipts/billing.json -- go test -count=1 ./model -run 'TestBillingReconciliationDatabase|TestCrashMatrix'
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate billing --output receipts/billing.json -- go test -count=1 ./model -run 'TestBillingReconciliationDatabase|TestCrashMatrix'
 
       - name: Backup and restore evidence
+        if: env.REHEARSAL_POOL_MODE == 'pg03'
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate backup_restore --output receipts/backup_restore.json -- python3 scripts/ci/verify-rehearsal-input.py --kind backup --manifest rc/gateway-image-release.json
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate backup_restore --output receipts/backup_restore.json -- python3 scripts/ci/verify-rehearsal-input.py --kind backup --manifest rc/gateway-image-release.json
+
+      - name: Backup and restore tool regression (off)
+        if: env.REHEARSAL_POOL_MODE == 'off'
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode off --gate backup_restore --output receipts/backup_restore.json -- python3 -B scripts/ci/test-backup-identity.py
 
       - name: Executor pairing identity
+        if: env.REHEARSAL_POOL_MODE == 'pg03'
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate executor_pairing --output receipts/executor_pairing.json -- python3 scripts/ci/verify-rehearsal-input.py --kind executor --manifest rc/gateway-image-release.json
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate executor_pairing --output receipts/executor_pairing.json -- python3 scripts/ci/verify-rehearsal-input.py --kind executor --manifest rc/gateway-image-release.json
 
       - name: SQLite migration idempotency
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate sqlite_upgrade_idempotency --output receipts/sqlite_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=sqlite go test -count=1 ./cmd/production-bootstrap/bootstrap ./model -run "TestDuplicateMigrationsSafe|TestBillingReconciliationDatabase|TestCrashMatrix"'
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate sqlite_upgrade_idempotency --output receipts/sqlite_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=sqlite go test -count=1 ./cmd/production-bootstrap/bootstrap ./model -run "TestDuplicateMigrationsSafe|TestBillingReconciliationDatabase|TestCrashMatrix"'
 
       - name: MySQL migration idempotency
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate mysql_upgrade_idempotency --output receipts/mysql_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=mysql TEST_BILLING_DSN="$TEST_MYSQL_DSN" go test -count=1 ./model -run "TestBillingReconciliationDatabase|TestCrashMatrix"'
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate mysql_upgrade_idempotency --output receipts/mysql_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=mysql TEST_BILLING_DSN="$TEST_MYSQL_DSN" go test -count=1 ./model -run "TestBillingReconciliationDatabase|TestCrashMatrix"'
 
       - name: PostgreSQL migration idempotency
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate postgres_upgrade_idempotency --output receipts/postgres_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=postgres TEST_BILLING_DSN="$TEST_POSTGRES_DSN" go test -count=1 ./model -run "TestBillingReconciliationDatabase|TestCrashMatrix"'
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate postgres_upgrade_idempotency --output receipts/postgres_upgrade_idempotency.json -- bash -c 'TEST_BILLING_DIALECT=postgres TEST_BILLING_DSN="$TEST_POSTGRES_DSN" go test -count=1 ./model -run "TestBillingReconciliationDatabase|TestCrashMatrix"'
 
       - name: Provider usage and billing evidence
-        if: env.RELEASE_STAGE == 'commercial'
+        if: env.REHEARSAL_POOL_MODE == 'pg03' && env.RELEASE_STAGE == 'commercial'
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate gateway_executor_provider_usage_billing --output receipts/gateway_executor_provider_usage_billing.json -- python3 scripts/ci/verify-rehearsal-input.py --kind provider --manifest rc/gateway-image-release.json
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate gateway_executor_provider_usage_billing --output receipts/gateway_executor_provider_usage_billing.json -- python3 scripts/ci/verify-rehearsal-input.py --kind provider --manifest rc/gateway-image-release.json
+
+      - name: Ordinary Provider usage and billing evidence
+        if: env.REHEARSAL_POOL_MODE == 'off'
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode off --gate ordinary_provider_usage_billing --output receipts/ordinary_provider_usage_billing.json -- go test -count=1 ./e2e/commercial -run '^TestCommercialLifecycle$'
+
+      - name: Pool disabled and Executor unschedulable evidence
+        if: env.REHEARSAL_POOL_MODE == 'off'
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode off --gate pool_disabled --output receipts/pool_disabled.json -- go test -count=1 ./model -run '^(TestPoolMasterFailClosed|TestPoolGateMatrix|TestPoolRoutingOptionSyncDoesNotRestoreOlderEnabledRevision)$'
 
       - name: Replay and duplicate charge contracts
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate replay_and_duplicate_charge --output receipts/replay_and_duplicate_charge.json -- go test -count=1 ./model -run 'TestCrashMatrixConcurrentSettleVsRefund|TestCrashMatrixCoversReserveAndCompletionBoundaries'
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate replay_and_duplicate_charge --output receipts/replay_and_duplicate_charge.json -- go test -count=1 ./model -run 'TestCrashMatrixConcurrentSettleVsRefund|TestCrashMatrixCoversReserveAndCompletionBoundaries'
 
       - name: State isolation contracts
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate state_isolation --output receipts/state_isolation.json -- go test -count=1 ./e2e/commercial -run TestCommercialLifecycle
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate state_isolation --output receipts/state_isolation.json -- go test -count=1 ./e2e/commercial -run TestCommercialLifecycle
 
-      - name: Safe rollback evidence
+      - name: Safe rollback evidence (PG03 operator result)
+        if: env.REHEARSAL_POOL_MODE == 'pg03'
         continue-on-error: true
-        run: python3 scripts/ci/produce-gate-receipt.py --gate safe_rollback --output receipts/safe_rollback.json -- python3 scripts/ci/verify-rehearsal-input.py --kind rollback --manifest rc/gateway-image-release.json
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode "$REHEARSAL_POOL_MODE" --gate safe_rollback --output receipts/safe_rollback.json -- python3 scripts/ci/verify-rehearsal-input.py --kind rollback --manifest rc/gateway-image-release.json
+
+      - name: Safe rollback contract tests (off)
+        if: env.REHEARSAL_POOL_MODE == 'off'
+        continue-on-error: true
+        run: python3 scripts/ci/produce-gate-receipt.py --pool-mode off --gate safe_rollback --output receipts/safe_rollback.json -- python3 -B scripts/ci/test-production-deploy.py -k rollback
 
       - name: Assemble proof only after all gates pass
         if: always()
@@ -201,13 +235,18 @@ jobs:
           PREVIOUS_SOURCE_COMMIT: ${{ vars.CLEARAPI_PREVIOUS_SOURCE_COMMIT }}
         run: |
           set -euo pipefail
+          if [[ "$REHEARSAL_POOL_MODE" == pg03 ]]; then
+            EXECUTOR_ARGS=(--executor-repository "$CLEARAPI_EXECUTOR_IMAGE_REPOSITORY"
+              --executor-source-commit "$CLEARAPI_EXECUTOR_SOURCE_COMMIT"
+              --executor-digest "$CLEARAPI_EXECUTOR_IMAGE_DIGEST"
+              --executor-binary-sha256 "$CLEARAPI_EXECUTOR_BINARY_SHA256")
+          else
+            EXECUTOR_ARGS=()
+          fi
           python3 scripts/ci/assemble-release-proof.py --manifest rc/gateway-image-release.json --receipts receipts \
+            --pool-mode "$REHEARSAL_POOL_MODE" "${EXECUTOR_ARGS[@]}" \
             --release-stage "$RELEASE_STAGE" \
             --output release-proof.json \
-            --executor-repository "$CLEARAPI_EXECUTOR_IMAGE_REPOSITORY" \
-            --executor-source-commit "$CLEARAPI_EXECUTOR_SOURCE_COMMIT" \
-            --executor-digest "$CLEARAPI_EXECUTOR_IMAGE_DIGEST" \
-            --executor-binary-sha256 "$CLEARAPI_EXECUTOR_BINARY_SHA256" \
             --previous-source-commit "$PREVIOUS_SOURCE_COMMIT"
 
       - name: Upload deployment proof and receipts

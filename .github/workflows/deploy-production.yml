@@ -179,7 +179,6 @@ jobs:
           python3 scripts/ci/automatic-release.py authorize \
             --destination "$RUNNER_TEMP/verified-release-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           {
-            echo "pool_mode=pg03"
             echo "legacy_transition_sha256="
           } >> "$GITHUB_OUTPUT"
 
