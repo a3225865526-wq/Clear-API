@@ -23,10 +23,11 @@ def schema_digest(document):
     return hashlib.sha256('\n'.join(lines).strip().encode()).hexdigest()
 
 
-def validate_receipt(receipt, candidate, source_schema):
+def validate_receipt(receipt, candidate, source_schema, pool_mode='pg03'):
     if (receipt.get('schema_version') != SCHEMA or receipt.get('postgres_image_ref') != POSTGRES
             or receipt.get('postgres_version_num') != '170006' or receipt.get('startup_passes') != 2
             or receipt.get('profile') != 'isolated_schema_only_master_single_postgres'
+            or receipt.get('pool_mode', 'pg03') != pool_mode
             or receipt.get('source_schema_sha256') != source_schema
             or receipt.get('candidate_image_id') != candidate['image_id']
             or receipt.get('candidate_binary_sha256') != candidate['binary_sha256']
@@ -161,7 +162,7 @@ def validate_log_config(raw):
 
 def rehearse(candidate, commit, schema, output, command=None, observation=None,
              nonce=None, expected_identity=None, expected_schema=None,
-             require_migration_evidence=False):
+             require_migration_evidence=False, pool_mode='pg03'):
     if command is None:
         def command(args, raw=None):
             result = subprocess.run(['docker', *args], input=raw, check=True,
@@ -343,10 +344,14 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
             if target is not None and target != current:
                 raise ValueError('second full startup changed schema again')
             target = current
-        receipt = {'schema_version': SCHEMA, 'profile': 'isolated_schema_only_master_single_postgres',
+        receipt = {'schema_version': SCHEMA, 'pool_mode': pool_mode,
+            'profile': 'isolated_schema_only_master_single_postgres',
             'source_commit': commit, 'candidate_image_id': image['Id'], 'candidate_binary_sha256': binary,
+            'candidate_image_digest': (candidate.split('@', 1)[1]
+                                       if '@' in candidate else None),
             'postgres_image_ref': POSTGRES, 'postgres_version_num': version, 'startup_passes': 2,
-            'source_schema_sha256': schema_digest(before), 'target_schema_sha256': target}
+            'source_schema_sha256': schema_digest(before), 'target_schema_sha256': target,
+            'production_schema': 'unverified'}
         observation['phase'] = 'startups_complete'
     except Exception as error:
         observation['failure'] = dict(phase=observation['phase'],
@@ -391,8 +396,12 @@ def main():
     p.add_argument('--commit', required=True)
     p.add_argument('--schema', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--pool-mode', choices=('off', 'pg03'), default='pg03')
+    p.add_argument('--require-migration-evidence', action='store_true')
     a = p.parse_args()
-    rehearse(a.candidate, a.commit, a.schema, a.output)
+    rehearse(a.candidate, a.commit, a.schema, a.output,
+             require_migration_evidence=a.require_migration_evidence,
+             pool_mode=a.pool_mode)
     print('Isolated exact-candidate schema rehearsal passed twice; not a production Runtime PASS')
 
 

@@ -50,15 +50,22 @@ class ProducerContractTest(unittest.TestCase):
         assembly = workflow.split('- name: Assemble proof only after all gates pass', 1)[1]
         script = textwrap.dedent(assembly.split('run: |', 1)[1].split('      - name:', 1)[0])
         script = script.replace('scripts/ci/assemble-release-proof.py', str(ASSEMBLER))
+        script = script.replace('--manifest rc/gateway-image-release.json \\\n+            "${SCHEMA_ARGS[@]}" --receipts', '--manifest rc/gateway-image-release.json --schema-rehearsal rc/schema-rehearsal.json \\\n+            "${SCHEMA_ARGS[@]}" --receipts')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'rc').mkdir()
             (root / 'receipts').mkdir()
             manifest = {'source_commit': 'a' * 40, 'image_digest': 'sha256:' + 'b' * 64,
                         'workflow_run': 123, 'workflow_run_attempt': 1, 'binary_sha256': 'c' * 64,
-                        'schema_transition': {'source_schema_sha256': '1' * 64,
-                                              'target_schema_sha256': '1' * 64}}
+                        'schema_transition': {'schema_version': 'pg03-schema-rehearsal-v1',
+                            'pool_mode': 'off', 'candidate_binary_sha256': 'c' * 64,
+                            'candidate_image_digest': 'sha256:' + 'b' * 64,
+                            'candidate_image_id': 'sha256:' + 'e' * 64,
+                            'production_schema': 'unverified',
+                            'source_commit': 'a' * 40, 'startup_passes': 2,
+                            'source_schema_sha256': '1' * 64, 'target_schema_sha256': '1' * 64}}
             (root / 'rc/gateway-image-release.json').write_text(json.dumps(manifest))
+            (root / 'rc/schema-rehearsal.json').write_text(json.dumps(manifest['schema_transition']))
             gates = {'runtime_integrity', 'billing', 'backup_restore', 'pool_disabled',
                      'sqlite_upgrade_idempotency', 'mysql_upgrade_idempotency',
                      'postgres_upgrade_idempotency', 'ordinary_provider_usage_billing',
@@ -70,6 +77,7 @@ class ProducerContractTest(unittest.TestCase):
                     'gateway_digest': manifest['image_digest'], 'rc_run_id': 123, 'rc_run_attempt': 1}))
             environment = dict(os.environ, REHEARSAL_POOL_MODE='off', RELEASE_STAGE='commercial',
                                PREVIOUS_SOURCE_COMMIT='d' * 40)
+            environment['PYTHONPATH'] = str(ROOT / 'scripts/ci')
             for name in tuple(environment):
                 if name.startswith('CLEARAPI_EXECUTOR_'):
                     environment.pop(name)
@@ -80,6 +88,17 @@ class ProducerContractTest(unittest.TestCase):
             self.assertEqual(proof['pool_mode'], 'off')
             self.assertEqual(set(proof['checks']), gates)
             self.assertNotIn('executor', proof)
+
+    def test_off_rc_uses_commit_workflow_artifact_and_schema_identity(self):
+        workflow = WORKFLOW.read_text()
+        self.assertIn("release-candidate.yml", workflow)
+        self.assertIn('clearapi-off-rc-${REHEARSAL_RC_RUN_ID}-${REHEARSAL_RC_RUN_ATTEMPT}', workflow)
+        policy = (ROOT / 'scripts/ci/release_proof.py').read_text()
+        self.assertIn('validate_off_rc_artifact', workflow + policy)
+        self.assertIn("'schema') != 'clearapi.release-candidate/v1'", policy)
+        self.assertIn("'pool_mode') != 'off'", policy)
+        self.assertIn("'candidate_image_digest') != manifest.get('image_digest')", policy)
+        self.assertIn("'candidate_binary_sha256') != manifest.get('binary_sha256')", policy)
 
     def test_failed_command_persists_bound_failure_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -120,7 +139,9 @@ class ProducerContractTest(unittest.TestCase):
             root = Path(temp)
             manifest = {'source_commit': 'a' * 40, 'image_digest': 'sha256:' + 'b' * 64,
                         'workflow_run': 123, 'workflow_run_attempt': 1, 'binary_sha256': 'c' * 64,
-                        'schema_transition': {'source_schema_sha256': '1' * 64, 'target_schema_sha256': '1' * 64}}
+                        'schema_transition': {'schema_version': 'pg03-schema-rehearsal-v1',
+                            'source_commit': 'a' * 40, 'startup_passes': 2,
+                            'source_schema_sha256': '1' * 64, 'target_schema_sha256': '1' * 64}}
             (root / 'manifest.json').write_text(json.dumps(manifest))
             gates = set(re.findall(r'--gate ([a-z_]+)', WORKFLOW.read_text()))
             for gate in gates - {'gateway_executor_provider_usage_billing'}:
@@ -151,13 +172,14 @@ class ProducerContractTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('gate failed', result.stderr)
 
-    def test_assembler_rejects_changed_schema_and_receipt_from_another_rc(self):
+    def test_assembler_binds_changed_schema_and_rejects_stale_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             manifest = {"source_commit": "a" * 40, "image_digest": "sha256:" + "b" * 64,
                         "workflow_run": 123, "workflow_run_attempt": 1, "binary_sha256": "c" * 64,
-                        "schema_transition": {"source_schema_sha256": "1" * 64,
-                                              "target_schema_sha256": "1" * 64}}
+                        "schema_transition": {"schema_version": "pg03-schema-rehearsal-v1",
+                            "source_commit": "a" * 40, "startup_passes": 2,
+                            "source_schema_sha256": "1" * 64, "target_schema_sha256": "1" * 64}}
             workflow = WORKFLOW.read_text()
             gates = set(re.findall(r"--gate ([a-z_]+)", workflow))
             for gate in gates:
@@ -178,13 +200,15 @@ class ProducerContractTest(unittest.TestCase):
             manifest["schema_transition"]["target_schema_sha256"] = "3" * 64
             (root / "manifest.json").write_text(json.dumps(manifest))
             result = subprocess.run(command, capture_output=True, text=True)
-            self.assertIn("RC schema transition", result.stderr)
-            self.assertFalse((root / "proof.json").exists())
+            self.assertEqual(result.returncode, 0, result.stderr)
+            proof = json.loads((root / "proof.json").read_text())
+            self.assertEqual(proof["migration"]["mode"], "in_place_startup_migration")
             manifest["schema_transition"]["target_schema_sha256"] = "1" * 64
             (root / "manifest.json").write_text(json.dumps(manifest))
             receipt = json.loads((root / "backup_restore.json").read_text())
             receipt["rc_run_id"] = 122
             (root / "backup_restore.json").write_text(json.dumps(receipt))
+            (root / "proof.json").unlink()
             result = subprocess.run(command, capture_output=True, text=True)
             self.assertIn("RC run", result.stderr)
             self.assertFalse((root / "proof.json").exists())

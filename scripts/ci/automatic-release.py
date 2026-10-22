@@ -11,7 +11,8 @@ from pathlib import Path
 import re
 import subprocess
 
-from release_proof import PG03_GATES, proof_mode, required_gates, validate_receipt_mode
+from release_proof import (PG03_GATES, proof_mode, required_gates,
+                           validate_receipt_mode, validate_schema_transition)
 
 REPOSITORY = "a3225865526-wq/Clear-API"
 IMAGE = "ghcr.io/a3225865526-wq/clearapi"
@@ -175,13 +176,23 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
     # PG03 forbids external migration flags, so an upgrading candidate proves
     # itself only through two idempotent startup passes on the same database.
     transition = manifest.get("schema_transition", {})
+    validate_schema_transition(transition, manifest, pool_mode)
     source_schema = transition.get("source_schema_sha256")
     target_schema = transition.get("target_schema_sha256")
     require(type(source_schema) is str and re.fullmatch(r"[0-9a-f]{64}", source_schema) is not None
             and type(target_schema) is str and re.fullmatch(r"[0-9a-f]{64}", target_schema) is not None,
             "RC schema transition is missing or malformed")
     migration = proof["migration"]
-    if source_schema == target_schema:
+    if pool_mode == 'off':
+        require(migration.get("mode") == "off_isolated_startup_migration",
+                "OFF proof must use its isolated startup migration evidence")
+        require(migration.get("source_schema_sha256") == source_schema
+                and migration.get("target_schema_sha256") == target_schema,
+                "OFF migration evidence contradicts the RC schema transition")
+        require(transition.get("pool_mode") == "off"
+                and migration.get("production_schema") == "unverified",
+                "OFF schema evidence cannot claim production schema acceptance")
+    elif source_schema == target_schema:
         require(migration.get("mode") == "no_schema_change",
                 "no_schema_change contradicts the RC schema transition")
     else:
@@ -190,8 +201,6 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
         require(migration.get("source_schema_sha256") == source_schema
                 and migration.get("target_schema_sha256") == target_schema,
                 "migration evidence contradicts the RC schema transition")
-        require(pool_mode == 'pg03',
-                "off schema changes require an off-specific migration rehearsal")
         require(transition.get("schema_version") == "pg03-schema-rehearsal-v1"
                 and transition.get("startup_passes") == 2,
                 "in-place migration requires two idempotent startup passes")

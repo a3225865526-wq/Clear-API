@@ -686,6 +686,16 @@ class NonPG03ProofTest(unittest.TestCase):
         self.proof.update(schema='clearapi.automatic-release/v2', pool_mode='off')
         self.proof.pop('executor')
         self.proof['checks'] = {}
+        self.manifest['schema_transition'].update(pool_mode='off',
+            candidate_binary_sha256=self.manifest['binary_sha256'],
+            candidate_image_digest=self.manifest['image_digest'],
+            candidate_image_id='sha256:' + 'e' * 64, production_schema='unverified')
+        self.proof['migration'] = {'mode': 'off_isolated_startup_migration',
+            'source_schema_sha256': '2' * 64, 'target_schema_sha256': '2' * 64,
+            'startup_passes': 2, 'production_schema': 'unverified'}
+        self.manifest['schema_transition']['pool_mode'] = 'off'
+        self.manifest['schema_transition']['candidate_binary_sha256'] = self.manifest['binary_sha256']
+        self.manifest['schema_transition']['candidate_image_digest'] = self.manifest['image_digest']
         gates = (policy.PROOF_CHECKS - {'executor_pairing', 'gateway_executor_provider_usage_billing'}
                  | {'pool_disabled', 'ordinary_provider_usage_billing'})
         for gate in gates:
@@ -752,9 +762,12 @@ class NonPG03ProofTest(unittest.TestCase):
     def test_off_assembler_and_validator_roundtrip_without_executor_arguments(self):
         manifest = self.root / 'manifest.json'
         manifest.write_text(json.dumps(self.manifest))
+        schema_rehearsal = self.root / 'schema-rehearsal.json'
+        schema_rehearsal.write_text(json.dumps(self.manifest['schema_transition']))
         output = self.root / 'off-proof.json'
         command = [sys.executable, '-B', str(Path(__file__).with_name('assemble-release-proof.py')),
-                   '--manifest', str(manifest), '--receipts', str(self.root),
+                   '--manifest', str(manifest), '--schema-rehearsal', str(schema_rehearsal),
+                   '--receipts', str(self.root),
                    '--output', str(output), '--pool-mode', 'off',
                    '--previous-source-commit', 'd' * 40]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
@@ -772,18 +785,21 @@ class NonPG03ProofTest(unittest.TestCase):
         changed = deepcopy(self.manifest)
         changed['schema_transition']['target_schema_sha256'] = '3' * 64
         manifest_path.write_text(json.dumps(changed))
+        rehearsal_path = self.root / 'changed-schema-rehearsal.json'
+        rehearsal_path.write_text(json.dumps(self.manifest['schema_transition']))
         command = [sys.executable, '-B', str(Path(__file__).with_name('assemble-release-proof.py')),
-                   '--manifest', str(manifest_path), '--receipts', str(self.root),
+                   '--manifest', str(manifest_path), '--schema-rehearsal', str(rehearsal_path),
+                   '--receipts', str(self.root),
                    '--output', str(self.root / 'off-schema-proof.json'), '--pool-mode', 'off',
                    '--previous-source-commit', 'd' * 40]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('off-specific migration rehearsal', result.stderr)
+        self.assertIn('OFF schema rehearsal artifact does not match', result.stderr)
         bad = deepcopy(self.proof)
         bad['migration'] = {'mode': 'in_place_startup_migration',
                             'source_schema_sha256': '2' * 64,
                             'target_schema_sha256': '3' * 64}
-        with self.assertRaisesRegex(ValueError, 'off schema changes require an off-specific'):
+        with self.assertRaisesRegex(ValueError, 'OFF proof must use its isolated startup'):
             policy.validate_proof(changed, bad, self.root, SOURCE, 123, '')
 
     def test_off_receipt_producer_binds_mode_and_preserves_command_failure(self):

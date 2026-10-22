@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 import re
 
-from release_proof import PG03_GATES, required_gates, validate_receipt_mode
+from release_proof import (PG03_GATES, required_gates, validate_receipt_mode,
+                           validate_schema_transition)
 
 
 GATES = PG03_GATES
@@ -16,6 +17,7 @@ GATES = PG03_GATES
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--schema-rehearsal", type=Path)
     parser.add_argument("--receipts", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--pool-mode", choices=('off', 'pg03'), default='pg03')
@@ -57,21 +59,34 @@ def main():
         checks[gate] = {"conclusion": "success", "file": path.name,
                         "sha256": hashlib.sha256(raw).hexdigest()}
     transition = manifest.get("schema_transition", {})
+    validate_schema_transition(transition, manifest, args.pool_mode)
+    if args.pool_mode == 'off':
+        if args.schema_rehearsal is None or args.schema_rehearsal.is_symlink() or not args.schema_rehearsal.is_file():
+            raise SystemExit("OFF proof requires the exact RC schema rehearsal artifact")
+        rehearsal = json.loads(args.schema_rehearsal.read_bytes())
+        if rehearsal != transition:
+            raise SystemExit("OFF schema rehearsal artifact does not match the RC manifest")
     source_schema = transition.get("source_schema_sha256", "")
     target_schema = transition.get("target_schema_sha256", "")
     if not re.fullmatch(r"[0-9a-f]{64}", source_schema) or not re.fullmatch(r"[0-9a-f]{64}", target_schema):
         raise SystemExit("RC schema transition is missing or malformed")
-    if source_schema == target_schema:
+    if args.pool_mode == 'off':
+        migration = {
+            "mode": "off_isolated_startup_migration",
+            "source_schema_sha256": source_schema,
+            "target_schema_sha256": target_schema,
+            "startup_passes": 2,
+            "production_schema": "unverified",
+        }
+    elif source_schema == target_schema:
         migration = {"mode": "no_schema_change"}
     else:
-        if args.pool_mode == 'off':
-            raise SystemExit("off release schema changes require an off-specific migration rehearsal")
         # PG03 forbids external migration flags: the candidate image applies its
         # own additive migrations during startup. A real upgrade is therefore only
         # provable when the RC rehearsal ran that startup twice on the same
         # database and observed an idempotent, converged schema.
         if transition.get("schema_version") != "pg03-schema-rehearsal-v1":
-            raise SystemExit("RC schema transition changed but is not a PG03 schema rehearsal")
+            raise SystemExit("RC schema transition is not a PG03 schema rehearsal")
         if transition.get("startup_passes") != 2:
             raise SystemExit("in-place migration requires two idempotent startup passes")
         if transition.get("source_commit") != manifest.get("source_commit"):

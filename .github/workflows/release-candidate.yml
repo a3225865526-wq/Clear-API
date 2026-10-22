@@ -349,9 +349,14 @@ jobs:
           trap 'docker rm "$CID" >/dev/null' EXIT
           docker cp "$CID:/new-api" release/new-api
           BINARY_SHA="$(sha256sum release/new-api | cut -d' ' -f1)"
+          docker pull postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+          python3 scripts/pg03-schema-rehearsal.py --candidate "$GHCR_IMAGE@$IMAGE_DIGEST" \
+            --commit "$SOURCE_COMMIT" --schema scripts/ci/fixtures/pg03-legacy-v5-schema.sql \
+            --output release/schema-rehearsal.json --pool-mode off --require-migration-evidence
           export BINARY_SHA
           python3 - <<'PY'
           import json, os, pathlib
+          transition = json.loads(pathlib.Path('release/schema-rehearsal.json').read_text())
           manifest = {
               'schema': 'clearapi.release-candidate/v1',
               'source_kind': 'git-commit',
@@ -364,6 +369,8 @@ jobs:
               'image': os.environ['GHCR_IMAGE'],
               'image_digest': os.environ['IMAGE_DIGEST'],
               'binary_sha256': os.environ['BINARY_SHA'],
+              'schema_transition': transition,
+              'production_acceptance': 'not_run',
               'production_ready': False,
           }
           pathlib.Path('release/gateway-image-release.json').write_text(
@@ -376,11 +383,12 @@ jobs:
           python3 - <<'PY'
           import hashlib, json, pathlib
           root = pathlib.Path('release')
-          paths = [root / 'new-api', root / 'gateway-image-release.json']
+          paths = [root / 'new-api', root / 'gateway-image-release.json',
+                   root / 'schema-rehearsal.json', root / 'schema-rehearsal.target.sql']
           paths.extend(sorted((root / 'runtime-assets').rglob('*')))
           hashes = {}
           for path in paths:
-              if path.is_file() and path.name != 'artifact-hashes.json':
+              if path.is_file() and path.relative_to(root).as_posix() != 'artifact-hashes.json':
                   hashes[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
           (root / 'artifact-hashes.json').write_text(json.dumps(hashes, indent=2, sort_keys=True) + '\n')
           PY
