@@ -400,6 +400,14 @@ class IsolatedStartupTest(unittest.TestCase):
             expected_identity=dict(image_id=self.image, binary_sha256=self.binary),
             expected_schema=PLAN.SCHEMA.schema_digest(self.sql))
 
+    def test_schema_rehearsal_failure_records_sanitized_reason_only(self):
+        self.fail_pass = 1
+        with self.assertRaisesRegex(ValueError, 'isolated candidate startup failed'):
+            self.rehearse()
+        self.assertEqual(self.observation['failure']['reason_code'], 'candidate_startup_failed')
+        self.assertNotIn('stderr', json.dumps(self.observation))
+        self.assertFalse(self.output.exists())
+
     def test_two_fresh_gateways_share_one_isolated_database_and_publish_after_cleanup(self):
         self.rehearse()
         startups = self.observation['startups']
@@ -865,10 +873,10 @@ class MigrationEvidenceTest(unittest.TestCase):
             phases=['main_database', 'retired_options', 'log_database'],
             main_database='postgres', log_database='postgres')
 
-    def structured(self, document, logs=None, source='d'*40, after='a'*64):
+    def structured(self, document, logs=None, source='d'*40, after='a'*64, pool_mode='pg03'):
         return PLAN.SCHEMA.structured_migration_evidence(document,
             self.log('database migration started') if logs is None else logs,
-            'b'*64, source, 'e'*64, 'c'*64, 'a'*64, after, 'b'*12)
+            'b'*64, source, 'e'*64, 'c'*64, 'a'*64, after, 'b'*12, pool_mode)
 
     def test_candidate_completion_binds_fresh_instance_binary_and_all_migration_phases(self):
         evidence = self.structured(json.dumps(self.proof()))
@@ -879,10 +887,13 @@ class MigrationEvidenceTest(unittest.TestCase):
         self.assertEqual(evidence['challenge'], 'e'*64)
 
     def test_candidate_completion_allows_first_startup_schema_change(self):
-        evidence = self.structured(json.dumps(self.proof()), after='f'*64)
+        evidence = self.structured(json.dumps(self.proof()), after='f'*64, pool_mode='off')
         self.assertEqual(evidence['status'], 'success')
         self.assertEqual(evidence['reason'], 'candidate_completed_startup_migrations')
         self.assertEqual(evidence['source_commit'], 'd'*40)
+        pg03_evidence = self.structured(json.dumps(self.proof()), after='f'*64)
+        self.assertEqual(pg03_evidence['status'], 'failure')
+        self.assertEqual(pg03_evidence['reason'], 'conflicting_migration_evidence')
 
     def test_persisted_migration_receipt_rejects_missing_tampered_and_replayed_bindings(self):
         observation = dict(startups=[completed_startup_fixture({}, i) for i in (1, 2)])
@@ -924,7 +935,8 @@ class MigrationEvidenceTest(unittest.TestCase):
         self.assertEqual(self.structured(proof, logs='x'*2097153)['status'], 'unknown')
         self.assertEqual(self.structured(proof,
             logs=self.log('failed to seed default vip levels: SYNTHETIC_SECRET'))['status'], 'failure')
-        self.assertEqual(self.structured(proof, after='c'*64)['status'], 'success')
+        self.assertEqual(self.structured(proof, after='c'*64, pool_mode='off')['status'], 'success')
+        self.assertEqual(self.structured(proof, after='c'*64)['status'], 'failure')
 
     def test_network_container_hostname_is_bound_to_live_and_configured_value(self):
         for mismatch in (False, True):
