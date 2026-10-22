@@ -1,5 +1,13 @@
 # ClearAPI 非 PG03 发布准备 — 2026-10-21
 
+## 2026-10-22 — 新正式 RC 阻塞与迁移 proof 修复
+
+- PR #84 已合并，merge commit `45c819d15855d4c7cbfce3c56d8739b2dd920052`；8 个必需 CI checks 全部 PASS。
+- 新 RC run `39754699152` 绑定上述源码。前端、竞态与 SQLite/MySQL/PostgreSQL matrix 成功；Docker image digest `sha256:4db763f26ab72b4f80732c34a48f4c57603084e59f9ef9ce9b5a4ee319c40a2d` 推送成功。OFF schema rehearsal 阶段失败，故无正式新 RC artifact、无可用 schema receipt、无 Deployment Rehearsal proof。不要使用该失败 digest。
+- 已确认 OFF 首轮 schema 变化会被原有共享 helper 过早拒绝；该代码缺陷已限定为仅 OFF 接受完整绑定的候选迁移 proof，PG03 仍拒绝 schema conflict，第二次启动继续要求 schema 收敛。失败 run 未保留 observation，因此实际触发点尚未确认；不把此代码缺陷推定为该 run 的唯一根因。新 RC 将保留单独诊断 artifact，失败也不会签发成功 receipt。生产 schema 继续 unverified。
+- 回归：WSL `python3 -B scripts/ci/test-pg03-successor-plan.py`（84/84 PASS）；`test-rehearsal-producer.py`（10/10 PASS）；`test-automatic-release.py`（45/45 PASS）；Python compile、两份 workflow YAML parse、`git diff --check` PASS。
+- 下一步：保护 PR/CI 后合并，以最新 main 构建新正式 RC 并核对 observation/artifact/schema proof；只有真实证据完整后才运行已获本任务授权的 OFF Deployment Rehearsal，并先确认自动生产发布关闭。真实备份、恢复、部署、流量切换仍须负责人单独批准。
+
 ## 2026-10-22 — OFF RC/Rehearsal 合同修复（本地验证）
 
 - `deployment-rehearsal.yml` 现在按 `pool_mode` 严格选择 RC workflow 和 artifact；OFF 绑定 `release-candidate.yml` 与 `clearapi-off-rc-{run_id}-{attempt}`，PG03 路径保持旧 workflow/artifact 和所有 Executor gate。

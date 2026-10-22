@@ -87,7 +87,7 @@ def migration_evidence(document, container_id, source, before_schema, after_sche
 
 
 def structured_migration_evidence(proof, logs, container_id, source, challenge, binary,
-                                  before_schema, after_schema, expected_hostname):
+                                  before_schema, after_schema, expected_hostname, pool_mode='pg03'):
     """Bind candidate-produced completion to this fresh container and binary.
 
     Logs supply only veto evidence. Neither quiet logs, health, process exit nor
@@ -97,7 +97,8 @@ def structured_migration_evidence(proof, logs, container_id, source, challenge, 
                                   before_schema, after_schema)
     evidence.update(source_commit=source, status='unknown', reason='missing_structured_proof',
                     proof_sha256=None)
-    if evidence['error_kinds'] or before_schema != after_schema:
+    if (evidence['error_kinds']
+            or before_schema != after_schema and pool_mode != 'off'):
         evidence.update(status='failure', reason='conflicting_migration_evidence')
         return evidence
     if not logs or len(logs.encode()) > 2097152:
@@ -339,7 +340,8 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
                         startup['before_schema_sha256'], current)
                     if commit != LEGACY_MIGRATION_SOURCE:
                         startup['migration'] = structured_migration_evidence(proof, logs, gateway,
-                            commit, challenge, binary, startup['before_schema_sha256'], current, startup['hostname'])
+                            commit, challenge, binary, startup['before_schema_sha256'], current,
+                            startup['hostname'], pool_mode)
                 except Exception:
                     # Preserve UNKNOWN and the normal outer cleanup path.
                     raise ValueError('migration log evidence unavailable') from None
@@ -363,6 +365,16 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
         observation['failure'] = dict(phase=observation['phase'],
             command_exit_code=error.returncode if isinstance(error, subprocess.CalledProcessError) else None,
             timed_out=isinstance(error, subprocess.TimeoutExpired))
+        reasons = {
+            'schema-only restoration changed structure': 'schema_restore_mismatch',
+            'isolated candidate startup failed': 'candidate_startup_failed',
+            'isolated candidate health deadline exceeded': 'candidate_health_deadline',
+            'migration outcome BLOCKED: conclusive evidence required': 'migration_evidence_inconclusive',
+            'second full startup changed schema again': 'non_idempotent_schema',
+            'live and configured hostname conflict': 'hostname_mismatch',
+            'candidate did not exit cleanly after SIGTERM': 'candidate_exit_failed',
+        }
+        observation['failure']['reason_code'] = reasons.get(str(error), 'unclassified')
         stderr = getattr(error, 'stderr', None)
         if type(stderr) is bytes:
             observation['failure']['stderr_sha256'] = hashlib.sha256(stderr).hexdigest()
@@ -402,12 +414,21 @@ def main():
     p.add_argument('--commit', required=True)
     p.add_argument('--schema', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--observation', type=Path)
     p.add_argument('--pool-mode', choices=('off', 'pg03'), default='pg03')
     p.add_argument('--require-migration-evidence', action='store_true')
     a = p.parse_args()
-    rehearse(a.candidate, a.commit, a.schema, a.output,
-             require_migration_evidence=a.require_migration_evidence,
-             pool_mode=a.pool_mode)
+    observation = {}
+    try:
+        rehearse(a.candidate, a.commit, a.schema, a.output,
+                 require_migration_evidence=a.require_migration_evidence,
+                 pool_mode=a.pool_mode, observation=observation)
+    finally:
+        if a.observation is not None:
+            a.observation.parent.mkdir(parents=True, exist_ok=True)
+            with a.observation.open('x', encoding='utf-8') as stream:
+                json.dump(observation, stream, indent=2)
+                stream.write('\n')
     print('Isolated exact-candidate schema rehearsal passed twice; not a production Runtime PASS')
 
 
