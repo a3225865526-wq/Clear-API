@@ -1,5 +1,14 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-23 — OFF RC 与 Deployment Rehearsal 完整通过；停在生产审批边界
+
+- PR #87 已合并，merge commit `60ea62441e4a628517e8d3e3c8762d30d0a1556b`，tree `6127ddc5e2a3d2c3f20bbf2c7ff27470f410a36c`；其 8 项保护 CI 全部 PASS（run `39806922042`）。
+- 最新正式 OFF RC `39808120659/1` 成功，基于上述最新 main；artifact `clearapi-off-rc-39808120659-1`，source/tree、run/attempt、manifest/schema receipt、镜像和二进制身份均经独立 validator PASS。镜像 digest `sha256:0ae055c5ab47a20b27a850491b2de0b7931c73393b3ccbaef891c9b062f561fa`；二进制 SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`。
+- OFF isolated schema evidence：PostgreSQL 17.6 disposable instance 两次启动成功；首轮 schema `578bc6f83dfafb47056c74324d13833a6333152685f4500316b0cd67f88333fd` -> `3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035`，第二轮保持目标值，cleanup 完整；production schema 明确 `unverified`。
+- OFF Deployment Rehearsal `39810841937/1` 成功，严格绑定 RC `39808120659/1`。最终 proof SHA256 `d17a8bd...`（本地下载文件实际 SHA256 `d17a8bdfaf873d7a947f2ae2739b8741a39897ce8e23de854d195735845f26c2`），proof artifact `deployment-proof-39810841937-1`，11/11 OFF gates PASS：runtime_integrity、billing、backup_restore、sqlite/mysql/postgres upgrade idempotency、ordinary_provider_usage_billing、pool_disabled、replay_and_duplicate_charge、state_isolation、safe_rollback。PG03-only `executor_pairing`、`gateway_executor_provider_usage_billing` 与 PG03 operator backup/rollback gates 按 OFF 模式不执行，未被伪装为 PASS。
+- `CLEARAPI_AUTO_PRODUCTION_ENABLED=false`；对应 automatic-deploy workflow runs skipped。没有 SSH、生产数据库连接、真实生产备份/恢复、部署、Gateway 替换/重启或公网流量切换。PG03、账号池和 Executor 保持关闭。
+- 剩余事项全部是生产现场/审批边界：负责人和服务器管理员需另行批准并执行真实生产备份、独立恢复验收、回滚窗口、Gateway 部署及流量切换；本 OFF rehearsal proof 不等于生产接受或部署授权。
+
 ## 2026-10-22 — OFF RC 成功；Rehearsal dispatch 被 choice 定义阻塞
 
 - PR #85 已合并，merge commit `98a3a1d32ddd078bb0b446ea3b47dab39923c91e`；其 8 项必需 CI 全部 PASS（Actions run `39794014652`），含 SQLite/MySQL/PostgreSQL matrix、backend、frontend、secret scan 与 PG03 isolated restore。
