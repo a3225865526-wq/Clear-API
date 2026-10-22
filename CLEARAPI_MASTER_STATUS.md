@@ -1,5 +1,24 @@
 # ClearAPI — 权威总控（MASTER STATUS）
 
+## 2026-10-22 — OFF 发布链合同修复完成；旧 RC 不可复用
+
+- 修复 `deployment-rehearsal.yml` 的模式分支：OFF 仅接受 `release-candidate.yml`、artifact `clearapi-off-rc-{run_id}-{attempt}` 与 `clearapi.release-candidate/v1`；PG03 继续使用原 `release-pg03-gateway.yml`、artifact 和 receipt 合同，未降低 PG03 门禁。
+- OFF RC 现在必须携带 exact-candidate 两次启动的 PostgreSQL schema rehearsal：source/target schema SHA256、source commit、image digest、Gateway binary SHA256、run/attempt、candidate image ID、`production_schema=unverified` 和完整 artifact hash inventory；缺失、错配或 UNKNOWN 不会生成 proof。
+- OFF proof 使用 `off_isolated_startup_migration`，明确是非生产隔离证据；不声明生产 schema 已验证、不依赖 Executor、不启用 PG03、账号池或 Executor。deployment rehearsal 对 manifest、runtime bundle、schema receipt、binary 和 digest 做独立绑定校验。
+- 定向验证：WSL `test-rehearsal-producer.py` 10/10 PASS；WSL `test-automatic-release.py` 45/45 PASS；Python compile、workflow YAML parse、`git diff --check` PASS。Windows 端 Bash heredoc 测试不作为结果，Linux/WSL 结果为准。
+- 旧正式 RC `39698686281/1`（commit `f5751ffba116048551312d6ffbb3473fd83e63ad`、digest `sha256:5f7ddd26258a2fa411e55cd5e13ccf36e43ec4b20506cc44dcb001ce97903bf7`）仍是历史身份，但不含本修复后的 OFF schema rehearsal，禁止沿用其 digest 或 artifact 作为新 rehearsal 身份。必须在修复合并后的最新 main 上重新构建 RC。
+- 当前仍未创建 PR、未触发 CI/RC/rehearsal、未连接生产；真实生产备份、恢复、回退、现场验收和部署审批继续 BLOCKED/NOT AUTHORIZED。PG03、账号池和 Executor 保持关闭。
+
+## 2026-10-22 — 非 PG03 正式 RC 已构建；生产仍未授权
+
+本节更新并取代下方“正式 commit/CI/RC/registry 尚未运行”的旧状态。该旧记录保留为历史，不再代表当前状态。
+
+- PR #83 已合并至 main：merge commit f5751ffba116048551312d6ffbb3473fd83e63ad，源码 tree 39d06ca31f4b19eb30c1555221d2c1318b24b12e。PR required checks 与合并后 main CI run 39697652261 全部 PASS（后端、前端、SQLite/MySQL/PostgreSQL、Secret scan、隔离 PG03 restore）。
+- 正式 Release Candidate workflow run 39698686281 成功；GHCR digest 为 sha256:5f7ddd26258a2fa411e55cd5e13ccf36e43ec4b20506cc44dcb001ce97903bf7。RC 中 pool_mode=off、production_ready=false。
+- RC job 对 GHCR digest 执行 pull 后提取 /new-api，验证镜像 revision 为精确源码 commit，并生成 runtime bundle。下载 artifact clearapi-off-rc-39698686281-1 后，本地逐项复算 7 个内容文件哈希全部匹配；Gateway binary SHA256 37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5 与 RC manifest/artifact 一致。Runtime inventory 绑定相同 commit/tree、RC run/attempt、manifest SHA、镜像 digest、helper 和六项资产哈希。详见 evidence/non-pg03-20261021/RESULT.md 与 evidence/non-pg03-20261021/formal-rc-39698686281/。
+- 自动 RC 与自动生产发布仓库开关均为 false；仅触发 Release Candidate 构建/镜像推送。PG03 RC、deployment rehearsal、automatic production release 的关联 workflow-run 均 skipped；没有生产 SSH、配置/服务/数据库访问或部署。隔离 PG03 restore CI 是 disposable runner 验证，不代表启用 PG03。
+- 生产仍 BLOCKED/NOT AUTHORIZED：真实生产备份、独立真实恢复、旧镜像与数据库配对回退、现场 host/tool/assets baseline、经批准的 off rehearsal/生产 authorization proof、线上非 PG03 验收和恢复公网入口均未完成。生产现场最新状态仍 UNKNOWN。正式 RC 身份不等于可部署授权；PG03 与账号池继续关闭。
+
 ## 2026-10-22 — 非 PG03 本地启动资产复核完成；生产仍未授权
 
 续办复核确认：冷启动时 `/opt/clearapi/runtime` 缺失的创建顺序、Compose durable bind source、容器 `/run/clearapi` 目标和 inventory/manifest/helper 身份绑定已在本地形成一致合同。独立只读审查未发现当前冷启动修复或生成 installer 的新阻塞；审查没有重跑测试。更早报告中“路径不一致/旧 inventory 无法安装新资产”的结论保留为历史，已由 2026-10-22 的新实现和隔离证据取代。

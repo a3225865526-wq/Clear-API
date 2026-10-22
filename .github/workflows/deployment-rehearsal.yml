@@ -121,7 +121,10 @@ jobs:
           repo = os.environ['GITHUB_REPOSITORY']
           main = os.environ['GITHUB_SHA']
           assert str(rc['id']) == os.environ['REHEARSAL_RC_RUN_ID'], 'RC run id mismatch'
-          assert rc['path'] == '.github/workflows/release-pg03-gateway.yml', 'wrong RC workflow'
+          expected_workflow = ('.github/workflows/release-candidate.yml'
+                               if os.environ['REHEARSAL_POOL_MODE'] == 'off'
+                               else '.github/workflows/release-pg03-gateway.yml')
+          assert rc['path'] == expected_workflow, 'wrong RC workflow'
           assert rc['event'] in ('workflow_dispatch', 'workflow_run'), 'untrusted RC trigger'
           assert rc['status'] == 'completed' and rc['conclusion'] == 'success', 'RC not successful'
           assert rc['head_branch'] == 'main', 'RC not from main'
@@ -147,18 +150,33 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p rc
+          if [[ "$REHEARSAL_POOL_MODE" == off ]]; then
+            RC_ARTIFACT="clearapi-off-rc-${REHEARSAL_RC_RUN_ID}-${REHEARSAL_RC_RUN_ATTEMPT}"
+          else
+            RC_ARTIFACT="pg03-gateway-release-${REHEARSAL_RC_RUN_ID}-${REHEARSAL_RC_RUN_ATTEMPT}"
+          fi
           gh run download "$REHEARSAL_RC_RUN_ID" --repo "$GITHUB_REPOSITORY" \
-            --name "pg03-gateway-release-${REHEARSAL_RC_RUN_ID}-${REHEARSAL_RC_RUN_ATTEMPT}" --dir rc
+            --name "$RC_ARTIFACT" --dir rc
+          REHEARSAL_SOURCE_TREE="$(git rev-parse "${REHEARSAL_SOURCE_COMMIT}^{tree}")"
+          export REHEARSAL_SOURCE_TREE
           python3 - <<'PY'
-          import json, os, re
-          m=json.load(open('rc/gateway-image-release.json'))
-          assert m['source_commit'] == os.environ['REHEARSAL_SOURCE_COMMIT']
-          assert m['workflow_run'] == os.environ['REHEARSAL_RC_RUN_ID']
-          assert re.fullmatch(r'sha256:[0-9a-f]{64}', m['image_digest'])
-          assert m['production_ready'] is False and m['production_acceptance'] == 'not_run'
+          import json, os, re, sys
+          sys.path.insert(0, 'scripts/ci')
+          if os.environ['REHEARSAL_POOL_MODE'] == 'off':
+              from release_proof import validate_off_rc_artifact
+              m=validate_off_rc_artifact('rc', os.environ['REHEARSAL_SOURCE_COMMIT'],
+                  os.environ['REHEARSAL_SOURCE_TREE'], os.environ['REHEARSAL_RC_RUN_ID'],
+                  int(os.environ['REHEARSAL_RC_RUN_ATTEMPT']))
+          else:
+              m=json.load(open('rc/gateway-image-release.json'))
+              assert m['source_commit'] == os.environ['REHEARSAL_SOURCE_COMMIT']
+              assert m['workflow_run'] == os.environ['REHEARSAL_RC_RUN_ID']
+              assert re.fullmatch(r'sha256:[0-9a-f]{64}', m['image_digest'])
+              assert m['production_ready'] is False and m['production_acceptance'] == 'not_run'
           print('RC manifest identity PASS')
           with open(os.environ['GITHUB_ENV'], 'a') as out:
               out.write('REHEARSAL_GATEWAY_DIGEST='+m['image_digest']+'\n')
+              out.write('REHEARSAL_BINARY_SHA256='+m['binary_sha256']+'\n')
           PY
 
       - name: Runtime integrity and Deploy V2 contracts
@@ -243,7 +261,12 @@ jobs:
           else
             EXECUTOR_ARGS=()
           fi
-          python3 scripts/ci/assemble-release-proof.py --manifest rc/gateway-image-release.json --receipts receipts \
+          SCHEMA_ARGS=()
+          if [[ "$REHEARSAL_POOL_MODE" == off ]]; then
+            SCHEMA_ARGS=(--schema-rehearsal rc/schema-rehearsal.json)
+          fi
+          python3 scripts/ci/assemble-release-proof.py --manifest rc/gateway-image-release.json \
+            "${SCHEMA_ARGS[@]}" --receipts receipts \
             --pool-mode "$REHEARSAL_POOL_MODE" "${EXECUTOR_ARGS[@]}" \
             --release-stage "$RELEASE_STAGE" \
             --output release-proof.json \
