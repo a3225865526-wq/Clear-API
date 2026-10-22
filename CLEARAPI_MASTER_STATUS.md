@@ -5,7 +5,7 @@
 - 修复 `deployment-rehearsal.yml` 的模式分支：OFF 仅接受 `release-candidate.yml`、artifact `clearapi-off-rc-{run_id}-{attempt}` 与 `clearapi.release-candidate/v1`；PG03 继续使用原 `release-pg03-gateway.yml`、artifact 和 receipt 合同，未降低 PG03 门禁。
 - OFF RC 现在必须携带 exact-candidate 两次启动的 PostgreSQL schema rehearsal：source/target schema SHA256、source commit、image digest、Gateway binary SHA256、run/attempt、candidate image ID、`production_schema=unverified` 和完整 artifact hash inventory；缺失、错配或 UNKNOWN 不会生成 proof。
 - OFF proof 使用 `off_isolated_startup_migration`，明确是非生产隔离证据；不声明生产 schema 已验证、不依赖 Executor、不启用 PG03、账号池或 Executor。deployment rehearsal 对 manifest、runtime bundle、schema receipt、binary 和 digest 做独立绑定校验。
-- 定向验证：WSL `test-rehearsal-producer.py` 10/10 PASS；WSL `test-automatic-release.py` 44/44 PASS；Python compile、workflow YAML parse、`git diff --check` PASS。Windows 端 Bash heredoc 测试不作为结果，Linux/WSL 结果为准。
+- 定向验证：WSL `test-rehearsal-producer.py` 10/10 PASS；WSL `test-automatic-release.py` 45/45 PASS；Python compile、workflow YAML parse、`git diff --check` PASS。Windows 端 Bash heredoc 测试不作为结果，Linux/WSL 结果为准。
 - 旧正式 RC `39698686281/1`（commit `f5751ffba116048551312d6ffbb3473fd83e63ad`、digest `sha256:5f7ddd26258a2fa411e55cd5e13ccf36e43ec4b20506cc44dcb001ce97903bf7`）仍是历史身份，但不含本修复后的 OFF schema rehearsal，禁止沿用其 digest 或 artifact 作为新 rehearsal 身份。必须在修复合并后的最新 main 上重新构建 RC。
 - 当前仍未创建 PR、未触发 CI/RC/rehearsal、未连接生产；真实生产备份、恢复、回退、现场验收和部署审批继续 BLOCKED/NOT AUTHORIZED。PG03、账号池和 Executor 保持关闭。
 

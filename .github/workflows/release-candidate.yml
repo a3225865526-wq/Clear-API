@@ -355,8 +355,9 @@ jobs:
             --output release/schema-rehearsal.json --pool-mode off --require-migration-evidence
           export BINARY_SHA
           python3 - <<'PY'
-          import json, os, pathlib
-          transition = json.loads(pathlib.Path('release/schema-rehearsal.json').read_text())
+          import hashlib, json, os, pathlib
+          schema_raw = pathlib.Path('release/schema-rehearsal.json').read_bytes()
+          transition = json.loads(schema_raw)
           manifest = {
               'schema': 'clearapi.release-candidate/v1',
               'source_kind': 'git-commit',
@@ -370,6 +371,7 @@ jobs:
               'image_digest': os.environ['IMAGE_DIGEST'],
               'binary_sha256': os.environ['BINARY_SHA'],
               'schema_transition': transition,
+              'schema_rehearsal_sha256': hashlib.sha256(schema_raw).hexdigest(),
               'production_acceptance': 'not_run',
               'production_ready': False,
           }

@@ -62,10 +62,16 @@ class ProducerContractTest(unittest.TestCase):
                             'candidate_image_digest': 'sha256:' + 'b' * 64,
                             'candidate_image_id': 'sha256:' + 'e' * 64,
                             'production_schema': 'unverified',
+                            'profile': 'isolated_schema_only_master_single_postgres',
+                            'postgres_image_ref': 'postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929',
+                            'postgres_version_num': '170006',
                             'source_commit': 'a' * 40, 'startup_passes': 2,
-                            'source_schema_sha256': '1' * 64, 'target_schema_sha256': '1' * 64}}
+                            'source_schema_sha256': '1' * 64, 'target_schema_sha256': '1' * 64},
+                        'schema_rehearsal_sha256': ''}
+            (root / 'rc/schema-rehearsal.json').write_text(json.dumps(manifest['schema_transition'], indent=2))
+            manifest['schema_rehearsal_sha256'] = __import__('hashlib').sha256(
+                (root / 'rc/schema-rehearsal.json').read_bytes()).hexdigest()
             (root / 'rc/gateway-image-release.json').write_text(json.dumps(manifest))
-            (root / 'rc/schema-rehearsal.json').write_text(json.dumps(manifest['schema_transition']))
             gates = {'runtime_integrity', 'billing', 'backup_restore', 'pool_disabled',
                      'sqlite_upgrade_idempotency', 'mysql_upgrade_idempotency',
                      'postgres_upgrade_idempotency', 'ordinary_provider_usage_billing',

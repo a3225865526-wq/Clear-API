@@ -690,9 +690,19 @@ class NonPG03ProofTest(unittest.TestCase):
             candidate_binary_sha256=self.manifest['binary_sha256'],
             candidate_image_digest=self.manifest['image_digest'],
             candidate_image_id='sha256:' + 'e' * 64, production_schema='unverified')
+        self.manifest.update(workflow_run='123', workflow_run_attempt=1,
+                             schema_rehearsal_sha256='f' * 64)
         self.proof['migration'] = {'mode': 'off_isolated_startup_migration',
             'source_schema_sha256': '2' * 64, 'target_schema_sha256': '2' * 64,
             'startup_passes': 2, 'production_schema': 'unverified'}
+        self.manifest['schema_transition'].update(
+            profile='isolated_schema_only_master_single_postgres', production_schema='unverified',
+            postgres_image_ref='postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929',
+            postgres_version_num='170006')
+        self.proof.update(repository='a3225865526-wq/Clear-API',
+            rc_artifact='clearapi-off-rc-123-1', manifest_sha256=hashlib.sha256(
+                (json.dumps(self.manifest, sort_keys=True, indent=2) + '\n').encode()).hexdigest(),
+            schema_rehearsal_sha256='f' * 64)
         self.manifest['schema_transition']['pool_mode'] = 'off'
         self.manifest['schema_transition']['candidate_binary_sha256'] = self.manifest['binary_sha256']
         self.manifest['schema_transition']['candidate_image_digest'] = self.manifest['image_digest']
@@ -724,6 +734,17 @@ class NonPG03ProofTest(unittest.TestCase):
             bad['checks'].pop(gate)
             with self.subTest(gate=gate), self.assertRaisesRegex(ValueError, 'missing/unknown'):
                 self.validate(bad)
+
+    def test_off_proof_binds_repository_rc_artifact_and_schema_receipt(self):
+        for field, value in [('repository', 'attacker/repo'),
+                             ('rc_artifact', 'clearapi-off-rc-124-1'),
+                             ('schema_rehearsal_sha256', '0' * 64),
+                             ('manifest_sha256', '0' * 64)]:
+            with self.subTest(field=field):
+                bad = deepcopy(self.proof)
+                bad[field] = value
+                with self.assertRaisesRegex(ValueError, 'OFF proof RC artifact identity'):
+                    self.validate(bad)
 
     def test_off_cannot_be_legacy_unknown_or_controlled(self):
         for schema, mode in [('clearapi.automatic-release/v1', 'off'),
@@ -761,9 +782,14 @@ class NonPG03ProofTest(unittest.TestCase):
 
     def test_off_assembler_and_validator_roundtrip_without_executor_arguments(self):
         manifest = self.root / 'manifest.json'
-        manifest.write_text(json.dumps(self.manifest))
+        manifest.write_text(json.dumps(self.manifest, sort_keys=True, indent=2) + '\n')
         schema_rehearsal = self.root / 'schema-rehearsal.json'
         schema_rehearsal.write_text(json.dumps(self.manifest['schema_transition']))
+        self.manifest['schema_rehearsal_sha256'] = hashlib.sha256(schema_rehearsal.read_bytes()).hexdigest()
+        self.proof['schema_rehearsal_sha256'] = self.manifest['schema_rehearsal_sha256']
+        self.proof['manifest_sha256'] = hashlib.sha256(
+            (json.dumps(self.manifest, sort_keys=True, indent=2) + '\n').encode()).hexdigest()
+        manifest.write_text(json.dumps(self.manifest, sort_keys=True, indent=2) + '\n')
         output = self.root / 'off-proof.json'
         command = [sys.executable, '-B', str(Path(__file__).with_name('assemble-release-proof.py')),
                    '--manifest', str(manifest), '--schema-rehearsal', str(schema_rehearsal),
@@ -794,8 +820,10 @@ class NonPG03ProofTest(unittest.TestCase):
                    '--previous-source-commit', 'd' * 40]
         result = subprocess.run(command, capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('OFF schema rehearsal artifact does not match', result.stderr)
+        self.assertIn('OFF schema rehearsal', result.stderr)
         bad = deepcopy(self.proof)
+        bad['manifest_sha256'] = hashlib.sha256(
+            (json.dumps(changed, sort_keys=True, indent=2) + '\n').encode()).hexdigest()
         bad['migration'] = {'mode': 'in_place_startup_migration',
                             'source_schema_sha256': '2' * 64,
                             'target_schema_sha256': '3' * 64}

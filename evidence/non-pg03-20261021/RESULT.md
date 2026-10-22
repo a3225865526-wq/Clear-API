@@ -3,9 +3,9 @@
 ## 2026-10-22 — OFF RC/Rehearsal 合同修复（本地验证）
 
 - `deployment-rehearsal.yml` 现在按 `pool_mode` 严格选择 RC workflow 和 artifact；OFF 绑定 `release-candidate.yml` 与 `clearapi-off-rc-{run_id}-{attempt}`，PG03 路径保持旧 workflow/artifact 和所有 Executor gate。
-- `release-candidate.yml` 为 OFF RC 生成 exact-candidate 两次启动的隔离 schema receipt，并把 schema transition、run/attempt、image digest、binary SHA256 和 runtime artifact hashes 纳入 manifest/inventory。
-- proof assembler 与 authorizer 拒绝 OFF 缺失或错配的 schema artifact；OFF proof 仅记录 `off_isolated_startup_migration` 与 `production_schema=unverified`，不会把隔离验证升级为生产接受。
-- 验证命令：WSL `python3 -B scripts/ci/test-rehearsal-producer.py`（10/10 PASS）；WSL `python3 -B scripts/ci/test-automatic-release.py`（44/44 PASS）；Windows Python compile、PyYAML workflow parse、`git diff --check` PASS。
+- `release-candidate.yml` 为 OFF RC 生成 exact-digest candidate 两次启动的隔离 schema receipt，并把 schema transition 摘要、run/attempt、image digest、binary SHA256 和 runtime artifact hashes 纳入 manifest/inventory。
+- proof assembler 与 authorizer 拒绝 OFF 缺失或错配的 schema artifact；OFF proof 绑定仓库、精确 artifact 名、manifest/schema receipt SHA256，且仅记录 `off_isolated_startup_migration` 与 `production_schema=unverified`，不会把隔离验证升级为生产接受。
+- 验证命令：WSL `python3 -B scripts/ci/test-rehearsal-producer.py`（10/10 PASS）；WSL `python3 -B scripts/ci/test-automatic-release.py`（45/45 PASS）；Windows Python compile、PyYAML workflow parse、`git diff --check` PASS。
 - 本节仅证明代码合同和本地回归；没有生成新的 GitHub RC、GHCR digest 或真实 Deployment Rehearsal。旧 RC `39698686281/1` 不含本修复后的 schema artifact，必须由合并后的最新 main 重新构建。
 
 ## 2026-10-22 — 正式 main CI 与非 PG03 RC 身份验证（最新）

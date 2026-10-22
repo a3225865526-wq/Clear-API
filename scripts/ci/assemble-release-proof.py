@@ -66,6 +66,9 @@ def main():
         rehearsal = json.loads(args.schema_rehearsal.read_bytes())
         if rehearsal != transition:
             raise SystemExit("OFF schema rehearsal artifact does not match the RC manifest")
+        schema_rehearsal_sha256 = hashlib.sha256(args.schema_rehearsal.read_bytes()).hexdigest()
+        if manifest.get('schema_rehearsal_sha256') != schema_rehearsal_sha256:
+            raise SystemExit("OFF schema rehearsal digest does not match the RC manifest")
     source_schema = transition.get("source_schema_sha256", "")
     target_schema = transition.get("target_schema_sha256", "")
     if not re.fullmatch(r"[0-9a-f]{64}", source_schema) or not re.fullmatch(r"[0-9a-f]{64}", target_schema):
@@ -120,6 +123,11 @@ def main():
             "binary_sha256": args.executor_binary_sha256,
             "paired_gateway_commit": manifest["source_commit"],
         }
+    else:
+        proof.update(repository='a3225865526-wq/Clear-API',
+                     rc_artifact=f"clearapi-off-rc-{manifest['workflow_run']}-{manifest['workflow_run_attempt']}",
+                     manifest_sha256=hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
+                     schema_rehearsal_sha256=schema_rehearsal_sha256)
     if args.release_stage == "controlled":
         proof["public_traffic"] = "blocked"
         proof["provider_acceptance"] = "deferred_to_owner_after_deployment"

@@ -12,7 +12,8 @@ import re
 import subprocess
 
 from release_proof import (PG03_GATES, proof_mode, required_gates,
-                           validate_receipt_mode, validate_schema_transition)
+                           validate_off_proof_identity, validate_receipt_mode,
+                           validate_schema_transition)
 
 REPOSITORY = "a3225865526-wq/Clear-API"
 IMAGE = "ghcr.io/a3225865526-wq/clearapi"
@@ -160,6 +161,10 @@ def validate_proof(manifest, proof, evidence_dir, source, rc_run, executor_image
     require(re.fullmatch(r"[0-9a-f]{64}", manifest["binary_sha256"]) is not None, "invalid binary hash")
     if pool_mode == 'off':
         require('executor' not in proof, 'off proof must not claim an Executor dependency')
+        try:
+            validate_off_proof_identity(manifest, proof, rc_run)
+        except ValueError as error:
+            raise ValueError(str(error)) from None
     else:
         require(isinstance(proof.get('executor'), dict), 'missing Executor identity')
         executor = proof["executor"]

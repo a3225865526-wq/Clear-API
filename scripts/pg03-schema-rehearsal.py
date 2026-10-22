@@ -176,6 +176,12 @@ def rehearse(candidate, commit, schema, output, command=None, observation=None,
             or image['Architecture'] != 'amd64'
             or image['Config']['Labels'].get('org.opencontainers.image.revision') != commit):
         raise ValueError('candidate platform or source mismatch')
+    if pool_mode == 'off' and (
+            not re.fullmatch(r'ghcr\.io/a3225865526-wq/clearapi@sha256:[a-f0-9]{64}', candidate)
+            or candidate not in image.get('RepoDigests', [])
+            or image['Config']['Labels'].get('org.opencontainers.image.source')
+                != 'https://github.com/a3225865526-wq/Clear-API'):
+        raise ValueError('OFF candidate repository or digest mismatch')
     if expected_identity is not None and (
             candidate not in image.get('RepoDigests', [])
             or image['Id'] != expected_identity['image_id']
