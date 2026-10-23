@@ -27,6 +27,10 @@ SPEC = importlib.util.spec_from_file_location('offline_restore', Path(__file__).
 RUNNER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RUNNER)
 
+SPEC = importlib.util.spec_from_file_location('source_inventory', Path(__file__).parents[1] / 'pg03-source-inventory.py')
+SOURCE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(SOURCE)
+
 
 def encoded(value):
     return json.dumps(value, sort_keys=True).encode()
@@ -189,6 +193,18 @@ class RestoreAuditTest(unittest.TestCase):
             with self.subTest(key=key):
                 self.docs['restored-inventory.json'] = copy.deepcopy(self.inventory)
                 self.docs['restored-inventory.json']['main'][key] = value
+                self.pin()
+                with self.assertRaises(ValueError): AUDIT.audit(self.root, self.plan_hash, self.now)
+
+    def test_readonly_source_still_requires_real_restored_uniqueness_and_exact_data(self):
+        self.docs['source-inventory.json']['main']['uniqueness_violations'] = None
+        self.pin()
+        self.assertEqual(AUDIT.audit(self.root, self.plan_hash, self.now)['content_status'], 'PASS')
+        for field, invalid in (('uniqueness_violations', None), ('uniqueness_violations', False),
+                               ('uniqueness_violations', 1), ('schema_sha256', 'f'*64)):
+            with self.subTest(field=field, invalid=invalid):
+                self.docs['restored-inventory.json'] = copy.deepcopy(self.inventory)
+                self.docs['restored-inventory.json']['main'][field] = invalid
                 self.pin()
                 with self.assertRaises(ValueError): AUDIT.audit(self.root, self.plan_hash, self.now)
 
@@ -388,6 +404,23 @@ class OfflineRunnerTest(unittest.TestCase):
             self.spec['input_sha256'][name] = AUDIT.digest(encoded(fixture.docs[name]))
         return self.spec
 
+    def test_source_inventory_never_reindexes_and_rejects_writable_session(self):
+        self.prepare_spec()
+        transport = FakeOfflineCommands(self.spec)
+        runner = RUNNER.OfflineRestore(self.spec, transport, self.fixture.root, self.fixture.root, lambda:None)
+        runner.cid = '8'*64
+        original_sql = runner.sql
+        def source_sql(database, query, hash_only=False):
+            if query == 'SHOW transaction_read_only;': return b'on\n'
+            return original_sql(database, query, hash_only=hash_only)
+        with patch.object(runner, 'sql', side_effect=source_sql):
+            inventory = runner.inventory('clearapi', read_only_source=True)
+        self.assertIsNone(inventory['uniqueness_violations'])
+        self.assertFalse(any(stdin and b'REINDEX' in stdin for _, stdin in transport.calls))
+        with patch.object(runner, 'sql', return_value=b'off\n'), \
+             self.assertRaisesRegex(ValueError, 'read-only transaction'):
+            runner.inventory('clearapi', read_only_source=True)
+
     def test_invalid_candidate_and_expired_spec_fail_before_commands(self):
         self.prepare_spec()
         self.spec['candidate']['image_digest'] = 'latest'
@@ -413,6 +446,10 @@ class OfflineRunnerTest(unittest.TestCase):
         output = self.fixture.root/'result'
         output.mkdir(mode=0o700)
         transport = FakeOfflineCommands(self.spec)
+        self.fixture.docs['source-inventory.json']['main']['uniqueness_violations'] = None
+        source = encoded(self.fixture.docs['source-inventory.json'])
+        self.fixture.write('source-inventory.json', source)
+        self.spec['input_sha256']['source-inventory.json'] = AUDIT.digest(source)
         transport.temporary_server_reads = 1  # temporary server already answers pg_isready
         runner = RUNNER.OfflineRestore(self.spec, transport, self.fixture.root, output, lambda:None)
         pg03 = self.fixture.docs['pg03-restored-inventory.json']
@@ -721,6 +758,52 @@ class OfflineExecuteAuthorizationTest(unittest.TestCase):
                 self.auth=original
 
 
+class SourceInventoryTest(unittest.TestCase):
+    def collector(self, payload):
+        collector = SOURCE.SourceInventory([], 'a'*64, 'clearapi', 'c'*64)
+        collector.session = SimpleNamespace(stdin=io.BytesIO(), poll=lambda:None)
+        for chunk in payload:
+            collector.events.put(chunk)
+        return collector
+
+    def test_streamed_source_copy_hash_and_metadata_are_exact(self):
+        marker = b'clearapi_'+b'f'*32+b'\n'
+        payload = b'{"synthetic": "'+b'x'*100000+b'"}\n'
+        for hash_only in (True, False):
+            with self.subTest(hash_only=hash_only):
+                collector = self.collector([('stdout', payload[:50000]),
+                    ('stdout', payload[50000:]+marker[:20]), ('stdout', marker[20:])])
+                with patch.object(SOURCE.uuid, 'uuid4', return_value=SimpleNamespace(hex='f'*32)):
+                    actual = collector.sql('clearapi', 'COPY fixture TO STDOUT;', hash_only=hash_only)
+                self.assertEqual(actual, AUDIT.digest(payload) if hash_only else payload)
+
+    def test_source_session_loss_or_diagnostics_never_produce_inventory(self):
+        for event in (('stderr', b'private synthetic diagnostics'), ('stdout', None)):
+            with self.subTest(event=event[0]):
+                collector = self.collector([event])
+                with self.assertRaisesRegex(ValueError, 'diagnostics withheld'):
+                    collector.sql('clearapi', 'SELECT 1;')
+        collector = self.collector([])
+        collector.session.poll = lambda:1
+        with self.assertRaisesRegex(ValueError, 'session lost'):
+            collector.sql('clearapi', 'SELECT 1;')
+
+    def test_schema_dump_requires_exported_snapshot_without_fallback(self):
+        collector = self.collector([])
+        args = ['exec', collector.cid, 'pg_dump', '-U', 'postgres', '-d', 'clearapi',
+                '--schema-only', '--no-owner', '--no-acl', '--restrict-key='+'c'*64]
+        with patch.object(SOURCE.subprocess, 'run') as run:
+            with self.assertRaisesRegex(ValueError, 'snapshot schema dump'):
+                collector.call(args)
+            run.assert_not_called()
+        collector.snapshot = '00000003-00000004-1'
+        with patch.object(SOURCE.subprocess, 'run', return_value=SimpleNamespace(returncode=1, stdout=b'')) as run:
+            with self.assertRaisesRegex(ValueError, 'snapshot dump failed'):
+                collector.call(args)
+            self.assertEqual(run.call_count, 1)
+            self.assertIn('--snapshot=00000003-00000004-1', run.call_args.args[0][-1])
+
+
 class SyntheticPostgresCommands(RUNNER.LocalCommands):
     """Diagnostics only for fresh hosted synthetic databases, never real data."""
     def run(self, argv, **kwargs):
@@ -801,7 +884,16 @@ class RealPostgresRestoreTest(unittest.TestCase):
                 source_db, target_db = 'clearapi_restore_source_'+logical,'clearapi_restore_target_'+logical
                 source.call(['exec',source.cid,'createdb','-U','postgres',source_db])
                 source.sql(source_db,seed)  # writes only to this newly owned synthetic source
-                baseline[logical] = source.inventory(source_db)
+                class SyntheticSource(SOURCE.SourceInventory):
+                    def remote(self, argv):
+                        return [RUNNER.DOCKER, *['postgres' if arg == 'clearapi_admin' else arg for arg in argv]]
+                collector = SyntheticSource([], source.cid, source_db, spec['challenge'])
+                try:
+                    collector.open()
+                    baseline[logical] = collector.inventory(source_db, read_only_source=True)
+                    collector.sql(source_db, 'COMMIT;')
+                finally:
+                    collector.close()
                 dumped = source.call(['exec',source.cid,'pg_dump','-U','postgres','-d',source_db,'-Fc'])
                 path = root/(logical+'.dump')
                 RUNNER.write_file(path,dumped['stdout'])
@@ -811,9 +903,7 @@ class RealPostgresRestoreTest(unittest.TestCase):
                 target.call(['exec',target.cid,'pg_restore','--exit-on-error','--no-owner','--no-acl',
                     '-U','postgres','--dbname='+target_db,'/restore/'+path.name])
                 restored[logical] = target.inventory(target_db)
-            AUDIT.database_inventory(baseline, {'main':{},'log':{}})
-            AUDIT.database_inventory(restored, {'main':{},'log':{}})
-            self.assertEqual(restored,baseline,'full synthetic restore inventory drift')
+            AUDIT.compare_database_inventories(baseline, restored, {'main':{},'log':{}})
             self.assertEqual(target.sql('clearapi_restore_target_main','SELECT last_value,is_called FROM public.entry_seq;').strip(),b'41|f')
             self.assertEqual(target.sql('clearapi_restore_target_log','SELECT last_value,is_called FROM public.logs_id_seq;').strip(),b'19|t')
         finally:
