@@ -130,12 +130,34 @@ def command_plan(spec):
 
 class LocalCommands:
     """Bounded no-shell local processes; raw row data is hashed, never persisted."""
-    def __init__(self, lease, daemon_id=None):
+    def __init__(self, lease, daemon_id=None, socket_path=None):
         self.lease = lease
         self.daemon_id = daemon_id
+        self.socket_path = Path(socket_path) if socket_path is not None else None
+        self.socket_identity = None
+        if self.socket_path is not None:
+            AU.require(self.socket_path.is_absolute() and '..' not in self.socket_path.parts,
+                       'absolute protected Docker socket required')
+            self.check_socket()
+
+    def check_socket(self):
+        if self.socket_path is None:
+            return
+        for parent in self.socket_path.parents:
+            info = parent.lstat()
+            AU.require(stat.S_ISDIR(info.st_mode) and info.st_uid == 0
+                       and not info.st_mode & 0o022, 'unsafe Docker socket parent')
+        info = self.socket_path.lstat()
+        AU.require(stat.S_ISSOCK(info.st_mode) and info.st_uid == info.st_gid == 0
+                   and not info.st_mode & 0o007, 'unsafe Docker socket')
+        identity = (info.st_dev, info.st_ino, info.st_mode, info.st_uid, info.st_gid)
+        AU.require(self.socket_identity is None or identity == self.socket_identity,
+                   'offline Docker socket replaced')
+        self.socket_identity = identity
 
     def run(self, argv, stdin=None, hash_only=False, stdin_file=None, expected_sha256=None):
         self.lease()
+        self.check_socket()
         AU.require(argv[0] in (DOCKER, OPENSSL), 'unsupported executable')
         AU.require((stdin_file is None and expected_sha256 is None)
                    or (stdin is None and stdin_file is not None and AU.valid_hash(expected_sha256)),
@@ -146,7 +168,8 @@ class LocalCommands:
                        'offline daemon identity changed')
         started, deadline = stamp(), time.monotonic()+600
         environment = {'PATH': '/usr/bin:/bin', 'HOME': '/nonexistent', 'LC_ALL': 'C',
-                       'DOCKER_HOST': 'unix:///var/run/docker.sock', 'DOCKER_CONFIG': '/nonexistent'}
+                       'DOCKER_HOST': 'unix://'+str(self.socket_path) if self.socket_path is not None
+                           else 'unix:///var/run/docker.sock', 'DOCKER_CONFIG': '/nonexistent'}
         input_stream, input_info = None, None
         try:
             if stdin_file is not None:
@@ -480,7 +503,7 @@ def execute(args):
     policy = private_file(POLICY_PATH, args.policy_sha256)
     spec = validate_spec(private_file(Path(args.spec), args.spec_sha256), now())
     authorization = private_file(Path(args.authorization), args.authorization_sha256)
-    AU.require(policy['schema'] == 'clearapi.offline-restore-policy/v1'
+    AU.require(policy['schema'] in ('clearapi.offline-restore-policy/v1', 'clearapi.offline-restore-policy/v2')
                and policy['environment'] == 'isolated_offline_restore'
                and policy['public_key_file'] == str(PUBLIC_KEY)
                and policy['machine_id_sha256'] == AU.digest(Path('/etc/machine-id').read_bytes())
@@ -514,7 +537,14 @@ def execute(args):
                    and AU.file_hash(Path(args.authorization).parent,Path(args.authorization).name)[0]
                        == args.authorization_sha256
                    and not (CLAIM_ROOT/(spec['authorization_id']+'.revoked')).exists(), 'authorization expired or revoked')
-    transport = LocalCommands(lease, policy['offline_daemon_id'])
+    socket_path = None
+    if policy['schema'] == 'clearapi.offline-restore-policy/v2':
+        socket_path = policy.get('docker_socket')
+        AU.require(type(socket_path) is str and socket_path.startswith('/'),
+                   'v2 policy requires protected dedicated Docker socket')
+    else:
+        AU.require('docker_socket' not in policy, 'socket selection requires v2 reviewed policy')
+    transport = LocalCommands(lease, policy['offline_daemon_id'], socket_path)
     verified = transport.run([OPENSSL, 'pkeyutl', '-verify', '-pubin', '-rawin', '-inkey', str(PUBLIC_KEY),
                               '-sigfile', str(signature), '-in', str(args.authorization)])
     AU.require(verified['returncode'] == 0, 'administrator signature rejected')
