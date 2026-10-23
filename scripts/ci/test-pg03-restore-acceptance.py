@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import sys
 import tarfile
@@ -534,6 +535,46 @@ class OfflineRunnerTest(unittest.TestCase):
         self.assertFalse(any('pg_restore' in argv for argv,_ in transport.calls))
 
 
+
+@unittest.skipUnless(os.name == 'posix' and getattr(os, 'geteuid', lambda: -1)() == 0,
+                     'Linux root protected Unix socket contract')
+class DedicatedOfflineSocketTest(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory(prefix='clearapi-offline-socket-',dir='/root')
+        self.addCleanup(self.temp.cleanup)
+        self.root=Path(self.temp.name)
+        self.path=self.root/'docker.sock'
+        self.socket=socket.socket(socket.AF_UNIX)
+        self.socket.bind(str(self.path));self.path.chmod(0o600)
+        self.addCleanup(self.socket.close)
+
+    def test_policy_socket_controls_transport_without_inherited_context(self):
+        with patch.object(RUNNER,'DOCKER',sys.executable),patch.dict(os.environ,{'DOCKER_HOST':'tcp://untrusted:2375'}):
+            transport=RUNNER.LocalCommands(lambda:None,socket_path=str(self.path))
+            result=transport.run([sys.executable,'-c','import os; print(os.environ["DOCKER_HOST"])'])
+        self.assertEqual(result['returncode'],0)
+        self.assertEqual(result['stdout'].strip(),('unix://'+str(self.path)).encode())
+
+    def test_replaced_or_symlink_socket_rejected(self):
+        transport=RUNNER.LocalCommands(lambda:None,socket_path=str(self.path))
+        self.path.rename(self.root/'original.sock')
+        replacement=socket.socket(socket.AF_UNIX)
+        self.addCleanup(replacement.close);replacement.bind(str(self.path));self.path.chmod(0o600)
+        with self.assertRaisesRegex(ValueError,'socket replaced'):transport.check_socket()
+        link=self.root/'linked.sock';link.symlink_to(self.path)
+        with self.assertRaisesRegex(ValueError,'unsafe Docker socket'):
+            RUNNER.LocalCommands(lambda:None,socket_path=str(link))
+
+    def test_public_parent_or_socket_refused(self):
+        self.path.chmod(0o606)
+        with self.assertRaisesRegex(ValueError,'unsafe Docker socket'):
+            RUNNER.LocalCommands(lambda:None,socket_path=str(self.path))
+        self.path.chmod(0o600);self.root.chmod(0o777)
+        with self.assertRaisesRegex(ValueError,'socket parent'):
+            RUNNER.LocalCommands(lambda:None,socket_path=str(self.path))
+        self.root.chmod(0o700)
+
+
 @unittest.skipUnless(os.name == 'posix' and getattr(os, 'geteuid', lambda: -1)() == 0,
                      'Linux root detached-signature entrypoint contract')
 class OfflineExecuteAuthorizationTest(unittest.TestCase):
@@ -620,6 +661,31 @@ class OfflineExecuteAuthorizationTest(unittest.TestCase):
              patch.object(Path,'read_text',read_text), patch.object(RUNNER.LocalCommands,'run',run), \
              patch.object(RUNNER.OfflineRestore,'run',return_value=dict(status='LOCAL_SIGNATURE_CONTRACT_ONLY')):
             return RUNNER.execute(args)
+
+    def test_signed_v2_policy_binds_dedicated_socket_through_execute(self):
+        temp=tempfile.TemporaryDirectory(prefix='clearapi-offline-execute-socket-',dir='/root')
+        self.addCleanup(temp.cleanup)
+        path=Path(temp.name)/'docker.sock'
+        endpoint=socket.socket(socket.AF_UNIX);endpoint.bind(str(path));path.chmod(0o600)
+        self.addCleanup(endpoint.close)
+        policy=json.loads(self.policy_path.read_bytes())
+        policy.update(schema='clearapi.offline-restore-policy/v2',docker_socket=str(path))
+        self.policy_path.write_bytes(RUNNER.encoded(policy))
+        seen=[]
+        original=RUNNER.LocalCommands.check_socket
+        def check(transport):
+            original(transport);seen.append(transport.socket_path)
+        with patch.object(RUNNER.LocalCommands,'check_socket',check):
+            self.assertEqual(self.execute()['status'],'LOCAL_SIGNATURE_CONTRACT_ONLY')
+        self.assertTrue(seen)
+        self.assertTrue(all(value==path for value in seen))
+
+    def test_legacy_policy_cannot_silently_select_new_socket(self):
+        policy=json.loads(self.policy_path.read_bytes());policy['docker_socket']='/root/unapproved.sock'
+        self.policy_path.write_bytes(RUNNER.encoded(policy))
+        with self.assertRaisesRegex(ValueError,'v2 reviewed policy'):self.execute()
+        self.assertEqual(self.docker_calls,[])
+        self.assertFalse(list(self.claims.iterdir()))
 
     def test_actual_signature_allows_one_claim_and_replay_cannot_replace_it(self):
         self.assertEqual(self.execute()['status'],'LOCAL_SIGNATURE_CONTRACT_ONLY')
