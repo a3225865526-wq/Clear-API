@@ -329,7 +329,10 @@ class OfflineRestore:
         actual = self.call(['exec', self.cid, 'sha256sum', target])['stdout']
         AU.require(actual == (expected_sha256+'  '+target+'\n').encode(), 'live restore payload hash mismatch')
 
-    def inventory(self, database):
+    def inventory(self, database, *, read_only_source=False):
+        if read_only_source:
+            AU.require(self.sql(database, 'SHOW transaction_read_only;').strip() == b'on',
+                       'source inventory requires a read-only transaction')
         table_query = """SELECT coalesce(json_agg(format('%I.%I',n.nspname,c.relname)
             ORDER BY n.nspname,c.relname),'[]') FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
             WHERE c.relkind IN ('r','p','m') AND n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema';"""
@@ -337,13 +340,14 @@ class OfflineRestore:
         AU.require(type(tables) is list and tables and len(tables) <= 10000, 'table catalog missing')
         foreign = int(self.sql(database, "SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind='f' AND n.nspname NOT LIKE 'pg_%';").strip())
         AU.require(foreign == 0, 'foreign tables require separately reviewed recovery coverage')
-        # Let PostgreSQL enforce NULLS/partial/expression uniqueness semantics.
-        # Rebuild before fingerprinting, so expression functions cannot mutate
-        # rows/sequences after the accepted inventory has been measured.
-        unique_indexes = json.loads(self.sql(database, "SELECT coalesce(json_agg(format('%I.%I',n.nspname,c.relname) ORDER BY n.nspname,c.relname),'[]') FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE i.indisunique AND n.nspname NOT LIKE 'pg_%';"))
-        for index in unique_indexes:
-            AU.require(type(index) is str and 0 < len(index) <= 256, 'invalid unique index identifier')
-            self.sql(database, 'REINDEX INDEX '+index+';')
+        if not read_only_source:
+            # Let PostgreSQL enforce NULLS/partial/expression uniqueness semantics.
+            # Rebuild before fingerprinting, so expression functions cannot mutate
+            # rows/sequences after the accepted inventory has been measured.
+            unique_indexes = json.loads(self.sql(database, "SELECT coalesce(json_agg(format('%I.%I',n.nspname,c.relname) ORDER BY n.nspname,c.relname),'[]') FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE i.indisunique AND n.nspname NOT LIKE 'pg_%';"))
+            for index in unique_indexes:
+                AU.require(type(index) is str and 0 < len(index) <= 256, 'invalid unique index identifier')
+                self.sql(database, 'REINDEX INDEX '+index+';')
         result = dict(catalog_tables=tables, tables={})
         for table in tables:
             # Names originate from PostgreSQL format('%I.%I'), never caller SQL.
@@ -376,7 +380,7 @@ class OfflineRestore:
         result.update(validated_constraints=counts['validated'], unvalidated_constraints=counts['unvalidated'])
         invalid = int(self.sql(database, "SELECT count(*) FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT LIKE 'pg_%' AND (NOT i.indisvalid OR NOT i.indisready);").strip())
         AU.require(invalid == 0, 'invalid or unready restored indexes')
-        result['uniqueness_violations'] = 0
+        result['uniqueness_violations'] = None if read_only_source else 0
         return result
 
     def run(self):
@@ -392,7 +396,7 @@ class OfflineRestore:
                    and self.manifest['stopped_writer_identity'] == self.spec['stopped_writer_identity']
                    and self.manifest['encryption']['key_fingerprint'] == self.spec['key_fingerprint'],
                    'backup identity mismatch')
-        AU.database_inventory(documents['source-inventory.json'], self.spec['databases'])
+        AU.database_inventory(documents['source-inventory.json'], self.spec['databases'], read_only_source=True)
         AU.require(predecrypt['schema'] == 'clearapi.offline-predecryption/v1'
                    and predecrypt['challenge'] == self.spec['challenge']
                    and predecrypt['candidate'] == self.spec['candidate']
@@ -457,8 +461,7 @@ class OfflineRestore:
             self.commands['restore_'+name] = self.command_record('restore_'+name, result)
             AU.require(result['returncode'] == 0, 'offline subprocess failed')
             restored[name] = self.inventory(database['target_database'])
-        AU.database_inventory(restored, self.spec['databases'])
-        AU.require(restored == documents['source-inventory.json'], 'restored/source inventory mismatch')
+        AU.compare_database_inventories(documents['source-inventory.json'], restored, self.spec['databases'])
         destination = self.output / 'pg03-recovered'
         STATE.restore(payload_dir/artifacts['pg03_state_archive']['name'],
                       payload_dir/artifacts['pg03_state_snapshot']['name'], destination)

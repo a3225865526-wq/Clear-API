@@ -224,7 +224,7 @@ def bundle_inventory(root, manifest):
     return pg03_snapshot
 
 
-def database_inventory(value, databases):
+def database_inventory(value, databases, *, read_only_source=False):
     require(set(value) == set(databases), 'main/log database coverage mismatch')
     for name, inventory in value.items():
         require(set(inventory) == {'catalog_tables', 'tables', 'schema_sha256', 'indexes_sha256',
@@ -245,9 +245,23 @@ def database_inventory(value, databases):
                 and type(inventory['validated_constraints']) is int
                 and inventory['validated_constraints'] > 0
                 and type(inventory['unvalidated_constraints']) is int
-                and inventory['unvalidated_constraints'] == 0
-                and type(inventory['uniqueness_violations']) is int
-                and inventory['uniqueness_violations'] == 0, 'invalid constraint or schema probe')
+                and inventory['unvalidated_constraints'] == 0, 'invalid constraint or schema probe')
+        uniqueness = inventory['uniqueness_violations']
+        require((type(uniqueness) is int and uniqueness == 0)
+                or (read_only_source and uniqueness is None),
+                'uniqueness verification missing or failed')
+
+
+def compare_database_inventories(source, restored, databases):
+    database_inventory(source, databases, read_only_source=True)
+    database_inventory(restored, databases)
+    for name in databases:
+        # Source collection must never REINDEX production. The recovered data
+        # must independently pass PostgreSQL's real unique-index enforcement.
+        source_data = {key: value for key, value in source[name].items() if key != 'uniqueness_violations'}
+        restored_data = {key: value for key, value in restored[name].items() if key != 'uniqueness_violations'}
+        require(source_data == restored_data,
+                'restored database data/schema/index/constraint/sequence/migration drift')
 
 
 def audit(root, plan_sha256, now, artifacts_root=None):
@@ -327,9 +341,7 @@ def audit(root, plan_sha256, now, artifacts_root=None):
                 and item['dump_artifact'] == ('database_dump' if name == 'main' else 'log_database_dump')
                 and item['dump_artifact'] in manifest['artifacts'], 'independent target or dump missing')
     source, restored = docs['source-inventory.json'], docs['restored-inventory.json']
-    database_inventory(source, databases)
-    database_inventory(restored, databases)
-    require(source == restored, 'restored database data/schema/index/constraint/sequence/migration drift')
+    compare_database_inventories(source, restored, databases)
     target = plan['target_container_id']
     require(type(target) is str and re.fullmatch('[a-f0-9]{64}', target) is not None
             and target not in plan['production_container_ids']
