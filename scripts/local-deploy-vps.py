@@ -21,6 +21,7 @@ import sys
 import tempfile
 import time
 from urllib.request import urlopen
+from urllib.parse import urlsplit
 
 ROOT = Path('/opt/clearapi')
 CONFIG = ROOT / 'config/local-deploy.json'
@@ -30,6 +31,7 @@ LOCK = Path('/run/lock/clearapi-production-deploy.lock')
 COMMIT = re.compile(r'^[0-9a-f]{40}$')
 SHA = re.compile(r'^sha256:[0-9a-f]{64}$')
 HEX = re.compile(r'^[0-9a-f]{64}$')
+IMAGE_REF = re.compile(r'^(?:clearapi-local:[a-f0-9]{40}|ghcr.io/a3225865526-wq/clearapi@sha256:[a-f0-9]{64})$')
 
 class DeployError(RuntimeError):
     pass
@@ -69,6 +71,15 @@ def config():
                 or not data['local_url'].startswith('http://127.0.0.1:')
                 or data['public_url'] != data['local_url']):
             raise DeployError('unsafe isolated test config')
+        for key in ('app_dir', 'runtime_identity_dir', 'backup_dir'):
+            resolved = Path(data[key]).resolve()
+            if not resolved.is_relative_to('/opt/clearapi-test') or resolved == Path('/opt/clearapi-test'):
+                raise DeployError('unsafe isolated test path')
+        url=urlsplit(data['local_url'])
+        if (url.scheme != 'http' or url.hostname != '127.0.0.1'
+                or url.username is not None or url.password is not None
+                or url.port is None or not 1 <= url.port <= 65535):
+            raise DeployError('unsafe isolated test URL')
         return data
     secure_file(ACTIVATED, 0o600)
     data=json.loads(path.read_text(encoding='utf-8'))
@@ -121,7 +132,7 @@ def deployed(c):
     engine_id=run('docker','inspect','--format','{{.Image}}',cid)
     img=image_id(engine_id)
     effective=json.loads(run(*(args+['config','--format','json'])))['services'][c['service']]['image']
-    if not re.fullmatch(r'(?:[a-z0-9./_-]+:)?[a-z0-9._-]+',effective):
+    if not IMAGE_REF.fullmatch(effective):
         raise DeployError('running Compose image reference is invalid')
     if image_id(effective)!=img:
         raise DeployError('Compose effective image does not match running image')
@@ -156,6 +167,22 @@ def verify_database(c):
     if not pg or run('docker','inspect','--format',
         '{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}',pg)!='healthy':
         raise DeployError('PostgreSQL not healthy')
+
+
+def wait_health(c):
+    # Compose start/recreate returns before the Gateway begins accepting HTTP.
+    # Bound readiness polling; retain the actual final probe failure for audit.
+    deadline=time.monotonic()+30
+    while True:
+        try:
+            verify_database(c)
+            probe(c['local_url'])
+            probe(c['public_url'])
+            return
+        except DeployError as ex:
+            if time.monotonic() >= deadline:
+                raise DeployError('health readiness timed out; '+str(ex)) from ex
+            time.sleep(1)
 
 
 def preflight(c):
@@ -247,7 +274,7 @@ def identity_refresh(c,commit,ref):
 
 
 def override_yaml(c,ref):
-    if not re.fullmatch(r'(?:[a-z0-9./_-]+:)?[a-z0-9._-]+',ref):
+    if not IMAGE_REF.fullmatch(ref):
         raise DeployError('invalid fixed local image ref')
     return (f'''services:
   {c["service"]}:
@@ -282,7 +309,7 @@ def receive_archive(c, archive_sha256, archive_bytes, commit, expected_id):
         raise DeployError('archive checksum mismatch')
     with tarfile.open(archive, 'r') as bundle:
         entries=json.loads(bundle.extractfile('manifest.json').read())
-        if len(entries)!=1 or not re.fullmatch(r'(?:[a-f0-9]{64}\\.json|blobs/sha256/[a-f0-9]{64})', entries[0]['Config']):
+        if len(entries)!=1 or not re.fullmatch(r'(?:[a-f0-9]{64}\.json|blobs/sha256/[a-f0-9]{64})', entries[0]['Config']):
             raise DeployError('invalid saved image manifest')
         config_name=entries[0]['Config']
         config_bytes=bundle.extractfile(config_name).read()
@@ -292,6 +319,10 @@ def receive_archive(c, archive_sha256, archive_bytes, commit, expected_id):
     ref = 'clearapi-local:' + commit
     if image_id(ref)!=expected_id:
         raise DeployError('loaded image config ID mismatches local build')
+    revision=run('docker','image','inspect','--format','{{index .Config.Labels "org.opencontainers.image.revision"}}',ref)
+    architecture=run('docker','image','inspect','--format','{{.Architecture}}',ref)
+    if revision != commit or architecture != arch():
+        raise DeployError('loaded image revision or architecture mismatch')
     return ref
 
 def manifest_next(previous, old, commit, ref, image, status, archive_sha256=None):
@@ -363,8 +394,7 @@ def apply(c,a,archive_sha256=None,archive_bytes=None):
             deployed_now=deployed(c)
             if deployed_now['image_id']!=a.image_id or deployed_now['commit']!=a.commit:
                 raise DeployError('new container image identity mismatch')
-            verify_database(c)
-            probe(c['local_url']);probe(c['public_url'])
+            wait_health(c)
             success=manifest_next(previous_obj,old,a.commit,ref,a.image_id,'success',archive_sha256)
             atomic_write(manifest,success)
             verify_manifest(c,deployed_now)
@@ -382,7 +412,7 @@ def apply(c,a,archive_sha256=None,archive_bytes=None):
             if a.scope=='backend':
                 # DB may have been modified by the new image, even without
                 # explicit migration flags; never silently restore/redeploy.
-                raise DeployError('backend candidate failed after switch; migration state UNKNOWN; MANUAL RECOVERY required') from ex
+                raise DeployError('backend candidate failed after switch; migration state UNKNOWN; MANUAL RECOVERY required; cause: '+str(ex)) from ex
             try:
                 atomic_write(override,original_override)
                 atomic_write(manifest,original_manifest)
@@ -392,13 +422,12 @@ def apply(c,a,archive_sha256=None,archive_bytes=None):
                 if restored['image_id']!=old['image_id']:
                     raise DeployError('rollback did not restore original image')
                 verify_manifest(c,restored)
-                verify_database(c)
-                probe(c['local_url']);probe(c['public_url'])
-                raise DeployError('frontend candidate FAILED; previous exact image restored and healthy') from ex
+                wait_health(c)
+                raise DeployError('frontend candidate FAILED; previous exact image restored and healthy; cause: '+str(ex)) from ex
             except DeployError as rollback_error:
                 if str(rollback_error).startswith('frontend candidate FAILED; previous exact image restored'):
                     raise
-                raise DeployError('ROLLBACK FAILED; manual incident recovery required') from rollback_error
+                raise DeployError('ROLLBACK FAILED; manual incident recovery required; cause: '+str(rollback_error)) from rollback_error
 
 
 def main():

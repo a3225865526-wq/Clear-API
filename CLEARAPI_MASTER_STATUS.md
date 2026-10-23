@@ -1,3 +1,16 @@
+## 2026-10-24 Asia/Shanghai — Windows 本地一键部署隔离验收 PASS（非生产状态更新）
+
+- 本节仅记录 `codex/clearapi-local-deploy-integration` 的本地交付；下方生产恢复主线原文保留，不能据此认定生产已恢复或切换。本轮未连接生产、未使用生产密钥、未推送 GitHub。
+- 基线 `d9cd1299f6cb0442ba9d43af1a1ac368c94816c5` 精确匹配正式独立 worktree；初始只有未跟踪 __pycache__，现已忽略。最终本地提交 SHA 以 Git HEAD 和交付消息记录为准。
+- 30 个真实验收场景 PASS：完整 Windows 入口、前端失败回退、真实 TimeoutError、安全并发锁、实际 pg_dump 失败前置阻断、归档 SHA/大小/image ID/revision 错配、测试模式生产隔离（含路径穿越/符号链接/userinfo/测试证明与身份/真实 sudo）、后端 UNKNOWN/pending 禁止自动回退、PowerShell 5.1 实际传输。完整/定向重跑的退出结果均如实保留，不把早期失败写成通过。
+- 成功测试应用源码 d9cd1299；镜像 config ID `sha256:a34b84f437efbacd174b20d0b54dd1b19a4dc3c5d63f40b75a7de79798731545`，归档 `76de8c04d0b4f76434b9aa0421352f29d7376e28f2a2995867db456a0595596c`，隔离备份 `20261023T180450Z`；Runtime check 与归档模式正式备份身份读取 PASS。最终工具字节哈希及逐例前后快照见 `evidence/local-deploy-final-20261024/results.json`，未复用不匹配的旧 PASS。
+- 直接修复：LF Linux 资产、正式/测试配置分离、严格隔离目录和 URL、加载后 revision/架构、保留固定 GHCR 前驱兼容、Compose 启动 HTTP 就绪等待、早期拒绝保留 SSH 错误、现有备份身份适配归档；既有后端不安全回退禁令保留。业务应用和 PG03 开发成果未改。
+- 定向回归 16+12 PASS；PS 5.1/7.6 AST、Python 编译、sudoers 解析、diff check PASS。切换准备器仅预览，旧 Actions 未停用。中文说明和首次切换清单已按 SSH 直传更新。
+- 具备申请首次切换的本地工具技术条件；生产现场恢复/健康、正式备份与恢复前提、远端旧链停用和精确 VPS 安装/首次部署仍需单独授权与现场核实。不得使用隔离证明替代生产验收，不自动开放流量。
+- 交付报告：`evidence/local-deploy-final-20261024/REPORT.md`；旧主线如下完整保留。
+
+---
+
 ## 2026-10-20 09:33 Asia/Shanghai — 新会话续办：恢复代码与条件开口已准备，生产仍521/未写入；等待最终CI/RC/排练
 
 - 只读09:14实核：原Gateway f8f963a7/22ec退出127，/run为tmpfs、/run/clearapi缺失；deploy.env显式覆盖为/run/clearapi，现有机制仅部署时prepare，无boot创建。PG/精确Executor健康；原Caddy54c8550b停止/restart=no，80/443无监听。公网末次复测521，未恢复网站。

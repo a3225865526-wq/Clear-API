@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import tarfile
+import tempfile
 
 
 def docker(*args):
@@ -46,26 +48,49 @@ def capture(app_dir):
         "services"]["new-api"]["image"]
     if override_image != effective:
         raise ValueError("Compose override does not pin the effective image")
-    if not re.fullmatch(r"ghcr.io/a3225865526-wq/clearapi@sha256:[0-9a-f]{64}", effective):
+    archive_ref = effective == 'clearapi-local:' + revision
+    if not archive_ref and not re.fullmatch(r"ghcr.io/a3225865526-wq/clearapi@sha256:[0-9a-f]{64}", effective):
         raise ValueError("Compose image must be an exact approved GHCR reference")
     effective_image = json.loads(docker("image", "inspect", effective))[0]
     if image["Id"] != image_id or effective_image["Id"] != image_id:
         raise ValueError("Compose / running Docker Image ID mismatch")
-    if effective not in image.get("RepoDigests", []):
+    if not archive_ref and effective not in image.get("RepoDigests", []):
         raise ValueError("GHCR RepoDigest missing from running image")
-    digest = effective.split("@", 1)[1]
-    expected = {"new_api_image_id": image_id, "candidate_commit": revision,
-                "image_digest": digest, "image_ref": effective}
+    digest = None if archive_ref else effective.split("@", 1)[1]
+    canonical_id = image_id
+    if archive_ref:
+        if (current.get('deployment_method') != 'local-build-ssh-archive-v1'
+                or not re.fullmatch(r'[0-9a-f]{64}', str(current.get('archive_sha256', '')))
+                or current.get('status') != 'success'):
+            raise ValueError('archive deployment provenance missing')
+        # Docker containerd and classic stores expose different .Id semantics.
+        # Freeze the config digest used by the SSH archive deployment manifest.
+        with tempfile.TemporaryDirectory(prefix='backup-image-id-') as folder:
+            archive = Path(folder) / 'image.tar'
+            docker('save', '-o', str(archive), image_id)
+            with tarfile.open(archive) as bundle:
+                entries = json.load(bundle.extractfile('manifest.json'))
+                if len(entries) != 1:
+                    raise ValueError('expected one saved image config')
+                canonical_id = 'sha256:' + hashlib.sha256(bundle.extractfile(entries[0]['Config']).read()).hexdigest()
+    expected = {"new_api_image_id": canonical_id, "candidate_commit": revision,
+                "image_ref": effective}
+    if not archive_ref:
+        expected['image_digest'] = digest
     if any(current.get(key) != value for key, value in expected.items()):
         raise ValueError("release manifest / running identity mismatch")
     # Include the files and container incarnation: a redeploy during a dump
     # invalidates the backup even if it uses the same revision and image.
-    return {"oci_revision": revision, "docker_image_id": image_id,
-            "ghcr_repo_digest": effective, "ghcr_digest": digest,
+    identity = {"oci_revision": revision, "docker_image_id": canonical_id,
+            "ghcr_repo_digest": None if archive_ref else effective, "ghcr_digest": digest,
             "container_id": container["Id"], "container_created": container["Created"],
             "release_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
             "compose_base_sha256": hashlib.sha256((app / "docker-compose.prod.yml").read_bytes()).hexdigest(),
             "compose_override_sha256": hashlib.sha256(override.read_bytes()).hexdigest()}
+    if archive_ref:
+        identity.update(image_ref=effective, archive_sha256=current['archive_sha256'],
+                        deployment_method=current['deployment_method'], docker_engine_image_id=image_id)
+    return identity
 
 
 def main():

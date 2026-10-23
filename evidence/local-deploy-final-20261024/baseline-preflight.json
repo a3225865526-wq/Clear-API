@@ -1,0 +1,1 @@
+{"arch": "amd64", "commit": "d9cd1299f6cb0442ba9d43af1a1ac368c94816c5", "container_id": "b80ef7df64168d8461cab0061c81e4ed858c712e117d3dd2c6eb435fd2cfaf0a", "healthy": true, "image_id": "sha256:9d3e330a96aa4382692cb3d41d4d09a8cdb898efeeeb35dee68128140976e16a", "image_ref": "clearapi-local:d9cd1299f6cb0442ba9d43af1a1ac368c94816c5", "service": "new-api"}

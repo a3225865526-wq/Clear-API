@@ -48,5 +48,6 @@ go.work.sum
 scripts/local-deploy.config.json
 scripts/*.key
 scripts/*.pem
+__pycache__/
 *.tar
 *.tar.gz

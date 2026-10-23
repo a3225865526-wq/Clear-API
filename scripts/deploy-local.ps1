@@ -63,12 +63,15 @@ function Send-ArchiveOverSsh([string[]]$Arguments, [string]$ArchivePath) {
     $stdout = $process.StandardOutput.ReadToEndAsync()
     $stderr = $process.StandardError.ReadToEndAsync()
     $input = [IO.File]::OpenRead($ArchivePath)
+    $inputError = $null
     try { $input.CopyTo($process.StandardInput.BaseStream) }
+    catch { $inputError = $_.Exception }
     finally { $input.Dispose(); $process.StandardInput.Close() }
     $process.WaitForExit()
     $output = $stdout.GetAwaiter().GetResult()
     $errorOutput = $stderr.GetAwaiter().GetResult()
     if ($process.ExitCode -ne 0) { throw "SSH failed (exit $($process.ExitCode)): $errorOutput" }
+    if ($inputError) { throw "SSH archive input failed: $($inputError.Message)" }
     return $output.Trim()
 }
 
@@ -106,9 +109,13 @@ try {
     $cfg = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($TestTarget) {
         if (-not $cfg.testTarget -or $cfg.host -cne '127.0.0.1' -or $cfg.remoteConfigPath -cnotmatch '^/opt/clearapi-test/[A-Za-z0-9._/-]+$') { throw 'TestTarget requires explicit loopback configuration' }
-    } elseif ($cfg.host -cne '103.42.181.219' -or $cfg.user -cne 'clearadmin' -or [int]$cfg.port -ne 22) {
-        throw 'Unapproved production server identity or port in configuration'
+    } else {
+        if ($cfg.testTarget) { throw 'Test configuration requires -TestTarget' }
+        if ($cfg.host -cne '103.42.181.219' -or $cfg.user -cne 'clearadmin' -or [int]$cfg.port -ne 22) {
+            throw 'Unapproved production server identity or port in configuration'
+        }
     }
+    $configArgument = if ($TestTarget) { ' --config-path ' + [string]$cfg.remoteConfigPath } else { '' }
     if (-not $FixturePath) {
         foreach ($p in @($cfg.identityFile, $cfg.knownHostsFile)) {
             if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { throw "Missing SSH identity/known-hosts file: $p" }
@@ -140,7 +147,7 @@ try {
         $phase = 'read-only VPS preflight'
         $preflightTarget = if ($TestTarget) { "$($cfg.user)@$($cfg.host)" } else { 'clearadmin@103.42.181.219' }
         $raw = Run-Native 'ssh' ($sshOptions + @($preflightTarget,
-            ('sudo -n /opt/clearapi/bin/clearapi-local-deploy.py --config-path ' + [string]$cfg.remoteConfigPath + ' preflight')))
+            ('sudo -n /opt/clearapi/bin/clearapi-local-deploy.py' + $configArgument + ' preflight')))
         $remote = $raw | ConvertFrom-Json
     }
     if ($remote.healthy -ne $true -or $remote.service -cne 'new-api' -or
@@ -209,7 +216,7 @@ try {
     $archiveHash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
     $archiveBytes = (Get-Item -LiteralPath $archive).Length
     $phase = 'stream image archive to controlled VPS helper'
-    $remoteCommand = 'sudo -n /opt/clearapi/bin/clearapi-local-deploy.py --config-path ' + [string]$cfg.remoteConfigPath + ' receive' +
+    $remoteCommand = 'sudo -n /opt/clearapi/bin/clearapi-local-deploy.py' + $configArgument + ' receive' +
         " --commit $commit --image-id $imageId --archive-sha256 $archiveHash --archive-bytes $archiveBytes" +
         " --previous-image-id $($remote.image_id) --scope $scope"
     $sshTarget = if ($TestTarget) { "$($cfg.user)@$($cfg.host)" } else { 'clearadmin@103.42.181.219' }
@@ -223,7 +230,8 @@ try {
     ([ordered]@{ result='SUCCESS'; commit=$commit; archive_sha256=$archiveHash
         image_id=$imageId; updated_service='new-api'; scope=$scope
         backup_id=$result.backup_id; health=$result.health; rollback=$result.rollback
-        public_url='https://www.clear999.com' }) | ConvertTo-Json -Depth 4
+        target_mode=$(if ($TestTarget) { 'isolated-test-v1' } else { 'production' })
+        public_url=$(if ($TestTarget) { $null } else { 'https://www.clear999.com' }) }) | ConvertTo-Json -Depth 4
 }
 catch {
     Write-Error "BLOCKED at [$phase]: $($_.Exception.Message)"

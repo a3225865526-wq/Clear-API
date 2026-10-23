@@ -20,8 +20,8 @@ OLDID='sha256:'+'a'*64
 NEWID='sha256:'+'b'*64
 OLDDIGEST='sha256:'+'c'*64
 NEWDIGEST='sha256:'+'d'*64
-OLDREF=m.REGISTRY+'@'+OLDDIGEST
-NEWREF=m.REGISTRY+'@'+NEWDIGEST
+OLDREF='clearapi-local:'+OLD
+NEWREF='clearapi-local:'+NEW
 
 class MockDeploy(unittest.TestCase):
     def setUp(self):
@@ -50,7 +50,7 @@ class MockDeploy(unittest.TestCase):
         self.patches=[
             patch.object(m,'LOCK',self.base/'lock'),
             patch.object(m,'preflight',side_effect=lambda _:dict(self.old)),
-            patch.object(m,'pull_candidate',return_value=None),
+            patch.object(m,'receive_archive',return_value=NEWREF),
             patch.object(m,'verify_override_scope',return_value=None),
             patch.object(m,'run',side_effect=self.fake_run),
             patch.object(m,'compose_args',return_value=['docker','compose']),
@@ -59,6 +59,7 @@ class MockDeploy(unittest.TestCase):
             patch.object(m,'probe',side_effect=self.fake_probe),
             patch.object(m,'identity_prepare',return_value=None),
             patch.object(m,'identity_refresh',return_value=None),
+            patch.object(m,'wait_health',side_effect=lambda c:self.fake_probe(c['local_url'])),
             patch.object(m,'verify_manifest',return_value=self.original)]
         for pt in self.patches:pt.start();self.addCleanup(pt.stop)
 
@@ -75,11 +76,11 @@ class MockDeploy(unittest.TestCase):
 
     def test_frontend_success(self):
         out=io.StringIO()
-        with contextlib.redirect_stdout(out):m.apply(self.c,self.a)
+        with contextlib.redirect_stdout(out):m.apply(self.c,self.a,'0'*64,1)
         r=json.loads(out.getvalue())
-        self.assertEqual(r['repo_digest'],NEWDIGEST)
+        self.assertEqual(r['archive_sha256'],'0'*64)
         self.assertEqual(r['result'],'success')
-        self.assertEqual(json.loads(self.manifest.read_text())['releases']['current']['image_digest'],NEWDIGEST)
+        self.assertEqual(json.loads(self.manifest.read_text())['releases']['current']['archive_sha256'],'0'*64)
         self.assertEqual(json.loads(self.manifest.read_text())['releases']['current']['status'],'success')
         self.assertIn(NEWREF,self.override.read_text())
         self.assertEqual(sum(1 for args in self.command_log if args[:3]==('docker','compose','up')),1)
@@ -87,7 +88,7 @@ class MockDeploy(unittest.TestCase):
     def test_frontend_failed_health_restores_both_manifest_and_override(self):
         self.fail_health=True
         with self.assertRaisesRegex(m.DeployError,'previous exact image restored and healthy'):
-            m.apply(self.c,self.a)
+            m.apply(self.c,self.a,'0'*64,1)
         self.assertEqual(json.loads(self.manifest.read_text()),self.original)
         self.assertIn(OLDREF,self.override.read_text())
         self.assertEqual(sum(1 for args in self.command_log if args[:3]==('docker','compose','up')),2)
@@ -96,13 +97,13 @@ class MockDeploy(unittest.TestCase):
         self.fail_health=True
         self.fail_rollback=True
         with self.assertRaisesRegex(m.DeployError,'ROLLBACK FAILED'):
-            m.apply(self.c,self.a)
+            m.apply(self.c,self.a,'0'*64,1)
 
     def test_backend_failure_no_auto_rollback(self):
         self.a.scope='backend';self.fail_health=True
         with patch.object(m,'backup',return_value='20261023T120000Z'):
             with self.assertRaisesRegex(m.DeployError,'MANUAL RECOVERY'):
-                m.apply(self.c,self.a)
+                m.apply(self.c,self.a,'0'*64,1)
         self.assertIn(NEWREF,self.override.read_text())
         self.assertEqual(json.loads(self.manifest.read_text())['releases']['current']['status'],'pending')
         self.assertEqual(sum(1 for args in self.command_log if args[:3]==('docker','compose','up')),1)
@@ -111,32 +112,32 @@ class MockDeploy(unittest.TestCase):
         self.a.scope='backend'
         with patch.object(m,'backup',side_effect=m.DeployError('no backup evidence')):
             with self.assertRaisesRegex(m.DeployError,'no backup evidence'):
-                m.apply(self.c,self.a)
+                m.apply(self.c,self.a,'0'*64,1)
         self.assertIn(OLDREF,self.override.read_text())
         self.assertEqual(self.command_log,[])
 
     def test_predecessor_mismatch(self):
         self.a.previous_image_id='sha256:'+'e'*64
         with self.assertRaisesRegex(m.DeployError,'predecessor changed'):
-            m.apply(self.c,self.a)
+            m.apply(self.c,self.a,'0'*64,1)
         self.assertEqual(self.command_log,[])
 
     def test_lock_conflict(self):
         with (self.base/'lock').open('a+b') as lock:
             fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
             with self.assertRaisesRegex(m.DeployError,'holds the lock'):
-                m.apply(self.c,self.a)
+                m.apply(self.c,self.a,'0'*64,1)
         self.assertEqual(self.command_log,[])
 
     def test_bad_digest(self):
-        self.a.image_digest='sha256:invalid'
+        self.a.image_id='sha256:invalid'
         with self.assertRaisesRegex(m.DeployError,'invalid candidate image identity'):
-            m.apply(self.c,self.a)
+            m.apply(self.c,self.a,'0'*64,1)
 
-    def test_registry_verification_failure_blocks_without_compose(self):
-        with patch.object(m,'pull_candidate',side_effect=m.DeployError('RepoDigest mismatch')):
-            with self.assertRaisesRegex(m.DeployError,'RepoDigest mismatch'):
-                m.apply(self.c,self.a)
+    def test_archive_verification_failure_blocks_without_compose(self):
+        with patch.object(m,'receive_archive',side_effect=m.DeployError('archive checksum mismatch')):
+            with self.assertRaisesRegex(m.DeployError,'archive checksum mismatch'):
+                m.apply(self.c,self.a,'0'*64,1)
         self.assertIn(OLDREF,self.override.read_text())
         self.assertEqual(self.command_log,[])
 
@@ -159,9 +160,8 @@ class Security(unittest.TestCase):
                     m.verify_override_scope(c,NEWREF)
             self.assertEqual(list(Path(folder).iterdir()),[])
 
-    def test_no_local_tag_identity_allowed(self):
-        with self.assertRaisesRegex(m.DeployError,'invalid fixed GHCR'):
-            m.override_yaml({'service':'new-api','runtime_identity_dir':'/opt/clearapi/runtime/new-api'},'clearapi-local:'+OLD)
+    def test_archive_tag_identity_allowed(self):
+        self.assertIn(OLDREF.encode(), m.override_yaml({'service':'new-api','runtime_identity_dir':'/opt/clearapi/runtime/new-api'}, OLDREF))
     def test_registry_name_locked(self):
         with self.assertRaises(m.DeployError):
             m.override_yaml({'service':'new-api','runtime_identity_dir':'/opt/clearapi/runtime/new-api'},'ghcr.io/attacker/evil@'+NEWDIGEST)

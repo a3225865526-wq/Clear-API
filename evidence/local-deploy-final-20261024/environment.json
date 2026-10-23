@@ -1,0 +1,26 @@
+{
+  "workspace": "D:\\AI\\API\\worktrees\\clearapi-local-deploy-integration",
+  "branch": "codex/clearapi-local-deploy-integration",
+  "baseline_head": "d9cd1299f6cb0442ba9d43af1a1ac368c94816c5",
+  "common_git_dir": "D:/AI/API/upstream/new-api/.git",
+  "initial_untracked": [
+    "scripts/__pycache__/",
+    "tests/__pycache__/"
+  ],
+  "outer_docker": "29.7.2 / 29.7.2",
+  "inner_docker": "29.9.2 / 29.9.2",
+  "postgres": "postgres (PostgreSQL) 17.6",
+  "python": "Python 3.12.10",
+  "endpoint": "127.0.0.1:2222",
+  "production_contacted": false,
+  "github_pushed": false,
+  "workflow_sha256": {
+    ".github/workflows/automatic-deploy.yml": "fbe200ab577ec2603c8d536c97370d34904ae93aca2320de75228d2bdb892829",
+    ".github/workflows/ci.yml": "f0c6180fc312a9a0a44a215c73d9a773c0c7b65397efce22c0af8fce2a95b059",
+    ".github/workflows/deploy-production.yml": "be9c93375d158d1218bd4af4e641f5e5c7b7847f9cf66591af613f34909d2b8a",
+    ".github/workflows/deployment-rehearsal.yml": "53249c7b9d20f97582f53c51d94ea2b9617d9bd996def6080a6f3b6d1dc28f55",
+    ".github/workflows/ghcr-pull-rehearsal.yml": "b4bea45c7f2b65922d3e748653d38c56cba7c034d4437aa704cb17fc07456811",
+    ".github/workflows/release-candidate.yml": "6cd204b8f849c3e6f82a07081471f185f4f069f015af3adf7728fc102475a303",
+    ".github/workflows/release-pg03-gateway.yml": "7765a55b1ce69868a978d8fe55e0b3a4a3a5c1b3f85f17c24c152c59806d63a0"
+  }
+}

@@ -1,0 +1,10 @@
+/etc/sudoers.d/clearapi-local: parsed OK
+Matching Defaults entries for clearadmin on 64b63ce8d824:
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin
+
+Runas and Command-specific defaults for clearadmin:
+    Defaults!/usr/sbin/visudo env_keep+="SUDO_EDITOR EDITOR VISUAL"
+
+User clearadmin may run the following commands on 64b63ce8d824:
+    (root) NOPASSWD: /opt/clearapi/bin/clearapi-local-deploy.py preflight, /opt/clearapi/bin/clearapi-local-deploy.py receive *
+843e477703c0b12e1e12c7771ce66f9ed0836b1186b6f47f1983bfee2277bbd8  /etc/sudoers.d/clearapi-local
