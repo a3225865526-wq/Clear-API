@@ -9,6 +9,7 @@ Run only in the separately approved offline backup environment, not production.
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -16,6 +17,11 @@ import re
 import stat
 import sys
 import tarfile
+
+sys.dont_write_bytecode = True
+STATE_SPEC = importlib.util.spec_from_file_location('pg03_state_format', Path(__file__).with_name('pg03-backup-state.py'))
+STATE = importlib.util.module_from_spec(STATE_SPEC)
+STATE_SPEC.loader.exec_module(STATE)
 
 MAX_JSON = 16 * 1024 * 1024
 MAX_PAYLOAD = 16 * 1024 * 1024 * 1024
@@ -180,9 +186,8 @@ def bundle_inventory(root, manifest):
                                 if item.name in PG03_GUARDS:
                                     require(item.size <= MAX_JSON, 'oversized PG03 guard')
                                     raw = source.read(MAX_JSON+1)
-                                    guard = json.loads(raw, object_pairs_hook=unique)
-                                    require(guard['guard_version'] == 3 and type(guard['revision']) is int
-                                            and guard['revision'] >= 0, 'invalid PG03 anti-rollback state')
+                                    STATE.validate_guard_document(raw,
+                                        journal=item.name.endswith('/checkpoint.journal'))
                                     guards.add(item.name)
                                     actual = digest(raw)
                                 else:

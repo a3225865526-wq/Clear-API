@@ -61,7 +61,10 @@ class RestoreAuditTest(unittest.TestCase):
                               image_ref='ghcr.io/a3225865526-wq/clearapi@sha256:'+'b'*64,
                               image_id='sha256:'+'c'*64, binary_sha256='d'*64, rc_run_id=12, rc_attempt=1)
         pg03_files = {name: None for name in AUDIT.PG03_DIRECTORIES}
-        pg03_files.update({name: encoded(dict(guard_version=3, revision=1)) for name in AUDIT.PG03_GUARDS})
+        pg03_files.update({name: (encoded(dict(guard_version=3, revision=0))+b'\n'
+                                +encoded(dict(guard_version=3, revision=1))+b'\n'
+                                if name.endswith('/checkpoint.journal') else encoded(dict(guard_version=3, revision=1)))
+                           for name in AUDIT.PG03_GUARDS})
         pg03_files['opt/clearapi/app/compose-pg03.yaml'] = b'fixture'
         pg03 = {name: dict(mode=0o700 if value is None else 0o600, uid=0, gid=0,
                     directory=value is None, mtime_ns=1,

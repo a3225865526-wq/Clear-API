@@ -269,7 +269,7 @@ class BackupIdentityTest(unittest.TestCase):
             pg03_files = {
                 'opt/clearapi/app/compose-pg03.yaml': 'services: {}\n',
                 'opt/clearapi/config/pg03/pg03.env': 'synthetic test-only environment\n',
-                'data/clearapi/pool-executor/pool/checkpoint.journal': '{"guard_version":3,"revision":8,"checkpoint":"signed-fixture-bytes"}',
+                'data/clearapi/pool-executor/pool/checkpoint.journal': '{"guard_version":3,"revision":0}\n{"guard_version":3,"revision":8,"checkpoint":"synthetic-preserved-bytes"}\n',
                 'data/clearapi/pool-executor/pool/admission.json': '{"guard_version":3,"revision":12,"grants":["synthetic-grant"],"capabilities":["synthetic-capability"]}',
                 'data/clearapi/pool-executor/receipts/receipt.json': '{"state":"STARTED","id":"synthetic-receipt"}',
                 'data/clearapi/pool-executor/auths/account.json': '{"synthetic_credential":true}',
@@ -578,6 +578,19 @@ class BackupIdentityTest(unittest.TestCase):
 
     def test_pg03_change_during_dump_does_not_publish_recovery_point(self):
         self.full_backup(pg03=True, pg03_drift=True)
+
+    def test_checkpoint_journal_preserves_all_records_and_rejects_bad_framing(self):
+        spec=importlib.util.spec_from_file_location('pg03_state',SCRIPTS/'pg03-backup-state.py')
+        tool=importlib.util.module_from_spec(spec);spec.loader.exec_module(tool)
+        first=b'{"guard_version":3,"revision":0,"executor_id":"synthetic"}\n'
+        second=b'{"guard_version":3,"revision":1,"executor_id":"synthetic"}\n'
+        self.assertEqual(tool.validate_guard_document(first+second,journal=True)['revision'],1)
+        for bad in (first+second[:-1],first+b'\n'+second,first+second+first,
+                    first+second+second,first+b'{"guard_version":3,"revision":true}\n',
+                    first+b'{"guard_version":3,"revision":1,"executor_id":"other"}\n',
+                    first+b'{"guard_version":3,"revision":1,"revision":2}\n'):
+            with self.subTest(raw=bad):
+                with self.assertRaises(ValueError):tool.validate_guard_document(bad,journal=True)
 
     def test_restore_rejects_traversal_links_and_existing_runtime(self):
         spec = importlib.util.spec_from_file_location('pg03_state', SCRIPTS / 'pg03-backup-state.py')
