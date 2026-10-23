@@ -32,6 +32,44 @@ def read_file(path):
     return raw
 
 
+def guard_fields(pairs):
+    fields = {}
+    for key, value in pairs:
+        if key in fields:
+            raise ValueError('duplicate anti-rollback field')
+        fields[key] = value
+    return fields
+
+
+def validate_guard_document(raw, *, journal=False):
+    """Validate stored framing, not runtime trust or permission to reset a floor.
+
+    The Executor owns journal integrity/trust verification. Backup and isolated
+    restore preserve every byte; neither may collapse records to the final one.
+    """
+    if journal:
+        if not raw or len(raw) > 4 * 1024 * 1024 or not raw.endswith(b'\n'):
+            raise ValueError('truncated or oversized checkpoint journal')
+        documents = raw[:-1].split(b'\n')
+    else:
+        documents = [raw]
+    previous = -1
+    executor = None
+    for index, data in enumerate(documents):
+        value = json.loads(data, object_pairs_hook=guard_fields)
+        if (type(value) is not dict or type(value.get('guard_version')) is not int
+                or value['guard_version'] != 3 or type(value.get('revision')) is not int
+                or not 0 <= value['revision'] < 2**64):
+            raise ValueError('invalid anti-rollback state')
+        if journal:
+            if value['revision'] <= previous:
+                raise ValueError('checkpoint journal revision regressed')
+            if index and value.get('executor_id') != executor:
+                raise ValueError('checkpoint journal Executor changed')
+            previous, executor = value['revision'], value.get('executor_id')
+    return value
+
+
 def inventory(root):
     files = {}
     owner = 0 if root == Path('/') else os.geteuid()
@@ -63,9 +101,8 @@ def inventory(root):
             if len(files) > 100000:
                 raise ValueError('state snapshot too large')
     for name in ('checkpoint.journal', 'admission.json'):
-        value = json.loads(read_file(root / 'data/clearapi/pool-executor/pool' / name))
-        if value['guard_version'] != 3 or type(value['revision']) is not int or value['revision'] < 0:
-            raise ValueError('invalid anti-rollback state')
+        validate_guard_document(read_file(root / 'data/clearapi/pool-executor/pool' / name),
+                                journal=name == 'checkpoint.journal')
     for name in ('auths', 'receipts', 'pool'):
         if not (root / 'data/clearapi/pool-executor' / name).is_dir():
             raise ValueError('incomplete PG03 state roots')
