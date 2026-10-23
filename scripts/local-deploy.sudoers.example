@@ -1,0 +1,5 @@
+# Placeholder. Install only after explicit production cutover and a sudoers review.
+# Substitute with the actual verified clearadmin user identity; check path hashes.
+# clearadmin ALL=(root) NOPASSWD: /opt/clearapi/bin/clearapi-local-deploy.py preflight, /opt/clearapi/bin/clearapi-local-deploy.py apply *
+# WARNING: wildcard sudoers arguments can be dangerously broad. Prefer an exact
+# root-controlled authorized-command wrapper; do not install the line above.

@@ -26,8 +26,8 @@ def docker_json(*args):
 
 
 def observe(container, image_ref, revision, directory):
-    if not re.fullmatch(r"[^\s@]+@sha256:[a-f0-9]{64}", image_ref):
-        raise IdentityError("EXACT_DIGEST_REQUIRED")
+    if not re.fullmatch(r"(?:[^\s@]+@sha256:[a-f0-9]{64}|clearapi-local:[0-9a-f]{40})", image_ref):
+        raise IdentityError("EXACT_ARCHIVE_IDENTITY_REQUIRED")
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise IdentityError("REVISION_REQUIRED")
     # Request only identity evidence; never retrieve Config.Env or credentials.
@@ -55,7 +55,10 @@ def observe(container, image_ref, revision, directory):
                         current["Image"])[0]
     if image["Id"] != current["Image"] or current["Config"]["Image"] != image_ref:
         raise IdentityError("IMAGE_MISMATCH")
-    if image_ref not in image.get("RepoDigests", []):
+    if image_ref.startswith("clearapi-local:"):
+        if image_ref != current["Config"]["Image"]:
+            raise IdentityError("IMAGE_REF_MISMATCH")
+    elif image_ref not in image.get("RepoDigests", []):
         raise IdentityError("DIGEST_MISMATCH")
     if (image.get("Config", {}).get("Labels") or {}).get("org.opencontainers.image.revision") != revision:
         raise IdentityError("REVISION_MISMATCH")
@@ -64,7 +67,7 @@ def observe(container, image_ref, revision, directory):
     if started.tzinfo is None or not dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc) < started <= now:
         raise IdentityError("INVALID_STARTED_AT")
     return {"container_id": current["Id"], "started_at": state["StartedAt"],
-            "image_digest": image_ref.rsplit("@", 1)[1], "oci_revision": revision}
+            "docker_image_id": image["Id"], "oci_revision": revision}
 
 
 def secure_directory(directory, prepare=False):

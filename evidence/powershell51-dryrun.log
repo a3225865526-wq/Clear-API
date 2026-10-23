@@ -1,0 +1,11 @@
+{
+    "commit":  "376890e9bea3fcd8e50a6c46aad3dd37809524b8",
+    "previous_commit":  "70f31171513dc4973e5c54d89d22d86e03e57f3a",
+    "architecture":  "amd64",
+    "service":  "new-api",
+    "scope":  "frontend",
+    "changed_files":  1,
+    "estimated_backup":  false,
+    "result":  "DRY_RUN_NO_PRODUCTION_WRITES",
+    "note":  "No image built, no GHCR push and no production writes. Real build/pull must be tested separately."
+}

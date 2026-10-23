@@ -1,0 +1,8 @@
+{
+  "host": "103.42.181.219",
+  "user": "clearadmin",
+  "port": 22,
+  "identityFile": "C:\\REPLACE_WITH_PROTECTED_ED25519_KEY",
+  "knownHostsFile": "C:\\REPLACE_WITH_PINNED_KNOWN_HOSTS",
+  "testTarget": false
+}

@@ -44,3 +44,9 @@ relaykit/relayconvert/chat_responses_live_local_test.go
 service/openaicompat/chat_responses_live_local_test.go
 go.work
 go.work.sum
+# Local deploy operator configuration (machine-specific; do not commit)
+scripts/local-deploy.config.json
+scripts/*.key
+scripts/*.pem
+*.tar
+*.tar.gz
