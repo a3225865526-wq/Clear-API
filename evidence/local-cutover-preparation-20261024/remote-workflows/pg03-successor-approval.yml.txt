@@ -1,0 +1,67 @@
+name: PG03 successor independent grant
+run-name: PG03 grant ${{ inputs.request_sha256 }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_json:
+        description: 'Exact canonical successor request; non-secret hashes and identities only'
+        required: true
+        type: string
+      request_sha256:
+        description: 'Exact SHA256 of canonical request_json, also identifies the frozen read-only approval activity'
+        required: true
+        type: string
+      qualification_policy_sha256:
+        description: 'Independently approved candidate qualification policy SHA256'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pg03-successor-grant
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: >-
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.ref == 'refs/heads/main' &&
+      github.actor == 'a3225865526-wq' &&
+      github.triggering_actor == 'a3225865526-wq'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Present exact non-secret request before independent review
+        env:
+          REQUEST_JSON: ${{ inputs.request_json }}
+          REQUEST_SHA256: ${{ inputs.request_sha256 }}
+          POLICY_SHA: ${{ inputs.qualification_policy_sha256 }}
+        run: python3 scripts/ci/pg03-successor-grant.py inspect
+
+  grant:
+    needs: inspect
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Create exact short-lived grant after environment review
+        env:
+          REQUEST_JSON: ${{ inputs.request_json }}
+          REQUEST_SHA256: ${{ inputs.request_sha256 }}
+          POLICY_SHA: ${{ inputs.qualification_policy_sha256 }}
+        run: python3 scripts/ci/pg03-successor-grant.py grant
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pg03-successor-grant-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/pg03-successor-grant/production-grant.json
+          if-no-files-found: error
+          retention-days: 1

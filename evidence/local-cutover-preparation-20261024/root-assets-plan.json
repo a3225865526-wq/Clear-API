@@ -1,0 +1,105 @@
+{
+  "production_authorized": false,
+  "executable": false,
+  "reason": "整合候选和首次接管合同未冻结，禁止直接安装旧分支资产",
+  "assets": [
+    {
+      "source": "scripts/local-deploy-vps.py",
+      "target": "/opt/clearapi/bin/clearapi-local-deploy.py",
+      "installed": {
+        "exists": false
+      },
+      "condition": "当前测试工具不能直接接管失败/隔离/四层 Compose 现场；先完成受控接管与现有布局整合",
+      "approved_production_candidate_sha256": null,
+      "source_references": {
+        "HEAD": "08cea48657e48985953a957f63bf519ee809b18285f50f917ed9bdeb3dbcc139"
+      }
+    },
+    {
+      "source": "scripts/runtime-identity-refresh.py",
+      "target": "/opt/clearapi/bin/runtime-identity-refresh.py",
+      "installed": {
+        "bytes": 8367,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "sha256": "afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e",
+        "symlink": false,
+        "uid": 0
+      },
+      "condition": "保留 main 身份合同，合入归档能力；与 boot helper pin 同时冻结，不能直接覆盖 afcefce7",
+      "approved_production_candidate_sha256": null,
+      "source_references": {
+        "HEAD": "8c7b8362e819fdf20703eca2df70162afdfc2470a4a28d0ac947fc14923d671e",
+        "production/main": "afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e"
+      }
+    },
+    {
+      "source": "scripts/backup-identity.py",
+      "target": "/opt/clearapi/backups/bin/backup-identity.py",
+      "installed": {
+        "bytes": 13375,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "sha256": "e1e21e0227b8f668bc9945e13e460542d8a07f7e6d3bdf7eaf00546180d7dc0d",
+        "symlink": false,
+        "uid": 0
+      },
+      "condition": "保留 main 停止态 schema2、successor_completion 和严格证明检查，再合入归档分支",
+      "approved_production_candidate_sha256": null,
+      "source_references": {
+        "HEAD": "6ef4b2ab8aece259e7ecbe7e4ac150116575b489d93f5bd0ce53976f9c95cdfe",
+        "production/main": "e1e21e0227b8f668bc9945e13e460542d8a07f7e6d3bdf7eaf00546180d7dc0d"
+      }
+    },
+    {
+      "source": "scripts/runtime-boot-recovery.py",
+      "target": "/opt/clearapi/bin/runtime-boot-recovery.py",
+      "installed": {
+        "bytes": 16647,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "sha256": "7c205fa4861ecbfca344f8289472be9ecd6e52abc7008f3ece4ffe3ec012b8c2",
+        "symlink": false,
+        "uid": 0
+      },
+      "condition": "保留现有依赖/冻结事故保护，审查新 archive 引用和 helper hash；不以关闭启动检查解决",
+      "approved_production_candidate_sha256": null,
+      "source_references": {
+        "production/main": "7c205fa4861ecbfca344f8289472be9ecd6e52abc7008f3ece4ffe3ec012b8c2"
+      }
+    },
+    {
+      "source": "scripts/production-backup.sh",
+      "target": "/opt/clearapi/backups/bin/clearapi-backup.sh",
+      "installed": {
+        "sha256": "7edb9ce97eff93992dc15b9c0f7cccf78e28009fc5a5d35ab022e653770c85ac",
+        "uid": 0,
+        "gid": 0,
+        "mode": "0o750"
+      },
+      "condition": "保留 main 当前 7edb9ce9 版本及 append-only checkpoint 备份能力，不安装本地旧 602db567 版本",
+      "approved_production_candidate_sha256": null,
+      "source_references": {
+        "HEAD": "602db56708b6dec4fdd781bed6b111b7c6024bded85345c15f4670f36164aa8c",
+        "production/main": "7edb9ce97eff93992dc15b9c0f7cccf78e28009fc5a5d35ab022e653770c85ac"
+      }
+    }
+  ],
+  "additional_root_assets": [
+    "root-only /opt/clearapi/config/local-deploy.json 和 local-deploy.enabled（0600）",
+    "经 visudo 校验的 sudoers（0440），仅固定 preflight/receive；不授予 --config-path 或 shell",
+    "既有 tmpfiles、runtime-directory service、Docker drop-in、runtime-identity service 按同源 bundle/pin 检查，权限保留",
+    "当前四层 Compose 的受控接管/规范化与 root 环境加载：保持全部非镜像有效配置、secret 文件引用、pool=false、数据/网络/端口不变"
+  ],
+  "ownership": "root:root，父目录与可执行资产不得由部署用户写入；执行文件 0750/0755，runtime 0750，identity JSON 0400",
+  "service_conditions": [
+    "备份服务实际入口为 /opt/clearapi/backups/bin/clearapi-backup.sh",
+    "修复基线/Compose 身份后，正式 fresh backup 必须真实成功并绑定实际当前容器/source/image；不得 reset-failed 冒充成功",
+    "最近停止态旧 c50 备份虽然密文完整，不能冒充当前 a032 运行基线备份",
+    "安装及 daemon-reload 不意味着允许 restart Docker、PostgreSQL 或 Executor；本窗口禁止 reboot"
+  ],
+  "current_admin_existing_nopasswd_all": true
+}

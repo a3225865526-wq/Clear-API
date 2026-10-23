@@ -1,0 +1,433 @@
+name: Release Candidate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-candidate-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GHCR_IMAGE: ghcr.io/a3225865526-wq/clearapi
+
+jobs:
+  race:
+    name: Race — billing/reservation critical packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GOWORK: 'off'
+      CGO_ENABLED: '1'
+      BOOTSTRAP_TEST_PG_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/postgres?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Create frontend embed placeholder
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Race test critical packages (baseline-aware)
+        env:
+          GOFLAGS: -p=2
+        run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./pkg/billingexpr/... ./model/... ./service/... ./setting/...
+
+      - name: Race test controller serially (SQLite concurrency contention)
+        # TestSecurityAccountDeletionConcurrentRequestsHaveOneWinner spawns
+        # concurrent account-deletion requests against a package-local SQLite
+        # database and asserts exactly one winner. Under -race it intermittently
+        # reports "expected: 1, actual: 0" (security_account_test.go:285).
+        #
+        # Evidence that this is contention and not a regression:
+        #  - failed under -race in runs 37735185976 and 37738237861;
+        #  - passed under -race in runs 37727302534 and 37732661437;
+        #  - has never failed in the authoritative `make test` gate, which
+        #    runs on every main CI run and is green.
+        #
+        # Root cause is in the test helper, not in production code:
+        # newAuditTestDatabase (controller/access_token_audit_test.go:440)
+        # opens SQLite as `sqlite.Open(t.TempDir()+"/audit.db")` -- a bare path
+        # with no DSN parameters. common/database.go documents precisely why
+        # that breaks concurrency (issue #6805): without
+        # `_pragma=busy_timeout(30000)` the pure-Go driver silently keeps
+        # SQLite's 5s default, and without `_txlock=immediate` a
+        # read-then-write transaction can die instantly on SQLITE_BUSY_SNAPSHOT
+        # regardless of any timeout. The production SQLitePath sets all three
+        # (busy_timeout, WAL, txlock=immediate); the test path sets none.
+        #
+        # Serialising the package reduces the pressure but cannot fix a missing
+        # busy timeout plus a missing IMMEDIATE transaction mode. The real fix
+        # is a one-line change to that test helper's DSN, which is business
+        # test code and therefore out of scope for this CI/CD-only stage.
+        # Recorded as a carry-forward rather than baseline-whitelisted: the
+        # authoritative `make test` gate is green, and whitelisting a known
+        # concurrency defect in the accounting-deletion path is not acceptable.
+        env:
+          GOFLAGS: -p=1
+        run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./controller/...
+
+      - name: Race test production-bootstrap serially (stdout capture is process-global)
+        # cmd/production-bootstrap's tests capture output by swapping the
+        # process-global os.Stdout/os.Stderr and restoring them via t.Cleanup.
+        # Under -race with parallel package execution, another test in the same
+        # package can write between the swap and the restore, so two JSON
+        # documents end up interleaved and json.Unmarshal fails with
+        # "invalid character '/' after top-level value". Observed once in
+        # Release Candidate run 37732661437; the identical test passed in run
+        # 37727302534, so it is a concurrency flake, not a regression -- it is
+        # isolated by serialisation rather than added to the baseline, and it
+        # must still pass.
+        env:
+          GOFLAGS: -p=1
+        run: bash scripts/ci/go-test-baseline.sh go test -race -count=1 ./cmd/production-bootstrap/...
+
+  db-matrix:
+    name: DB matrix — ${{ matrix.dialect }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - dialect: sqlite
+          - dialect: mysql
+          - dialect: postgres
+
+    services:
+      mysql:
+        image: mysql:8.4.6@sha256:c296d65ee6ab3ce2f608c1d1b2bdd3c08b087a5834101d76a6db2e00875216cc
+        env:
+          MYSQL_ROOT_PASSWORD: clearapi_test
+          MYSQL_USER: clearapi
+          MYSQL_PASSWORD: clearapi_test
+          MYSQL_DATABASE: clearapi_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -u clearapi -pclearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 15
+      postgres:
+        image: postgres:17.6@sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
+        env:
+          POSTGRES_USER: clearapi
+          POSTGRES_PASSWORD: clearapi_test
+          POSTGRES_DB: clearapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U clearapi -d clearapi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      GOWORK: 'off'
+      TEST_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_test?sslmode=disable
+      TEST_SERVICE_MYSQL_DSN: clearapi:clearapi_test@tcp(127.0.0.1:3306)/clearapi_service_test?charset=utf8mb4&parseTime=true&loc=Local
+      TEST_SERVICE_POSTGRES_DSN: postgres://clearapi:clearapi_test@127.0.0.1:5432/clearapi_service_test?sslmode=disable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Create frontend embed placeholder
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Select dialect env (sqlite default; explicit DSN for mysql/postgres)
+        # TEST_TASK_LOG_DSN is the task-settlement harness's secondary
+        # (log-database) handle. TestTaskSettlementDatabase opens a second GORM
+        # connection for it and asserts the DSN is non-empty, so every dialect
+        # needs the value -- pointing it at the same database as the main DSN is
+        # correct here because the harness provisions its own isolated schema.
+        run: |
+          case "${{ matrix.dialect }}" in
+            sqlite)   echo 'TEST_BILLING_DIALECT=sqlite' >> "$GITHUB_ENV" ;;
+            mysql)    echo 'TEST_BILLING_DIALECT=mysql'  >> "$GITHUB_ENV"
+                      echo "TEST_BILLING_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_TASK_LOG_DSN=$TEST_MYSQL_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_SERVICE_DSN=$TEST_SERVICE_MYSQL_DSN" >> "$GITHUB_ENV" ;;
+            postgres) echo 'TEST_BILLING_DIALECT=postgres' >> "$GITHUB_ENV"
+                      echo "TEST_BILLING_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_TASK_LOG_DSN=$TEST_POSTGRES_DSN" >> "$GITHUB_ENV"
+                      echo "TEST_SERVICE_DSN=$TEST_SERVICE_POSTGRES_DSN" >> "$GITHUB_ENV" ;;
+            *) echo "unknown dialect"; exit 1 ;;
+          esac
+
+      - name: Provision isolated service-package database (${{ matrix.dialect }})
+        # Model and Service test databases are isolated: model-package tests
+        # migrate the additive billing schema into their database first, and
+        # service-package tests assert fail-closed behavior on a pristine
+        # schema. Sharing one database made the service legs depend on package
+        # execution order (Final Launch Gate audit §2.A). sqlite legs are
+        # already isolated per-test via t.TempDir() and need no provisioning.
+        if: matrix.dialect != 'sqlite'
+        run: |
+          case "${{ matrix.dialect }}" in
+            mysql)
+              mysql --host 127.0.0.1 --port 3306 --user root --password=clearapi_test \
+                -e "CREATE DATABASE IF NOT EXISTS clearapi_service_test; GRANT ALL PRIVILEGES ON clearapi_service_test.* TO 'clearapi'@'%'; FLUSH PRIVILEGES;"
+              ;;
+            postgres)
+              if ! PGPASSWORD=clearapi_test psql --host 127.0.0.1 --username clearapi --dbname clearapi_test --tuples-only \
+                   --command "SELECT 1 FROM pg_database WHERE datname = 'clearapi_service_test'" | grep -q 1; then
+                PGPASSWORD=clearapi_test psql --host 127.0.0.1 --username clearapi --dbname clearapi_test \
+                  --command "CREATE DATABASE clearapi_service_test"
+              fi
+              ;;
+          esac
+
+      - name: Test model-side billing-critical packages against ${{ matrix.dialect }}
+        # Baseline-aware per spec §11: the DB matrix must distinguish a known
+        # frozen-baseline failure from a new dialect regression, exactly like
+        # the main CI test job. Failures not listed in test-baseline.txt still
+        # turn this job red.
+        run: bash scripts/ci/go-test-baseline.sh go test -count=1 ./pkg/billingexpr/... ./model/... ./setting/...
+
+      - name: Test service package against isolated ${{ matrix.dialect }} database
+        env:
+          TEST_BILLING_DSN: ${{ env.TEST_SERVICE_DSN || '' }}
+          # No service test currently opens a second (log-database) handle;
+          # kept aligned with the isolated database so a future one inherits
+          # the same isolation instead of silently reaching the shared DB.
+          TEST_TASK_LOG_DSN: ${{ env.TEST_SERVICE_DSN || '' }}
+        run: bash scripts/ci/go-test-baseline.sh go test -count=1 ./service/...
+
+  frontend-release:
+    name: Frontend production build
+    runs-on: ubuntu-latest
+    # Matches the CI frontend budget: the 10-minute CI cap was hit and
+    # cancelled vitest mid-run, so the candidate build gets the same headroom.
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: '1.4.0'
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Test
+        run: bun run test
+
+      - name: Production build
+        env:
+          VITE_REACT_APP_VERSION: candidate-${{ github.sha }}
+        run: DISABLE_ESLINT_PLUGIN='true' bun run build
+
+  docker:
+    name: Docker build, GHCR push, exact digest
+    needs: [race, db-matrix, frontend-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image_digest: ${{ steps.digest.outputs.image_digest }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Login to GHCR (password-stdin)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build image from exact commit
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          SOURCE_REPO: https://github.com/${{ github.repository }}
+          BUILD_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
+        run: |
+          BUILD_TS="${BUILD_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
+          docker build \
+            --build-arg SOURCE_COMMIT="${SOURCE_COMMIT}" \
+            --build-arg SOURCE_REPO="${SOURCE_REPO}" \
+            --build-arg BUILD_TIMESTAMP="${BUILD_TS}" \
+            --build-arg VERSION_LABEL="candidate-${GITHUB_SHA::7}" \
+            -t "$GHCR_IMAGE:sha-${GITHUB_SHA}" \
+            -t "$GHCR_IMAGE:candidate-${GITHUB_SHA::7}" \
+            .
+
+      - name: Push sha tag
+        run: docker push "$GHCR_IMAGE:sha-${GITHUB_SHA}" 2>&1 | tee /tmp/push-sha.log
+
+      - name: Push candidate tag
+        run: docker push "$GHCR_IMAGE:candidate-${GITHUB_SHA::7}" 2>&1 | tee /tmp/push-candidate.log
+
+      - name: Extract exact digest
+        id: digest
+        run: |
+          DIGEST="$(grep -oE 'digest: sha256:[a-f0-9]{64}' /tmp/push-sha.log | head -1 | cut -d' ' -f2)"
+          if [ -z "$DIGEST" ]; then
+            echo "push output did not contain a digest"
+            exit 1
+          fi
+          echo "image_digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+          echo "image digest: $DIGEST"
+
+      - name: Verify digest pull and provenance labels
+        env:
+          SOURCE_COMMIT: ${{ github.sha }}
+          SOURCE_TREE: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          docker pull "$GHCR_IMAGE@$IMAGE_DIGEST"
+          REVISION="$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$GHCR_IMAGE@$IMAGE_DIGEST")"
+          if [ "$REVISION" != "${GITHUB_SHA}" ]; then
+            echo "image revision label '$REVISION' does not match source commit '${GITHUB_SHA}'"
+            exit 1
+          fi
+          SOURCE_TREE="$(git rev-parse "${GITHUB_SHA}^{tree}")"
+          mkdir -p release
+          CID="$(docker create --network none "$GHCR_IMAGE@$IMAGE_DIGEST")"
+          trap 'docker rm "$CID" >/dev/null' EXIT
+          docker cp "$CID:/new-api" release/new-api
+          BINARY_SHA="$(sha256sum release/new-api | cut -d' ' -f1)"
+          docker pull postgres@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+          python3 scripts/pg03-schema-rehearsal.py --candidate "$GHCR_IMAGE@$IMAGE_DIGEST" \
+            --commit "$SOURCE_COMMIT" --schema scripts/ci/fixtures/pg03-legacy-v5-schema.sql \
+            --output release/schema-rehearsal.json --pool-mode off --require-migration-evidence \
+            --observation rc-diagnostics/schema-observation.json
+          export BINARY_SHA
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          schema_raw = pathlib.Path('release/schema-rehearsal.json').read_bytes()
+          transition = json.loads(schema_raw)
+          manifest = {
+              'schema': 'clearapi.release-candidate/v1',
+              'source_kind': 'git-commit',
+              'source_commit': os.environ['SOURCE_COMMIT'],
+              'source_tree': os.environ['SOURCE_TREE'],
+              'workflow_run': os.environ['RUN_ID'],
+              'workflow_run_attempt': int(os.environ['RUN_ATTEMPT']),
+              'pool_mode': 'off',
+              'platform': 'linux/amd64',
+              'image': os.environ['GHCR_IMAGE'],
+              'image_digest': os.environ['IMAGE_DIGEST'],
+              'binary_sha256': os.environ['BINARY_SHA'],
+              'schema_transition': transition,
+              'schema_rehearsal_sha256': hashlib.sha256(schema_raw).hexdigest(),
+              'production_acceptance': 'not_run',
+              'production_ready': False,
+          }
+          pathlib.Path('release/gateway-image-release.json').write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + '\n')
+          PY
+          python3 scripts/ci/build-runtime-assets.py \
+            --repository . --source-tree "$SOURCE_TREE" \
+            --manifest release/gateway-image-release.json \
+            --output release/runtime-assets
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          root = pathlib.Path('release')
+          paths = [root / 'new-api', root / 'gateway-image-release.json',
+                   root / 'schema-rehearsal.json', root / 'schema-rehearsal.target.sql']
+          paths.extend(sorted((root / 'runtime-assets').rglob('*')))
+          hashes = {}
+          for path in paths:
+              if path.is_file() and path.relative_to(root).as_posix() != 'artifact-hashes.json':
+                  hashes[path.relative_to(root).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+          (root / 'artifact-hashes.json').write_text(json.dumps(hashes, indent=2, sort_keys=True) + '\n')
+          PY
+          DOCKERFILE_HASH="$(sha256sum Dockerfile | cut -d' ' -f1)"
+          {
+            echo "## Release candidate provenance"
+            echo ""
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| source commit | ${GITHUB_SHA} |"
+            echo "| workflow run | ${GITHUB_RUN_ID} |"
+            echo "| image | ${GHCR_IMAGE} |"
+            echo "| digest | ${IMAGE_DIGEST} |"
+            echo "| source tree | ${SOURCE_TREE} |"
+            echo "| Gateway binary SHA256 | ${BINARY_SHA} |"
+            echo "| Dockerfile sha256 | ${DOCKERFILE_HASH} |"
+            echo "| created | $(date -u +%Y-%m-%dT%H:%M:%SZ) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact RC identity and runtime assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clearapi-off-rc-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Retain isolated schema diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: clearapi-off-rc-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: rc-diagnostics/
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Logout from GHCR
+        if: always()
+        run: docker logout ghcr.io

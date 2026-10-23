@@ -53,3 +53,9 @@ python3 -m unittest discover -s tests -p test_cutover_prepare.py -v
 5. 审查并用 `visudo -cf` 验证 `scripts/local-deploy.sudoers.example`；仅允许默认配置的 `preflight` 和参数校验严格的 `receive`。不授权 `--config-path`、通用 shell 或从用户可写路径执行 root 程序。
 6. 真实核实生产架构、Compose 有效配置、运行镜像/manifest、Runtime mount、健康及备份服务。既有固定 GHCR 前驱可识别；新镜像均以归档直传，不需要 GHCR write/pull token。首次正式加密备份、恢复前提和生产业务验收必须在授权窗口按现有合同确认，不能拿隔离测试证明替代。
 7. 授权后先预演，再执行本地入口并核对精确 SUCCESS receipt。公网开放、Provider/PG03 商业使用、账务处理按各自授权和验收合同处理。本轮结束后不自动切换或开放流量。
+
+## 2026-10-24 首次生产交接只读补充
+
+当前生产 Gateway 已运行 a032/ed6 且 loopback200，但 Caddy仍隔离、公网521，manifest仍旧FAILED，实际四层Compose和备份/boot基线尚未闭环。普通本地helper要求成功前驱和公网健康，不能直接接管这个现场；不要仅安装旧验收分支资产后运行正式命令。验收分支落后正式main138提交，备份/Runtime/boot须保留main新增合同后整合。
+
+唯一切换顺序、精确停链清单、root资产条件与集中授权申请见 `evidence/local-cutover-preparation-20261024/CUTOVER_PLAN.md`。本轮仅准备，没有远端或生产写入，也没有重跑30个真实测试。

@@ -1,0 +1,30 @@
+{
+  "boot_check": {
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Runtime boot recovery BLOCKED: Blocked; retain isolation."
+  },
+  "boot_check-installed": {
+    "exit": 0,
+    "stdout": "Installed boot assets PASS; effective ordering and enablement verified; no service started",
+    "stderr": ""
+  },
+  "backup_service_executable_paths": [
+    "/opt/clearapi/backups/bin/clearapi-backup.sh"
+  ],
+  "backup_executables": {
+    "/opt/clearapi/backups/bin/clearapi-backup.sh": {
+      "sha256": "7edb9ce97eff93992dc15b9c0f7cccf78e28009fc5a5d35ab022e653770c85ac",
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o750"
+    }
+  },
+  "compose_required_variable_names": [
+    "CLEARAPI_PG02_GATEWAY_PROOF_KEY",
+    "CLEARAPI_PG02_PROCESS_EPOCH",
+    "CLEARAPI_PG03_POLICY_KEY",
+    "CLEARAPI_POOL_CLIPROXY_KEY",
+    "CLEARAPI_POOL_EXECUTOR_ID"
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "observed_at": "2026-10-23T21:11:38.733470+00:00",
+  "mode": "read_only",
+  "recovery_files": [
+    {
+      "name": "compose-website-recovery-39957948359.json",
+      "directory": false,
+      "bytes": 413,
+      "sha256": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+      "summary": {}
+    }
+  ],
+  "compose_inputs": {
+    "docker-compose.prod.yml": {
+      "exists": true,
+      "sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+      "image_lines": [
+        "image: postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+        "image: clearapi/new-api:reservation-h2-603b217-rc1",
+        "image: clearapi/new-api:reservation-h2-603b217-rc1"
+      ]
+    },
+    "compose-pg03.yaml": {
+      "exists": true,
+      "sha256": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+      "image_lines": [
+        "image: ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58"
+      ]
+    },
+    "compose-candidate.yaml": {
+      "exists": true,
+      "sha256": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+      "image_lines": [
+        "image: ghcr.io/a3225865526-wq/clearapi@sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02"
+      ]
+    },
+    "compose-website-recovery-39957948359.json": {
+      "exists": true,
+      "sha256": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+      "services": {
+        "new-api": {
+          "image": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+          "ports": null,
+          "volumes": [
+            {
+              "type": "bind",
+              "source": "/opt/clearapi/runtime/new-api",
+              "target": "/run/clearapi",
+              "read_only": true,
+              "bind": {
+                "create_host_path": false
+              }
+            }
+          ],
+          "pool_enabled": "false"
+        }
+      }
+    }
+  },
+  "compose_error": {
+    "exit": 1,
+    "stderr_sha256": "ccae7c5696f65671600a2a506134e1031fa36655c00d798cb224b2976a95fed6",
+    "missing_file": false,
+    "missing_variable": true,
+    "messages": [
+      "REDACTED credential-related diagnostic"
+    ]
+  },
+  "backup_failure": {
+    "journal_exit": 0,
+    "known_identity_errors": [
+      "Compose / running Docker Image ID mismatch",
+      "expected exactly one running new-api container"
+    ],
+    "journal_sha256": "fcb06cfa8e74ea5cb130d28a0cab9fa4bbdc10d43a4d0f6c6714717d9b5e2ae3",
+    "unit_failure": true
+  },
+  "sudo_admin": {
+    "exit": 0,
+    "preexisting_nopasswd_all": true
+  },
+  "runtime_check": {
+    "exit": 0,
+    "stdout": "Runtime identity PASS",
+    "stderr": ""
+  }
+}

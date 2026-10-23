@@ -1,3 +1,16 @@
+## 2026-10-24 05:04–05:12 Asia/Shanghai — 首次本地切换只读准备；现场已变化，生产执行仍 BLOCKED
+
+- 本轮仅 GitHub GET/git fetch、merge-tree预览和固定SSH只读检查；没有停用远端workflow、Push、生产安装/配置修改/备份触发/服务启停/开放公网，未重跑30场景。验收提交49f23003a054e7b156e9f7c6a25589aa56500adc继续保留。
+- 正式main=a032815cb6244a7ee5e812de82f8300c02554e99；验收分支独有4提交、落后138提交。三方预览仅master与backup-identity冲突；必须正常整合，保留main完整恢复/停机备份成果和本地两项合法shop修复，不覆盖其他worktree/PR。Runtime/boot存在无文本冲突的pin/引用语义差异，禁止直接复制旧分支资产。
+- GitHub自动RC/生产变量仍false；所有旧workflow仍active；queued/in_progress/waiting/pending/requested均0。已列出先切断4个生产可达入口、再退役RC/排练/授权来源的8项顺序。现有4文件停用准备器覆盖不足，不代表已安全退役；CI/分支保护保留。
+- **本次现场取代旧退出127记录：** Gateway0a9a93c02646/ed6f93a9已运行main a032约7小时，loopback3000=200、pool=false、restart=no；durable runtime已挂载，静态identity --check PASS。原Caddy54c8550b仍stopped/restart=no，公网API521。原Executor1081a1与PG99299d/17.6健康，不启停、不开放PG03商业功能。
+- manifest仍旧c50/22ec FAILED、hold isolated，当前Gateway由四层Compose含website-recovery-39957948359 overlay运行；39957948359是RC成功编号，不是生产恢复成功证明。普通local helper两层Compose/成功manifest/公网健康前置均不适用当前隔离交接，换来源不会自动恢复网站；禁止伪造success、删hold或TestTarget用于生产。
+- 备份timer active，service failed；最近20261023T102102Z为旧c50停止态schema2，密文12330812bytes/SHA995100eb…匹配，但不是当前a032运行态备份。root备份入口实际clearapi-backup.sh（main7edb9ce9）；不得装回旧602db567或丢弃main停机/严格证明/append-only备份能力。
+- 现有boot资产/加载顺序check-installed PASS，live check BLOCKED；新helper未安装、本地启用配置/哨兵不存在。必须先闭环最新main整合、合法首次接管/有效Compose及受控环境、当前真实备份/Runtime/boot身份；本轮不修改实现、不新增发布系统、不重测已验收矩阵。
+- 唯一顺序与一次集中授权申请（含具体范围、前置停止点、失败/安全回退）已写入 evidence/local-cutover-preparation-20261024/CUTOVER_PLAN.md；当前申请未生效，不能声称生产切换已可直接执行。下方所有历史原文保留，不覆盖生产恢复主线。
+
+---
+
 ## 2026-10-24 Asia/Shanghai — Windows 本地一键部署隔离验收 PASS（非生产状态更新）
 
 - 本节仅记录 `codex/clearapi-local-deploy-integration` 的本地交付；下方生产恢复主线原文保留，不能据此认定生产已恢复或切换。本轮未连接生产、未使用生产密钥、未推送 GitHub。
