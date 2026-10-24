@@ -162,11 +162,14 @@ try {
     $changedRaw = Run-Native 'git' @('-C',$repo,'diff','--name-only',"$($remote.commit)..$commit",'--')
     $changes = @($changedRaw -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     if ($changes.Count -eq 0) { throw 'No source changes to deploy' }
+    # These operator tools are not copied into the Gateway runtime image.
+    $operatorOnlyPaths = @('scripts/pg03-failed-recovery.py', 'scripts/pg03-release-control.py')
     $risky = @($changes | Where-Object {
+        $_ -cnotin $operatorOnlyPaths -and (
         $_ -match '(^|/)(migrations?|schema|pg03|accountpool|routechain)(/|\.|$)' -or
         $_ -match '^cmd/(finance-migrate|billing-migrate|legacy-store-retire|production-bootstrap)/' -or
         $_ -match '^scripts/(production-entrypoint|production-migration-entrypoint|pg03-)' -or
-        $_ -match '\.sql$'
+        $_ -match '\.sql$')
     })
     if ($risky.Count -gt 0 -and -not $TestTarget) { throw "Migration/PG03-sensitive paths changed. Separate reviewed deployment required: $($risky -join ', ')" }
     $appChanges = @($changes | Where-Object {

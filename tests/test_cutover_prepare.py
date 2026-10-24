@@ -1,6 +1,8 @@
 """Run on a generated throwaway Git checkout layout only; no GitHub calls."""
 import importlib.util
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -42,5 +44,48 @@ class CutoverPreparation(unittest.TestCase):
                 (root/'.github/workflows'/name).write_text('new layout\n')
             with patch.object(m,'ROOT',root):
                 with self.assertRaises(ValueError): m.changes()
+
+class WindowsClassification(unittest.TestCase):
+    def test_operator_only_changes_do_not_block_app_updates_or_weaken_migration_checks(self):
+        runtimes=[p for p in (shutil.which('powershell.exe'),shutil.which('pwsh')) if p]
+        if not runtimes:self.skipTest('PowerShell runtime unavailable')
+        entry=SRC.parent/'deploy-local.ps1'
+        script=r'''
+$ErrorActionPreference='Stop'
+$entry='ENTRY_PATH'
+$tokens=$null;$errors=$null
+[void][Management.Automation.Language.Parser]::ParseFile($entry,[ref]$tokens,[ref]$errors)
+if ($errors.Count) { throw 'Entry AST failed' }
+$source=Get-Content -LiteralPath $entry -Raw -Encoding UTF8
+$start=$source.IndexOf('    $operatorOnlyPaths =')
+$end=$source.IndexOf('    $summary =',$start)
+if ($start -lt 0 -or $end -le $start) { throw 'Classifier not found' }
+$classification=$source.Substring($start,$end-$start)
+function Check-Classification([string[]]$paths,[string]$expected) {
+    $changes=$paths;$TestTarget=$false;$dirty=''
+    $actual=''
+    try { Invoke-Expression $classification; $actual=$scope }
+    catch {
+        if ($_.Exception.Message -like 'Only metadata/tooling changed*') { $actual='no-app-change' }
+        elseif ($_.Exception.Message -like 'Migration/PG03-sensitive paths changed*') { $actual='blocked' }
+        else { throw }
+    }
+    if ($actual -cne $expected) { throw "Expected $expected got $actual" }
+}
+$operators=@('scripts/pg03-failed-recovery.py','scripts/pg03-release-control.py')
+Check-Classification $operators 'no-app-change'
+Check-Classification ($operators+@('web/src/routes/index.tsx')) 'frontend'
+Check-Classification ($operators+@('controller/public.go')) 'backend'
+Check-Classification ($operators+@('model/migrations.go')) 'blocked'
+Check-Classification ($operators+@('migrations/change.sql')) 'blocked'
+Check-Classification ($operators+@('scripts/pg03-schema-rehearsal.py')) 'blocked'
+Check-Classification ($operators+@('cmd/production-bootstrap/main.go')) 'blocked'
+Write-Output 'AST and seven deployment-classification contracts PASS; no network/build/deployment'
+'''.replace('ENTRY_PATH',str(entry).replace("'","''"))
+        for runtime in runtimes:
+            with self.subTest(runtime=runtime):
+                result=subprocess.run([runtime,'-NoProfile','-NonInteractive','-Command',script],capture_output=True,text=True)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+
 
 if __name__=='__main__':unittest.main()

@@ -23,6 +23,25 @@ NEWDIGEST='sha256:'+'d'*64
 OLDREF='clearapi-local:'+OLD
 NEWREF='clearapi-local:'+NEW
 
+class StatusProbeTest(unittest.TestCase):
+    def test_native_curl_identifies_probe_without_browser_spoofing(self):
+        with patch.object(m,'run',return_value='{"success":true}\nCLEARAPI_HTTP:200') as command:
+            m.probe('https://www.clear999.com/api/status')
+        args=command.call_args.args
+        self.assertEqual(args[0],'curl')
+        self.assertIn('X-ClearAPI-Probe: local-deploy-v1',args)
+        self.assertNotIn('--insecure',args);self.assertNotIn('--location',args)
+        self.assertNotIn('--user-agent',args)
+
+    def test_http_denial_redirect_invalid_json_or_unhealthy_status_blocks(self):
+        for response in ['error code: 1010\nCLEARAPI_HTTP:403',
+                         '{"success":true}\nCLEARAPI_HTTP:301',
+                         '<html>challenge</html>\nCLEARAPI_HTTP:200',
+                         '{"success":false}\nCLEARAPI_HTTP:200']:
+            with self.subTest(response=response),patch.object(m,'run',return_value=response):
+                with self.assertRaises(m.DeployError):m.probe('https://www.clear999.com/api/status')
+
+
 class MockDeploy(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory()

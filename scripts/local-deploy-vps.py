@@ -21,8 +21,9 @@ import subprocess
 import sys
 import tempfile
 import time
-from urllib.request import urlopen
 from urllib.parse import urlsplit
+
+sys.dont_write_bytecode = True
 
 ROOT = Path('/opt/clearapi')
 CONFIG = ROOT / 'config/local-deploy.json'
@@ -168,11 +169,17 @@ def verify_manifest(c,d):
 
 def probe(url):
     try:
-        with urlopen(url,timeout=8) as response:
-            if response.status!=200 or json.loads(response.read(65536)).get('success') is not True:
-                raise DeployError('status endpoint not PASS')
+        response=run('curl','-q','--noproxy','*','--silent','--show-error',
+            '--proto','=http,https','--max-time','8','--max-filesize','65536',
+            '--header','X-ClearAPI-Probe: local-deploy-v1',
+            '--write-out','\nCLEARAPI_HTTP:%{http_code}',url)
+        body,separator,status=response.rpartition('\nCLEARAPI_HTTP:')
+        if not separator or status!='200':
+            raise DeployError('status endpoint HTTP '+status)
+        if len(body.encode())>65536 or json.loads(body).get('success') is not True:
+            raise DeployError('status endpoint not PASS')
     except Exception as e:
-        raise DeployError('health probe failed ('+type(e).__name__+')') from e
+        raise DeployError('health probe failed ('+type(e).__name__+'): '+str(e)) from e
 
 
 def verify_database(c):
