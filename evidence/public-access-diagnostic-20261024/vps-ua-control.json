@@ -1,0 +1,20 @@
+{
+  "utc": "2026-10-24T03:16:46.613978+00:00",
+  "method": "GET",
+  "client": "VPS curl/8.5.0; only User-Agent changed to actual Python-urllib/3.12",
+  "url": "https://www.clear999.com/api/status?clearapi_readonly_dns=20261024",
+  "exit": 0,
+  "headers": {
+    "date": "Sat, 24 Oct 2026 03:16:46 GMT",
+    "content-type": "text/plain; charset=UTF-8",
+    "server": "cloudflare",
+    "cf-ray": "a4f5d31faa871483-HKG"
+  },
+  "metrics_http_remote_version": "403|172.67.129.157|2",
+  "body_bytes": 17,
+  "error_codes": [
+    "1010"
+  ],
+  "body_sha256": "2938e9f1284180959e33ab1718d0793a72ff6e4cdb8108c34dcd14e69446de5c",
+  "stderr": ""
+}

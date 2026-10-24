@@ -1,0 +1,22 @@
+{
+  "utc": "2026-10-24T03:17:18.672457+00:00",
+  "results": [
+    {
+      "name": "clear999.com",
+      "server": "10.187.34.32",
+      "type": "A",
+      "exit": 0,
+      "stdout": "Server:  bogon\nAddress:  10.187.34.32\n\n",
+      "stderr": "*** No address (A) records available for clear999.com\n\n"
+    },
+    {
+      "name": "www.clear999.com",
+      "server": "10.187.34.32",
+      "type": "A",
+      "exit": 0,
+      "stdout": "Server:  bogon\nAddress:  10.187.34.32\n\nName:    www.clear999.com\nAddresses:  172.67.129.157\n\t  104.21.2.201\n\n",
+      "stderr": "Non-authoritative answer:\n\n"
+    }
+  ],
+  "direct_1_1_1_1_udp53": "Initial Windows nslookup NS query timed out; no DNS conclusion inferred from that timeout."
+}

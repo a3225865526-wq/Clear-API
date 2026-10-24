@@ -1,3 +1,15 @@
+## 2026-10-24 11:12–11:17 Asia/Shanghai — 公网只读排障：探针签名1010、裸域NODATA、Caddy停止为独立问题
+
+- 基于正式集成分支22f85af11f68a9de62807332f62953dd0b2385b9及干净工作区，仅采集网络/Docker只读状态；未改Cloudflare/DNS/NS/服务/root资产/业务数据，未激活入口或重跑30项E2E。
+- **1010范围已收窄：** UTC03:14:12同一VPS原生curl/8.5.0为521（Ray a4f5cf5a5f85df9d-HKG），Python-urllib/3.12为403/1010（a4f5cf5aeb77107b-HKG）；Windows原生curl/8.21.0为521（a4f5cf621b61a425-LAX）。VPS curl仅改显式UA为该Python值也复现1010（03:16:46，a4f5d31faa871483-HKG）。指向探针客户端签名拒绝，不能写成整个VPS IP或所有普通用户被封禁。官方1010/BIC语义吻合，但具体安全功能/规则未由Security Events确认。
+- **裸域确实缺少可用地址：** .com父区委派至drew/khloe.ns.cloudflare.com；两台权威均aa/NOERROR，对clear999.com的A/AAAA/CNAME均NODATA、SOA serial2416861397、负缓存TTL1800。VPS默认及1.1.1.1/8.8.8.8/9.9.9.9一致，Windows默认最终也返回无A；不是仅VPS解析器故障或刷新缓存可解决。www权威A/AAAA正常指向Cloudflare、TTL300，公开CNAME NODATA不能排除面板有展平CNAME。Windows公共DNS/DoH通路超时/重置与域名缺记录分开记录。
+- **源站仍未恢复：** 只读确认原Caddy stopped/restart=no，Gateway原CID/镜像/启动时间保持且loopback200，PG/Executor身份/启动时间未变。原生curl的521与Caddy关闭一致，不证明源站TLS/转发健康；面板内源站目标仍待核实。正式恢复public_health默认urllib UA是已定位的兼容点，不能原样再次启动Caddy后假定探针会过。
+- **明确未验证项：** 浏览器工具无法可靠识别当前URL而安全停止，已停止UI操作；未获得普通浏览器网站结果、Cloudflare登录态、Security Events/BIC开关或DNS面板内容，不猜测具体规则或全用户影响。未读取cookies/Token、未索要凭据。
+- **最短后续路径：** 先只读补齐Security Events/面板源站/TLS及普通浏览器；最小修正正式探针客户端签名且保留原健康/失败停回合同，经精确差异/SHA和单独维护授权后仅恢复原Caddy。裸域另需有效代理DNS与规范跳转/证书条件；原源站只配置www，不能只补@记录就声称裸域HTTPS恢复。不需要替换健康Gateway，不关闭全站防护。上述写入均未授权执行，本地正式入口仍未激活，PG03暂缓商业及其他业务保持原样。
+- 证据及最小操作建议：evidence/public-access-diagnostic-20261024/REPORT.md和同目录6项JSON。下方生产维护、备份、Runtime/boot及历史恢复主线记录原样保留。
+
+---
+
 ## 2026-10-24 Asia/Shanghai — 最小生产维护已执行至公网失败停止；Caddy停回，入口未激活
 
 - **最终结果：网站未恢复，正式入口未激活，不宣称整套接管成功。** 用户明确批准的源码为1aa591f4bb230c4fce5770114e45e9311beb87a4；执行前核实正确独立工作区/分支、精确HEAD及干净状态，7项源blob/SHA和实际现场无漂移。以下为本轮真实执行结果，下方准备/历史记录保留。

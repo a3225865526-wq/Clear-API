@@ -1,0 +1,54 @@
+{
+  "client": "Windows curl direct/no proxy/default UA",
+  "results": [
+    {
+      "utc": "2026-10-24T03:14:13.169597+00:00",
+      "method": "GET",
+      "url": "https://www.clear999.com/api/status?clearapi_readonly_dns=20261024",
+      "user_agent": "curl/8.21.0",
+      "exit": 0,
+      "metrics_http_remote_local_version": "521|2606:4700:3034::ac43:819d|2408:8439:420:4404::/64 (host redacted)|1.1",
+      "headers": {
+        "date": "Sat, 24 Oct 2026 03:14:13 GMT",
+        "content-type": "text/plain; charset=UTF-8",
+        "server": "cloudflare",
+        "cf-ray": "a4f5cf621b61a425-LAX"
+      },
+      "body_bytes": 16,
+      "error_codes": [
+        "521"
+      ],
+      "body_sha256": "4558ae09802e147610ebdb88e4472fe625c897af9a18b04d47dfcdb6b563a138",
+      "stderr": "",
+      "trace": null
+    },
+    {
+      "utc": "2026-10-24T03:14:14.840402+00:00",
+      "method": "GET",
+      "url": "https://www.cloudflare.com/cdn-cgi/trace",
+      "user_agent": "curl/8.21.0",
+      "exit": 0,
+      "metrics_http_remote_local_version": "200|2606:4700::6810:7b60|2408:8439:420:4404::/64 (host redacted)|1.1",
+      "headers": {
+        "date": "Sat, 24 Oct 2026 03:14:15 GMT",
+        "content-type": "text/plain",
+        "server": "cloudflare",
+        "cf-ray": "a4f5cf6e6edc0788-LAX"
+      },
+      "body_bytes": 235,
+      "error_codes": [],
+      "body_sha256": "427663197ffc103aa7e89a1f22c22385af7e88b8aaaa7f6e120c6fc86b02aefb",
+      "stderr": "",
+      "trace": {
+        "ip": "2408:8439:420:4404::/64 (host redacted)",
+        "uag": "curl/8.21.0",
+        "colo": "LAX"
+      }
+    }
+  ],
+  "privacy": {
+    "windows_ipv6_host_redacted": true,
+    "original_capture_sha256": "4aa073533eaf7c4de858cb96aa80041bcea81fd1dfe0db9122c1b890cfbb50cc",
+    "original_capture_location": "Git-external maintenance runtime directory"
+  }
+}

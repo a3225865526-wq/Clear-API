@@ -1,0 +1,34 @@
+{
+  "utc": "2026-10-24T03:17:02.070233+00:00",
+  "method": "native curl bounded DoH A queries; earlier urllib attempt stalled and was terminated locally",
+  "results": [
+    {
+      "name": "clear999.com",
+      "resolver": "https://dns.google/resolve",
+      "exit": 28,
+      "response": null,
+      "stderr": "curl: (28) Connection timed out after 8012 milliseconds\n"
+    },
+    {
+      "name": "clear999.com",
+      "resolver": "https://cloudflare-dns.com/dns-query",
+      "exit": 35,
+      "response": null,
+      "stderr": "curl: (35) Recv failure: Connection was reset\n"
+    },
+    {
+      "name": "www.clear999.com",
+      "resolver": "https://dns.google/resolve",
+      "exit": 28,
+      "response": null,
+      "stderr": "curl: (28) Connection timed out after 8012 milliseconds\n"
+    },
+    {
+      "name": "www.clear999.com",
+      "resolver": "https://cloudflare-dns.com/dns-query",
+      "exit": 35,
+      "response": null,
+      "stderr": "curl: (35) Recv failure: Connection was reset\n"
+    }
+  ]
+}
