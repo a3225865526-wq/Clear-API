@@ -71,3 +71,15 @@ python3 -m unittest discover -s tests -p test_cutover_prepare.py -v
 正式首次接管仍须解决：原隔离的合法恢复合同、当前四层有效 Compose 与 helper 两层配置的交接、与当前 Gateway 一致的真实正式备份/manifest/boot 基线，以及源码必需 CI。不得把旧 FAILED 改写为 success、拿旧停止态备份冒充当前运行态证明，或通过 TestTarget 接管生产。本次只做本地集成和对应回归，尚不申请合并执行整套切换。
 
 仅 PG03 账号池暂缓商业使用；其余注册登录、普通 API、渠道路由、共享 Executor、定价、充值支付、余额计费均保持原样。报告和验证记录位于 `evidence/caddy-and-formal-integration-20261024/`。
+
+## 最小接管兼容准备（2026-10-24 09:34，未生产执行）
+
+已在同一正式集成分支补齐现有实例接管：root 维护入口 `adopt-check` / `adopt-running --source-commit <完整源码提交>` 只观察当前健康 Gateway 并保存真实 `adopted` 状态，不重建容器。原 FAILED manifest、target、hold 保留；原四层 Compose 不变，另加未来本地镜像覆盖层。备份、boot 和 helper 使用同一 `local-deploy-state.json`，继续读取现有 root-only `config/pg03/pg03.env`。
+
+原恢复脚本新增 root `restore-adopted` 入口，私有 stdin 明确绑定同一源码提交及 `existing-gateway-original-caddy-v1` 范围。它复用原 TrafficHold/edge 校验、boot 检查、一次正式备份、原 Caddy 开启与失败停回；成功后追加既有 website-restoration result，不修改历史隔离文件。Caddy 探针按实际成功结果识别新的有效开放状态。
+
+生产只读候选预检仍因 `docker-compose.prod.yml` 归UID/GID1000而BLOCKED，未放宽权限；授权后须仅改为root:root、保持原0644及内容哈希。7项精确安装资产、最短执行顺序、风险和集中授权申请见 `evidence/minimal-production-handoff-20261024/REPORT.md` 与 `asset-plan.json`。原4项boot系统文件无需改变，不要求替换健康 Gateway 或重新构建其镜像。
+
+新接管回归、现有受影响回归及真实隔离五层Compose/备份身份/boot读取检查已通过；未重跑30项E2E，未执行生产备份或宣称已解除隔离。生产仍待文件归属修正、精确资产安装、元数据接管及真实备份/boot/网站检查；本轮无任何生产或GitHub远端写入。
+
+当前clearadmin仍为既有管理员通道；安装受限sudoers片段不会撤销其原有ALL。本次恢复不新增账号、不改管理员权限。网站通过后再启用既定root配置/哨兵；仅工具/元数据差异时Windows脚本不构建Gateway。4个旧生产入口经授权后精确停用，普通CI和分支保护保留。

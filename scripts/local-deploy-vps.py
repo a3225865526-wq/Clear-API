@@ -9,6 +9,7 @@ from contextlib import contextmanager
 import datetime as dt
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -33,6 +34,10 @@ SHA = re.compile(r'^sha256:[0-9a-f]{64}$')
 HEX = re.compile(r'^[0-9a-f]{64}$')
 IMAGE_REF = re.compile(r'^(?:clearapi-local:[a-f0-9]{40}|ghcr.io/a3225865526-wq/clearapi@sha256:[a-f0-9]{64})$')
 
+_spec = importlib.util.spec_from_file_location('local_state', Path(__file__).with_name('local-deploy-state.py'))
+STATE = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(STATE)
+
 class DeployError(RuntimeError):
     pass
 
@@ -46,6 +51,8 @@ def secure_file(path, mode=None):
 
 
 def run(*args, input_data=None, env=None):
+    if env is None and args[:2] == ('docker', 'compose') and '--env-file' in args:
+        env = STATE.compose_environment()
     p=subprocess.run(list(args), input=input_data, capture_output=True, text=True, env=env)
     if p.returncode:
         raise DeployError('command failed: '+args[0]+' (exit='+str(p.returncode)+')')
@@ -105,6 +112,8 @@ def arch():
 
 
 def compose_args(c):
+    if not TEST_CONFIG and (Path(c['app_dir']) / STATE.NAME).exists():
+        return STATE.compose_args(c['app_dir'])
     base=['docker','compose','--project-directory',c['app_dir'],'-f',str(Path(c['app_dir'])/c['compose_file'])]
     override=Path(c['app_dir'])/'compose-candidate.yaml'
     secure_file(override)
@@ -142,11 +151,15 @@ def deployed(c):
     return {'container_id':cid,'image_id':img,'image_ref':effective,'commit':rev}
 
 def verify_manifest(c,d):
-    path=Path(c['app_dir'])/'release-manifest.json'
+    path=STATE.manifest_path(c['app_dir']) if not TEST_CONFIG else Path(c['app_dir'])/'release-manifest.json'
     secure_file(path)
     manifest=json.loads(path.read_text())
     current=manifest['releases']['current']
-    required={'status':'success','candidate_commit':d['commit'], 'new_api_image_id':d['image_id'],
+    if current.get('status') == 'adopted' and path.name == STATE.NAME:
+        expected_status = 'adopted'
+    else:
+        expected_status = 'success'
+    required={'status':expected_status,'candidate_commit':d['commit'], 'new_api_image_id':d['image_id'],
               'image_ref':d['image_ref']}
     if any(current.get(k)!=v for k,v in required.items()):
         raise DeployError('release manifest disagrees with running Gateway')
@@ -192,6 +205,120 @@ def preflight(c):
     probe(c['local_url'])
     probe(c['public_url'])
     return {'arch':arch(),'service':c['service'],**d,'healthy':True}
+
+
+def adoption_snapshot(app):
+    """Observe this already-running recovery instance; no container operation."""
+    app = Path(app)
+    run('systemctl', 'is-active', '--quiet', 'docker.service')
+    for name, digest in STATE.FROZEN.items():
+        if hashlib.sha256(STATE.read_file(app/name)).hexdigest() != digest:
+            raise DeployError('original incident changed')
+    fmt = ('{"Id":{{json .Id}},"Image":{{json .Image}},"Ref":{{json .Config.Image}},'
+           '"Running":{{json .State.Running}},"Restarting":{{json .State.Restarting}},'
+           '"StartedAt":{{json .State.StartedAt}},"Mounts":{{json .Mounts}},'
+           '"Files":{{index .Config.Labels "com.docker.compose.project.config_files" | json}},'
+           '"Hash":{{index .Config.Labels "com.docker.compose.config-hash" | json}}}')
+    gateway=json.loads(run('docker','inspect','--format',fmt,'clearapi-new-api-1'))
+    revision='a032815cb6244a7ee5e812de82f8300c02554e99'
+    image='sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1'
+    ref='ghcr.io/a3225865526-wq/clearapi@'+image
+    if (gateway['Id']!='0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c'
+            or gateway['Image']!=image or gateway['Ref']!=ref
+            or gateway['Running'] is not True or gateway['Restarting']):
+        raise DeployError('not the reviewed running Gateway')
+    mounts=[m for m in gateway['Mounts'] if m.get('Destination')=='/run/clearapi']
+    if (len(mounts)!=1 or mounts[0].get('Source')!='/opt/clearapi/runtime/new-api'
+            or mounts[0].get('RW') is not False or mounts[0].get('Type')!='bind'):
+        raise DeployError('running Gateway runtime mount changed')
+    files=[str(app/name) for name in STATE.BASE_FILES]
+    if gateway['Files'].split(',') != files:
+        raise DeployError('running Gateway Compose inputs changed')
+    env_file=STATE.environment_file(app)
+    environment=hashlib.sha256(STATE.read_file(env_file,private=True)).hexdigest()
+    args=['docker','compose','--project-directory',str(app),'--env-file',str(env_file)]
+    for name in files:args+=['-f',name]
+    calculated=run(*(args+['config','--hash','new-api'])).split()
+    if len(calculated)!=2 or calculated[1]!=gateway['Hash']:
+        raise DeployError('effective Compose differs from running Gateway')
+    effective=json.loads(run(*(args+['config','--format','json'])))
+    if (effective['services']['new-api']['image']!=ref or
+            str(effective['services']['new-api'].get('environment',{}).get('CLEARAPI_POOL_ENABLED')).lower()!='false'):
+        raise DeployError('running Gateway image or deferred PG03 mode changed')
+    observed_revision=run('docker','image','inspect','--format',
+        '{{index .Config.Labels "org.opencontainers.image.revision"}}',image)
+    if observed_revision!=revision:raise DeployError('running Gateway OCI revision changed')
+    run('python3','-I','/opt/clearapi/bin/runtime-identity-refresh.py','--check',
+        '--container',gateway['Id'],'--image-ref',ref,'--expected-revision',revision,
+        '--directory','/opt/clearapi/runtime/new-api')
+    probe('http://127.0.0.1:3000/api/status')
+    shared={}
+    expected={'clearapi-postgres-1':'99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb',
+              'clearapi-pool-executor-1':'1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f'}
+    for name,cid in expected.items():
+        info=json.loads(run('docker','inspect','--format',
+            '{"Id":{{json .Id}},"Image":{{json .Image}},"Running":{{json .State.Running}},'
+            '"Health":{{with index .State "Health"}}{{json .Status}}{{else}}null{{end}}}',name))
+        if info['Id']!=cid or info['Running'] is not True or info['Health']!='healthy':
+            raise DeployError('shared service changed or unhealthy')
+        shared[name]={'container_id':cid,'image_id':info['Image']}
+    return {'gateway':{'container_id':gateway['Id'],'image_ref':ref,'image_id':image,
+                       'commit':revision,'started_at':gateway['StartedAt']},
+            'shared':shared,'compose_hash':gateway['Hash'],
+            'compose_sha256':{n:hashlib.sha256(STATE.read_file(app/n)).hexdigest() for n in STATE.BASE_FILES},
+            'environment_sha256':environment}
+
+
+@contextmanager
+def deploy_lock():
+    with LOCK.open('a+b') as lock:
+        try:fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:raise DeployError('another production deploy holds the lock')
+        yield
+
+
+def adopt_running(app, source_commit, execute=False):
+    if not COMMIT.fullmatch(source_commit):raise DeployError('exact adoption source commit required')
+    app=Path(app)
+    with deploy_lock():
+        if (app/STATE.NAME).exists() or (app/STATE.NAME).is_symlink():
+            raise DeployError('instance already adopted; use ordinary preflight')
+        before=adoption_snapshot(app)
+        # Reuse the original edge identity/configuration check, without opening it.
+        spec=importlib.util.spec_from_file_location('failed_recovery',Path(__file__).with_name('pg03-failed-recovery.py'))
+        recovery=importlib.util.module_from_spec(spec);spec.loader.exec_module(recovery)
+        original=recovery.WebsiteRestoration(recovery=recovery.Recovery(app,lambda args:run(*args)))
+        original.edge(False)
+        hold=recovery.TRAFFIC.TrafficHold(app,lambda args:run(*args))
+        hold.verify(hold.binding(recovery.FAILED_RUN,recovery.DIGEST,recovery.COMMIT))
+        if not execute:return {'mode':'read_only','result':'adoption_ready','snapshot':before}
+        config_id=image_id(before['gateway']['image_ref'])
+        overlay=app/'compose-local.yaml'
+        if overlay.exists() or overlay.is_symlink():raise DeployError('local Compose overlay already exists')
+        # No Compose up/start: this only creates a future image-only terminal layer.
+        STATE.publish(overlay,{'services':{'new-api':{'image':before['gateway']['image_ref']}}})
+        try:
+            args=['docker','compose','--project-directory',str(app),'--env-file',str(STATE.environment_file(app))]
+            for n in STATE.BASE_FILES:args+=['-f',str(app/n)]
+            baseline=json.loads(run(*(args+['config','--format','json'])))
+            proposed=json.loads(run(*(args+['-f',str(overlay),'config','--format','json'])))
+            if baseline!=proposed or adoption_snapshot(app)!=before:
+                raise DeployError('adoption would change live configuration')
+            original.edge(False)
+            g=before['gateway']
+            state={'schema':'clearapi.local-deploy-state/v1',
+                   'adoption':{**before,'original_incident':dict(STATE.FROZEN),
+                       'source_commit':source_commit,'recorded_at':dt.datetime.now(dt.timezone.utc).isoformat()},
+                   'releases':{'current':{'status':'adopted','deployment_method':'existing-running-adoption-v1',
+                       'candidate_commit':g['commit'],'new_api_image_id':config_id,
+                       'docker_engine_image_id':g['image_id'],
+                       'image_ref':g['image_ref'],'image_digest':g['image_ref'].split('@')[1]},'previous':{}}}
+            STATE.publish(app/STATE.NAME,state)
+        except BaseException:
+            # An unpublished adoption leaves the old contract authoritative.
+            if not (app/STATE.NAME).exists():overlay.unlink()
+            raise
+        return {'result':'adopted_running_instance','gateway_replaced':False,'snapshot':before}
 
 
 def atomic_write(path,content,mode=0o600):
@@ -258,6 +385,14 @@ def backup(c):
         for chunk in iter(lambda:f.read(1024*1024),b''): h.update(chunk)
     if h.hexdigest()!=encmeta['sha256']:
         raise DeployError('backup ciphertext checksum mismatch')
+    live=deployed(c)
+    identity=obj['running_identity']
+    if any(identity.get(key)!=live[value] for key,value in
+           (('container_id','container_id'),('oci_revision','commit'),('docker_image_id','image_id'))):
+        raise DeployError('fresh backup does not identify the current running Gateway')
+    state_path=STATE.manifest_path(c['app_dir'])
+    if identity.get('release_manifest_sha256')!=hashlib.sha256(state_path.read_bytes()).hexdigest():
+        raise DeployError('backup deployment metadata changed')
     return bid
 
 
@@ -350,9 +485,11 @@ def verify_override_scope(c, ref):
     try:
         with os.fdopen(fd,'wb') as stream:
             stream.write(override_yaml(c,ref))
-        candidate=json.loads(run('docker','compose','--project-directory',c['app_dir'],
-            '-f',str(Path(c['app_dir'])/c['compose_file']),'-f',name,
-            'config','--format','json'))
+        args = (STATE.compose_args(c['app_dir'], name) if not TEST_CONFIG and
+                (Path(c['app_dir']) / STATE.NAME).exists() else
+                ['docker','compose','--project-directory',c['app_dir'],
+                 '-f',str(Path(c['app_dir'])/c['compose_file']),'-f',name])
+        candidate=json.loads(run(*(args+['config','--format','json'])))
         if candidate!=expected:
             raise DeployError('candidate override would change non-image configuration; preserve existing configuration before cutover')
     finally:
@@ -363,9 +500,7 @@ def apply(c,a,archive_sha256=None,archive_bytes=None):
     if not COMMIT.fullmatch(a.commit) or not SHA.fullmatch(a.image_id) or not SHA.fullmatch(a.previous_image_id):
         raise DeployError('invalid candidate image identity')
     ref='clearapi-local:'+a.commit
-    with LOCK.open('a+b') as lock:
-        try: fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except BlockingIOError:raise DeployError('another production deploy holds the lock')
+    with deploy_lock():
         old=preflight(c)
         if old['image_id']!=a.previous_image_id or old['commit']==a.commit:
             raise DeployError('predecessor changed or candidate already deployed')
@@ -373,8 +508,8 @@ def apply(c,a,archive_sha256=None,archive_bytes=None):
         if archive_sha256 is None: raise DeployError('archive transport required')
         receive_archive(c,archive_sha256,archive_bytes,a.commit,a.image_id)
         bid=backup(c) if a.scope=='backend' else None
-        override=Path(c['app_dir'])/'compose-candidate.yaml'
-        manifest=Path(c['app_dir'])/'release-manifest.json'
+        manifest=STATE.manifest_path(c['app_dir']) if not TEST_CONFIG else Path(c['app_dir'])/'release-manifest.json'
+        override=Path(c['app_dir'])/('compose-local.yaml' if manifest.name == STATE.NAME else 'compose-candidate.yaml')
         original_override=override.read_bytes()
         original_manifest=manifest.read_bytes()
         previous_obj=json.loads(original_manifest)
@@ -435,6 +570,9 @@ def main():
     parser.add_argument('--config-path', default='')
     sub=parser.add_subparsers(dest='mode',required=True)
     sub.add_parser('preflight')
+    for mode in ('adopt-check','adopt-running'):
+        adoption=sub.add_parser(mode)
+        adoption.add_argument('--source-commit',required=True)
     ap=sub.add_parser('receive')
     for name in ('commit','image-id','previous-image-id'):
         ap.add_argument('--'+name,required=True)
@@ -445,6 +583,10 @@ def main():
     if os.geteuid()!=0:raise DeployError('root required; fixed sudoers entry only')
     global TEST_CONFIG
     TEST_CONFIG = a.config_path or None
+    if a.mode in ('adopt-check','adopt-running'):
+        if TEST_CONFIG:raise DeployError('test config cannot authorize production adoption')
+        print(json.dumps(adopt_running(ROOT/'app',a.source_commit,a.mode=='adopt-running'),sort_keys=True))
+        return
     c=config()
     if a.mode=='preflight': print(json.dumps(preflight(c),sort_keys=True))
     else:apply(c,a,a.archive_sha256,a.archive_bytes)

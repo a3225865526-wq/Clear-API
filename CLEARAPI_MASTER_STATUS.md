@@ -1,3 +1,16 @@
+## 2026-10-24 09:34 Asia/Shanghai — 最小接管兼容已本地完成；生产仍隔离，待一次维护授权
+
+- **网站主线：未启动Caddy、未解除隔离。** 当前0a9a93c0/a032/ed6 Gateway、持久Runtime、本机HTTP200正常，PG/共享Executor healthy。只读实核既有root pg03.env可解析四层Compose，其a2ab7e6c配置哈希与运行标签完全一致；不需要重新部署Gateway、换镜像或改业务配置。
+- 旧恢复合同具体不适配：固定f8f963a7/c50/22ec、/run/clearapi挂载、旧GitHub恢复receipt。已复用原TrafficHold/Runtime/boot/备份/Caddy恢复函数补兼容入口，另存local-deploy-state.json的真实adopted状态和compose-local.yaml终端层；不制造旧receipt、不改原FAILED/target/hold，不用测试证明接管生产。原四层内容保留，后续新本地版本只写本地状态/第五层。
+- **真实前置尚未执行：** 候选只读snapshot在原docker-compose.prod.yml权限处BLOCKED：UID/GID1000、0644，SHA c5fc8ca1…未变。经授权后仅需root:root归属修正，不能放宽root读取校验。7项精确资产安装/旧资产保全及当前真实正式备份、boot/网站健康均待批准；生产备份service仍failed、timer active，本轮没有调用生产备份或伪称其修复。
+- 新restore-adopted在root明确范围下先验原隔离、当前身份、boot和一次正式备份，再仅开启原Caddy；失败/可捕获中断沿用stop+restart=no，真实记录UNKNOWN/失败，保留健康Gateway及历史。既有Caddy探针读取成功恢复结果为有效状态，历史isolated原文件不覆盖。4份boot系统资产和服务顺序不变，未重启Docker/主机，也未追加重启验收。
+- 本地兼容验证：接管7项OK，adapter14、boot18、候选包3、恢复38、探针20等受影响回归OK；最后仅重跑新增接管7和相关恢复/固定哈希4项均OK。真实隔离Docker五层配置等价、备份身份/config digest、boot/Runtime及9项配置归档成员PASS，3个既有测试容器/文件不变；非生产验收，未重跑30项E2E。初次pin/fixture路径/9误写10的失败均保留并定向修正。Python编译、bash/shellcheck、diff及提交前secret scan检查；无Go/web/依赖/生产Compose或workflow内容改动。
+- 旧生产入口仍4项，最新GitHub只读main=a032、两AUTO=false、五类在途0、11项active。本轮未停用、未Push/PR/main合并；普通CI与分支保护保留。现有管理员clearadmin权限不变，不把新增sudoers片段描述成撤销其ALL；不新建账号或发布平台。
+- **一次明确授权申请（未生效）：** 停4旧生产入口→保全现场/旧资产→1项归属修正→按asset-plan.json安装7项精确资产→只做当前实例元数据接管→现有boot检查及一次正式加密备份→原Caddy HTTP/HTTPS/转发/页面检查→本地配置/哨兵激活与只读preflight。不含Gateway重部署、DB修改、Executor操作、PG03商业开放、Cloudflare策略、Push或main合并。公网403或其他异常按原停回合同停止，不假装恢复。
+- 仅PG03账号池商业使用暂缓，其余功能/配置/商业逻辑原样。报告、具体命令、源哈希与风险：evidence/minimal-production-handoff-20261024/REPORT.md、asset-plan.json。代码提交SHA由Git HEAD及交付消息给出；下方其他主线完整保留。
+
+---
+
 ## 2026-10-24 08:54 Asia/Shanghai — 网站优先恢复只读核实；独立 main 集成（非生产切换）
 
 - **网站恢复结果：未恢复、未启动 Caddy。** 用户只批准满足现有安全条件后的原 Caddy 最小恢复，未批准整套生产切换。现场原容器54c8550b、Caddyfile SHA6b124666保持原样，由现有 edge Compose 管理；代理127.0.0.1:3000，Gateway0a9a93c0/ed6运行、HTTP200，证书www.clear999.com有效至2027-01-04。Caddy exited/restart=no，80/443无监听，源站HTTPS000；08:55本机公网首页及api/status均403/CF-Ray，不能当源站恢复。未执行启动后的页面或TLS握手验收。

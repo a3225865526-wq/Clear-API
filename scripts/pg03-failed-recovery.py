@@ -343,14 +343,65 @@ class WebsiteRestoration:
                     recovery_receipt_sha256=hashlib.sha256(raw).hexdigest(), incident=before,
                     edge=expected_edge, original_deployment_status='failed', circuit_cleared=False,
                     provider_acceptance='deferred_to_owner_after_deployment')
+        def verify():
+            require(self.recovery.snapshot(restore=True, ingress_open=True) == before, 'incident changed after opening')
+            require(LIFECYCLE.read_file(self.recovery.receipt) == raw, 'isolated recovery record changed')
+        return self.open_edge(base, expected_edge, verify, authorization['recovery_run'])
+
+    def restore_adopted(self, authorization, adapter):
+        """Root-authorized restoration of the separately observed current instance.
+
+        Does not manufacture the legacy GitHub recovery receipt or clear FAILED.
+        """
+        require(set(authorization) == {'source_commit', 'scope'}
+                and authorization['scope'] == 'existing-gateway-original-caddy-v1',
+                'explicit existing-instance restoration scope required')
+        require(not any(p.exists() or p.is_symlink() for p in (self.attempt,self.result,self.failure_result)),
+                'website opening already attempted; operator review required')
+        app=self.recovery.app
+        state=adapter.STATE.load(app)
+        require(state['adoption']['source_commit'] == authorization['source_commit']
+                and state['releases']['current']['status'] == 'adopted',
+                'restoration must identify the initial running-instance adoption')
+        before=adapter.adoption_snapshot(app)
+        require(all(state['adoption'].get(k)==v for k,v in before.items()), 'adopted instance changed')
+        expected_edge=self.edge(False)
+        hold=TRAFFIC.TrafficHold(app,self.command)
+        hold.verify(hold.binding(FAILED_RUN,DIGEST,COMMIT))
+        self.command(['/usr/bin/python3','-I','/opt/clearapi/bin/runtime-boot-recovery.py','check-installed'])
+        self.command(['/usr/bin/python3','-I','/opt/clearapi/bin/runtime-boot-recovery.py','check'])
+        config={'app_dir':str(app),'service':'new-api','backup_service':'clearapi-backup.service',
+                'backup_dir':'/opt/clearapi/backups','compose_file':'docker-compose.prod.yml'}
+        backup_id=adapter.backup(config)
+        raw=adapter.STATE.read_file(app/adapter.STATE.NAME,private=True)
+        require(adapter.adoption_snapshot(app)==before, 'instance changed during backup')
+        base=dict(schema='clearapi.website-restoration/v1',authorization=authorization,
+                  method='existing-running-adoption-v1',adoption_sha256=hashlib.sha256(raw).hexdigest(),
+                  adoption_identity_sha256=hashlib.sha256(json.dumps(state['adoption'],sort_keys=True).encode()).hexdigest(),
+                  incident=before,backup_id=backup_id,edge=expected_edge,
+                  original_deployment_status='failed',circuit_cleared=False,
+                  gateway_replaced=False,database_restored=False)
+        def verify():
+            adapter.STATE.load(app)
+            require(adapter.adoption_snapshot(app)==before, 'instance changed after opening')
+            require(adapter.STATE.read_file(app/adapter.STATE.NAME,private=True)==raw, 'adoption changed')
+            origin=self.command(['curl','--noproxy','*','--fail','--silent','--max-time','5',
+                '--resolve','www.clear999.com:443:127.0.0.1','https://www.clear999.com/api/status'])
+            require(json.loads(origin).get('success') is True, 'origin HTTPS Gateway forwarding failed')
+            redirect=self.command(['curl','--noproxy','*','--silent','--max-time','5',
+                '--resolve','www.clear999.com:80:127.0.0.1','-o','/dev/null','-w','%{http_code} %{redirect_url}',
+                'http://www.clear999.com/'])
+            require(redirect=='308 https://www.clear999.com/', 'origin HTTP redirect failed')
+        return self.open_edge(base,expected_edge,verify,authorization['source_commit'])
+
+    def open_edge(self, base, expected_edge, verify, health_nonce):
         LIFECYCLE.publish(self.attempt, dict(base, stage='opening', recorded_at=datetime.now(timezone.utc).isoformat()))
         try:
             self.command(['docker', 'update', '--restart=unless-stopped', self.CADDY_ID])
             self.command(['docker', 'start', self.CADDY_ID])
             require(self.edge(True) == expected_edge, 'Caddy changed during opening')
-            health = self.public_health(authorization['recovery_run'])
-            require(self.recovery.snapshot(restore=True, ingress_open=True) == before, 'incident changed after opening')
-            require(LIFECYCLE.read_file(self.recovery.receipt) == raw, 'isolated recovery record changed')
+            health = self.public_health(health_nonce)
+            verify()
             require(self.edge(True) == expected_edge, 'Caddy changed during verification')
             result = dict(base, status='website_restored', public_traffic='open', health=health,
                           recorded_at=datetime.now(timezone.utc).isoformat())
@@ -383,6 +434,19 @@ def restoration_interrupted(signum, frame):
 
 
 def main():
+    if sys.argv[1:] == ['restore-adopted']:
+        require(os.geteuid()==0, 'root restoration required')
+        for signum in (signal.SIGTERM,signal.SIGHUP,signal.SIGINT):
+            signal.signal(signum,restoration_interrupted)
+        data=json.loads(sys.stdin.buffer.read(4097),object_pairs_hook=CONTROL.unique)
+        path=Path(__file__).with_name('clearapi-local-deploy.py')
+        if not path.exists():path=Path(__file__).with_name('local-deploy-vps.py')
+        spec=importlib.util.spec_from_file_location('local_adapter',path)
+        adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
+        with adapter.deploy_lock():
+            result=WebsiteRestoration().restore_adopted(data,adapter)
+        print(json.dumps(result,sort_keys=True))
+        return
     require(sys.argv[1:] in (['authorize'], ['recover']), 'invalid recovery entry point')
     data = json.loads(sys.stdin.buffer.read(32769), object_pairs_hook=CONTROL.unique)
     token = data.pop('token')

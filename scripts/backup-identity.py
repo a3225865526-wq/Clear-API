@@ -4,6 +4,7 @@
 import argparse
 from datetime import datetime, timezone
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -16,7 +17,11 @@ import tempfile
 
 
 def docker(*args):
-    result = subprocess.run(["docker", *args], check=True, capture_output=True, text=True)
+    env = None
+    if args[0] == 'compose' and '--env-file' in args:
+        env = {key: value for key, value in os.environ.items()
+               if key in ('PATH', 'HOME', 'LANG') or key.startswith('LC_')}
+    result = subprocess.run(["docker", *args], check=True, capture_output=True, text=True, env=env)
     return result.stdout.strip()
 
 
@@ -24,12 +29,27 @@ def capture(app_dir, stopped_gateway=None):
     app = Path(app_dir)
     override = app / "compose-candidate.yaml"
     manifest = app / "release-manifest.json"
+    adopted = app / "local-deploy-state.json"
+    state = None
+    if adopted.exists() or adopted.is_symlink():
+        source = Path(__file__).with_name('local-deploy-state.py')
+        if not source.is_file():
+            source = Path('/opt/clearapi/bin/local-deploy-state.py')
+        spec = importlib.util.spec_from_file_location('local_state', source)
+        state = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(state)
+        manifest = state.manifest_path(app)
+        override = app / 'compose-local.yaml'
     if not override.is_file() or not override.stat().st_size:
         raise ValueError("missing effective Compose override")
     manifest_bytes = manifest.read_bytes()
     current = json.loads(manifest_bytes)["releases"]["current"]
     compose = ("compose", "--project-directory", str(app), "-f",
                str(app / "docker-compose.prod.yml"), "-f", str(override))
+    if state:
+        if stopped_gateway:
+            raise ValueError('legacy stopped-writer mode cannot consume adopted metadata')
+        compose = tuple(state.compose_args(app)[1:])
     selection = ("ps", "-a", "-q", "new-api") if stopped_gateway else ("ps", "-q", "new-api")
     containers = docker(*compose, *selection).splitlines()
     if len(containers) != 1:
@@ -75,8 +95,8 @@ def capture(app_dir, stopped_gateway=None):
         raise ValueError("GHCR RepoDigest missing from running image")
     digest = None if archive_ref else effective.split("@", 1)[1]
     canonical_id = image_id
-    if archive_ref:
-        if (current.get('deployment_method') != 'local-build-ssh-archive-v1'
+    if archive_ref or state:
+        if archive_ref and (current.get('deployment_method') != 'local-build-ssh-archive-v1'
                 or not re.fullmatch(r'[0-9a-f]{64}', str(current.get('archive_sha256', '')))
                 or current.get('status') != 'success'):
             raise ValueError('archive deployment provenance missing')
@@ -104,6 +124,13 @@ def capture(app_dir, stopped_gateway=None):
             "release_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
             "compose_base_sha256": hashlib.sha256((app / "docker-compose.prod.yml").read_bytes()).hexdigest(),
             "compose_override_sha256": hashlib.sha256(override.read_bytes()).hexdigest()}
+    if state:
+        adopted_state = state.load(app)
+        identity.update(deployment_state_file=state.NAME,
+                        original_incident=adopted_state['adoption']['original_incident'],
+                        compose_inputs_sha256=adopted_state['adoption']['compose_sha256'],
+                        compose_environment_sha256=adopted_state['adoption']['environment_sha256'])
+        identity['docker_engine_image_id']=image_id
     if stopped_gateway:
         identity.update(identity_mode="stopped_failed_gateway",
                         gateway_state={key: container["State"].get(key) for key in
@@ -210,14 +237,27 @@ def successor_completion(base, manifest_path, stopped_identity, invocation_start
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("capture", "check", "finalize"))
+    parser.add_argument("mode", choices=("capture", "check", "finalize", "archive-paths"))
     parser.add_argument("--app-dir", default="/opt/clearapi/app")
     parser.add_argument("--snapshot")
     parser.add_argument("--manifest")
     parser.add_argument("--dump-started")
     parser.add_argument("--dump-completed")
     parser.add_argument("--stopped-gateway", help="exact failed, exited, restart=no Gateway; separate incident mode")
+    parser.add_argument("--archive-root", default="/")
     args = parser.parse_args()
+    if args.mode == 'archive-paths':
+        app = Path(args.app_dir)
+        names = ['docker-compose.prod.yml', 'compose-candidate.yaml']
+        if (app / 'local-deploy-state.json').exists():
+            # capture validates the state, all original layers and environment first.
+            capture(app)
+            names += ['compose-pg03.yaml', 'compose-website-recovery-39957948359.json',
+                      'compose-local.yaml', 'local-deploy-state.json', 'release-manifest.json',
+                      'pg03-target-manifest.json', 'controlled-launch-state.json']
+        for name in names:
+            print(str((app / name).relative_to(args.archive_root)))
+        return
     live = capture(args.app_dir, args.stopped_gateway)
     if args.mode == "capture":
         print(json.dumps(live, sort_keys=True))

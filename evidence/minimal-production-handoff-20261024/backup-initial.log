@@ -1,0 +1,22 @@
+test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history (__main__.BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history) ... FAIL
+test_archive_capture_keeps_config_and_engine_identity_distinct (__main__.BackupIdentityTest.test_archive_capture_keeps_config_and_engine_identity_distinct) ... ok
+
+======================================================================
+FAIL: test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history (__main__.BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/clearapi-minimal-handoff-s1bmpywx/scripts/ci/test-backup-identity.py", line 596, in test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history
+    self.full_backup(pg03=True, preserve=True, stopped=True)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/clearapi-minimal-handoff-s1bmpywx/scripts/ci/test-backup-identity.py", line 364, in full_backup
+    self.assertEqual(result.returncode, 0, result.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 2 != 0 : tar: tmp/tmpuhkhjh6n/opt/clearapi/app/docker-compose.prod.yml: Cannot stat: No such file or directory
+tar: tmp/tmpuhkhjh6n/opt/clearapi/app/compose-candidate.yaml: Cannot stat: No such file or directory
+tar: Exiting with failure status due to previous errors
+
+
+----------------------------------------------------------------------
+Ran 2 tests in 1.698s
+
+FAILED (failures=1)

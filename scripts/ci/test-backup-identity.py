@@ -333,6 +333,7 @@ class BackupIdentityTest(unittest.TestCase):
         source = source.replace("/var/log/clearapi", str(self.root / "log"))
         source = source.replace("/run/lock/clearapi-backup.lock", str(self.root / "backup.lock"))
         source = source.replace(" -C / ", " -C " + str(self.root) + " ")
+        source = source.replace("--archive-root /", "--archive-root " + str(self.root))
         source = source.replace("D675187C7097EF9D8C3BFF966B1439F896043FFD", fingerprint)
         if cleanup_failure:
             source = source.replace('if ! find "$STAGE" -type f -exec shred -u {} +; then rc=1; fi',

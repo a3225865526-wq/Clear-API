@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 36, in <module>
+    paths=capture.getvalue().splitlines();assert len(paths)==10 and any(p.endswith('/local-deploy-state.json') for p in paths)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

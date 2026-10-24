@@ -19,6 +19,9 @@ import sys
 import time
 
 sys.dont_write_bytecode = True
+_spec = importlib.util.spec_from_file_location('local_state', Path(__file__).with_name('local-deploy-state.py'))
+STATE = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(STATE)
 APP = Path('/opt/clearapi/app')
 DIRECTORY = Path('/opt/clearapi/runtime/new-api')
 HELPER = Path('/opt/clearapi/bin/runtime-identity-refresh.py')
@@ -108,7 +111,8 @@ def unique(pairs):
 
 
 def approved_identity(app=APP):
-    raw = read_safe(app / 'release-manifest.json')
+    path = STATE.manifest_path(app)
+    raw = read_safe(path)
     current = json.loads(raw, object_pairs_hook=unique)['releases']['current']
     ref, revision, image_id = (current[k] for k in
                                ('image_ref', 'candidate_commit', 'new_api_image_id'))
@@ -131,7 +135,14 @@ def approved_identity(app=APP):
             content = raw if name == 'release-manifest.json' else read_safe(app / name)
             require(hashlib.sha256(content).hexdigest() == expected, 'frozen incident evidence changed')
     else:
-        require(current.get('status') == 'success', 'release is not successful')
+        require(current.get('status') == 'success' or
+                path.name == STATE.NAME and current.get('status') == 'adopted'
+                and current.get('deployment_method') == 'existing-running-adoption-v1',
+                'release is not successful or explicitly adopted')
+    if path.name == STATE.NAME and not ref.startswith('clearapi-local:'):
+        engine_id=current['docker_engine_image_id']
+        require(re.fullmatch(r'sha256:[a-f0-9]{64}',engine_id), 'invalid adopted Docker engine identity')
+        image_id=engine_id
     return ref, revision, image_id
 
 

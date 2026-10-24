@@ -1,0 +1,6 @@
+test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history (__main__.BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 1.125s
+
+OK

@@ -1,0 +1,21 @@
+{
+  "observed_at": "2026-10-24T01:25:49.924653+00:00",
+  "mode": "read_only_in_memory_source",
+  "installed_assets": false,
+  "production_mutations": false,
+  "helper_source_sha256": "70d23b133903f89245d76920958366d8ca1c1724e29a5a14fde90a4c88fcee8d",
+  "state_source_sha256": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+  "result": "BLOCKED",
+  "error_type": "ValueError",
+  "reason": "unsafe deployment metadata file: /opt/clearapi/app/docker-compose.prod.yml",
+  "required_ownership_migration": {
+    "path": "/opt/clearapi/app/docker-compose.prod.yml",
+    "uid": 1000,
+    "gid": 1000,
+    "mode": "0o644",
+    "sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+    "executed": false,
+    "proposed_owner": "root:root",
+    "contents_change": false
+  }
+}

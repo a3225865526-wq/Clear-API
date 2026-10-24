@@ -342,6 +342,48 @@ class WebsiteRestorationTest(unittest.TestCase):
             self.running = False
         return ''
 
+    def current_adapter(self):
+        before={'gateway':{'container_id':'current-healthy-gateway'},'shared':{}}
+        state={'adoption':{**before,'source_commit':'a'*40},'releases':{'current':{'status':'adopted'}}}
+        path=self.app/'local-deploy-state.json'
+        RECOVERY.LIFECYCLE.publish(path,state)
+        adapter=SimpleNamespace(STATE=SimpleNamespace(NAME=path.name,load=lambda app:state,
+            read_file=lambda p,**kw:p.read_bytes()),adoption_snapshot=MagicMock(return_value=before),
+            backup=MagicMock(return_value='20261024T010000Z'))
+        command=self.restore.command
+        def origin(args):
+            if args[0]=='curl':
+                return '{"success":true}' if args[-1].endswith('/api/status') else '308 https://www.clear999.com/'
+            return command(args)
+        self.restore.command=origin
+        return adapter,{'source_commit':'a'*40,'scope':'existing-gateway-original-caddy-v1'},path
+
+    def test_adopted_current_instance_restores_original_edge_without_legacy_receipt_rewrite(self):
+        adapter,authorization,path=self.current_adapter();raw=path.read_bytes()
+        result=self.restore.restore_adopted(authorization,adapter)
+        self.assertEqual(result['status'],'website_restored')
+        self.assertFalse(result['gateway_replaced']);self.assertFalse(result['database_restored'])
+        self.assertEqual(result['backup_id'],'20261024T010000Z')
+        self.assertEqual(path.read_bytes(),raw);self.assert_preserved()
+        writes=[args for args in self.calls if args[:2] in (['docker','start'],['docker','update'])]
+        self.assertTrue(writes);self.assertTrue(all(args[-1]==self.restore.CADDY_ID for args in writes))
+
+    def test_adopted_backup_failure_blocks_before_edge_mutation(self):
+        adapter,authorization,path=self.current_adapter()
+        adapter.backup.side_effect=ValueError('actual backup invocation failed')
+        with self.assertRaises(ValueError):self.restore.restore_adopted(authorization,adapter)
+        self.assertFalse(self.running);self.assertFalse(self.restore.attempt.exists())
+        self.assertFalse(any(args[:2]==['docker','start'] for args in self.calls));self.assert_preserved()
+
+    def test_adopted_public_failure_returns_original_caddy_to_isolation(self):
+        adapter,authorization,path=self.current_adapter();raw=path.read_bytes()
+        self.health.side_effect=RECOVERY.CONTROL.ReleaseBlocked('public health 403')
+        with self.assertRaises(RECOVERY.CONTROL.ReleaseBlocked):self.restore.restore_adopted(authorization,adapter)
+        self.assertFalse(self.running);self.assertEqual(self.policy,'no')
+        result=RECOVERY.LIFECYCLE.read_json(self.restore.failure_result)
+        self.assertTrue(result['containment_verified']);self.assertEqual(result['public_traffic'],'blocked')
+        self.assertEqual(path.read_bytes(),raw);self.assert_preserved()
+
     def assert_preserved(self):
         for path, raw in self.original.items():
             self.assertEqual(path.read_bytes(), raw)

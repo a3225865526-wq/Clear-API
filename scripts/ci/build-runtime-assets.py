@@ -11,7 +11,7 @@ import subprocess
 
 REPOSITORY = 'a3225865526-wq/Clear-API'
 RUNTIME = '/opt/clearapi/runtime/new-api'
-SCRIPTS = ('runtime-boot-recovery.py', 'runtime-identity-refresh.py')
+SCRIPTS = ('runtime-boot-recovery.py', 'runtime-identity-refresh.py', 'local-deploy-state.py')
 TEMPLATE_SHA = '6bf1c77e6ce1c162e22328239badbaf67b77bde21f100fbbcf3a5747812d01d5'
 
 
@@ -98,7 +98,7 @@ def build(repository, tree, manifest_path, output):
     rendered = rendered.replace("TREE = '7231fa53f2a1bb8cebb7ab314f9f038442ac3de6'", 'TREE = ' + repr(tree))
     rendered = rendered.replace('39357150402', run)
     rendered = rendered.replace("'runtime-boot-recovery.py', 'runtime-identity-refresh.py', 'pg03-failed-recovery.py'",
-                                "'runtime-boot-recovery.py', 'runtime-identity-refresh.py'")
+                                "'runtime-boot-recovery.py', 'runtime-identity-refresh.py', 'local-deploy-state.py'")
     rendered = rendered.replace("inventory['rc']['attempt'] == 1", "inventory['rc']['attempt'] == " + str(attempt))
     rendered = rendered.replace("rc_attempt=1", "rc_attempt=" + str(attempt))
     rendered = rendered.replace("baseline['rc_attempt'] == 1", "baseline['rc_attempt'] == " + str(attempt))

@@ -1,0 +1,8 @@
+test_exact_tree_bundle_installs_and_rolls_back_without_starting_services (__main__.CandidateBundleTest.test_exact_tree_bundle_installs_and_rolls_back_without_starting_services) ... ok
+test_old_inventory_changed_manifest_and_helper_stop_before_installation (__main__.CandidateBundleTest.test_old_inventory_changed_manifest_and_helper_stop_before_installation) ... ok
+test_tree_and_rc_mismatch_cannot_publish_bundle (__main__.CandidateBundleTest.test_tree_and_rc_mismatch_cannot_publish_bundle) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.141s
+
+OK
