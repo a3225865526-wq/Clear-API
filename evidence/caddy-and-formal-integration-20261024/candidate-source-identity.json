@@ -1,0 +1,11 @@
+{
+  "production_installation_authorized": false,
+  "source_sha256": {
+    "runtime-identity-refresh.py": "9e64059039b6de48d6e88bce6a3cfb587f4835d9b4234f0cc0693343e1e4fa95",
+    "runtime-boot-recovery.py": "5387b4105df98f9edf4bf2f55fe723a9775e3adff9012547c8e57baf4c9e1696",
+    "backup-identity.py": "2549ade3ded29653f23c7aeef4b2e6d53eaa536ec76d69789f33345343b07b6e",
+    "local-deploy-vps.py": "08cea48657e48985953a957f63bf519ee809b18285f50f917ed9bdeb3dbcc139",
+    "clearapi-install-approved-script.sh": "264c6932ee96523ba9e6c59d6db3d01baec6b3e872166e3f5554866d2965e7dd",
+    "runtime-identity-artifacts.sha256": "5e87f373771d4317c08a2f16d27d90fd3d5d6d71b11fdda28b5a02c74aa4df73"
+  }
+}

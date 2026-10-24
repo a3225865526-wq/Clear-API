@@ -1,0 +1,46 @@
+name: PG03 release state audit
+
+on:
+  push:
+    branches: [codex/pg03-predecessor-compat-20261019]
+    paths:
+      - .github/workflows/release-state-audit.yml
+      - scripts/ci/audit-release-state.py
+
+permissions:
+  contents: read
+  actions: read
+  deployments: read
+
+concurrency:
+  group: pg03-release-state-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: >-
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.ref == 'refs/heads/codex/pg03-predecessor-compat-20261019' &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Read existing release state without production access
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_RC_RUN_ID: '39205228315'
+          CLEARAPI_REHEARSAL_TARGET_ID: ${{ vars.CLEARAPI_REHEARSAL_TARGET_ID }}
+          CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE }}
+          CLEARAPI_REHEARSAL_BACKUP_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_BACKUP_EVIDENCE }}
+          CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE }}
+        run: python3 scripts/ci/audit-release-state.py
+      - name: Preserve sanitized read-only audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-state-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-state-audit.json
+          if-no-files-found: error

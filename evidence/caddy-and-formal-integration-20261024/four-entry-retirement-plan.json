@@ -1,0 +1,49 @@
+{
+  "mode": "plan_only",
+  "executed": false,
+  "supersedes": "evidence/local-cutover-preparation-20261024/workflow-retirement-plan.json (8-workflow proposal, not authorized)",
+  "base_main": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "preconditions": [
+    "Both AUTO variables remain false; all five in-flight counts remain zero.",
+    "Separate owner authorization before remote disable or local --apply.",
+    "No disabling CI, branch protection, RC builds or offline checks."
+  ],
+  "ordered_production_entries": [
+    {
+      "path": "automatic-deploy.yml",
+      "id": 387486994,
+      "capability": "workflow_run caller of reusable production deployment"
+    },
+    {
+      "path": "deploy-production.yml",
+      "id": 378101050,
+      "capability": "manual/reusable SSH production deployment"
+    },
+    {
+      "path": "failed-production-recovery.yml",
+      "id": 390042545,
+      "capability": "manual recover/restore SSH mutations; offline rehearse is distinct"
+    },
+    {
+      "path": "ghcr-pull-rehearsal.yml",
+      "id": 378227091,
+      "capability": "SSH inspection and optional docker pull; release_audit job is read-only"
+    }
+  ],
+  "retain": [
+    "ci.yml",
+    "release-candidate.yml",
+    "release-pg03-gateway.yml",
+    "deployment-rehearsal.yml",
+    "release-state-audit.yml",
+    "pg03-isolated-rehearsal.yml",
+    "pg03-successor-approval.yml"
+  ],
+  "local_preview": "four-entry-retirement-preview.patch",
+  "source_workflows_modified": false,
+  "notes": [
+    "Disable the four remote workflow entrypoints only after authorization; no commands executed.",
+    "Future source retirement preview disables terminal write jobs and removes automatic production workflow_run. It preserves read-only/offline jobs and does not retire RC workflows.",
+    "New source gates alone do not revoke old refs or credentials; confirm entrypoints cannot be run when executing a future retirement. No Secrets/Environment changes currently authorized."
+  ]
+}

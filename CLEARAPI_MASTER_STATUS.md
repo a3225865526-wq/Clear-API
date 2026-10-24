@@ -1,3 +1,42 @@
+## 2026-10-24 08:54 Asia/Shanghai — 网站优先恢复只读核实；独立 main 集成（非生产切换）
+
+- **网站恢复结果：未恢复、未启动 Caddy。** 用户只批准满足现有安全条件后的原 Caddy 最小恢复，未批准整套生产切换。现场原容器54c8550b、Caddyfile SHA6b124666保持原样，由现有 edge Compose 管理；代理127.0.0.1:3000，Gateway0a9a93c0/ed6运行、HTTP200，证书www.clear999.com有效至2027-01-04。Caddy exited/restart=no，80/443无监听，源站HTTPS000；08:55本机公网首页及api/status均403/CF-Ray，不能当源站恢复。未执行启动后的页面或TLS握手验收。
+- **具体停止点：** frozen hold SHA57a7152a仍stage=isolated，target SHA521e60ce仍public_traffic=blocked，release SHA6c308146仍旧c50/22ec FAILED。正式 WebsiteRestoration 绑定旧失败 Gateway，必须存在 failed-recovery-39347012653.json 等门禁；现场该凭证及pg03-failed-recovery.py安装入口缺失，当前Gateway已为a032/ed6。不能套用旧恢复证明或直接docker start绕过隔离。未改hold/FAILED、未安装资产、未变更任何生产容器或业务配置。该阻断独立于本地部署接管。
+- **本地部署切换进度：** 创建独立工作区 D:/Codex/worktrees/clearapi-local-formal-integration/clearapi-controlled-launch-20261020，分支codex/clearapi-local-deploy-formal-integration，以正式main a032815cb6244a7ee5e812de82f8300c02554e99合入原验收分支8a8b36ab。main的138个后续提交全部保留，未覆盖其他工作区。仅两处文本冲突：总状态保留main完整历史并加本地主线；backup-identity合并归档支持与main停止态/schema2/严格successor完成证明。业务源码和workflow文件相对main完全不变。
+- Runtime语义集成：恢复旧GHCR image_digest输出；归档继续docker_image_id，增加tag/revision绑定；boot允许有明确success/method/archive SHA的本地归档，实核config digest与Docker engine ID分离；候选helper/boot/安装器/清单固定哈希同步，仅为本地新资产，不继承旧生产安装授权。
+- 定向结果：boot18、安装器14、候选包3、备份16（含真实GPG停止态备份与严格完成证明）、停链预览2均OK；原RuntimeIdentityTest21个用例完成，但该组合命令误选不存在的InstallerTest导致exit1，后续仅正确InstallerFaultTest14项OK，未隐藏初次错误。真实隔离Docker新boot/config digest/Runtime只读检查PASS，既有manifest及identity原字节不变；未重跑30项矩阵，不改绑旧验收证据。
+- 工作流范围修正：08:49复核main仍a032、两个AUTO=false、五类在途计数均0。仅automatic-deploy、deploy-production、failed-production-recovery(recover/restore)、ghcr-pull-rehearsal(SSH/pull)列为4个生产可达入口；保留普通CI、RC、离线排练/审计。上轮8项整套停用方案未获批准、现已被4项计划取代。prepare-local-cutover仅preview，未apply，远端11项仍active。
+- 首次生产接管尚未就绪：需按当前健康Gateway解决原隔离恢复合同、四层Compose/受控环境与普通helper两层配置交接、当前正式备份/manifest/boot基线，并在未来授权Push后满足必需CI。此处不重写FAILED为success、不删除历史证据，不申请或执行整套生产切换。
+- 仅PG03账号池暂缓商业；注册登录、普通API、模型渠道路由、共享Executor、模型定价、充值支付、余额计费全部保持原样。证据及正式集成报告：evidence/caddy-and-formal-integration-20261024/REPORT.md；下方历史完整保留。
+
+---
+
+## 2026-10-24 05:04–05:12 Asia/Shanghai — 首次本地切换只读准备；现场已变化，生产执行仍 BLOCKED
+
+- 本轮仅 GitHub GET/git fetch、merge-tree预览和固定SSH只读检查；没有停用远端workflow、Push、生产安装/配置修改/备份触发/服务启停/开放公网，未重跑30场景。验收提交49f23003a054e7b156e9f7c6a25589aa56500adc继续保留。
+- 正式main=a032815cb6244a7ee5e812de82f8300c02554e99；验收分支独有4提交、落后138提交。三方预览仅master与backup-identity冲突；必须正常整合，保留main完整恢复/停机备份成果和本地两项合法shop修复，不覆盖其他worktree/PR。Runtime/boot存在无文本冲突的pin/引用语义差异，禁止直接复制旧分支资产。
+- GitHub自动RC/生产变量仍false；所有旧workflow仍active；queued/in_progress/waiting/pending/requested均0。已列出先切断4个生产可达入口、再退役RC/排练/授权来源的8项顺序。现有4文件停用准备器覆盖不足，不代表已安全退役；CI/分支保护保留。
+- **本次现场取代旧退出127记录：** Gateway0a9a93c02646/ed6f93a9已运行main a032约7小时，loopback3000=200、pool=false、restart=no；durable runtime已挂载，静态identity --check PASS。原Caddy54c8550b仍stopped/restart=no，公网API521。原Executor1081a1与PG99299d/17.6健康，不启停、不开放PG03商业功能。
+- manifest仍旧c50/22ec FAILED、hold isolated，当前Gateway由四层Compose含website-recovery-39957948359 overlay运行；39957948359是RC成功编号，不是生产恢复成功证明。普通local helper两层Compose/成功manifest/公网健康前置均不适用当前隔离交接，换来源不会自动恢复网站；禁止伪造success、删hold或TestTarget用于生产。
+- 备份timer active，service failed；最近20261023T102102Z为旧c50停止态schema2，密文12330812bytes/SHA995100eb…匹配，但不是当前a032运行态备份。root备份入口实际clearapi-backup.sh（main7edb9ce9）；不得装回旧602db567或丢弃main停机/严格证明/append-only备份能力。
+- 现有boot资产/加载顺序check-installed PASS，live check BLOCKED；新helper未安装、本地启用配置/哨兵不存在。必须先闭环最新main整合、合法首次接管/有效Compose及受控环境、当前真实备份/Runtime/boot身份；本轮不修改实现、不新增发布系统、不重测已验收矩阵。
+- 唯一顺序与一次集中授权申请（含具体范围、前置停止点、失败/安全回退）已写入 evidence/local-cutover-preparation-20261024/CUTOVER_PLAN.md；当前申请未生效，不能声称生产切换已可直接执行。下方所有历史原文保留，不覆盖生产恢复主线。
+
+---
+
+## 2026-10-24 Asia/Shanghai — Windows 本地一键部署隔离验收 PASS（非生产状态更新）
+
+- 本节仅记录 `codex/clearapi-local-deploy-integration` 的本地交付；下方生产恢复主线原文保留，不能据此认定生产已恢复或切换。本轮未连接生产、未使用生产密钥、未推送 GitHub。
+- 基线 `d9cd1299f6cb0442ba9d43af1a1ac368c94816c5` 精确匹配正式独立 worktree；初始只有未跟踪 __pycache__，现已忽略。最终本地提交 SHA 以 Git HEAD 和交付消息记录为准。
+- 30 个真实验收场景 PASS：完整 Windows 入口、前端失败回退、真实 TimeoutError、安全并发锁、实际 pg_dump 失败前置阻断、归档 SHA/大小/image ID/revision 错配、测试模式生产隔离（含路径穿越/符号链接/userinfo/测试证明与身份/真实 sudo）、后端 UNKNOWN/pending 禁止自动回退、PowerShell 5.1 实际传输。完整/定向重跑的退出结果均如实保留，不把早期失败写成通过。
+- 成功测试应用源码 d9cd1299；镜像 config ID `sha256:a34b84f437efbacd174b20d0b54dd1b19a4dc3c5d63f40b75a7de79798731545`，归档 `76de8c04d0b4f76434b9aa0421352f29d7376e28f2a2995867db456a0595596c`，隔离备份 `20261023T180450Z`；Runtime check 与归档模式正式备份身份读取 PASS。最终工具字节哈希及逐例前后快照见 `evidence/local-deploy-final-20261024/results.json`，未复用不匹配的旧 PASS。
+- 直接修复：LF Linux 资产、正式/测试配置分离、严格隔离目录和 URL、加载后 revision/架构、保留固定 GHCR 前驱兼容、Compose 启动 HTTP 就绪等待、早期拒绝保留 SSH 错误、现有备份身份适配归档；既有后端不安全回退禁令保留。业务应用和 PG03 开发成果未改。
+- 定向回归 16+12 PASS；PS 5.1/7.6 AST、Python 编译、sudoers 解析、diff check PASS。切换准备器仅预览，旧 Actions 未停用。中文说明和首次切换清单已按 SSH 直传更新。
+- 具备申请首次切换的本地工具技术条件；生产现场恢复/健康、正式备份与恢复前提、远端旧链停用和精确 VPS 安装/首次部署仍需单独授权与现场核实。不得使用隔离证明替代生产验收，不自动开放流量。
+- 交付报告：`evidence/local-deploy-final-20261024/REPORT.md`；旧主线如下完整保留。
+
+---
+
 # ClearAPI — 权威总控（MASTER STATUS）
 
 ## 2026-10-23 — OFF RC 与 Deployment Rehearsal 完整通过；停在生产审批边界

@@ -1,0 +1,17 @@
+{
+  "containers": {
+    "exit": 0,
+    "stdout": "0a9a93c02646 clearapi-new-api-1 ed6f93a91285 Up 7 hours\n1081a1b576ad clearapi-pool-executor-1 cfad1b519288 Up 3 days (healthy)\n38602f5a777e pg03-credential-generation-8afe7ec46a05 0838072c3fd6 Exited (0) 9 days ago\n54c8550bbaca clearapi-edge-caddy f2a1290d0463 Exited (0) 3 days ago\n99299db0bed7 clearapi-postgres-1 postgres:17.6-alpine Up 3 days (healthy)\n",
+    "stderr": ""
+  },
+  "gateway_identity": {
+    "exit": 0,
+    "stdout": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c {\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"0001-01-01T00:00:00Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":1206906,\"Restarting\":false,\"Running\":true,\"StartedAt\":\"2026-10-23T14:07:58.383082222Z\",\"Status\":\"running\"}\n",
+    "stderr": ""
+  },
+  "edge_identity": {
+    "exit": 0,
+    "stdout": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf {\"Dead\":false,\"Error\":\"\",\"ExitCode\":0,\"FinishedAt\":\"2026-10-20T00:21:38.074678851Z\",\"OOMKilled\":false,\"Paused\":false,\"Pid\":0,\"Restarting\":false,\"Running\":false,\"StartedAt\":\"2026-10-07T14:00:40.028691257Z\",\"Status\":\"exited\"}\n",
+    "stderr": ""
+  }
+}

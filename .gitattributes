@@ -47,4 +47,13 @@ web/src/routeTree.gen.ts linguist-generated
 
 # Installer approvals hash the exact LF artifact bytes.
 scripts/runtime-identity-refresh.py text eol=lf
+scripts/runtime-boot-recovery.py text eol=lf
+scripts/local-deploy-vps.py text eol=lf
+scripts/deploy-local.ps1 text eol=lf
+scripts/backup-identity.py text eol=lf
+scripts/local-deploy.sudoers.example text eol=lf
+# Diagnostic streams and unified-diff context retain intentional whitespace.
+evidence/local-deploy-final-20261024/*.log -whitespace
+evidence/local-deploy-final-20261024/*.patch -whitespace
+evidence/caddy-and-formal-integration-20261024/*.patch -whitespace
 scripts/runtime-identity-artifacts.sha256 text eol=lf

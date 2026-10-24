@@ -1,0 +1,65 @@
+[
+  {
+    "name": "installer",
+    "command": [
+      "python3",
+      "scripts/ci/test-production-deploy.py",
+      "InstallerFaultTest"
+    ],
+    "cwd": "/tmp/clearapi-formal-integration-zlswhkpn",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "..............\n----------------------------------------------------------------------\nRan 14 tests in 9.773s\n\nOK\n"
+  },
+  {
+    "name": "runtime-bundle",
+    "command": [
+      "python3",
+      "scripts/ci/test-boot-recovery-install.py",
+      "CandidateBundleTest"
+    ],
+    "cwd": "/tmp/clearapi-formal-integration-zlswhkpn",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "test_exact_tree_bundle_installs_and_rolls_back_without_starting_services (__main__.CandidateBundleTest.test_exact_tree_bundle_installs_and_rolls_back_without_starting_services) ... ok\ntest_old_inventory_changed_manifest_and_helper_stop_before_installation (__main__.CandidateBundleTest.test_old_inventory_changed_manifest_and_helper_stop_before_installation) ... ok\ntest_tree_and_rc_mismatch_cannot_publish_bundle (__main__.CandidateBundleTest.test_tree_and_rc_mismatch_cannot_publish_bundle) ... ok\n\n----------------------------------------------------------------------\nRan 3 tests in 0.127s\n\nOK\n"
+  },
+  {
+    "name": "backup",
+    "command": [
+      "python3",
+      "scripts/ci/test-backup-identity.py",
+      "BackupIdentityTest.test_actual_old_release_and_distinct_identity_semantics",
+      "BackupIdentityTest.test_archive_capture_keeps_config_and_engine_identity_distinct",
+      "BackupIdentityTest.test_missing_revision_rejected",
+      "BackupIdentityTest.test_missing_override_rejected",
+      "BackupIdentityTest.test_empty_override_rejected",
+      "BackupIdentityTest.test_release_commit_mismatch_rejected",
+      "BackupIdentityTest.test_release_image_mismatch_rejected",
+      "BackupIdentityTest.test_release_digest_mismatch_rejected",
+      "BackupIdentityTest.test_override_does_not_pin_effective_image_rejected",
+      "BackupIdentityTest.test_compose_image_mismatch_rejected",
+      "BackupIdentityTest.test_unverified_repo_digest_rejected",
+      "BackupIdentityTest.test_floating_compose_reference_rejected",
+      "BackupIdentityTest.test_container_change_during_backup_rejected",
+      "BackupIdentityTest.test_stopped_backup_is_explicit_and_rechecks_writer_isolation",
+      "BackupIdentityTest.test_stopped_backup_rejects_restart_or_incident_drift",
+      "BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history"
+    ],
+    "cwd": "/tmp/clearapi-formal-integration-zlswhkpn",
+    "exit": 0,
+    "stdout": "",
+    "stderr": "test_actual_old_release_and_distinct_identity_semantics (__main__.BackupIdentityTest.test_actual_old_release_and_distinct_identity_semantics) ... ok\ntest_archive_capture_keeps_config_and_engine_identity_distinct (__main__.BackupIdentityTest.test_archive_capture_keeps_config_and_engine_identity_distinct) ... ok\ntest_missing_revision_rejected (__main__.BackupIdentityTest.test_missing_revision_rejected) ... ok\ntest_missing_override_rejected (__main__.BackupIdentityTest.test_missing_override_rejected) ... ok\ntest_empty_override_rejected (__main__.BackupIdentityTest.test_empty_override_rejected) ... ok\ntest_release_commit_mismatch_rejected (__main__.BackupIdentityTest.test_release_commit_mismatch_rejected) ... ok\ntest_release_image_mismatch_rejected (__main__.BackupIdentityTest.test_release_image_mismatch_rejected) ... ok\ntest_release_digest_mismatch_rejected (__main__.BackupIdentityTest.test_release_digest_mismatch_rejected) ... ok\ntest_override_does_not_pin_effective_image_rejected (__main__.BackupIdentityTest.test_override_does_not_pin_effective_image_rejected) ... ok\ntest_compose_image_mismatch_rejected (__main__.BackupIdentityTest.test_compose_image_mismatch_rejected) ... ok\ntest_unverified_repo_digest_rejected (__main__.BackupIdentityTest.test_unverified_repo_digest_rejected) ... ok\ntest_floating_compose_reference_rejected (__main__.BackupIdentityTest.test_floating_compose_reference_rejected) ... ok\ntest_container_change_during_backup_rejected (__main__.BackupIdentityTest.test_container_change_during_backup_rejected) ... ok\ntest_stopped_backup_is_explicit_and_rechecks_writer_isolation (__main__.BackupIdentityTest.test_stopped_backup_is_explicit_and_rechecks_writer_isolation) ... ok\ntest_stopped_backup_rejects_restart_or_incident_drift (__main__.BackupIdentityTest.test_stopped_backup_rejects_restart_or_incident_drift) ... ok\ntest_stopped_incident_encrypted_backup_preserves_failed_identity_and_history (__main__.BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 5.601s\n\nOK\n"
+  },
+  {
+    "name": "pins",
+    "command": [
+      "sha256sum",
+      "--check",
+      "runtime-identity-artifacts.sha256"
+    ],
+    "cwd": "/tmp/clearapi-formal-integration-zlswhkpn",
+    "exit": 0,
+    "stdout": "production-deploy.sh: OK\nruntime-identity-refresh.py: OK\n",
+    "stderr": ""
+  }
+]

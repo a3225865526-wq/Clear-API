@@ -1,0 +1,1 @@
+PASS: real Compose preview permits image-only change, rejects dropped override environment, preserves bytes and cleans preview files

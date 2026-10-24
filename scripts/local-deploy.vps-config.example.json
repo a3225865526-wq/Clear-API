@@ -1,0 +1,11 @@
+{
+  "app_dir": "/opt/clearapi/app",
+  "compose_file": "docker-compose.prod.yml",
+  "service": "new-api",
+  "runtime_identity_dir": "/opt/clearapi/runtime/new-api",
+  "local_url": "http://127.0.0.1:3000/api/status",
+  "public_url": "https://www.clear999.com/api/status",
+  "backup_service": "clearapi-backup.service",
+  "backup_dir": "/opt/clearapi/backups",
+  "archive_transport": true
+}

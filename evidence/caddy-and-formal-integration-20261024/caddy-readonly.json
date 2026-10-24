@@ -1,0 +1,424 @@
+{
+  "observed_at": "2026-10-24T00:46:07.977333+00:00",
+  "read_only": true,
+  "production_mutations": false,
+  "containers": {
+    "clearapi-edge-caddy": {
+      "Id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+      "Image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+      "Running": false,
+      "Paused": false,
+      "Restarting": false,
+      "Status": "exited",
+      "StartedAt": "2026-10-07T14:00:40.028691257Z",
+      "FinishedAt": "2026-10-20T00:21:38.074678851Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "NetworkMode": "host",
+      "Mounts": [
+        {
+          "Destination": "/config",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/caddy/config",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/data",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/caddy/data",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/etc/caddy/Caddyfile",
+          "Mode": "ro",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/edge/Caddyfile",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/log/caddy",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/caddy/logs",
+          "Type": "bind"
+        }
+      ],
+      "compose_labels": {
+        "com.docker.compose.config-hash": "e883106769df8227b86e58643ddf44abc8385660c49e415552da32f8bc8f205e",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:173b26306d711395accaeba8b67afcaad2a085ccb1e6bf26010bfe8c095a5229",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi-edge",
+        "com.docker.compose.project.config_files": "/opt/clearapi/edge/docker-compose.yml",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/edge",
+        "com.docker.compose.replace": "clearapi-edge-caddy",
+        "com.docker.compose.service": "caddy",
+        "com.docker.compose.version": "5.6.0"
+      }
+    },
+    "clearapi-new-api-1": {
+      "Id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+      "Image": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "Status": "running",
+      "StartedAt": "2026-10-23T14:07:58.383082222Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "NetworkMode": "clearapi_internal",
+      "Mounts": [
+        {
+          "Destination": "/data",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/new-api",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/app/logs",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/opt/clearapi/logs",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/clearapi",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/runtime/new-api",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/crypto_secret",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/crypto_secret",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/session_secret",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/session_secret",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/sql_dsn",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/sql_dsn",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/token_encryption_key",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/token_encryption_key",
+          "Type": "bind"
+        }
+      ],
+      "compose_labels": {
+        "com.docker.compose.config-hash": "a2ab7e6c055fe0e7ef37b5dad6ef6a5cdceb855f852f8133ea40f7a1d65ce3e7",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi",
+        "com.docker.compose.project.config_files": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml,/opt/clearapi/app/compose-website-recovery-39957948359.json",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/app",
+        "com.docker.compose.replace": "new-api-1",
+        "com.docker.compose.service": "new-api",
+        "com.docker.compose.version": "5.6.0"
+      }
+    },
+    "clearapi-postgres-1": {
+      "Id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+      "Image": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "Status": "running",
+      "StartedAt": "2026-10-20T00:46:43.870944528Z",
+      "FinishedAt": "2026-10-20T00:46:42.802136276Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "unless-stopped"
+      },
+      "NetworkMode": "clearapi_internal",
+      "Mounts": [
+        {
+          "Destination": "/run/secrets/pg_superuser_password",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/pg_superuser_password",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/postgresql/data",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/postgres",
+          "Type": "bind"
+        }
+      ],
+      "compose_labels": {
+        "com.docker.compose.config-hash": "334795d80847707b3cd4497e7986271aea491468d8e65ba5a8b7ed786c3f3188",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:747d5ed1fdeeb124b880fbe3d7c6557d2c4064ae41d6b6297d417882effce4be",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi",
+        "com.docker.compose.project.config_files": "/opt/clearapi/app/docker-compose.prod.yml",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/app",
+        "com.docker.compose.service": "postgres",
+        "com.docker.compose.version": "5.6.0"
+      }
+    },
+    "clearapi-pool-executor-1": {
+      "Id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+      "Image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "Status": "running",
+      "StartedAt": "2026-10-20T00:46:43.85551099Z",
+      "FinishedAt": "2026-10-20T00:46:42.802722759Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "unless-stopped"
+      },
+      "NetworkMode": "clearapi_internal",
+      "Mounts": [
+        {
+          "Destination": "/CLIProxyAPI/config.yaml",
+          "Mode": "ro",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/config/pg03/executor.yaml",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/auths",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/auths",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/pool",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/pool",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/receipts",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/receipts",
+          "Type": "bind"
+        }
+      ],
+      "compose_labels": {
+        "com.docker.compose.config-hash": "388ef54492c69a51e1107c9a31ad81ae02fedbe11c44e8b0f68ea96bfe816f38",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi",
+        "com.docker.compose.project.config_files": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/app",
+        "com.docker.compose.service": "pool-executor",
+        "com.docker.compose.version": "5.6.0"
+      }
+    }
+  },
+  "caddyfile": {
+    "exists": true,
+    "mode": "0o644",
+    "uid": 0,
+    "bytes": 2494,
+    "sha256": "6b1246669fbab3287a5c9e99f041cbcff0c44ebbcedb9c0a751310f7b1b05969"
+  },
+  "caddy_directives": [
+    "# ClearAPI production edge — www.clear999.com is the only Web/API origin this round.",
+    "# decision (see acceptance doc). Only ONE reverse proxy; no nginx chain.",
+    "{",
+    "\tauto_https disable_redirects",
+    "\t}",
+    "}",
+    "",
+    "# Port 80 exists only for ACME HTTP-01 + redirect to HTTPS.",
+    "http://www.clear999.com {",
+    "\tredir https://www.clear999.com{uri} 308",
+    "}",
+    "",
+    "# Shared edge logic: imported by the public 443 site and the internal",
+    "\treverse_proxy 127.0.0.1:3000 {",
+    "\t\t# H4: trust boundary enforced here — upstream only ever sees the",
+    "\t\t# client IP Caddy resolved via trusted_proxies (CF ranges only),",
+    "\t\t# and scheme/host are set by Caddy, never trusted from upstream.",
+    "\t\t\t# app RELAY_RESPONSE_HEADER_TIMEOUT is 120s; 130s gives margin.",
+    "\t\t\t# No total-request timeout: long AI streams governed by app RELAY_TIMEOUT=900s.",
+    "\t\t}",
+    "\t}",
+    "\t\t# app gate MAX_REQUEST_BODY_MB=32 (32MiB); proxy must not be the tighter limit.",
+    "\t}",
+    "\t}",
+    "\t\t}",
+    "\t\t\t}",
+    "\t\t}",
+    "\t}",
+    "}",
+    "",
+    "www.clear999.com {",
+    "}"
+  ],
+  "edge_compose": {
+    "exists": true,
+    "mode": "0o644",
+    "uid": 0,
+    "bytes": 817,
+    "sha256": "009019eb9ecf04062f865ba2ba582688b8e5cb9bae7fc13c3fce9702e77bbaf7"
+  },
+  "certificates": [
+    {
+      "path": "/data/clearapi/caddy/data/caddy/certificates/acme-v02.api.letsencrypt.org-directory/www.clear999.com/www.clear999.com.crt",
+      "metadata": {
+        "exit": 0,
+        "stdout": "notBefore=Oct  6 14:19:27 2026 GMT\nnotAfter=Jan  4 14:19:26 2027 GMT\nissuer=C = US, O = Let's Encrypt, CN = YE2\nsubject=CN = www.clear999.com\nX509v3 Subject Alternative Name: \n    DNS:www.clear999.com"
+      }
+    }
+  ],
+  "isolation": {
+    "controlled-launch-state.json": {
+      "metadata": {
+        "exists": true,
+        "mode": "0o600",
+        "uid": 0,
+        "bytes": 571,
+        "sha256": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d"
+      },
+      "state": {
+        "binding": {
+          "commit": "c50a53c1b89e121bcade7dac41d3f11e53a9832a",
+          "digest": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+          "run": "39347012653",
+          "target_sha256": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e"
+        },
+        "edge": {
+          "id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+          "image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+          "paused": false,
+          "restart_policy": {
+            "MaximumRetryCount": 0,
+            "Name": "unless-stopped"
+          },
+          "running": true
+        },
+        "schema": "clearapi.controlled-traffic/v1",
+        "stage": "isolated"
+      }
+    },
+    "pg03-target-manifest.json": {
+      "metadata": {
+        "exists": true,
+        "mode": "0o600",
+        "uid": 0,
+        "bytes": 1902,
+        "sha256": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e"
+      },
+      "contract": {
+        "schema": null,
+        "pool_mode": "pg03",
+        "public_traffic": "blocked",
+        "controlled_launch": null,
+        "controlled_authorization": null,
+        "candidate_commit": null,
+        "image_digest": null
+      }
+    },
+    "release-manifest.json": {
+      "metadata": {
+        "exists": true,
+        "mode": "0o600",
+        "uid": 0,
+        "bytes": 5178,
+        "sha256": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3"
+      },
+      "current": {
+        "status": "failed",
+        "candidate_commit": "c50a53c1b89e121bcade7dac41d3f11e53a9832a",
+        "image_digest": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+        "pool_mode": "pg03"
+      }
+    }
+  },
+  "recovery_records": {
+    "failed-recovery-39347012653.json": {
+      "exists": false
+    },
+    "website-restoration-attempt-39347012653.json": {
+      "exists": false
+    },
+    "website-restoration-result-39347012653.json": {
+      "exists": false
+    },
+    "website-restoration-failure-39347012653.json": {
+      "exists": false
+    }
+  },
+  "installed_opening_assets": {
+    "/opt/clearapi/bin/pg03-failed-recovery.py": {
+      "exists": false
+    },
+    "/opt/clearapi/bin/controlled-traffic-hold.py": {
+      "exists": true,
+      "mode": "0o750",
+      "uid": 0,
+      "bytes": 6030,
+      "sha256": "b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90"
+    }
+  },
+  "listeners": {
+    "exit": 0,
+    "stdout": "State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess\nLISTEN 0      4096       127.0.0.1:3000      0.0.0.0:*    users:((\"docker-proxy\",pid=1206936,fd=8))"
+  },
+  "caddy_systemd": {
+    "exit": 1,
+    "stdout": "UNIT FILE STATE PRESET\n\n0 unit files listed."
+  },
+  "gateway_status": {
+    "exit": 0,
+    "stdout": "200"
+  },
+  "origin_https": {
+    "exit": 7,
+    "stdout": "000"
+  }
+}

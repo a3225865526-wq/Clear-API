@@ -1,0 +1,67 @@
+--- a/.github/workflows/automatic-deploy.yml
++++ b/.github/workflows/automatic-deploy.yml
+@@ -1,10 +1,7 @@
+ name: Automatic production release
+ 
+ on:
+-  workflow_run:
+-    workflows: [Deployment rehearsal]
+-    branches: [main]
+-    types: [completed]
++  workflow_dispatch:
+ 
+ permissions:
+   contents: read
+@@ -14,14 +11,7 @@
+ 
+ jobs:
+   deploy:
+-    if: >-
+-      vars.CLEARAPI_AUTO_PRODUCTION_ENABLED == 'true' &&
+-      github.repository == 'a3225865526-wq/Clear-API' &&
+-      github.event_name == 'workflow_run' &&
+-      github.event.workflow_run.event == 'workflow_run' &&
+-      github.event.workflow_run.head_branch == 'main' &&
+-      github.event.workflow_run.head_repository.full_name == github.repository &&
+-      github.event.workflow_run.conclusion == 'success'
++    if: ${{ false }} # retired local cutover
+     uses: ./.github/workflows/deploy-production.yml
+     with:
+       rehearsal_run_id: ${{ format('{0}', github.event.workflow_run.id) }}
+--- a/.github/workflows/release-pg03-gateway.yml
++++ b/.github/workflows/release-pg03-gateway.yml
+@@ -2,10 +2,6 @@
+ 
+ on:
+   workflow_dispatch:
+-  workflow_run:
+-    workflows: [CI]
+-    branches: [main]
+-    types: [completed]
+ 
+ permissions:
+   contents: read
+--- a/.github/workflows/deployment-rehearsal.yml
++++ b/.github/workflows/deployment-rehearsal.yml
+@@ -1,10 +1,6 @@
+ name: Deployment rehearsal
+ 
+ on:
+-  workflow_run:
+-    workflows: [PG03 reviewed main Gateway RC]
+-    branches: [main]
+-    types: [completed]
+ 
+ permissions:
+   contents: read
+--- a/.github/workflows/deploy-production.yml
++++ b/.github/workflows/deploy-production.yml
+@@ -60,6 +60,7 @@
+ 
+ jobs:
+   authorize:
++    if: ${{ false }} # retired local cutover
+     name: Validate release authorization before production credentials
+     runs-on: ubuntu-24.04
+     timeout-minutes: 10
+PREVIEW ONLY. No local files changed, no workflow or production writes.

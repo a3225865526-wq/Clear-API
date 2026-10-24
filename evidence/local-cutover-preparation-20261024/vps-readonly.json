@@ -1,0 +1,756 @@
+{
+  "app_files": {
+    "compose-candidate.yaml": {
+      "bytes": 379,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o600",
+      "sha256": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+      "symlink": false,
+      "uid": 0
+    },
+    "compose-pg03.yaml": {
+      "bytes": 2809,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o644",
+      "sha256": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+      "symlink": false,
+      "uid": 0
+    },
+    "controlled-launch-state.json": {
+      "bytes": 571,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o600",
+      "sha256": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+      "symlink": false,
+      "uid": 0
+    },
+    "docker-compose.prod.yml": {
+      "bytes": 5242,
+      "exists": true,
+      "gid": 1000,
+      "mode": "0o644",
+      "sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+      "symlink": false,
+      "uid": 1000
+    },
+    "pg03-target-manifest.json": {
+      "bytes": 1902,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o600",
+      "sha256": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+      "symlink": false,
+      "uid": 0
+    },
+    "release-manifest.json": {
+      "bytes": 5178,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o600",
+      "sha256": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3",
+      "symlink": false,
+      "uid": 0
+    }
+  },
+  "architecture": "x86_64",
+  "assets": {
+    "/etc/systemd/system/clearapi-runtime-directory.service": {
+      "bytes": 364,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o644",
+      "sha256": "c2d6ca276c39331f5ae702e2d616073d7a9c6c27b3bf9e97aad877de3cd1cfd5",
+      "symlink": false,
+      "uid": 0
+    },
+    "/etc/systemd/system/clearapi-runtime-identity.service": {
+      "bytes": 314,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o644",
+      "sha256": "81dfc61b3d6b118dac38f846827bd49d0f4dcfd9f3c874a796b534eb4e8972aa",
+      "symlink": false,
+      "uid": 0
+    },
+    "/etc/systemd/system/docker.service.d/clearapi-runtime.conf": {
+      "bytes": 92,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o644",
+      "sha256": "b327be816c5c2a7bcef7a8378be6af5eb91cd9689ac04515766dad38e8d2d630",
+      "symlink": false,
+      "uid": 0
+    },
+    "/etc/tmpfiles.d/clearapi-runtime.conf": {
+      "bytes": 90,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o644",
+      "sha256": "ea7b388e75fc642540637f895690a3b63716ace30bc9f936ca8afa8392fc65b4",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/backups/bin/backup-identity.py": {
+      "bytes": 13375,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o750",
+      "sha256": "e1e21e0227b8f668bc9945e13e460542d8a07f7e6d3bdf7eaf00546180d7dc0d",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/backups/bin/pg03-backup-state.py": {
+      "bytes": 9450,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o750",
+      "sha256": "ad4aecf27de0bcdccde84743c9a390bff6ec645f94734696839f453d630aaa26",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/backups/bin/production-backup.sh": {
+      "exists": false
+    },
+    "/opt/clearapi/bin/clearapi-local-deploy.py": {
+      "exists": false
+    },
+    "/opt/clearapi/bin/controlled-traffic-hold.py": {
+      "bytes": 6030,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o750",
+      "sha256": "b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/bin/pg03-failed-recovery.py": {
+      "exists": false
+    },
+    "/opt/clearapi/bin/production-deploy-v2.sh": {
+      "bytes": 99830,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o750",
+      "sha256": "1bd21eae376dd8316d1cfabe558133b4e0390965c2f13b7005e4deb656eac109",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/bin/runtime-boot-recovery.py": {
+      "bytes": 16647,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o750",
+      "sha256": "7c205fa4861ecbfca344f8289472be9ecd6e52abc7008f3ece4ffe3ec012b8c2",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/bin/runtime-identity-refresh.py": {
+      "bytes": 8367,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o750",
+      "sha256": "afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/config/local-deploy.enabled": {
+      "exists": false
+    },
+    "/opt/clearapi/config/local-deploy.json": {
+      "exists": false
+    },
+    "/opt/clearapi/edge/Caddyfile": {
+      "bytes": 2494,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o644",
+      "sha256": "6b1246669fbab3287a5c9e99f041cbcff0c44ebbcedb9c0a751310f7b1b05969",
+      "symlink": false,
+      "uid": 0
+    }
+  },
+  "backup_manifests": [
+    {
+      "actual_bytes": 12330812,
+      "actual_sha256": "995100eb925127adcbb063bf8e7f8cee93597d3f5e11e488d7835d2ad988e609",
+      "artifact_exists": true,
+      "backup_id": "20261023T102102Z",
+      "backup_identity_schema_version": 2,
+      "backup_schema_version": 2,
+      "candidate_commit": "c50a53c1b89e121bcade7dac41d3f11e53a9832a",
+      "created_at_utc": "2026-10-23T10:21:07Z",
+      "encrypted_artifact": {
+        "bytes": 12330812,
+        "name": "clearapi-backup-20261023T102102Z.tar.gz.gpg",
+        "sha256": "995100eb925127adcbb063bf8e7f8cee93597d3f5e11e488d7835d2ad988e609"
+      },
+      "file": "20261023T102102Z.json",
+      "file_sha256": "76733dbc572569aca713dfad81076c59c96526069b311ff8972e7803ed6a77c3",
+      "identity_kind": "stopped_writer_identity",
+      "new_api_image_id": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02"
+    },
+    {
+      "artifact_exists": true,
+      "backup_id": "20261020T002138Z",
+      "backup_identity_schema_version": 1,
+      "backup_schema_version": 2,
+      "candidate_commit": "eb67c5f21639716eed7489d32ca322c249e5fdf3",
+      "created_at_utc": "2026-10-20T00:21:42Z",
+      "encrypted_artifact": {
+        "bytes": 12323351,
+        "name": "clearapi-backup-20261020T002138Z.tar.gz.gpg",
+        "sha256": "0c8757c8d204cddd7cc5b3b9a7835823e376093b9ee344f5a8bd8c219d3b3b31"
+      },
+      "file": "20261020T002138Z.json",
+      "file_sha256": "a9b9c32cd168c5a68740e20f1c949cff41da665b14d7aeb5790404dd0d795166",
+      "identity_kind": "running_identity",
+      "new_api_image_id": "sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5"
+    },
+    {
+      "artifact_exists": true,
+      "backup_id": "20261019T193103Z",
+      "backup_identity_schema_version": 1,
+      "backup_schema_version": 2,
+      "candidate_commit": "eb67c5f21639716eed7489d32ca322c249e5fdf3",
+      "created_at_utc": "2026-10-19T19:31:07Z",
+      "encrypted_artifact": {
+        "bytes": 12251854,
+        "name": "clearapi-backup-20261019T193103Z.tar.gz.gpg",
+        "sha256": "86ebbcdc0cb963c15c4cf8b985c1b3614c1f3938797e79f77b91e77458b1fbbe"
+      },
+      "file": "20261019T193103Z.json",
+      "file_sha256": "0d9487b7e70de6f7e86d0607a229f64a6e33c5122e748bd4d1eb66c67fbff916",
+      "identity_kind": "running_identity",
+      "new_api_image_id": "sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5"
+    },
+    {
+      "artifact_exists": true,
+      "backup_id": "20261018T193241Z",
+      "backup_identity_schema_version": 1,
+      "backup_schema_version": 2,
+      "candidate_commit": "eb67c5f21639716eed7489d32ca322c249e5fdf3",
+      "created_at_utc": "2026-10-18T19:32:46Z",
+      "encrypted_artifact": {
+        "bytes": 12021369,
+        "name": "clearapi-backup-20261018T193241Z.tar.gz.gpg",
+        "sha256": "f81df080f8c71a248a86fe11e4ea65bcb4eba04e6085528aeaa61c0e60536022"
+      },
+      "file": "20261018T193241Z.json",
+      "file_sha256": "89f8909efa4c7c91623fce85e87cf25d6289a36cec104a9c0b4369ab6de8d36e",
+      "identity_kind": "running_identity",
+      "new_api_image_id": "sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5"
+    },
+    {
+      "artifact_exists": true,
+      "backup_id": "20261017T193407Z",
+      "backup_identity_schema_version": 1,
+      "backup_schema_version": 2,
+      "candidate_commit": "eb67c5f21639716eed7489d32ca322c249e5fdf3",
+      "created_at_utc": "2026-10-17T19:34:11Z",
+      "encrypted_artifact": {
+        "bytes": 12008990,
+        "name": "clearapi-backup-20261017T193407Z.tar.gz.gpg",
+        "sha256": "fcbd883727e5783a849f7b4b7cbdf5af0416592e75ad3ea2e01e5af821ebfab4"
+      },
+      "file": "20261017T193407Z.json",
+      "file_sha256": "b0d6896608352aab8ade960824ba74b3bd4c5fce00a1c4d6c8ecf443a67ea60b",
+      "identity_kind": "running_identity",
+      "new_api_image_id": "sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5"
+    }
+  ],
+  "boot_id": "175e402f-669c-4a2c-9351-0dcdf0a5de7f",
+  "compose": {
+    "config_hashes": {
+      "exit": 1,
+      "stdout": ""
+    },
+    "files": [
+      "/opt/clearapi/app/docker-compose.prod.yml",
+      "/opt/clearapi/app/compose-pg03.yaml",
+      "/opt/clearapi/app/compose-candidate.yaml",
+      "/opt/clearapi/app/compose-website-recovery-39957948359.json"
+    ],
+    "images": {
+      "exit": 1,
+      "stdout": ""
+    },
+    "services": {
+      "exit": 1,
+      "stdout": ""
+    }
+  },
+  "containers": {
+    "clearapi-edge-caddy": {
+      "Id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+      "Image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+      "ImageRef": "caddy@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+      "NetworkMode": "host",
+      "PortBindings": {},
+      "RestartCount": 0,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "State": {
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "2026-10-20T00:21:38.074678851Z",
+        "Health": null,
+        "OOMKilled": false,
+        "Running": false,
+        "StartedAt": "2026-10-07T14:00:40.028691257Z",
+        "Status": "exited"
+      },
+      "compose_labels": {
+        "com.docker.compose.config-hash": "e883106769df8227b86e58643ddf44abc8385660c49e415552da32f8bc8f205e",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:173b26306d711395accaeba8b67afcaad2a085ccb1e6bf26010bfe8c095a5229",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi-edge",
+        "com.docker.compose.project.config_files": "/opt/clearapi/edge/docker-compose.yml",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/edge",
+        "com.docker.compose.replace": "clearapi-edge-caddy",
+        "com.docker.compose.service": "caddy",
+        "com.docker.compose.version": "5.6.0"
+      },
+      "image_identity": {
+        "Architecture": "amd64",
+        "Id": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+        "RepoDigests": [
+          "caddy@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772"
+        ],
+        "Revision": null
+      },
+      "mounts": [
+        {
+          "Destination": "/config",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/caddy/config",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/data",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/caddy/data",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/etc/caddy/Caddyfile",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/edge/Caddyfile",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/log/caddy",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/caddy/logs",
+          "Type": "bind"
+        }
+      ]
+    },
+    "clearapi-new-api-1": {
+      "Id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+      "Image": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "ImageRef": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "NetworkMode": "clearapi_internal",
+      "PortBindings": {
+        "3000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3000"
+          }
+        ]
+      },
+      "RestartCount": 0,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "State": {
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "Health": null,
+        "OOMKilled": false,
+        "Running": true,
+        "StartedAt": "2026-10-23T14:07:58.383082222Z",
+        "Status": "running"
+      },
+      "compose_labels": {
+        "com.docker.compose.config-hash": "a2ab7e6c055fe0e7ef37b5dad6ef6a5cdceb855f852f8133ea40f7a1d65ce3e7",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi",
+        "com.docker.compose.project.config_files": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml,/opt/clearapi/app/compose-website-recovery-39957948359.json",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/app",
+        "com.docker.compose.replace": "new-api-1",
+        "com.docker.compose.service": "new-api",
+        "com.docker.compose.version": "5.6.0"
+      },
+      "image_identity": {
+        "Architecture": "amd64",
+        "Id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "RepoDigests": [
+          "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1"
+        ],
+        "Revision": "a032815cb6244a7ee5e812de82f8300c02554e99"
+      },
+      "mounts": [
+        {
+          "Destination": "/data",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/new-api",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/app/logs",
+          "Name": null,
+          "RW": true,
+          "Source": "/opt/clearapi/logs",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/clearapi",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/runtime/new-api",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/crypto_secret",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/crypto_secret",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/session_secret",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/session_secret",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/sql_dsn",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/sql_dsn",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/token_encryption_key",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/token_encryption_key",
+          "Type": "bind"
+        }
+      ]
+    },
+    "clearapi-pool-executor-1": {
+      "Id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+      "Image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+      "ImageRef": "ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+      "NetworkMode": "clearapi_internal",
+      "PortBindings": {},
+      "RestartCount": 0,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "unless-stopped"
+      },
+      "State": {
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "2026-10-20T00:46:42.802722759Z",
+        "Health": "healthy",
+        "OOMKilled": false,
+        "Running": true,
+        "StartedAt": "2026-10-20T00:46:43.85551099Z",
+        "Status": "running"
+      },
+      "compose_labels": {
+        "com.docker.compose.config-hash": "388ef54492c69a51e1107c9a31ad81ae02fedbe11c44e8b0f68ea96bfe816f38",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi",
+        "com.docker.compose.project.config_files": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/app",
+        "com.docker.compose.service": "pool-executor",
+        "com.docker.compose.version": "5.6.0"
+      },
+      "image_identity": {
+        "Architecture": "amd64",
+        "Id": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+        "RepoDigests": [
+          "ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58"
+        ],
+        "Revision": "b6e5a90fce6c0b3fa231d43ab07a65622f981be2"
+      },
+      "mounts": [
+        {
+          "Destination": "/CLIProxyAPI/config.yaml",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/config/pg03/executor.yaml",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/auths",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/auths",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/pool",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/pool",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/receipts",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/receipts",
+          "Type": "bind"
+        }
+      ]
+    },
+    "clearapi-postgres-1": {
+      "Id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+      "Image": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "ImageRef": "postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "NetworkMode": "clearapi_internal",
+      "PortBindings": {},
+      "RestartCount": 0,
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "unless-stopped"
+      },
+      "State": {
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "2026-10-20T00:46:42.802136276Z",
+        "Health": "healthy",
+        "OOMKilled": false,
+        "Running": true,
+        "StartedAt": "2026-10-20T00:46:43.870944528Z",
+        "Status": "running"
+      },
+      "compose_labels": {
+        "com.docker.compose.config-hash": "334795d80847707b3cd4497e7986271aea491468d8e65ba5a8b7ed786c3f3188",
+        "com.docker.compose.container-number": "1",
+        "com.docker.compose.depends_on": "",
+        "com.docker.compose.image": "sha256:747d5ed1fdeeb124b880fbe3d7c6557d2c4064ae41d6b6297d417882effce4be",
+        "com.docker.compose.oneoff": "False",
+        "com.docker.compose.project": "clearapi",
+        "com.docker.compose.project.config_files": "/opt/clearapi/app/docker-compose.prod.yml",
+        "com.docker.compose.project.working_dir": "/opt/clearapi/app",
+        "com.docker.compose.service": "postgres",
+        "com.docker.compose.version": "5.6.0"
+      },
+      "image_identity": {
+        "Architecture": "amd64",
+        "Id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+        "RepoDigests": [
+          "postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        ],
+        "Revision": null
+      },
+      "mounts": [
+        {
+          "Destination": "/run/secrets/pg_superuser_password",
+          "Name": null,
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/pg_superuser_password",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/postgresql/data",
+          "Name": null,
+          "RW": true,
+          "Source": "/data/clearapi/postgres",
+          "Type": "bind"
+        }
+      ]
+    }
+  },
+  "deployment_locks": {
+    "exit": 0,
+    "stdout": []
+  },
+  "docker_version": "29.8.2",
+  "gateway_nonsecret_flags": "CLEARAPI_POOL_ENABLED=false\nGIN_MODE=release",
+  "listeners": {
+    "exit": 0,
+    "stdout": [
+      "tcp LISTEN 0      4096       127.0.0.1:3000 0.0.0.0:*"
+    ]
+  },
+  "local_health": {
+    "exit": 0,
+    "stdout": "200"
+  },
+  "mode": "read_only",
+  "observed_at": "2026-10-23T21:08:30.523274+00:00",
+  "origin_https": {
+    "exit": 7,
+    "stdout": "000"
+  },
+  "postgres_version": {
+    "exit": 0,
+    "stdout": "postgres (PostgreSQL) 17.6"
+  },
+  "production_mutations": false,
+  "release": {
+    "attempt": {
+      "finished_at_utc": null,
+      "id": "9e37b9c3-9987-453f-bd49-f4a28fa77c81",
+      "started_at_utc": null,
+      "status": "failed",
+      "workflow_run": null
+    },
+    "candidate_commit": "c50a53c1b89e121bcade7dac41d3f11e53a9832a",
+    "deployed_at_utc": "2026-10-20T00:25:55Z",
+    "image_digest": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+    "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+    "new_api_image_id": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+    "pool_mode": "pg03",
+    "status": "failed"
+  },
+  "runtime_identity": {
+    "/opt/clearapi/runtime/new-api/runtime-identity.json": {
+      "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+      "docker_image_id": null,
+      "generated_at": "2026-10-23T14:08:00.400420+00:00",
+      "image_digest": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "oci_revision": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "started_at": "2026-10-23T14:07:58.383082222Z"
+    }
+  },
+  "runtime_paths": {
+    "/opt/clearapi/runtime": {
+      "bytes": 4096,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o755",
+      "symlink": false,
+      "uid": 0
+    },
+    "/opt/clearapi/runtime/new-api": {
+      "bytes": 4096,
+      "exists": true,
+      "gid": 0,
+      "mode": "0o750",
+      "symlink": false,
+      "uid": 0
+    },
+    "/run/clearapi": {
+      "exists": false
+    }
+  },
+  "systemd": {
+    "clearapi-backup.service": {
+      "exit": 0,
+      "properties": {
+        "ActiveState": "failed",
+        "After": "docker.service systemd-journald.socket clearapi-backup.timer sysinit.target basic.target system.slice",
+        "Before": "shutdown.target",
+        "DropInPaths": "/etc/systemd/system/clearapi-backup.service.d/90-preserve-release-backups.conf",
+        "ExecMainStatus": "1",
+        "FragmentPath": "/etc/systemd/system/clearapi-backup.service",
+        "Requires": "docker.service system.slice sysinit.target",
+        "Result": "exit-code",
+        "SubState": "failed",
+        "UnitFileState": "disabled"
+      }
+    },
+    "clearapi-backup.timer": {
+      "exit": 0,
+      "properties": {
+        "ActiveState": "active",
+        "After": "time-set.target time-sync.target sysinit.target -.mount",
+        "Before": "timers.target shutdown.target clearapi-backup.service",
+        "DropInPaths": "",
+        "FragmentPath": "/etc/systemd/system/clearapi-backup.timer",
+        "LastTriggerUSec": "Fri 2026-10-23 19:30:30 UTC",
+        "NextElapseUSecRealtime": "Sat 2026-10-24 19:34:23 UTC",
+        "Requires": "sysinit.target -.mount",
+        "Result": "success",
+        "SubState": "waiting",
+        "UnitFileState": "enabled"
+      }
+    },
+    "clearapi-runtime-directory.service": {
+      "exit": 0,
+      "properties": {
+        "ActiveState": "inactive",
+        "After": "systemd-journald.socket systemd-tmpfiles-setup.service system.slice",
+        "Before": "clearapi-runtime-identity.service docker.service",
+        "DropInPaths": "",
+        "ExecMainStatus": "0",
+        "FragmentPath": "/etc/systemd/system/clearapi-runtime-directory.service",
+        "Requires": "systemd-tmpfiles-setup.service system.slice",
+        "Result": "success",
+        "SubState": "dead",
+        "UnitFileState": "static"
+      }
+    },
+    "clearapi-runtime-identity.service": {
+      "exit": 0,
+      "properties": {
+        "ActiveState": "inactive",
+        "After": "system.slice systemd-journald.socket docker.service sysinit.target basic.target clearapi-runtime-directory.service",
+        "Before": "shutdown.target multi-user.target",
+        "DropInPaths": "",
+        "ExecMainStatus": "0",
+        "FragmentPath": "/etc/systemd/system/clearapi-runtime-identity.service",
+        "Requires": "sysinit.target system.slice",
+        "Result": "success",
+        "SubState": "dead",
+        "UnitFileState": "enabled"
+      }
+    },
+    "docker.service": {
+      "exit": 0,
+      "properties": {
+        "ActiveState": "active",
+        "After": "containerd.service clearapi-runtime-directory.service docker.socket systemd-journald.socket firewalld.service sysinit.target network-online.target time-set.target basic.target nss-lookup.target system.slice",
+        "Before": "shutdown.target clearapi-runtime-identity.service multi-user.target clearapi-backup.service",
+        "DropInPaths": "/etc/systemd/system/docker.service.d/clearapi-runtime.conf",
+        "ExecMainStatus": "0",
+        "FragmentPath": "/usr/lib/systemd/system/docker.service",
+        "Requires": "system.slice clearapi-runtime-directory.service sysinit.target docker.socket",
+        "Result": "success",
+        "SubState": "running",
+        "UnitFileState": "enabled"
+      }
+    }
+  },
+  "traffic_hold": {
+    "created_at_utc": null,
+    "keys": [
+      "binding",
+      "edge",
+      "schema",
+      "stage"
+    ],
+    "public_traffic": null,
+    "schema": "clearapi.controlled-traffic/v1",
+    "stage": "isolated",
+    "updated_at_utc": null
+  }
+}

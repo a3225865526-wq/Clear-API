@@ -1,0 +1,454 @@
+{
+  "queued": {
+    "total_count": 0,
+    "runs": []
+  },
+  "in_progress": {
+    "total_count": 0,
+    "runs": []
+  },
+  "waiting": {
+    "total_count": 0,
+    "runs": []
+  },
+  "pending": {
+    "total_count": 0,
+    "runs": []
+  },
+  "requested": {
+    "total_count": 0,
+    "runs": []
+  },
+  "environment_protection": {
+    "production": [
+      {
+        "id": 68381329,
+        "node_id": "GA_kwDOU6JUs84EE2qR",
+        "type": "branch_policy"
+      }
+    ]
+  },
+  "candidate_rc_run": {
+    "id": 39957948359,
+    "name": "Release Candidate",
+    "display_title": "Release Candidate",
+    "path": ".github/workflows/release-candidate.yml",
+    "event": "workflow_dispatch",
+    "head_sha": "a032815cb6244a7ee5e812de82f8300c02554e99",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "html_url": "https://github.com/a3225865526-wq/Clear-API/actions/runs/39957948359",
+    "created_at": "2026-10-23T13:02:28Z",
+    "updated_at": "2026-10-23T13:19:16Z"
+  },
+  "candidate_rc_jobs": [
+    {
+      "name": "Frontend production build",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Bun",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install dependencies (frozen lockfile)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Production build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Bun",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Race \u2014 billing/reservation critical packages",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Create frontend embed placeholder",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Race test critical packages (baseline-aware)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Race test controller serially (SQLite concurrency contention)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Race test production-bootstrap serially (stdout capture is process-global)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "DB matrix \u2014 sqlite",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Create frontend embed placeholder",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Select dialect env (sqlite default; explicit DSN for mysql/postgres)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Provision isolated service-package database (sqlite)",
+          "status": "completed",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Test model-side billing-critical packages against sqlite",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test service package against isolated sqlite database",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "DB matrix \u2014 mysql",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Create frontend embed placeholder",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Select dialect env (sqlite default; explicit DSN for mysql/postgres)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Provision isolated service-package database (mysql)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test model-side billing-critical packages against mysql",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test service package against isolated mysql database",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "DB matrix \u2014 postgres",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Create frontend embed placeholder",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Select dialect env (sqlite default; explicit DSN for mysql/postgres)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Provision isolated service-package database (postgres)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test model-side billing-critical packages against postgres",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test service package against isolated postgres database",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Set up Go",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "name": "Docker build, GHCR push, exact digest",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Login to GHCR (password-stdin)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build image from exact commit",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Push sha tag",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Push candidate tag",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Extract exact digest",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify digest pull and provenance labels",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Upload exact RC identity and runtime assets",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Retain isolated schema diagnostic evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Logout from GHCR",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ]
+}

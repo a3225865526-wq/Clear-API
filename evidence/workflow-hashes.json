@@ -1,0 +1,18 @@
+[
+  {
+    "Path": "C:\\Users\\Chen\\Documents\\Codex\\2026-10-23\\referenced-chatgpt-conversation-this-is-an-2\\work\\repo\\.github\\workflows\\automatic-deploy.yml",
+    "Hash": "A5C613C889DD30590AF44B18DB7A4D56CECB8622766F1953D26F99044184B350"
+  },
+  {
+    "Path": "C:\\Users\\Chen\\Documents\\Codex\\2026-10-23\\referenced-chatgpt-conversation-this-is-an-2\\work\\repo\\.github\\workflows\\release-pg03-gateway.yml",
+    "Hash": "7765A55B1CE69868A978D8FE55E0B3A4A3A5C1B3F85F17C24C152C59806D63A0"
+  },
+  {
+    "Path": "C:\\Users\\Chen\\Documents\\Codex\\2026-10-23\\referenced-chatgpt-conversation-this-is-an-2\\work\\repo\\.github\\workflows\\deployment-rehearsal.yml",
+    "Hash": "0DDD64C7F46ECC886B55A2C73D2109A9BA88E73B03D3F5218A5D86835DBC5860"
+  },
+  {
+    "Path": "C:\\Users\\Chen\\Documents\\Codex\\2026-10-23\\referenced-chatgpt-conversation-this-is-an-2\\work\\repo\\.github\\workflows\\deploy-production.yml",
+    "Hash": "C362DC52712115984B87A9813057B48F5DECBE52F9EE9C3F18AAB70D5764C852"
+  }
+]

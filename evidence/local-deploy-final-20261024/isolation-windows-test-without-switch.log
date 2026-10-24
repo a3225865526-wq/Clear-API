@@ -1,0 +1,5 @@
+Write-Error: D:\AI\API\worktrees\clearapi-local-deploy-integration\scripts\deploy-local.ps1:237
+Line |
+ 237 |      Write-Error "BLOCKED at [$phase]: $($_.Exception.Message)"
+     |                                          ~~~~~~~~~~~~~~~~~~~~
+     | BLOCKED at [precheck]: Test configuration requires -TestTarget

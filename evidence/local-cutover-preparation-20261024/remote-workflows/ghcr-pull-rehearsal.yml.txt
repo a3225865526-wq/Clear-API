@@ -1,0 +1,198 @@
+name: GHCR Pull Rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_audit_only:
+        description: 'Read-only RC/evidence/deployment-record audit; no SSH, environment or rehearsal'
+        required: true
+        type: boolean
+        default: false
+      audit_rc_run_id:
+        description: 'Existing successful RC to audit; never builds or deploys'
+        required: false
+        type: string
+        default: '39205228315'
+      inspection_only:
+        description: 'Read-only SSH/sudo/asset/Runtime verification; never pulls or deploys'
+        required: true
+        type: boolean
+        default: true
+      image_digest:
+        description: 'Exact image digest (sha256:<64 hex>) to rehearse pulling'
+        required: false
+        type: string
+      expected_commit:
+        description: 'Expected source commit (full 40 hex) of the image'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ghcr-pull-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  release_audit:
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.release_audit_only &&
+      github.repository == 'a3225865526-wq/Clear-API' &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/pg03-predecessor-compat-20261019')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - name: Audit existing release identities without production access
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AUDIT_RC_RUN_ID: ${{ inputs.audit_rc_run_id }}
+          CLEARAPI_REHEARSAL_TARGET_ID: ${{ vars.CLEARAPI_REHEARSAL_TARGET_ID }}
+          CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_PROVIDER_EVIDENCE }}
+          CLEARAPI_REHEARSAL_BACKUP_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_BACKUP_EVIDENCE }}
+          CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE: ${{ secrets.CLEARAPI_REHEARSAL_ROLLBACK_EVIDENCE }}
+        run: python3 scripts/ci/audit-release-state.py
+      - name: Preserve sanitized read-only audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-state-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-state-audit.json
+          if-no-files-found: error
+
+  rehearse:
+    if: ${{ !inputs.release_audit_only }}
+    name: VPS authorization inspection or exact-digest pull rehearsal
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+
+    env:
+      PROD_SSH_HOST: ${{ vars.PROD_SSH_HOST }}
+      PROD_SSH_PORT: ${{ vars.PROD_SSH_PORT }}
+      PROD_SSH_USER: ${{ vars.PROD_SSH_USER }}
+      PROD_SSH_ALIAS: clearapi-vps
+
+    steps:
+      - name: Checkout deploy assets
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Validate rehearsal inputs
+        env:
+          INSPECTION_ONLY: ${{ inputs.inspection_only }}
+          INPUT_COMMIT: ${{ inputs.expected_commit }}
+          INPUT_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/main
+          if [[ "$INSPECTION_ONLY" == true ]]; then exit 0; fi
+          if [[ ! "$INPUT_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "expected_commit is not a full 40-hex commit SHA"
+            exit 1
+          fi
+          # NOTE: expected_commit is intentionally NOT required to equal
+          # github.sha. The candidate being rehearsed was produced by an
+          # earlier Release Candidate run of an earlier main commit, so the
+          # rehearsal workflow's own commit will normally differ from the
+          # image's revision. The objective integrity check is inside the
+          # wrapper: the exact digest uniquely identifies the image, and the
+          # wrapper fails unless that image's OCI revision label equals
+          # expected_commit. A tampered image would have a different digest.
+          if [[ ! "$INPUT_DIGEST" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+            echo "image_digest must be an exact 'sha256:<64 hex>' digest — tags and 'latest' are forbidden"
+            exit 1
+          fi
+
+      - name: Set up SSH with pinned host key
+        env:
+          SSH_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.PROD_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then
+            echo "environment secrets PROD_SSH_PRIVATE_KEY / PROD_KNOWN_HOSTS are not configured"
+            exit 1
+          fi
+          if [ -z "$PROD_SSH_HOST" ] || [ -z "$PROD_SSH_USER" ]; then
+            echo "environment variables PROD_SSH_HOST / PROD_SSH_USER are not configured"
+            exit 1
+          fi
+          PORT="${PROD_SSH_PORT:-22}"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/ci_known_hosts
+          chmod 0644 ~/.ssh/ci_known_hosts
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/ci_deploy_key
+          chmod 0600 ~/.ssh/ci_deploy_key
+          {
+            echo "Host ${PROD_SSH_ALIAS}"
+            echo "  HostName ${PROD_SSH_HOST}"
+            echo "  Port ${PORT}"
+            echo "  User ${PROD_SSH_USER}"
+            echo "  IdentityFile ~/.ssh/ci_deploy_key"
+            echo "  UserKnownHostsFile ~/.ssh/ci_known_hosts"
+            echo "  StrictHostKeyChecking yes"
+            echo "  IdentitiesOnly yes"
+            echo "  BatchMode yes"
+          } > ~/.ssh/config
+          chmod 0600 ~/.ssh/config
+
+      - name: Inspect existing VPS authorization without deployment
+        if: inputs.inspection_only
+        run: python3 scripts/ci/inspect-vps-authorization.py --output "$RUNNER_TEMP/vps-authorization-inspection.json"
+
+      - name: Upload read-only authorization inspection
+        if: always() && inputs.inspection_only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: vps-authorization-inspection-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/vps-authorization-inspection.json
+          if-no-files-found: error
+
+      - name: Verify installed rehearsal wrapper matches this commit
+        if: ${{ !inputs.inspection_only }}
+        # Same integrity model as the deploy wrapper: the copy on the VPS is
+        # installed out-of-band as root-owned 0750; this job only proves it is
+        # byte-identical to the script in this exact commit. No upload.
+        run: |
+          set -euo pipefail
+          LOCAL_SHA="$(sha256sum scripts/ghcr-pull-rehearsal.sh | cut -d' ' -f1)"
+          REMOTE_SHA="$(ssh "${PROD_SSH_ALIAS}" "sudo /usr/bin/sha256sum /opt/clearapi/bin/ghcr-pull-rehearsal.sh | cut -d' ' -f1")"
+          if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
+            echo "rehearsal wrapper integrity check FAILED"
+            echo "  repo (${{ github.sha }}): $LOCAL_SHA"
+            echo "  VPS  /opt/clearapi/bin/ghcr-pull-rehearsal.sh: $REMOTE_SHA"
+            echo "refusing to rehearse; the installed wrapper is not the audited script for this commit"
+            exit 1
+          fi
+          echo "rehearsal wrapper integrity PASS: $LOCAL_SHA"
+
+      - name: Run pull rehearsal on VPS
+        if: ${{ !inputs.inspection_only }}
+        env:
+          GH_PULL_TOKEN: ${{ github.token }}
+          INPUT_DIGEST: ${{ inputs.image_digest }}
+          INPUT_COMMIT: ${{ inputs.expected_commit }}
+        run: |
+          set -euo pipefail
+          # Short-lived job token piped over stdin; the wrapper logs into a
+          # throwaway DOCKER_CONFIG, pulls the exact digest, verifies the OCI
+          # revision label, logs out and removes the config. Nothing persists.
+          printf '%s' "$GH_PULL_TOKEN" | ssh "${PROD_SSH_ALIAS}" \
+            "sudo /opt/clearapi/bin/ghcr-pull-rehearsal.sh \
+              --digest '$INPUT_DIGEST' \
+              --expected-commit '$INPUT_COMMIT'"
+
+      - name: Clear deploy key material
+        if: always()
+        run: rm -f ~/.ssh/ci_deploy_key ~/.ssh/ci_known_hosts ~/.ssh/config

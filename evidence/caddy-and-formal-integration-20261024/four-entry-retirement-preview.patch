@@ -1,0 +1,64 @@
+--- a/.github/workflows/automatic-deploy.yml
++++ b/.github/workflows/automatic-deploy.yml
+@@ -1,10 +1,7 @@
+ name: Automatic production release
+ 
+ on:
+-  workflow_run:
+-    workflows: [Deployment rehearsal]
+-    branches: [main]
+-    types: [completed]
++  workflow_dispatch:
+ 
+ permissions:
+   contents: read
+@@ -14,15 +11,7 @@
+ 
+ jobs:
+   deploy:
+-    if: >-
+-      vars.CLEARAPI_AUTO_PRODUCTION_ENABLED == 'true' &&
+-      github.repository == 'a3225865526-wq/Clear-API' &&
+-      github.event_name == 'workflow_run' &&
+-      (github.event.workflow_run.event == 'workflow_run' ||
+-       github.event.workflow_run.event == 'workflow_dispatch') &&
+-      github.event.workflow_run.head_branch == 'main' &&
+-      github.event.workflow_run.head_repository.full_name == github.repository &&
+-      github.event.workflow_run.conclusion == 'success'
++    if: ${{ false }} # retired local cutover
+     uses: ./.github/workflows/deploy-production.yml
+     with:
+       rehearsal_run_id: ${{ format('{0}', github.event.workflow_run.id) }}
+--- a/.github/workflows/deploy-production.yml
++++ b/.github/workflows/deploy-production.yml
+@@ -70,6 +70,7 @@
+ 
+ jobs:
+   authorize:
++    if: ${{ false }} # retired local cutover
+     name: Validate release authorization before production credentials
+     runs-on: ubuntu-24.04
+     timeout-minutes: 10
+--- a/.github/workflows/failed-production-recovery.yml
++++ b/.github/workflows/failed-production-recovery.yml
+@@ -95,7 +95,7 @@
+ 
+   recover:
+     name: Recover incident or restore verified website
+-    if: inputs.mode == 'recover' || inputs.mode == 'restore'
++    if: ${{ false }} # retired local cutover
+     needs: authorize
+     runs-on: ubuntu-24.04
+     timeout-minutes: 15
+--- a/.github/workflows/ghcr-pull-rehearsal.yml
++++ b/.github/workflows/ghcr-pull-rehearsal.yml
+@@ -70,7 +70,7 @@
+           if-no-files-found: error
+ 
+   rehearse:
+-    if: ${{ !inputs.release_audit_only }}
++    if: ${{ false }} # retired local cutover
+     name: VPS authorization inspection or exact-digest pull rehearsal
+     runs-on: ubuntu-latest
+     environment: production
+PREVIEW ONLY. No local files changed, no workflow or production writes.
