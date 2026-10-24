@@ -55,6 +55,7 @@ scripts/local-deploy-vps.py text eol=lf
 scripts/deploy-local.ps1 text eol=lf
 scripts/backup-identity.py text eol=lf
 scripts/local-deploy.sudoers.example text eol=lf
+evidence/local-entry-preparation-20261024/*.candidate text eol=lf
 # Diagnostic streams and unified-diff context retain intentional whitespace.
 evidence/local-deploy-final-20261024/*.log -whitespace
 evidence/local-deploy-final-20261024/*.patch -whitespace

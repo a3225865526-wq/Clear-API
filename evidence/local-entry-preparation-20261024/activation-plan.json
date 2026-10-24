@@ -1,6 +1,6 @@
 {
   "mode": "PREPARATION_ONLY_NOT_AUTHORIZED_OR_EXECUTED",
-  "source_commit": "14d7c09582e99c3144a76fcbeb06f509f3225489",
+  "source_commit": "ce84487c4d1838e3f911c826f1dd4d781d6b5e20",
   "production_target": "clearadmin@103.42.181.219:22",
   "changes": [
     {
@@ -13,7 +13,7 @@
       "bytes": 31111
     },
     {
-      "source": "local-deploy.vps-config.json.candidate",
+      "source": "evidence/local-entry-preparation-20261024/local-deploy.vps-config.json.candidate",
       "target": "/opt/clearapi/config/local-deploy.json",
       "owner": "root:root",
       "mode": "0600",
@@ -22,7 +22,7 @@
       "bytes": 388
     },
     {
-      "source": "local-deploy.enabled.candidate",
+      "source": "evidence/local-entry-preparation-20261024/local-deploy.enabled.candidate",
       "target": "/opt/clearapi/config/local-deploy.enabled",
       "owner": "root:root",
       "mode": "0600",
@@ -39,5 +39,7 @@
   "no_gateway_update": true,
   "no_website_restart": true,
   "no_sudoers_or_identity_or_business_changes": true,
-  "stop_and_revoke_activation_on_any_failure": true
+  "stop_and_revoke_activation_on_any_failure": true,
+  "helper_implementation_commit": "14d7c09582e99c3144a76fcbeb06f509f3225489",
+  "artifact_encoding": "Exact LF bytes from git show source_commit:source; candidates also have scoped eol=lf attributes"
 }

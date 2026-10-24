@@ -1,0 +1,19 @@
+{
+  "utc": "2026-10-24T13:43:59.073205+00:00",
+  "source_head": "ce84487c4d1838e3f911c826f1dd4d781d6b5e20",
+  "command": [
+    "C:\\Users\\Chen\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\powershell\\pwsh.EXE",
+    "-NoProfile",
+    "-File",
+    "D:\\Codex\\worktrees\\clearapi-local-formal-integration\\clearapi-controlled-launch-20261020\\scripts\\deploy-local.ps1",
+    "-DryRun",
+    "-FixturePath",
+    "D:\\AI\\API\\runtime\\clearapi-local-deploy-production\\offline-classification-fixture.json"
+  ],
+  "exit": 1,
+  "stdout": "",
+  "stderr": "Write-Error: D:\\Codex\\worktrees\\clearapi-local-formal-integration\\clearapi-controlled-launch-20261020\\scripts\\deploy-local.ps1:240\nLine |\n 240 |      Write-Error \"BLOCKED at [$phase]: $($_.Exception.Message)\"\n     |                                          ~~~~~~~~~~~~~~~~~~~~\n     | BLOCKED at [source diff classification]: Only metadata/tooling changed; no Gateway build needed\n",
+  "expected_metadata_only_stop": true,
+  "no_SSH_or_build_or_production_writes": true,
+  "fixture_not_formal_preflight_receipt": true
+}

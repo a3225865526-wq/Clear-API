@@ -33,7 +33,7 @@ PowerShell5.1/7.6的AST及七项分类合同、Linux两项状态探针定向测�
 
 ## 3. 待批准的最小VPS激活范围
 
-精确字节、SHA和前置在 **activation-plan.json**，源码绑定14d7c09582：
+精确字节、SHA和前置在 **activation-plan.json**。helper实现提交为14d7c09582；三项安装资产统一取自包含候选配置的本地提交 **ce84487c4d1838e3f911c826f1dd4d781d6b5e20** 的Git blob，并逐项核对下表。候选文件已固定LF，避免Windows换行转换造成哈希漂移：
 
 | 目标 | 操作 | root模式 | 新SHA256 |
 | --- | --- | --- | --- |
@@ -62,6 +62,8 @@ if ($LASTEXITCODE -ne 0) { throw '预检未通过，停止部署' }
 若从PowerShell5.1启动，使用中文README给出的现有pwsh.exe绝对路径运行同一脚本，无需改执行策略。无需Push、触发旧GitHub发布、手工打镜像或抄SSH命令。`-DryRun`不构建镜像或更新容器，仍需已激活helper才能完成正式预检。
 
 当前源代码相对线上a032只有工具/记录差异，因此正常分类会拒绝无意义构建：`Only metadata/tooling changed; no Gateway build needed`。这不是要补一次Gateway发布，不应创建空应用提交。启用完成由正式helper preflight证明；下一次真正的web/Go等应用变更才进入镜像构建、SSH直传和原单服务部署。迁移/PG03敏感变更仍须单独审阅，后端仍先正式备份且未知数据库状态不自动回退。
+
+在干净工作区用明确标注“非正式预检凭证”的离线fixture实际运行完整Windows `-DryRun -FixturePath`，已到达预期metadata-only拒绝（exit1），没有SSH、构建或生产写入；原始结果见windows-offline-entry.json。该退出不是DRY_RUN成功或生产preflight PASS。
 
 本机不缺凭据或软件安装；部署激活唯一待用户决定的是上述VPS最小写入授权，不需要用户手工重启服务或提供私钥/Token。
 
