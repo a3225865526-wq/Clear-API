@@ -82,7 +82,9 @@
   },
   "locale_changes": {
     "en.json": {
-      "added": [],
+      "added": [
+        "Failed to load model pricing records"
+      ],
       "removed": [],
       "changed": [],
       "root_preserved": true
@@ -228,7 +230,9 @@
       "root_preserved": true
     },
     "zh.json": {
-      "added": [],
+      "added": [
+        "Failed to load model pricing records"
+      ],
       "removed": [],
       "changed": [],
       "root_preserved": true

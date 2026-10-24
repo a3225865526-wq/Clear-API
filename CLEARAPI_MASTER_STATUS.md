@@ -1223,3 +1223,15 @@ Status: **BLOCKED**（首次生产切换尚未完成）
 - **失败保护不变：** 工具仅允许单服务new-api/no-deps更新并检查非镜像Compose配置无变化；后端候选需新鲜正式备份，切换后失败保留pending/人工恢复；前端失败尝试恢复前驱配置/镜像并验证健康。不自动恢复数据库，不为此次核对执行任何失败演练。
 - **唯一停止原因：** `NO_GATEWAY_APPLICATION_DELTA`。当前生产已经具备PG03暂缓配置，正式候选应用与现网一致；不构成新的应用发布，deploy-local.ps1:181已有“Only metadata/tooling changed; no Gateway build needed”门禁。本轮没有运行完整-DryRun，没有绕过或修改门禁。正式只读preflight已PASS；以后有真实、经审查的应用差异时再进入正式DryRun，不能人为制造差异。
 - **验证与边界：** worktree/分支/全SHA/状态、git diff路径、SSH pin、生产投影、只读SQL、Runtime/boot、默认preflight、资产及备份hash、GitHub GET均有本轮证据；首次SQL输出解析失败保留在pg03-dataplane-readonly.json，改用JSONB输出后v2采集成功，两个事务均只读。未重跑已通过30项E2E，未构建镜像、部署、重启服务、修改生产配置/数据库、Push/合并main或改Cloudflare/DNS。证据：`evidence/pg03-hold-source-readonly-20261024/`（含完整worktree清单、分类、readiness、SHA清单）。
+
+
+## 2026-10-24 Asia/Shanghai — A/B/C/E 应用候选集成，D 生图排除（发布前）
+
+- 正式工具基线复核仍为 `80d3dc5b3a58655f736e4fcd49372971c30014b4`。独立工作区 `D:/Codex/worktrees/clearapi-abce-release-20261024/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-abce-release-20261024`；旧工作区和 E 线未提交内容完整保留。生产只读身份为 `a032815cb6244a7ee5e812de82f8300c02554e99` / config digest `sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f`，GitHub main 仍为 a032。
+- 按共同基线和实际文件重新比对：A（含 b140f5a7 清空修复）、B、C 的功能实现已经在 a032 应用树；本候选保留这些功能和 main 后续修复。37 个源文件与来源比较，A仅三处既有格式/导入排序差异，B/C功能文件一致。没有盲目整分支合并或把工具提交冒充业务集成。证据：`evidence/abce-release-20261024/integration.json`。
+- 本轮实际应用变化：补齐 A 的 zh-TW/fr/ja/ru/vi 各21条文案，并修复加载定价记录失败文案在 en/zh 中也缺失的问题，共107条新增语言值；其他既有值和根级历史内容保留。B补充草稿新增、编辑、确认删除的UI回归和普通用户公告配置GET/PUT返回403的后端回归。没有重新开发既有功能或自动运行定价清理。
+- A：真实 SQLite 3.50.4、MySQL 8.4.11、PostgreSQL 17.6 清理、保存/转换/读取验证通过，覆盖清空后重载、冲突拒绝、单位、显式零值和旁观模型不变。A无schema/启动迁移改动，生产账单/余额不作改写；不宣称生产付费交易已验收。B：公告6项界面用例、后端发布状态过滤、普通用户权限通过。C：七组通道/协议测试通过，保留智谱尾帧先于[DONE]与nil防护；没有真实厂商请求，不宣称厂商可用性或计费已验收。
+- E：当前实际链为 Windows deploy-local.ps1 → 已安装 local-deploy-vps.py → 正式备份服务。helper/state/backup三份生产字节与候选源码一致。备份锁竞争退出75，部署锁fail-closed；新鲜唯一manifest、密文大小/SHA和当前容器/源码/发布元数据绑定均经测试。17项helper、7项adoption、2项真实加密/锁回归通过；未重跑此前30项隔离部署E2E，没有迁回旧生产入口、旧workflow或E旧总控文档。
+- 根Go模块及独立relaykit构建、前端生产构建、typecheck、所改TS文件lint/format通过。HTTP矩阵首轮被loopback夹具拒绝，切换隔离实例127.0.0.1网络后通过；Bun测试运行器的Zod导入失败由Node运行器复验通过。实际命令、数据库版本、结果和未验证事项见 `validation.json`。普通CI及正式DryRun/部署待后续回执，不把本段当成已部署证明。
+- D三个提交均不是候选祖先，专属前端/路由/下载代码不存在；未改PG03、迁移入口或旧生产workflow。当前生产Compose/容器/进程三层POOL_ENABLED和DEDICATED均false，PG03能力入口404；注册/登录开启、普通API维持认证边界、共享Executor保留运行。
+- 候选完整SHA、CI、实际镜像、备份回执及部署验收在后续节追加；保留所有既有主线历史。此前工具差异为零的只读结论不作为本次已有真实应用变化的发布停止理由。

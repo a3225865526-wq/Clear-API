@@ -1,0 +1,98 @@
+{
+  "runtime": {
+    "go": "go1.26.9 linux/amd64",
+    "bun": "1.4.3",
+    "node": "24.22.1",
+    "production_Dockerfile": "pins Bun 1.4.0 and Go 1.26.1"
+  },
+  "database_versions": {
+    "sqlite": "3.50.4 real file database",
+    "mysql": "8.4.11",
+    "postgres": "17.6 Debian 17.6-2.pgdg13+1"
+  },
+  "checks": [
+    {
+      "command": "go test -count=1 -v ./model -run TestModelPricing",
+      "result": "PASS; real sqlite/mysql/postgres cleanup, no dialect skipped"
+    },
+    {
+      "command": "go test -count=1 -v ./model -run \"TestApplyModelPricingCleanup|TestClearedModelPricing\"",
+      "result": "PASS; clear/reload/stale-plan/unrelated-record invariants"
+    },
+    {
+      "command": "go test -count=1 -v ./controller -run \"TestModelPricingConversionDatabaseMatrix|TestPricingSync\"",
+      "result": "sqlite and pricing sync PASS; first mysql/postgres rejected non-loopback fixture. Each rerun below PASS"
+    },
+    {
+      "command": "go test -count=1 -v ./controller -run TestModelPricingConversionDatabaseMatrix/mysql; network container:clearapi-abce-mysql-20261024, 127.0.0.1 DSN",
+      "result": "PASS real MySQL; conversion, preview, zero values, units, persistence"
+    },
+    {
+      "command": "go test -count=1 -v ./controller -run TestModelPricingConversionDatabaseMatrix/postgres; network container:clearapi-abce-postgres-20261024, 127.0.0.1 DSN",
+      "result": "PASS real PostgreSQL; conversion, preview, zero values, units, persistence"
+    },
+    {
+      "command": "go test -count=1 ./relay/channel ./relay/channel/ali ./relay/channel/deepseek ./relay/channel/moonshot ./relay/channel/zhipu ./relay/channel/zhipu_4v ./relay/channel/xai ./setting/console_setting",
+      "result": "PASS eight packages; Zhipu stream order/nil and published-only announcement filtering included"
+    },
+    {
+      "command": "go test -count=1 -v ./controller -run TestAnnouncementOptionsRejectOrdinaryUsers",
+      "result": "PASS; ordinary user GET/PUT option routes 403"
+    },
+    {
+      "command": "vitest run model-pricing, models and system-settings pricing-sync test directories",
+      "result": "Bun runner: 10 files/113 cases PASS; 3 model suites failed Zod import. Node rerun models plus announcements: all 6 files/58 cases PASS"
+    },
+    {
+      "command": "node node_modules/vitest/vitest.mjs run src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx",
+      "result": "PASS six cases including create draft, edit, publish/save and confirmed deletion"
+    },
+    {
+      "command": "tsgo -b",
+      "result": "PASS after removing unsupported exact property from ByRoleOptions"
+    },
+    {
+      "command": "oxlint -c .oxlintrc.json src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx",
+      "result": "PASS 0 warnings/errors"
+    },
+    {
+      "command": "oxfmt --check src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx",
+      "result": "PASS after formatting"
+    },
+    {
+      "command": "DISABLE_ESLINT_PLUGIN=true bun run build",
+      "result": "PASS built in 35.1s; exact candidate will also build in ordinary CI and formal local deployment"
+    },
+    {
+      "command": "GOWORK=off go build ./...; cd relaykit && GOWORK=off go build ./...",
+      "result": "PASS both independent module builds"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -p test_local_deploy_vps.py -v",
+      "result": "PASS 17 tests; unique fresh completed proof, malformed/truncated/corrupt/stale/wrong-identity/failed-unit rejected; deployment lock fail-closed"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -p test_local_deploy_adoption.py -v",
+      "result": "PASS 7 tests; formal backup identity and predecessor preservation"
+    },
+    {
+      "command": "python3 scripts/ci/test-backup-identity.py BackupIdentityTest.test_lock_contention_never_publishes_a_backup BackupIdentityTest.test_full_encrypted_backup_offsite_and_legacy_restore_reader -v",
+      "result": "PASS two tests; real GPG/tar; lock contention exit75, no published proof"
+    },
+    {
+      "command": "bun run i18n:sync; semantic/placeholder verification across seven locales",
+      "result": "PASS; 21 active A keys present in all locales. Sync fills unrelated baseline gaps too, so final script writes scoped back to only A additions, retaining all existing root content and values"
+    },
+    {
+      "command": "git diff --check; source comparison A/B/C; D ancestry and path checks",
+      "result": "PASS; 37 source paths compared, three existing format/import differences only; D excluded"
+    }
+  ],
+  "limitations": [
+    "No real vendor request or vendor billing acceptance; no upstream credentials used",
+    "No production pricing cleanup or price rewrite; no balances/bills changed",
+    "No schema/startup migration code delta; no claim of new release-to-release schema migration verification",
+    "Login/register page/status checks do not prove real credential login or registration",
+    "Ordinary CI and deployment pending at candidate creation; no 30-case isolated deployment E2E rerun"
+  ]
+}
