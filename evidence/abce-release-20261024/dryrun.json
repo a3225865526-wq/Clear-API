@@ -1,0 +1,11 @@
+{
+  "commit": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+  "previous_commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "architecture": "amd64",
+  "service": "new-api",
+  "scope": "backend",
+  "changed_files": 256,
+  "estimated_backup": true,
+  "result": "DRY_RUN_NO_PRODUCTION_WRITES",
+  "note": "No image built, no SSH writes, no registry access and no production writes."
+}

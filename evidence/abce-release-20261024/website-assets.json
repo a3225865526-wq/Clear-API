@@ -1,0 +1,45 @@
+{
+  "origin": {
+    "html_sha256": "9e07389a40656f1663a5f63fe873bc65db268bb11f41dac7100a188d8b56ae9d",
+    "scripts": [
+      "/static/js/vendor-ui-primitives.5564bb5e9e.js",
+      "/static/js/vendor-tanstack.e331468f06.js",
+      "/static/js/lib-react.91bc21a6cf.js",
+      "/static/js/59486.358f4047ce.js",
+      "/static/js/index.55158802f7.js"
+    ]
+  },
+  "public": {
+    "html_sha256": "9e07389a40656f1663a5f63fe873bc65db268bb11f41dac7100a188d8b56ae9d",
+    "scripts": [
+      "/static/js/vendor-ui-primitives.5564bb5e9e.js",
+      "/static/js/vendor-tanstack.e331468f06.js",
+      "/static/js/lib-react.91bc21a6cf.js",
+      "/static/js/59486.358f4047ce.js",
+      "/static/js/index.55158802f7.js"
+    ]
+  },
+  "same_application_assets": true,
+  "asset_status": {
+    "/static/js/vendor-ui-primitives.5564bb5e9e.js": {
+      "status": "200",
+      "exit": 0
+    },
+    "/static/js/vendor-tanstack.e331468f06.js": {
+      "status": "200",
+      "exit": 0
+    },
+    "/static/js/lib-react.91bc21a6cf.js": {
+      "status": "200",
+      "exit": 0
+    },
+    "/static/js/59486.358f4047ce.js": {
+      "status": "200",
+      "exit": 0
+    },
+    "/static/js/index.55158802f7.js": {
+      "status": "200",
+      "exit": 0
+    }
+  }
+}

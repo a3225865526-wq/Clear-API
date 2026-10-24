@@ -1,3 +1,16 @@
+## 2026-10-24 23:18–23:24 Asia/Shanghai — A/B/C/E 应用候选已正式部署，D 生图排除
+
+- **生产发布成功：** 候选 `dc685cbe338e8f700cae347e2eaac351d984c9c7`；镜像 `clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7`，规范 OCI config ID `sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728`（Docker engine/store ID `sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020`）；新 Gateway CID `aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0`。生产独立只读复核与正式成功回执一致。
+- **正确发布链：** 从独立、干净候选工作区执行 `./scripts/deploy-local.ps1 -DryRun` 后执行 `./scripts/deploy-local.ps1`；固定 `clearadmin@103.42.181.219:22`、amd64、单服务 new-api。普通 CI [40105138077](https://github.com/a3225865526-wq/Clear-API/actions/runs/40105138077) 的7个适用任务成功，包读取任务按条件跳过。没有重新启用旧 GitHub 生产发布链；没有将工具提交当成应用发布。
+- **应用与来源：** A（2e1b2238及b140f5a7修复）、B（1b04b8bc）、C（88e935b9）功能代码已逐文件核对并保留；这些实现已在a032基线。本候选实际补齐107条定价语言资源，并加入公告CRUD/普通用户权限及当前部署链备份证明的聚焦回归。未盲目合并旧分支或覆盖 main 后续修复。A三真实数据库、B公告/权限、C五家适配定向测试、Go/relaykit构建、前端测试/构建和CI通过。
+- **有效E门禁及真实备份：** 备份 `20261024T151740Z`，正式服务 Result=success / ExecMainStatus=0；密文 `clearapi-backup-20261024T151740Z.tar.gz.gpg`，12416579 bytes，SHA256 `e5a171ab877977c2c3ba5741dd715b46458416bd6e40444880e302108ca3c756`。唯一新鲜完成记录和密文校验通过，备份绑定的是切换前 a032/48df93b3/0a9a93c0 的真实身份；不是把旧备份或新候选身份伪称为前驱恢复点。当前生产helper/state/backup与候选字节仍一致；备份/部署锁fail-closed测试通过，未改旧入口。正式回执 health=PASS / rollback=false。
+- **上线核对：** 公网和源站HTML SHA256同为 `9e07389a40656f1663a5f63fe873bc65db268bb11f41dac7100a188d8b56ae9d`，新首页入口 `index.55158802f7.js` 等5个资源均200；首页、登录、注册入口200，公开status success=true，注册/密码登录开关true。公告启用且已发布内容与发布前一致，草稿/编辑/发布/删除已在隔离测试验证；没有向用户发送测试公告。普通API无凭据仍401，权限边界保持。
+- **D与PG03边界：** D三个提交、专属生图前端/路由/下载均未纳入。PG03在有效Compose/容器/进程三层POOL_ENABLED及DEDICATED仍false，能力入口404。共享Executor、PostgreSQL和Caddy容器ID/镜像不变；仅Gateway更新。没有主动改写生产定价、余额、历史账单、业务开关或DNS。
+- **未验证事项如实保留：** C没有真实上游调用/厂商计费验收；未提交真实注册/登录或付费普通API请求，线上仅验证页面、状态和认证边界。A没有执行生产改价/清理；无schema/启动迁移代码变化，历史账单运行逻辑不变，不把本地测试冒充生产财务验收。未重跑此前30项隔离部署E2E。没有已知阻断本次发布的问题。
+- **完整回执：** `evidence/abce-release-20261024/` 中的 integration、validation、ci、dryrun、deployment-result、production-before/after、website-assets、verification JSON。后续仅保存本段及回执的记录提交，不作为再次应用部署的候选；实际运行Commit固定为上面的dc685cbe。下方原有主线历史完整保留。
+
+---
+
 ## 2026-10-24 晚间 Asia/Shanghai — Windows本地部署入口正式激活；preflight实测PASS，未执行应用部署
 
 - **真实激活完成：** 本轮人类用户明确批准冻结activation-plan范围。开始工作区/分支正确、HEAD精确133336060a650be577d618a046f001a124f379aa且干净；三项资产均取ce84487c4d1838e3f911c826f1dd4d781d6b5e20的Git blob，字节数/LF/SHA逐项匹配。SSH可信ed25519指纹、现有helper66ec、生产状态、备份及恢复约束无漂移。GitHub经子进程直连GET确认四旧生产入口仍停用、普通CI保留、两AUTO=false、五类在途0，未改代理设置或远端状态。

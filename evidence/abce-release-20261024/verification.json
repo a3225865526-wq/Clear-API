@@ -1,0 +1,96 @@
+{
+  "recorded_at_asia_shanghai": "2026-10-24T23:24:36.912010+08:00",
+  "result": "DEPLOYED_AND_READONLY_VERIFIED",
+  "candidate_commit": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+  "production_image": {
+    "commit": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+    "container_id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+    "image_id": "sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728",
+    "image_ref": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7"
+  },
+  "archive_sha256": "94101ca6fb96c2b7dc653de29f299e4ca4b5d0535a253547f1a3ad6308c3edce",
+  "ci": {
+    "run_id": 40105138077,
+    "all_applicable_jobs_passed": true
+  },
+  "backup": {
+    "id": "20261024T151740Z",
+    "encrypted_artifact": {
+      "bytes": 12416579,
+      "name": "clearapi-backup-20261024T151740Z.tar.gz.gpg",
+      "sha256": "e5a171ab877977c2c3ba5741dd715b46458416bd6e40444880e302108ca3c756"
+    },
+    "manifest_sha256": "7365b80bb85fdc21472d79abaa96a04c9ccaab17816971b9792123c3e264b2bf",
+    "predecessor_identity_verified": true,
+    "ciphertext_verified": true,
+    "systemd_exit_status": 0
+  },
+  "acceptance": {
+    "A": "real SQLite/MySQL/PostgreSQL pricing cleanup/save/read/convert tests PASS; existing sales prices and historical billing runtime unchanged by source delta; production pricing mutations NOT RUN",
+    "B": "six announcement UI lifecycle cases PASS, published-only backend filtering PASS, ordinary-user option GET/PUT 403 PASS; production published announcements unchanged and enabled",
+    "C": "five-provider adaptation retained; channel/inbound tests PASS including Zhipu DONE order and nil guards; real provider requests and billing NOT VERIFIED",
+    "E": "installed helper/state/backup hashes equal candidate; fresh backup receipt/ciphertext/predecessor binding verified; deployment/backup lock fail-closed tests PASS; old GitHub production workflows remain disabled",
+    "D": "all three D commits excluded by ancestry; dedicated image-generation feature/routes/downloads absent; application source diff reviewed",
+    "PG03": "effective compose/container/process pool and dedicated flags false; capability endpoint 404; shared executor unchanged",
+    "business": "homepage/status/login/register accessible; register/login enabled; ordinary API retains baseline 401 without credentials; Caddy/PostgreSQL/executor IDs and images unchanged"
+  },
+  "unchanged_services": {
+    "clearapi-pool-executor-1": true,
+    "clearapi-edge-caddy": true,
+    "clearapi-postgres-1": true
+  },
+  "website_assets": {
+    "origin": {
+      "html_sha256": "9e07389a40656f1663a5f63fe873bc65db268bb11f41dac7100a188d8b56ae9d",
+      "scripts": [
+        "/static/js/vendor-ui-primitives.5564bb5e9e.js",
+        "/static/js/vendor-tanstack.e331468f06.js",
+        "/static/js/lib-react.91bc21a6cf.js",
+        "/static/js/59486.358f4047ce.js",
+        "/static/js/index.55158802f7.js"
+      ]
+    },
+    "public": {
+      "html_sha256": "9e07389a40656f1663a5f63fe873bc65db268bb11f41dac7100a188d8b56ae9d",
+      "scripts": [
+        "/static/js/vendor-ui-primitives.5564bb5e9e.js",
+        "/static/js/vendor-tanstack.e331468f06.js",
+        "/static/js/lib-react.91bc21a6cf.js",
+        "/static/js/59486.358f4047ce.js",
+        "/static/js/index.55158802f7.js"
+      ]
+    },
+    "same_application_assets": true,
+    "asset_status": {
+      "/static/js/vendor-ui-primitives.5564bb5e9e.js": {
+        "status": "200",
+        "exit": 0
+      },
+      "/static/js/vendor-tanstack.e331468f06.js": {
+        "status": "200",
+        "exit": 0
+      },
+      "/static/js/lib-react.91bc21a6cf.js": {
+        "status": "200",
+        "exit": 0
+      },
+      "/static/js/59486.358f4047ce.js": {
+        "status": "200",
+        "exit": 0
+      },
+      "/static/js/index.55158802f7.js": {
+        "status": "200",
+        "exit": 0
+      }
+    }
+  },
+  "not_executed": [
+    "No real vendor requests or billing acceptance",
+    "No production pricing cleanup, balance modification, historical bill modification or paid API test",
+    "No real account login or registration submission; page availability/config only",
+    "No public test announcement sent; CRUD verified in isolated tests",
+    "No rerun of 30-case isolated deployment E2E",
+    "No old production workflow enablement, main merge or production DNS change"
+  ],
+  "source_note": "A/B/C implementations already present in a032; this candidate retains them and adds 107 active pricing locale values plus focused B/E regression tests. This is an application release, not a tooling-only deployment."
+}
