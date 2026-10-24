@@ -1,3 +1,16 @@
+## 2026-10-24 Asia/Shanghai — 最小生产维护已执行至公网失败停止；Caddy停回，入口未激活
+
+- **最终结果：网站未恢复，正式入口未激活，不宣称整套接管成功。** 用户明确批准的源码为1aa591f4bb230c4fce5770114e45e9311beb87a4；执行前核实正确独立工作区/分支、精确HEAD及干净状态，7项源blob/SHA和实际现场无漂移。以下为本轮真实执行结果，下方准备/历史记录保留。
+- **旧发布链：** 10:42精确停用387486994 automatic-deploy、378101050 deploy-production、390042545 failed-production-recovery、378227091 ghcr-pull-rehearsal，均disabled_manually；其他7项仍active，CI/分支保护/两AUTO=false均未改。最终五类在途计数0，远端main仍a032，未Push/合并。
+- **Root与元数据：** 现场及旧资产保存在/opt/clearapi/backups/maintenance-20261024-1aa591f4bb。只将指定docker-compose.prod.yml由1000:1000改为root:root，0644和c5fc8ca1内容SHA不变，无递归修改；7个批准资产逐项root:root0750/SHA匹配，受限sudoers root:root0440及全局visudo通过（原管理员ALL仍保留，不虚称被收紧）。adopt-check PASS后adopt-running完成，新增状态adopted，state SHA cdcea866、local overlay aee0bbc3；原FAILED/target/hold和四层内容原字节保留，未改成success。
+- **备份/Runtime/boot PASS：** 一次正式备份20261024T025143Z，10:51:43启动、10:52:07正常完成，Result=success/exit0；密文12377896bytes，SHA7e77bb3aba44e22bc3be0be2b272f454ce122811e2676cac44bec3cfa732f54a。绑定当前0a9a93c0/a032/config48df及state SHA；staging清理。新密文认证解密及9项归档SHA全部匹配，本机隔离无网络PG17客户端pg_restore -l PASS；无私钥导出、无本地明文备份文件、无生产DB恢复，不冒称新备份完整DB恢复演练。原恢复密钥及既有真实PG17恢复证据可用，关键两份旧备份另保全。接管后/停止后Runtime及boot installed/live均PASS，未改4份boot系统文件、未重启Docker/主机。
+- **Caddy：** 原54c8550b/f2a于10:52:19成功启动，日志server running；规定公网检查未通过，于10:52:49由冻结恢复入口安全停回，restart=no、exit0、State.Error空，containment_verified=true。失败凭证website-restoration-failure-39347012653.json SHA42eca429保留，无成功result，未清attempt/隔离或重试。源站HTTPS/转发/HTTP308/全页面后置验收未完整走完，不能报PASS。
+- **剩余阻塞：** 维护客户端持续收到www.clear999.com HTTP403 / Cloudflare error1010；VPS解析裸域clear999.com未获得地址。未擅改Cloudflare防护/DNS、未绕过健康合同。到达停止条件后只有只读检查及本地加密备份可读取性验证，未再写生产或激活入口。/opt/clearapi/config/local-deploy.json与local-deploy.enabled均不存在；7资产/元数据完成不等于入口激活，恢复需后续明确审阅和授权，不能删除真实失败记录来重试。
+- **业务及容器：** Gateway仍0a9a93c0/ed6（OCI源码a032、config digest48df），StartedAt仍2026-10-23T14:07:58.383082222Z，HTTP200；PG99299d、Executor1081a1的CID/镜像/StartedAt/restart/mounts一致且healthy。未重部署/重启Gateway、未启停PG/Executor、未执行数据库或渠道/余额/计费等业务写入，仅正式备份读取。PG03=false维持，其他业务配置原样。
+- 执行事实、逐阶段日志和完整SHA：evidence/production-maintenance-20261024/{REPORT.md,RESULT.json,final-production-state.json,fresh-backup-readability.json}。未重跑30项E2E或无关CI；提交仅保存本轮状态/证据，冻结源代码及安装资产不改，后续Git HEAD仅为本地记录提交。
+
+---
+
 ## 2026-10-24 09:34 Asia/Shanghai — 最小接管兼容已本地完成；生产仍隔离，待一次维护授权
 
 - **网站主线：未启动Caddy、未解除隔离。** 当前0a9a93c0/a032/ed6 Gateway、持久Runtime、本机HTTP200正常，PG/共享Executor healthy。只读实核既有root pg03.env可解析四层Compose，其a2ab7e6c配置哈希与运行标签完全一致；不需要重新部署Gateway、换镜像或改业务配置。

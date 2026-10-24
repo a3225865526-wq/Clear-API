@@ -1,0 +1,86 @@
+{
+  "observed_at": "2026-10-24T02:43:03.327672+00:00",
+  "disabled_ids": [
+    387486994,
+    378101050,
+    390042545,
+    378227091
+  ],
+  "workflows": [
+    {
+      "id": 377545312,
+      "path": ".github/workflows/ci.yml",
+      "name": "CI",
+      "state": "active"
+    },
+    {
+      "id": 378068457,
+      "path": ".github/workflows/release-candidate.yml",
+      "name": "Release Candidate",
+      "state": "active"
+    },
+    {
+      "id": 384204592,
+      "path": ".github/workflows/release-pg03-gateway.yml",
+      "name": "PG03 reviewed main Gateway RC",
+      "state": "active"
+    },
+    {
+      "id": 387553097,
+      "path": ".github/workflows/deployment-rehearsal.yml",
+      "name": "Deployment rehearsal",
+      "state": "active"
+    },
+    {
+      "id": 389079463,
+      "path": ".github/workflows/release-state-audit.yml",
+      "name": "PG03 release state audit",
+      "state": "active"
+    },
+    {
+      "id": 390820963,
+      "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+      "name": "PG03 isolated exact-image schema rehearsal",
+      "state": "active"
+    },
+    {
+      "id": 391551026,
+      "path": ".github/workflows/pg03-successor-approval.yml",
+      "name": "PG03 successor independent grant",
+      "state": "active"
+    },
+    {
+      "id": 378101050,
+      "path": ".github/workflows/deploy-production.yml",
+      "name": "Deploy Production",
+      "state": "disabled_manually"
+    },
+    {
+      "id": 378227091,
+      "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+      "name": "GHCR Pull Rehearsal",
+      "state": "disabled_manually"
+    },
+    {
+      "id": 387486994,
+      "path": ".github/workflows/automatic-deploy.yml",
+      "name": "Automatic production release",
+      "state": "disabled_manually"
+    },
+    {
+      "id": 390042545,
+      "path": ".github/workflows/failed-production-recovery.yml",
+      "name": "Failed production recovery",
+      "state": "disabled_manually"
+    }
+  ],
+  "in_flight": {
+    "queued": 0,
+    "in_progress": 0,
+    "waiting": 0,
+    "pending": 0,
+    "requested": 0
+  },
+  "other_workflows_unchanged": true,
+  "variables_and_branch_protection_modified": false
+}

@@ -1,0 +1,30 @@
+[
+  {
+    "id": 387486994,
+    "exit": 0,
+    "observed_at": "2026-10-24T02:42:22.001293+00:00",
+    "path": ".github/workflows/automatic-deploy.yml",
+    "state": "disabled_manually"
+  },
+  {
+    "id": 378101050,
+    "exit": 0,
+    "observed_at": "2026-10-24T02:42:33.278946+00:00",
+    "path": ".github/workflows/deploy-production.yml",
+    "state": "disabled_manually"
+  },
+  {
+    "id": 390042545,
+    "exit": 0,
+    "observed_at": "2026-10-24T02:42:43.681543+00:00",
+    "path": ".github/workflows/failed-production-recovery.yml",
+    "state": "disabled_manually"
+  },
+  {
+    "id": 378227091,
+    "exit": 0,
+    "observed_at": "2026-10-24T02:42:52.568036+00:00",
+    "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+    "state": "disabled_manually"
+  }
+]

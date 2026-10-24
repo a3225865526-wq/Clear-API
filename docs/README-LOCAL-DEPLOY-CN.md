@@ -83,3 +83,12 @@ python3 -m unittest discover -s tests -p test_cutover_prepare.py -v
 新接管回归、现有受影响回归及真实隔离五层Compose/备份身份/boot读取检查已通过；未重跑30项E2E，未执行生产备份或宣称已解除隔离。生产仍待文件归属修正、精确资产安装、元数据接管及真实备份/boot/网站检查；本轮无任何生产或GitHub远端写入。
 
 当前clearadmin仍为既有管理员通道；安装受限sudoers片段不会撤销其原有ALL。本次恢复不新增账号、不改管理员权限。网站通过后再启用既定root配置/哨兵；仅工具/元数据差异时Windows脚本不构建Gateway。4个旧生产入口经授权后精确停用，普通CI和分支保护保留。
+
+
+## 2026-10-24 维护执行状态：公网失败，尚未激活
+
+已按授权源码1aa591f4bb完成4项旧生产workflow停用、7资产/sudoers安装及当前运行实例的adopted元数据接管；Gateway未重启或换镜像。正式备份20261024T025143Z、认证解密/9项哈希/PG17 TOC、Runtime和boot检查通过。
+
+原Caddy启动后公网健康合同失败，已停止并恢复restart=no，失败记录保留。www维护请求仍为Cloudflare403/error1010，VPS裸域解析未获得地址；未改Cloudflare规则/DNS。按停止条件，local-deploy.json及启用哨兵尚未创建，Windows正式入口没有激活。不要重跑adopt-running、删除失败记录或直接启动Caddy；需先按明确审阅与授权处理剩余公网/检查兼容问题。其他业务配置、PG/Executor及原FAILED/target/hold保持，PG03商业仍暂缓。
+
+执行证据与前后状态见evidence/production-maintenance-20261024/REPORT.md；此前准备说明为历史，不代表当前所有步骤已成功。

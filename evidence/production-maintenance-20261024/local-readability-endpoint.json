@@ -1,0 +1,6 @@
+{
+  "docker_context": "desktop-linux",
+  "endpoint": "npipe:////./pipe/dockerDesktopLinuxEngine",
+  "local_endpoint_verified": true,
+  "production_docker_endpoint_used": false
+}

@@ -1,0 +1,7 @@
+{
+  "observed_at": "2026-10-24T02:50:36.759488+00:00",
+  "phase": "preserve-recovery-evidence",
+  "exit": 0,
+  "stdout": "{\"result\": \"PASS\", \"existing_recovery_backups_preserved\": [{\"backup_id\": \"20261020T002138Z\", \"cipher_sha256\": \"0c8757c8d204cddd7cc5b3b9a7835823e376093b9ee344f5a8bd8c219d3b3b31\", \"bytes\": 12323351, \"preserved_at\": \"/opt/clearapi/backups/maintenance-20261024-1aa591f4bb/preserved-backups/20261020T002138Z\"}, {\"backup_id\": \"20261023T102102Z\", \"cipher_sha256\": \"995100eb925127adcbb063bf8e7f8cee93597d3f5e11e488d7835d2ad988e609\", \"bytes\": 12330812, \"preserved_at\": \"/opt/clearapi/backups/maintenance-20261024-1aa591f4bb/preserved-backups/20261023T102102Z\"}], \"backup_public_recipient_available\": true, \"origin_certificate\": \"subject=CN = www.clear999.com\\nnotBefore=Oct  6 14:19:27 2026 GMT\\nnotAfter=Jan  4 14:19:26 2027 GMT\\nCertificate will not expire\", \"private_key_read_or_exported\": false, \"production_database_restore\": false}\n",
+  "stderr": ""
+}

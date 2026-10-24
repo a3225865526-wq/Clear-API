@@ -1,0 +1,8 @@
+{
+  "authorized_commit": "1aa591f4bb230c4fce5770114e45e9311beb87a4",
+  "branch": "codex/clearapi-local-deploy-formal-integration",
+  "observed_at": "2026-10-24T02:36:48.221225+00:00",
+  "initial_worktree_clean": true,
+  "asset_plan_sha256": "7660be0853d4119d12710ca3f814778e09874a8e41a7d55cd6c1c18ff5852a1b",
+  "scope": "user-authorized minimal maintenance; no image/Gateway/DB/Executor business changes; no Push/main merge"
+}
