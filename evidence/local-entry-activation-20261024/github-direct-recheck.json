@@ -1,0 +1,269 @@
+{
+  "utc": "2026-10-24T13:56:54.489420+00:00",
+  "method": "GET through existing gh identity; bypassed only local network proxy in this child process, no persistent settings or access controls changed",
+  "results": {
+    "workflows": {
+      "data": [
+        {
+          "id": 377545312,
+          "path": ".github/workflows/ci.yml",
+          "state": "active"
+        },
+        {
+          "id": 378068457,
+          "path": ".github/workflows/release-candidate.yml",
+          "state": "active"
+        },
+        {
+          "id": 384204592,
+          "path": ".github/workflows/release-pg03-gateway.yml",
+          "state": "active"
+        },
+        {
+          "id": 387553097,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "state": "active"
+        },
+        {
+          "id": 389079463,
+          "path": ".github/workflows/release-state-audit.yml",
+          "state": "active"
+        },
+        {
+          "id": 390820963,
+          "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+          "state": "active"
+        },
+        {
+          "id": 391551026,
+          "path": ".github/workflows/pg03-successor-approval.yml",
+          "state": "active"
+        },
+        {
+          "id": 378101050,
+          "path": ".github/workflows/deploy-production.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 378227091,
+          "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 387486994,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 390042545,
+          "path": ".github/workflows/failed-production-recovery.yml",
+          "state": "disabled_manually"
+        }
+      ]
+    },
+    "active_runs": {
+      "data": [
+        {
+          "id": 39957948359,
+          "path": ".github/workflows/release-candidate.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-23T13:02:28Z",
+          "updated_at": "2026-10-23T13:19:16Z"
+        },
+        {
+          "id": 39945000549,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T11:17:06Z",
+          "updated_at": "2026-10-23T11:17:07Z"
+        },
+        {
+          "id": 39944993784,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T11:17:03Z",
+          "updated_at": "2026-10-23T11:17:04Z"
+        },
+        {
+          "id": 39944971679,
+          "path": ".github/workflows/release-pg03-gateway.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T11:16:52Z",
+          "updated_at": "2026-10-23T11:17:01Z"
+        },
+        {
+          "id": 39944096489,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-23T11:09:21Z",
+          "updated_at": "2026-10-23T11:16:50Z"
+        },
+        {
+          "id": 39942181557,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-23T10:52:48Z",
+          "updated_at": "2026-10-23T11:00:39Z"
+        },
+        {
+          "id": 39938300678,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T10:19:39Z",
+          "updated_at": "2026-10-23T10:19:40Z"
+        },
+        {
+          "id": 39938295360,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T10:19:36Z",
+          "updated_at": "2026-10-23T10:19:37Z"
+        },
+        {
+          "id": 39938288492,
+          "path": ".github/workflows/release-pg03-gateway.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T10:19:33Z",
+          "updated_at": "2026-10-23T10:19:34Z"
+        },
+        {
+          "id": 39937355659,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-23T10:11:44Z",
+          "updated_at": "2026-10-23T10:19:31Z"
+        },
+        {
+          "id": 39936345578,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-23T10:03:26Z",
+          "updated_at": "2026-10-23T10:10:59Z"
+        },
+        {
+          "id": 39904997595,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T05:18:09Z",
+          "updated_at": "2026-10-23T05:18:10Z"
+        },
+        {
+          "id": 39904993118,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T05:18:06Z",
+          "updated_at": "2026-10-23T05:18:07Z"
+        },
+        {
+          "id": 39904988641,
+          "path": ".github/workflows/release-pg03-gateway.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-23T05:18:03Z",
+          "updated_at": "2026-10-23T05:18:04Z"
+        },
+        {
+          "id": 39904295635,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-23T05:10:29Z",
+          "updated_at": "2026-10-23T05:18:01Z"
+        },
+        {
+          "id": 39903132565,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-23T04:57:51Z",
+          "updated_at": "2026-10-23T05:05:34Z"
+        },
+        {
+          "id": 39823787085,
+          "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+          "status": "completed",
+          "conclusion": "failure",
+          "created_at": "2026-10-22T17:33:42Z",
+          "updated_at": "2026-10-22T17:34:15Z"
+        },
+        {
+          "id": 39821130419,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T17:16:06Z",
+          "updated_at": "2026-10-22T17:16:07Z"
+        },
+        {
+          "id": 39820023740,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T17:08:19Z",
+          "updated_at": "2026-10-22T17:16:04Z"
+        },
+        {
+          "id": 39818820533,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T17:00:11Z",
+          "updated_at": "2026-10-22T17:00:23Z"
+        },
+        {
+          "id": 39818812002,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T17:00:08Z",
+          "updated_at": "2026-10-22T17:00:09Z"
+        },
+        {
+          "id": 39818786597,
+          "path": ".github/workflows/release-pg03-gateway.yml",
+          "status": "completed",
+          "conclusion": "skipped",
+          "created_at": "2026-10-22T16:59:58Z",
+          "updated_at": "2026-10-22T17:00:06Z"
+        },
+        {
+          "id": 39817772180,
+          "path": ".github/workflows/release-candidate.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T16:52:50Z",
+          "updated_at": "2026-10-22T17:06:37Z"
+        },
+        {
+          "id": 39817671465,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T16:52:08Z",
+          "updated_at": "2026-10-22T16:59:56Z"
+        },
+        {
+          "id": 39816378844,
+          "path": ".github/workflows/ci.yml",
+          "status": "completed",
+          "conclusion": "success",
+          "created_at": "2026-10-22T16:43:46Z",
+          "updated_at": "2026-10-22T16:51:20Z"
+        }
+      ]
+    }
+  }
+}

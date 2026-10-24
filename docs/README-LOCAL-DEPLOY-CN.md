@@ -4,18 +4,18 @@
 
 ## 当前使用步骤（2026-10-24；以下历史记录不覆盖本节）
 
-网站 `https://www.clear999.com` 已恢复，原 Gateway、Caddy、PostgreSQL、Executor 正常；4项旧生产workflow仍停用，普通CI保留。Windows本机配置和可信SSH pin已准备，**VPS正式入口尚未激活**，不要为此更新Gateway。
+网站 `https://www.clear999.com` 已恢复，原 Gateway、Caddy、PostgreSQL、Executor 正常；4项旧生产workflow仍停用，普通CI保留。**2026-10-24晚间已按明确授权正式激活Windows本地部署入口，并完成实际preflight；没有更新Gateway或启停服务。**
 
 - 正式工作区：`D:\Codex\worktrees\clearapi-local-formal-integration\clearapi-controlled-launch-20261020`，分支 `codex/clearapi-local-deploy-formal-integration`。
 - 已忽略的 `scripts/local-deploy.config.json` 引用现有受保护私钥；专用pin为 `D:\AI\API\runtime\clearapi-local-deploy-production\known_hosts`，仅复制既有可信ed25519记录，已与服务器公钥指纹匹配。不需要复制私钥、填写密码或新建Token。
 - 本机PowerShell7.6.5为RemoteSigned；5.1目前Restricted，不改策略、不使用Bypass。以下命令使用已存在的PowerShell7。
 - 本地兼容修复提交 `14d7c09582e99c3144a76fcbeb06f509f3225489`：helper状态探针改用明确标识的原生curl；Windows仅将不在Gateway运行镜像内的两项恢复工具排除出PG03业务变更误报，SQL/迁移/真实PG03变更阻断保留。
 
-**待单独批准的最小VPS写入：** 保全旧helper后，仅更新 `/opt/clearapi/bin/clearapi-local-deploy.py` 为本次精确SHA版本，并创建既定 `local-deploy.json`、最后发布 `local-deploy.enabled`，随后执行正式只读preflight。三项路径、内容、模式、SHA和失败撤销范围在 `evidence/local-entry-preparation-20261024/activation-plan.json`。其余6项资产、sudoers、Runtime/boot、接管状态和网站服务不改；不调用receive，不构建/load或替换镜像。
+**已完成的最小VPS写入：** 保全旧helper后，仅更新 `/opt/clearapi/bin/clearapi-local-deploy.py` 为SHA b9c11350版本(root:root0750)，创建既定 `local-deploy.json`(root:root0600/SHA22833e91)，最后发布 `local-deploy.enabled`(root:root0600/SHA00d09bec)。按冻结的 `evidence/local-entry-preparation-20261024/activation-plan.json` 执行，其余6项资产、sudoers、Runtime/boot、接管状态和网站服务保持。完整回执在 `evidence/local-entry-activation-20261024/REPORT.md`；旧helper及现场保全于 `/opt/clearapi/backups/local-entry-activation-20261024-133336060a`。
 
-正式helper preflight目前因配置缺失而正常拒绝，不能冒称已经PASS。候选探针只在内存中检查了本机及公网200/success=true；没有绕过启用门禁执行完整preflight。现有preflight为校验OCI config digest会临时docker save到自动清理的临时目录；这项临时写入也包含在待授权范围内。
+**正式preflight已实际PASS：** 安装事务中调用默认生产配置的正式CLI通过；又从Windows现有本机配置、真实OpenSSH及固定sudo命令路径执行通过，返回原a032提交/0a9a93c0容器/48df OCI config digest，healthy=true。备份前置和Runtime/boot另作只读实核通过，未触发新备份。preflight使用的临时docker save校验目录已全部清理；没有运行deploy-local.ps1、receive、build、load或Compose up。本次仅激活入口，不是一次应用发布。
 
-入口激活并通过正式preflight后，每次更新先保存真实应用改动为本地Git提交，完成对应检查并保持工作区干净，然后执行：
+今后每次更新，先保存真实应用改动为本地Git提交，完成对应检查并保持工作区干净，然后执行：
 
 ```powershell
 Set-Location 'D:\Codex\worktrees\clearapi-local-formal-integration\clearapi-controlled-launch-20261020'

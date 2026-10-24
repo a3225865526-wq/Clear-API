@@ -1,3 +1,15 @@
+## 2026-10-24 晚间 Asia/Shanghai — Windows本地部署入口正式激活；preflight实测PASS，未执行应用部署
+
+- **真实激活完成：** 本轮人类用户明确批准冻结activation-plan范围。开始工作区/分支正确、HEAD精确133336060a650be577d618a046f001a124f379aa且干净；三项资产均取ce84487c4d1838e3f911c826f1dd4d781d6b5e20的Git blob，字节数/LF/SHA逐项匹配。SSH可信ed25519指纹、现有helper66ec、生产状态、备份及恢复约束无漂移。GitHub经子进程直连GET确认四旧生产入口仍停用、普通CI保留、两AUTO=false、五类在途0，未改代理设置或远端状态。
+- **21:59:13–21:59:27按顺序写入：** helper /opt/clearapi/bin/clearapi-local-deploy.py root:root0750、31111bytes、SHA b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f；正式config/local-deploy.json root:root0600、388bytes、SHA22833e916fc368b208959d55442f006e5b551e81dc5261be40a92803bb188286；最后发布config/local-deploy.enabled root:root0600、33bytes、SHA00d09becb7e5b07482cf917cf361befd457a12e664d193645454e0e6a4904f16。其余6项root资产和sudoers不改。
+- **保全与回执：** 旧helper、配置原本不存在的状态及必要FAILED/target/hold/adopted/网站恢复记录保存在/opt/clearapi/backups/local-entry-activation-20261024-133336060a(root0700)。root回执activation-receipt.json root0600、12172bytes、SHA558886f95653bc58683ca848c71192093a1b19463ee49b09feff717c167fa5c1，result=ACTIVATED/rollback=false/application_deployment_executed=false。原历史文件原字节不变。
+- **正式preflight PASS：** 安装事务实际执行已安装默认生产CLI；22:01:55又从Windows现有本地配置经真实OpenSSH调用sudo -n /opt/clearapi/bin/clearapi-local-deploy.py preflight，exit0/healthy=true。返回service new-api/amd64、原Gateway0a9a93c0、源码a032、GHCR ref/engine ed6、OCI config digest48df，与接管状态一致。不是fixture、内存候选或DryRun替代。配置/哨兵、root权限、镜像归档身份、Compose/manifest及本地/公网健康按正式代码核对；Runtime/boot、备份前置/sudoers另作只读实核通过，没有新触发备份或恢复。两次preflight临时docker save目录最终为空，未load/build或修改镜像。
+- **网站与服务保持：** 激活后www首页HTTP200/CF-Ray a4f9808e9ff70987-HKG，应用壳SHA8112a695与恢复时一致，正式preflight两次API success=true。Caddy、Gateway、PG、Executor的CID/镜像/运行/StartedAt/restart/mounts均与激活前相同；Gateway仍a032/ed6、StartedAt2026-10-23T14:07:58.383082222Z。未重启任何服务、未修改数据库/计费/用户数据或业务配置，PG03仍不商业开放。
+- **本轮到此停止：** 没有运行deploy-local.ps1（包括DryRun），没有receive/应用部署/Push/main合并/GitHub启用/Cloudflare或DNS变更。裸域方案独立未执行。今后有真实应用变更时，按中文README在PowerShell7先-DryRun，通过且获该次更新授权后才执行部署；当前仅工具/记录差异，不需为激活补发Gateway。
+- 完整实际写入、前后快照、默认CLI及Windows路径回执：evidence/local-entry-activation-20261024/REPORT.md和同目录JSON。当前目标无剩余阻塞；下方准备、网站恢复及其他主线历史原样保留。
+
+---
+
 ## 2026-10-24 晚间 Asia/Shanghai — 本地入口非生产准备完成；三项VPS激活写入待授权
 
 - **网站保持恢复，不再开展恢复开发。** 21:27只读实核与网站恢复后基线无漂移，原Gateway/Caddy/PG/Executor的CID/镜像/启动时间/restart/mounts原样；Compose/环境/adopted元数据及website_restored结果匹配。Runtime、boot installed/live及既有备份20261024T033125Z的密文/manifest/当前身份均匹配，未新触发备份或恢复演练。
