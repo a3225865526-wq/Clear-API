@@ -1,0 +1,12 @@
+{
+  "utc": "2026-10-24T03:36:04.957930+00:00",
+  "client": "Windows native curl forced IPv4 after initial connection timeout; no changed server/security settings",
+  "url": "https://www.clear999.com/api/status?clearapi_ipv4_postflight=8a081ff2d0",
+  "exit": 28,
+  "metrics_http_remote": "000|",
+  "headers": {},
+  "api_success": false,
+  "body_bytes": 0,
+  "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stderr": "curl: (28) Connection timed out after 8007 milliseconds\n"
+}

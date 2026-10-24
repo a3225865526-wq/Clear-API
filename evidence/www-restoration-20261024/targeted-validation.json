@@ -1,0 +1,31 @@
+{
+  "command": [
+    "docker",
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "--read-only",
+    "--tmpfs",
+    "/tmp",
+    "-v",
+    "D:\\Codex\\worktrees\\clearapi-local-formal-integration\\clearapi-controlled-launch-20261020:/work:ro",
+    "-w",
+    "/work",
+    "python:3.12-slim",
+    "python",
+    "-B",
+    "scripts/ci/test-failed-recovery.py",
+    "WebsiteRestorationTest",
+    "RecoveryAuthorityTest.test_wrapper_and_recovery_helper_pins_match_reviewed_bytes"
+  ],
+  "exit": 0,
+  "output": "................\n----------------------------------------------------------------------\nRan 16 tests in 0.039s\n\nOK\n",
+  "checks": [
+    "Python source compile PASS",
+    "16 focused Linux tests PASS"
+  ],
+  "windows_test_attempt": "fcntl unavailable on Windows; actual tests executed in local Linux container",
+  "earlier_fixture_failure": "retry fixture lost its temporary Caddy CONFIG path; fixture corrected and retested",
+  "source_sha256": "04b237bd1337fb535fb6c2cb45c3462e13fd69e01a50e98c8df4b245e6c628bd"
+}

@@ -1,0 +1,11 @@
+{
+  "utc": "2026-10-24T03:31:20.296765+00:00",
+  "four_disabled": true,
+  "inflight_counts": {
+    "queued": 0,
+    "in_progress": 0,
+    "waiting": 0,
+    "pending": 0,
+    "requested": 0
+  }
+}

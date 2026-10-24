@@ -1,0 +1,27 @@
+{
+  "recorded_at": "2026-10-24T03:37:36.969176+00:00",
+  "client": "Existing Microsoft Edge user profile; normal browser; read-only browser automation observation",
+  "homepage": {
+    "requested_url": "https://www.clear999.com/",
+    "rendered": true,
+    "observed_main_heading": "让模型接入、密钥与用量，在一个清晰的控制台中管理",
+    "observed_navigation": [
+      "主页",
+      "控制台",
+      "模型广场",
+      "购买额度"
+    ],
+    "dom_snapshot_observed": true,
+    "browser_http_status_not_collected": true
+  },
+  "public_api": {
+    "observed_at": "2026-10-24T03:37:08.736Z",
+    "url": "https://www.clear999.com/api/status",
+    "visible_json": true,
+    "api_success": true
+  },
+  "manual_human_acceptance": "not_performed",
+  "login_or_transactions": "not_performed",
+  "account_data_or_settings_changed": false,
+  "initial_cua_navigation_timeout": "DOM-backed browser API subsequently read the rendered page successfully without reloading it"
+}

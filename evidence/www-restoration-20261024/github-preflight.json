@@ -1,0 +1,70 @@
+{
+  "utc": "2026-10-24T03:28:05.199563+00:00",
+  "production_workflows": [
+    {
+      "id": 378101050,
+      "path": ".github/workflows/deploy-production.yml",
+      "state": "disabled_manually"
+    },
+    {
+      "id": 378227091,
+      "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+      "state": "disabled_manually"
+    },
+    {
+      "id": 387486994,
+      "path": ".github/workflows/automatic-deploy.yml",
+      "state": "disabled_manually"
+    },
+    {
+      "id": 390042545,
+      "path": ".github/workflows/failed-production-recovery.yml",
+      "state": "disabled_manually"
+    }
+  ],
+  "other_workflows": [
+    {
+      "id": 377545312,
+      "path": ".github/workflows/ci.yml",
+      "state": "active"
+    },
+    {
+      "id": 378068457,
+      "path": ".github/workflows/release-candidate.yml",
+      "state": "active"
+    },
+    {
+      "id": 384204592,
+      "path": ".github/workflows/release-pg03-gateway.yml",
+      "state": "active"
+    },
+    {
+      "id": 387553097,
+      "path": ".github/workflows/deployment-rehearsal.yml",
+      "state": "active"
+    },
+    {
+      "id": 389079463,
+      "path": ".github/workflows/release-state-audit.yml",
+      "state": "active"
+    },
+    {
+      "id": 390820963,
+      "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+      "state": "active"
+    },
+    {
+      "id": 391551026,
+      "path": ".github/workflows/pg03-successor-approval.yml",
+      "state": "active"
+    }
+  ],
+  "inflight_counts": {
+    "queued": 0,
+    "in_progress": 0,
+    "waiting": 0,
+    "pending": 0,
+    "requested": 0
+  },
+  "mode": "GET only; no changes"
+}

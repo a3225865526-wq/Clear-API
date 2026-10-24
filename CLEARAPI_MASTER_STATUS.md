@@ -1,3 +1,16 @@
+## 2026-10-24 11:26–11:37 Asia/Shanghai — www已真实恢复；原Caddy运行，本地部署入口仍未激活
+
+- **网站恢复成功：** 本轮明确授权范围内完成原正式恢复入口一次受控执行。原Caddy54c8550b/f2a于UTC03:31:58.532588899启动，Running=true/restart=unless-stopped；源站HTTPS证书/到Gateway转发及HTTP308通过，Cloudflare的/api/status、首页、/login、/dashboard/overview均200并通过原内容合同。真实结果website_restored/public_traffic=open；本次未触发安全停回。
+- **真实浏览器：** 现有正常Edge实际渲染首页品牌、导航及主标题；UTC03:37:08浏览器直接访问公开/api/status显示JSON且success=true。属于只读自动观察，不冒称人工登录、充值支付或Provider验收。Windows原生curl首页200/DYNAMIC；独立API连接超时及JS部分下载超时原样记录，无HTTP/Ray，不能假称这些通路PASS或猜成Cloudflare拒绝。
+- **最小探针修复：** 源码提交8a081ff2d07951d8fa7b0626743df51dcb3899cf。仅将正式公网探针替换为正常原生curl默认UA，加X-ClearAPI-Probe用途标识；不伪装浏览器、不改WAF/BIC。保留TLS/不跟随跳转/时间大小限制、CF-Ray/API/应用壳及失败停回。源站检查在Caddy启动后、公网检查之前。原一次失败经本轮重新授权人工复核后，以精确失败SHA绑定一次追加尝试，原锁/失败文件不删改，不自动重试。
+- **生产资产：** 仅原子更新原pg03-failed-recovery.py，root:root0750、34573bytes、SHA04b237bd1337fb535fb6c2cb45c3462e13fd69e01a50e98c8df4b245e6c628bd；其他6项资产不变。旧文件及原attempt/failure保全在/opt/clearapi/backups/www-restoration-20261024-8a081ff2d0。仓库legacy V2/CONTROL哈希引用同步仅保存源码，未安装或重新启用旧发布器。
+- **前置及正式合同：** 安装前无生产漂移，原配置SHA6b124666/证书www有效，既有备份/元数据/Runtime/boot匹配；4个旧生产workflow仍disabled_manually、5类在途均0。原入口内部按合同生成一次正式备份20261024T033125Z，success/exit0，密文SHAf0fbffaaf17116b46f93ab41986033fc84902fd52089f8a1bf07365d6af667e2，身份/大小/清理通过；复用前轮解密与既有恢复方法证据，不虚称新密文完成全量恢复演练。
+- **后置：** Runtime/boot PASS，既有只读Caddy reconcile PASS/effective_stage=website_restored。成功result root0600、SHA d2bfd7f6fbe7da232b5e91ea39d64ae9622d66070497d444fb9643a516b99328。原FAILED/target/hold及前次attempt43d5f560/failure42eca429、接管state cdcea866原字节保留；未把历史失败覆盖成success。
+- **严格边界保持：** Gateway仍原0a9a93c0/ed6/a032且StartedAt不变，未重部署/重启；PG99299db0、Executor1081a1b5的身份/启动时间/restart/mounts不变，未改数据库、渠道、余额、计费或其他业务配置。PG03仍暂缓商业，其他业务原样。未改Cloudflare/DNS/NS、未Push/合并main、未重跑30项E2E。裸域修复独立后续处理；local-deploy.json和local-deploy.enabled仍均不存在，本地入口待单独激活。
+- 16项定向Linux测试、Python编译及Git diff检查通过。完整执行和分层验收：evidence/www-restoration-20261024/REPORT.md及同目录JSON。网站恢复生产写入到此结束，下方历史主线原样保留。
+
+---
+
 ## 2026-10-24 11:12–11:17 Asia/Shanghai — 公网只读排障：探针签名1010、裸域NODATA、Caddy停止为独立问题
 
 - 基于正式集成分支22f85af11f68a9de62807332f62953dd0b2385b9及干净工作区，仅采集网络/Docker只读状态；未改Cloudflare/DNS/NS/服务/root资产/业务数据，未激活入口或重跑30项E2E。
