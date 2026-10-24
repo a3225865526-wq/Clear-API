@@ -19,12 +19,13 @@ For commercial licensing, please contact support@quantumnous.com
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { normalizeAnnouncementStatus } from '../announcements'
 import { AnnouncementsSection } from '../announcements-section'
 
 const mockPut = vi.fn()
+beforeEach(() => mockPut.mockReset())
 vi.mock('@/lib/api', () => ({
   api: {
     get: vi.fn(),
@@ -68,6 +69,67 @@ function renderSection(data: unknown[]) {
 }
 
 describe('announcement release lifecycle', () => {
+  it('creates a draft announcement and persists it only after saving settings', async () => {
+    mockPut.mockResolvedValue({ data: { success: true } })
+    const user = userEvent.setup()
+    renderSection([])
+    await user.click(screen.getByRole('button', { name: 'Add Announcement' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Content' }),
+      'New release announcement'
+    )
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }))
+    expect(await screen.findByText('New release announcement')).toBeVisible()
+    expect(screen.getByText('Draft')).toBeVisible()
+    expect(mockPut).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'Save Settings' }))
+    await waitFor(() => expect(mockPut).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(mockPut.mock.calls[0][1].value)).toEqual([
+      expect.objectContaining({
+        content: 'New release announcement',
+        status: 'draft',
+      }),
+    ])
+  })
+
+  it('edits an existing announcement while preserving its publication state', async () => {
+    mockPut.mockResolvedValue({ data: { success: true } })
+    const user = userEvent.setup()
+    renderSection([draftRecord])
+    await screen.findByText('Draft announcement')
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const dialog = await screen.findByRole('dialog')
+    const content = within(dialog).getByRole('textbox', { name: 'Content' })
+    await user.clear(content)
+    await user.type(content, 'Edited release announcement')
+    await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+    expect(await screen.findByText('Edited release announcement')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: 'Save Settings' }))
+    await waitFor(() => expect(mockPut).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(mockPut.mock.calls[0][1].value)).toEqual([
+      { ...draftRecord, content: 'Edited release announcement', extra: '' },
+    ])
+  })
+
+  it('deletes an announcement after confirmation and saves the empty list', async () => {
+    mockPut.mockResolvedValue({ data: { success: true } })
+    const user = userEvent.setup()
+    renderSection([draftRecord])
+    await screen.findByText('Draft announcement')
+    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
+    const dialog = await screen.findByRole('alertdialog')
+    expect(screen.getByText('Draft announcement')).toBeVisible()
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+    await waitFor(() =>
+      expect(screen.queryByText('Draft announcement')).not.toBeInTheDocument()
+    )
+    await user.click(screen.getByRole('button', { name: 'Save Settings' }))
+    await waitFor(() => expect(mockPut).toHaveBeenCalledTimes(1))
+    expect(JSON.parse(mockPut.mock.calls[0][1].value)).toEqual([])
+  })
+
   it('treats records without a status as published and unknown statuses as drafts', () => {
     expect(normalizeAnnouncementStatus(undefined)).toBe('published')
     expect(normalizeAnnouncementStatus('')).toBe('published')

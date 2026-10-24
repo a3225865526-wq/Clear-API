@@ -1,5 +1,6 @@
 """No network, Docker, GHCR, VPS or real file outside an isolated tempdir."""
 import contextlib
+import hashlib
 import fcntl
 import importlib.util
 import io
@@ -40,6 +41,42 @@ class StatusProbeTest(unittest.TestCase):
                          '{"success":false}\nCLEARAPI_HTTP:200']:
             with self.subTest(response=response),patch.object(m,'run',return_value=response):
                 with self.assertRaises(m.DeployError):m.probe('https://www.clear999.com/api/status')
+
+
+class BackupProofTest(unittest.TestCase):
+    def test_only_fresh_complete_current_identity_backup_is_accepted(self):
+        for fault in ('none','missing','malformed','truncated','checksum','identity','stale','unit_failed'):
+            with self.subTest(fault=fault),tempfile.TemporaryDirectory() as temporary:
+                base=Path(temporary)
+                stamp='20261024T150000Z'
+                manifests=base/'manifests';manifests.mkdir()
+                encrypted=base/'encrypted'/stamp;encrypted.mkdir(parents=True)
+                artifact=encrypted/'backup.gpg';artifact.write_bytes(b'encrypted fixture')
+                state=base/'release-manifest.json';state.write_bytes(b'current release')
+                proof={'backup_schema_version':2,'backup_identity_schema_version':1,
+                       'backup_id':stamp,'running_identity':{'oci_revision':OLD,
+                       'docker_image_id':OLDID,'container_id':'current-container',
+                       'release_manifest_sha256':hashlib.sha256(state.read_bytes()).hexdigest()},
+                       'encryption':{'encrypted_artifact':{'name':artifact.name,
+                       'bytes':artifact.stat().st_size,'sha256':hashlib.sha256(artifact.read_bytes()).hexdigest()}}}
+                marker=manifests/(stamp+'.json')
+                if fault=='stale':marker.write_text(json.dumps(proof))
+                def systemctl(*args):
+                    if args[1]=='start':
+                        if fault in ('missing','stale'):return ''
+                        if fault=='identity':proof['running_identity']['oci_revision']=NEW
+                        if fault=='truncated':artifact.write_bytes(b'x')
+                        if fault=='checksum':artifact.write_bytes(b'corrupted fixture')
+                        marker.write_text('{' if fault=='malformed' else json.dumps(proof))
+                        return ''
+                    return 'failed' if fault=='unit_failed' else 'success'
+                config={'backup_dir':str(base),'backup_service':'isolated-backup.service','app_dir':str(base)}
+                with patch.object(m,'run',side_effect=systemctl),patch.object(m,'secure_file'),\
+                     patch.object(m,'deployed',return_value={'commit':OLD,'image_id':OLDID,'container_id':'current-container'}),\
+                     patch.object(m.STATE,'manifest_path',return_value=state):
+                    if fault=='none':self.assertEqual(m.backup(config),stamp)
+                    else:
+                        with self.assertRaises((m.DeployError,json.JSONDecodeError)):m.backup(config)
 
 
 class MockDeploy(unittest.TestCase):
