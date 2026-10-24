@@ -1,3 +1,15 @@
+## 2026-10-24 晚间 Asia/Shanghai — 本地入口非生产准备完成；三项VPS激活写入待授权
+
+- **网站保持恢复，不再开展恢复开发。** 21:27只读实核与网站恢复后基线无漂移，原Gateway/Caddy/PG/Executor的CID/镜像/启动时间/restart/mounts原样；Compose/环境/adopted元数据及website_restored结果匹配。Runtime、boot installed/live及既有备份20261024T033125Z的密文/manifest/当前身份均匹配，未新触发备份或恢复演练。
+- **本机已准备：** 正式集成分支开始HEAD ed78f07a91240462bd617abc49e6877e99d4e599且干净；创建Git忽略的scripts/local-deploy.config.json，引用已有受保护私钥。专用known_hosts仅复制原可信ed25519记录，指纹SHA256:kVqtsCzwAanVxCoVB5OA4b1lvMVdF9bpxYhy8xjNuLc与实际服务器公钥一致，真实批处理SSH连接通过；未读取私钥内容。Docker Linux/Buildx可用，使用现有PowerShell7.6.5/RemoteSigned；5.1的Restricted策略不改、不使用Bypass。
+- **真实兼容缺口已本地最小修复：** 提交14d7c09582e99c3144a76fcbeb06f509f3225489。已安装helper66ec仍默认urllib，真实公网403/Ray a4f952650e378a4c-HKG；候选helper b9c11350仅改状态探针为明确标识的原生curl。候选只以内存方式调用status函数，本机/公网200且success=true；未安装资产/写配置，也未调用完整preflight/docker save。Windows对两项不进Gateway运行镜像的恢复工具精确排除PG03误报，SQL/迁移/真实PG03阻断保留。PS5.1/7的AST及七项分类合同、Linux两项状态探针定向回归和Python编译通过，未复跑30项E2E。
+- **正式入口没有激活或冒充PASS：** /opt/clearapi/config/local-deploy.json及local-deploy.enabled仍不存在。实调现有正式helper preflight（禁字节码缓存）因缺配置退出2，未绕过门禁。下一步仅申请更新一个helper为b9c11350、创建正式JSON(root0600/SHA22833e91)、最后发布原合同启用哨兵(root0600/SHA00d09bec)，保全旧helper并运行正式preflight；包含其临时docker save校验文件自动清理，不运行receive/load/Compose up、不更新或重启任何服务。其余6项root资产和sudoers均保持。精确授权范围/回退见evidence/local-entry-preparation-20261024/activation-plan.json和REPORT.md，本轮未执行这些VPS写入。
+- **旧发布链已只读确认：** 21:34四项旧生产workflow仍disabled_manually，普通CI及其他7项active；两AUTO_ENABLED=false，五类在途均0，远端main仍a032。未Push/合并/更改GitHub。当前分支相对运行a032仅工具/记录差异，激活不需要发布Gateway；后续有真实应用变更时才依中文README执行PowerShell7的deploy-local.ps1 -DryRun，再在更新授权下执行同一脚本。
+- **裸域独立准备：** 权威A/AAAA仍NODATA，负缓存1800秒；实际Cloudflare边缘TLS链/主机名验证通过，SAN覆盖clear999.com和*.clear999.com，至2027-01-05有效。候选为代理A @→103.42.181.219，加仅匹配裸域的边缘308到www，保留路径/查询参数；先规则后DNS，无需改Caddy/NS/WAF/BIC。Dashboard导航未完成、仍about:blank，zone/现有规则未读，不猜登录态；执行前需补齐面板读核并另授权。没有修改DNS/Cloudflare。
+- 当前使用命令及最小激活范围已更新docs/README-LOCAL-DEPLOY-CN.md；本轮证据与明确未完成项在evidence/local-entry-preparation-20261024/。本轮只有本地配置/源码/文档准备与生产只读检查，PG03仍暂缓商业，其他业务保持。下方网站恢复及其他历史主线原样保留。
+
+---
+
 ## 2026-10-24 11:26–11:37 Asia/Shanghai — www已真实恢复；原Caddy运行，本地部署入口仍未激活
 
 - **网站恢复成功：** 本轮明确授权范围内完成原正式恢复入口一次受控执行。原Caddy54c8550b/f2a于UTC03:31:58.532588899启动，Running=true/restart=unless-stopped；源站HTTPS证书/到Gateway转发及HTTP308通过，Cloudflare的/api/status、首页、/login、/dashboard/overview均200并通过原内容合同。真实结果website_restored/public_traffic=open；本次未触发安全停回。

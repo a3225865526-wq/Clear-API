@@ -1,6 +1,34 @@
 # ClearAPI — Windows 本地一键部署
 
-本工具采用 **Windows Buildx 构建 → docker save → 固定主机密钥的 SSH 直传 → Linux helper 校验/load → 单服务 Compose 更新**。不执行 Git push，不使用 GHCR 作为新镜像传输依赖，不触发 Actions。本轮不连接生产，首次生产切换必须另行授权。
+本工具采用 **Windows Buildx 构建 → docker save → 固定主机密钥的 SSH 直传 → Linux helper 校验/load → 单服务 Compose 更新**。不执行 Git push，不使用 GHCR 作为新镜像传输依赖，不触发 Actions。生产入口激活或实际更新仍须在明确授权范围内执行。
+
+## 当前使用步骤（2026-10-24；以下历史记录不覆盖本节）
+
+网站 `https://www.clear999.com` 已恢复，原 Gateway、Caddy、PostgreSQL、Executor 正常；4项旧生产workflow仍停用，普通CI保留。Windows本机配置和可信SSH pin已准备，**VPS正式入口尚未激活**，不要为此更新Gateway。
+
+- 正式工作区：`D:\Codex\worktrees\clearapi-local-formal-integration\clearapi-controlled-launch-20261020`，分支 `codex/clearapi-local-deploy-formal-integration`。
+- 已忽略的 `scripts/local-deploy.config.json` 引用现有受保护私钥；专用pin为 `D:\AI\API\runtime\clearapi-local-deploy-production\known_hosts`，仅复制既有可信ed25519记录，已与服务器公钥指纹匹配。不需要复制私钥、填写密码或新建Token。
+- 本机PowerShell7.6.5为RemoteSigned；5.1目前Restricted，不改策略、不使用Bypass。以下命令使用已存在的PowerShell7。
+- 本地兼容修复提交 `14d7c09582e99c3144a76fcbeb06f509f3225489`：helper状态探针改用明确标识的原生curl；Windows仅将不在Gateway运行镜像内的两项恢复工具排除出PG03业务变更误报，SQL/迁移/真实PG03变更阻断保留。
+
+**待单独批准的最小VPS写入：** 保全旧helper后，仅更新 `/opt/clearapi/bin/clearapi-local-deploy.py` 为本次精确SHA版本，并创建既定 `local-deploy.json`、最后发布 `local-deploy.enabled`，随后执行正式只读preflight。三项路径、内容、模式、SHA和失败撤销范围在 `evidence/local-entry-preparation-20261024/activation-plan.json`。其余6项资产、sudoers、Runtime/boot、接管状态和网站服务不改；不调用receive，不构建/load或替换镜像。
+
+正式helper preflight目前因配置缺失而正常拒绝，不能冒称已经PASS。候选探针只在内存中检查了本机及公网200/success=true；没有绕过启用门禁执行完整preflight。现有preflight为校验OCI config digest会临时docker save到自动清理的临时目录；这项临时写入也包含在待授权范围内。
+
+入口激活并通过正式preflight后，每次更新先保存真实应用改动为本地Git提交，完成对应检查并保持工作区干净，然后执行：
+
+```powershell
+Set-Location 'D:\Codex\worktrees\clearapi-local-formal-integration\clearapi-controlled-launch-20261020'
+$PS7 = 'C:\Users\Chen\.cache\codex-runtimes\codex-primary-runtime\dependencies\native\powershell\pwsh.exe'
+& $PS7 -NoProfile -File .\scripts\deploy-local.ps1 -DryRun
+if ($LASTEXITCODE -ne 0) { throw '预检未通过，停止部署' }
+# 确认本次应用版本/变更范围且已获实际更新授权后：
+& $PS7 -NoProfile -File .\scripts\deploy-local.ps1
+```
+
+在已经打开的PowerShell7中，也可直接使用 ` .\scripts\deploy-local.ps1 -DryRun` 和 ` .\scripts\deploy-local.ps1`。不要在报错后继续第二条。当前分支相对线上a032只有工具/记录差异，**“Only metadata/tooling changed; no Gateway build needed”是拒绝无意义构建，不是要重新发布网站**；无需创建空应用提交来凑部署。正式激活以helper preflight通过为准，下一次有真实应用变更时才会生成DRY_RUN及后续镜像部署结果。
+
+前端部署按原合同可安全回退；后端部署先做正式备份，数据库状态未知时要求人工恢复。历史30场景验收不重复执行，本次仅运行必要兼容回归。裸域DNS/边缘308计划独立保存在同目录 `apex-dns-redirect-plan.json`，未执行，不影响www入口激活。
 
 ## 本地入口
 
@@ -11,7 +39,7 @@
 .\scripts\deploy-local.ps1
 ```
 
-普通 `-DryRun` 仍会连接已经授权切换的正式目标执行只读 preflight；本轮禁止对生产使用。离线预演使用 `-DryRun -FixturePath <可信隔离preflight.json>`，不会建立 SSH 连接。正式部署要求干净工作树、可追溯前驱提交及明确的前后端变更分类；仅工具或元数据修改不会构建 Gateway。
+普通 `-DryRun` 仍会连接正式目标执行preflight；服务端未激活时会拒绝。离线预演使用 `-DryRun -FixturePath <明确标注的可信测试fixture.json>`，不会建立SSH连接，不能当作正式预检凭证。正式部署要求干净工作树、可追溯前驱提交及明确的前后端变更分类；仅工具或元数据修改不会构建Gateway。
 
 正式模式固定目标为配置中的既定生产主机和 clearadmin:22；只使用 helper 默认的 root 配置，不能传入测试配置。`-TestTarget` 必须同时提供 `testTarget=true`、`127.0.0.1` 及 `/opt/clearapi-test/` 内的 root-only 配置路径。测试配置还必须满足 `isolated-test-v1` 合同、固定 daemon ID、loopback 健康地址和规范化后的隔离目录边界；不能直接改指生产。
 
@@ -44,7 +72,7 @@ python3 -m unittest discover -s tests -p test_local_deploy_vps.py -v
 python3 -m unittest discover -s tests -p test_cutover_prepare.py -v
 ```
 
-## 首次生产切换清单（尚未执行）
+## 首次生产切换清单（历史准备计划；当前状态以开头及总控为准）
 
 1. 单独授权切换窗口、精确源码/镜像身份、必要 root 工具安装及首次部署。首先只读核实实际生产状态和现有恢复主线；本轮未连接生产，历史总控不是当前现场证明。故障前驱必须先按已有恢复合同恢复，不能用本工具绕过。
 2. 检查 GitHub 实际 workflow/变量和在途运行。先经授权在 GitHub 停用旧自动及手动生产入口，再审查 `python scripts/prepare-local-cutover.py` 的本地预览；未确认旧链不可写生产前不得推送停用文件或启用新入口。本轮只保留预览，未更改远端。

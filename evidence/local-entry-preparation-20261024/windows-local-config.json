@@ -1,0 +1,37 @@
+{
+  "recorded_at": "2026-10-24T13:17:10.964369+00:00",
+  "config_path": "D:\\Codex\\worktrees\\clearapi-local-formal-integration\\clearapi-controlled-launch-20261020\\scripts\\local-deploy.config.json",
+  "config_gitignored": true,
+  "host": "103.42.181.219",
+  "user": "clearadmin",
+  "port": 22,
+  "identity_file_exists": true,
+  "identity_contents_read": false,
+  "uses_existing_authorized_identity": true,
+  "known_hosts_path": "D:\\AI\\API\\runtime\\clearapi-local-deploy-production\\known_hosts",
+  "pin_source": "Existing trusted known_hosts entry; no ssh-keyscan or trust-on-first-use",
+  "known_hosts_sha256": "68037cafe2cb3b15eba76c67ef5a5c1452829b35f59c9139476c547f0093e84a",
+  "host_key_fingerprint": "256 SHA256:kVqtsCzwAanVxCoVB5OA4b1lvMVdF9bpxYhy8xjNuLc 103.42.181.219 (ED25519)",
+  "effective_ssh": {
+    "user": "clearadmin",
+    "hostname": "103.42.181.219",
+    "port": "22",
+    "batchmode": "yes",
+    "identitiesonly": "yes",
+    "stricthostkeychecking": "true",
+    "updatehostkeys": "false",
+    "identityfile": "<existing authorized key path>",
+    "userknownhostsfile": "D:\\AI\\API\\runtime\\clearapi-local-deploy-production\\known_hosts"
+  },
+  "private_key_acl": {
+    "protected": true,
+    "allowed_readers": "Existing owner Chen, SYSTEM, Administrators; no broad Users/Everyone access; no key content read"
+  },
+  "powershell": {
+    "recommended_runtime": "7.6.5",
+    "execution_policy": "RemoteSigned",
+    "legacy_5_1_execution_policy": "Restricted; not changed"
+  },
+  "ssh_agent": "Stopped; batch SSH succeeded using the existing explicit key",
+  "server_fingerprint_matches_dedicated_pin": true
+}
