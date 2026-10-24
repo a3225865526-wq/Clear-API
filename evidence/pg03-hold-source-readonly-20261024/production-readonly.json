@@ -1,0 +1,548 @@
+{
+  "utc": "2026-10-24T14:24:20.215950+00:00",
+  "exit": 0,
+  "stderr": "",
+  "production_writes": false,
+  "result": {
+    "activation_sentinel": "LOCAL_DEPLOY_CUTOVER_APPROVED_V1",
+    "adopted_state": {
+      "adoption": {
+        "compose_hash": "a2ab7e6c055fe0e7ef37b5dad6ef6a5cdceb855f852f8133ea40f7a1d65ce3e7",
+        "compose_sha256": {
+          "compose-candidate.yaml": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+          "compose-pg03.yaml": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+          "compose-website-recovery-39957948359.json": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+          "docker-compose.prod.yml": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa"
+        },
+        "environment_sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a",
+        "gateway": {
+          "commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+          "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+          "image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+          "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+          "started_at": "2026-10-23T14:07:58.383082222Z"
+        },
+        "original_incident": {
+          "controlled-launch-state.json": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+          "pg03-target-manifest.json": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+          "release-manifest.json": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3"
+        },
+        "recorded_at": "2026-10-24T02:47:44.007088+00:00",
+        "shared": {
+          "clearapi-pool-executor-1": {
+            "container_id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+            "image_id": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58"
+          },
+          "clearapi-postgres-1": {
+            "container_id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+            "image_id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+          }
+        },
+        "source_commit": "1aa591f4bb230c4fce5770114e45e9311beb87a4"
+      },
+      "releases": {
+        "current": {
+          "candidate_commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+          "deployment_method": "existing-running-adoption-v1",
+          "docker_engine_image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+          "image_digest": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+          "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+          "new_api_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+          "status": "adopted"
+        },
+        "previous": {}
+      },
+      "schema": "clearapi.local-deploy-state/v1"
+    },
+    "assets": {
+      "backup": {
+        "exists": false
+      },
+      "backup_identity": {
+        "bytes": 17049,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "nlink": 1,
+        "sha256": "f0373c961a883b8d63e6d5d864ca523628ea01a1f3a4dbf8fd58f30307dddc4e",
+        "symlink": false,
+        "uid": 0
+      },
+      "boot": {
+        "bytes": 17979,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "nlink": 1,
+        "sha256": "44a4ee9213d59db4d3151500446adcefa503a0d4ac47457e9af0de1b0d9e1fa3",
+        "symlink": false,
+        "uid": 0
+      },
+      "config": {
+        "bytes": 388,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o600",
+        "nlink": 1,
+        "sha256": "22833e916fc368b208959d55442f006e5b551e81dc5261be40a92803bb188286",
+        "symlink": false,
+        "uid": 0
+      },
+      "enabled": {
+        "bytes": 33,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o600",
+        "nlink": 1,
+        "sha256": "00d09becb7e5b07482cf917cf361befd457a12e664d193645454e0e6a4904f16",
+        "symlink": false,
+        "uid": 0
+      },
+      "helper": {
+        "bytes": 31111,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "nlink": 1,
+        "sha256": "b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f",
+        "symlink": false,
+        "uid": 0
+      },
+      "runtime": {
+        "bytes": 9586,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "nlink": 1,
+        "sha256": "9e64059039b6de48d6e88bce6a3cfb587f4835d9b4234f0cc0693343e1e4fa95",
+        "symlink": false,
+        "uid": 0
+      },
+      "state": {
+        "bytes": 4506,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o750",
+        "nlink": 1,
+        "sha256": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+        "symlink": false,
+        "uid": 0
+      }
+    },
+    "backup_units": {
+      "clearapi-backup.service": {
+        "ActiveState": "inactive",
+        "ExecMainStatus": "0",
+        "Result": "success",
+        "SubState": "dead"
+      },
+      "clearapi-backup.timer": {
+        "ActiveState": "active",
+        "Result": "success",
+        "SubState": "waiting"
+      },
+      "clearapi-runtime-identity.service": {
+        "ActiveState": "inactive",
+        "ExecMainStatus": "0",
+        "Result": "success",
+        "SubState": "dead"
+      }
+    },
+    "config_sources": {
+      "/opt/clearapi/app/compose-candidate.yaml": {
+        "flag_lines": [],
+        "metadata": {
+          "bytes": 379,
+          "exists": true,
+          "gid": 0,
+          "mode": "0o600",
+          "nlink": 1,
+          "sha256": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+          "symlink": false,
+          "uid": 0
+        }
+      },
+      "/opt/clearapi/app/compose-local.yaml": {
+        "flag_lines": [],
+        "metadata": {
+          "bytes": 168,
+          "exists": true,
+          "gid": 0,
+          "mode": "0o600",
+          "nlink": 1,
+          "sha256": "aee0bbc3a6f66a33ca37709c71a09c50ddded57d1f787088ac8723b27e0087db",
+          "symlink": false,
+          "uid": 0
+        }
+      },
+      "/opt/clearapi/app/compose-pg03.yaml": {
+        "flag_lines": [
+          {
+            "line": 49,
+            "text": "CLEARAPI_POOL_ENABLED: \"true\""
+          }
+        ],
+        "metadata": {
+          "bytes": 2809,
+          "exists": true,
+          "gid": 0,
+          "mode": "0o644",
+          "nlink": 1,
+          "sha256": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+          "symlink": false,
+          "uid": 0
+        }
+      },
+      "/opt/clearapi/app/compose-website-recovery-39957948359.json": {
+        "flag_lines": [
+          {
+            "line": 1,
+            "text": "{\"services\": {\"new-api\": {\"image\": \"ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1\", \"restart\": \"no\", \"environment\": {\"CLEARAPI_POOL_ENABLED\": \"false\", \"CLEARAPI_POOL_CLIPROXY_DEDICATED\": \"false\"}, \"volumes\": [{\"type\": \"bind\", \"source\": \"/opt/clearapi/runtime/new-api\", \"target\": \"/run/clearapi\", \"read_only\": true, \"bind\": {\"create_host_path\": false}}]}}}"
+          }
+        ],
+        "metadata": {
+          "bytes": 413,
+          "exists": true,
+          "gid": 0,
+          "mode": "0o600",
+          "nlink": 1,
+          "sha256": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+          "symlink": false,
+          "uid": 0
+        }
+      },
+      "/opt/clearapi/app/docker-compose.prod.yml": {
+        "flag_lines": [
+          {
+            "line": 52,
+            "text": "- CLEARAPI_CLOSED_LAUNCH=false"
+          }
+        ],
+        "metadata": {
+          "bytes": 5242,
+          "exists": true,
+          "gid": 0,
+          "mode": "0o644",
+          "nlink": 1,
+          "sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+          "symlink": false,
+          "uid": 0
+        }
+      },
+      "/opt/clearapi/config/pg03/pg03.env": {
+        "flag_lines": [],
+        "metadata": {
+          "bytes": 397,
+          "exists": true,
+          "gid": 0,
+          "mode": "0o600",
+          "nlink": 1,
+          "sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a",
+          "symlink": false,
+          "uid": 0
+        }
+      }
+    },
+    "containers": {
+      "clearapi-edge-caddy": {
+        "compose_files": "/opt/clearapi/edge/docker-compose.yml",
+        "engine_image_id": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+        "flags": {
+          "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+          "CLEARAPI_ENABLE_ROUTE_CIRCUIT_BREAKER": null,
+          "CLEARAPI_PG03_IMAGES": null,
+          "CLEARAPI_POOL_CLIPROXY_DEDICATED": null,
+          "CLEARAPI_POOL_ENABLED": null,
+          "CLOSED_LAUNCH": null,
+          "DISABLE_RELAY": null,
+          "MASTER_NODE": null
+        },
+        "health": null,
+        "id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+        "image_ref": "caddy@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+        "mounts": [
+          {
+            "Destination": "/config",
+            "RW": true,
+            "Source": "/data/clearapi/caddy/config"
+          },
+          {
+            "Destination": "/data",
+            "RW": true,
+            "Source": "/data/clearapi/caddy/data"
+          },
+          {
+            "Destination": "/etc/caddy/Caddyfile",
+            "RW": false,
+            "Source": "/opt/clearapi/edge/Caddyfile"
+          },
+          {
+            "Destination": "/var/log/caddy",
+            "RW": true,
+            "Source": "/data/clearapi/caddy/logs"
+          }
+        ],
+        "restart": {
+          "MaximumRetryCount": 0,
+          "Name": "unless-stopped"
+        },
+        "running": true,
+        "started_at": "2026-10-24T03:31:58.532588899Z"
+      },
+      "clearapi-new-api-1": {
+        "compose_files": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml,/opt/clearapi/app/compose-website-recovery-39957948359.json",
+        "engine_image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "flags": {
+          "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+          "CLEARAPI_ENABLE_ROUTE_CIRCUIT_BREAKER": null,
+          "CLEARAPI_PG03_IMAGES": null,
+          "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+          "CLEARAPI_POOL_ENABLED": "false",
+          "CLOSED_LAUNCH": null,
+          "DISABLE_RELAY": null,
+          "MASTER_NODE": null
+        },
+        "health": null,
+        "id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+        "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "mounts": [
+          {
+            "Destination": "/data",
+            "RW": true,
+            "Source": "/data/clearapi/new-api"
+          },
+          {
+            "Destination": "/app/logs",
+            "RW": true,
+            "Source": "/opt/clearapi/logs"
+          },
+          {
+            "Destination": "/run/clearapi",
+            "RW": false,
+            "Source": "/opt/clearapi/runtime/new-api"
+          },
+          {
+            "Destination": "/run/secrets/crypto_secret",
+            "RW": false,
+            "Source": "/opt/clearapi/secrets/crypto_secret"
+          },
+          {
+            "Destination": "/run/secrets/session_secret",
+            "RW": false,
+            "Source": "/opt/clearapi/secrets/session_secret"
+          },
+          {
+            "Destination": "/run/secrets/sql_dsn",
+            "RW": false,
+            "Source": "/opt/clearapi/secrets/sql_dsn"
+          },
+          {
+            "Destination": "/run/secrets/token_encryption_key",
+            "RW": false,
+            "Source": "/opt/clearapi/secrets/token_encryption_key"
+          }
+        ],
+        "restart": {
+          "MaximumRetryCount": 0,
+          "Name": "no"
+        },
+        "running": true,
+        "started_at": "2026-10-23T14:07:58.383082222Z"
+      },
+      "clearapi-pool-executor-1": {
+        "compose_files": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml",
+        "engine_image_id": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+        "flags": {
+          "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+          "CLEARAPI_ENABLE_ROUTE_CIRCUIT_BREAKER": null,
+          "CLEARAPI_PG03_IMAGES": null,
+          "CLEARAPI_POOL_CLIPROXY_DEDICATED": null,
+          "CLEARAPI_POOL_ENABLED": null,
+          "CLOSED_LAUNCH": null,
+          "DISABLE_RELAY": null,
+          "MASTER_NODE": null
+        },
+        "health": "healthy",
+        "id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+        "image_ref": "ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+        "mounts": [
+          {
+            "Destination": "/CLIProxyAPI/config.yaml",
+            "RW": false,
+            "Source": "/opt/clearapi/config/pg03/executor.yaml"
+          },
+          {
+            "Destination": "/var/lib/pool-executor/auths",
+            "RW": true,
+            "Source": "/data/clearapi/pool-executor/auths"
+          },
+          {
+            "Destination": "/var/lib/pool-executor/pool",
+            "RW": true,
+            "Source": "/data/clearapi/pool-executor/pool"
+          },
+          {
+            "Destination": "/var/lib/pool-executor/receipts",
+            "RW": true,
+            "Source": "/data/clearapi/pool-executor/receipts"
+          }
+        ],
+        "restart": {
+          "MaximumRetryCount": 0,
+          "Name": "unless-stopped"
+        },
+        "running": true,
+        "started_at": "2026-10-20T00:46:43.85551099Z"
+      },
+      "clearapi-postgres-1": {
+        "compose_files": "/opt/clearapi/app/docker-compose.prod.yml",
+        "engine_image_id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+        "flags": {
+          "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+          "CLEARAPI_ENABLE_ROUTE_CIRCUIT_BREAKER": null,
+          "CLEARAPI_PG03_IMAGES": null,
+          "CLEARAPI_POOL_CLIPROXY_DEDICATED": null,
+          "CLEARAPI_POOL_ENABLED": null,
+          "CLOSED_LAUNCH": null,
+          "DISABLE_RELAY": null,
+          "MASTER_NODE": null
+        },
+        "health": "healthy",
+        "id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+        "image_ref": "postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+        "mounts": [
+          {
+            "Destination": "/run/secrets/pg_superuser_password",
+            "RW": false,
+            "Source": "/opt/clearapi/secrets/pg_superuser_password"
+          },
+          {
+            "Destination": "/var/lib/postgresql/data",
+            "RW": true,
+            "Source": "/data/clearapi/postgres"
+          }
+        ],
+        "restart": {
+          "MaximumRetryCount": 0,
+          "Name": "unless-stopped"
+        },
+        "running": true,
+        "started_at": "2026-10-20T00:46:43.870944528Z"
+      }
+    },
+    "effective_compose": {
+      "env_file": "/opt/clearapi/config/pg03/pg03.env",
+      "executor_image": "ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+      "files": [
+        "docker-compose.prod.yml",
+        "compose-pg03.yaml",
+        "compose-candidate.yaml",
+        "compose-website-recovery-39957948359.json",
+        "compose-local.yaml"
+      ],
+      "gateway_flags": {
+        "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+        "CLEARAPI_ENABLE_ROUTE_CIRCUIT_BREAKER": null,
+        "CLEARAPI_PG03_IMAGES": null,
+        "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+        "CLEARAPI_POOL_ENABLED": "false",
+        "CLOSED_LAUNCH": null,
+        "DISABLE_RELAY": null,
+        "MASTER_NODE": null
+      },
+      "gateway_image": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "services": [
+        "new-api",
+        "pool-executor",
+        "postgres"
+      ]
+    },
+    "gateway_command": null,
+    "gateway_entrypoint": [
+      "/entrypoint-secure.sh",
+      "/new-api"
+    ],
+    "gateway_revision": "a032815cb6244a7ee5e812de82f8300c02554e99",
+    "latest_backup": {
+      "backup_id": "20261024T033125Z",
+      "backup_identity_schema_version": 1,
+      "backup_schema_version": 2,
+      "candidate_commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "created_at_utc": "2026-10-24T03:31:40Z",
+      "encrypted_artifact_actual": {
+        "bytes": 12390727,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o600",
+        "nlink": 1,
+        "sha256": "f0fbffaaf17116b46f93ab41986033fc84902fd52089f8a1bf07365d6af667e2",
+        "symlink": false,
+        "uid": 0
+      },
+      "encrypted_artifact_expected": {
+        "bytes": 12390727,
+        "name": "clearapi-backup-20261024T033125Z.tar.gz.gpg",
+        "sha256": "f0fbffaaf17116b46f93ab41986033fc84902fd52089f8a1bf07365d6af667e2"
+      },
+      "manifest": {
+        "bytes": 6462,
+        "exists": true,
+        "gid": 0,
+        "mode": "0o640",
+        "nlink": 1,
+        "sha256": "48cf9630ea93a75d02fdc76c8e9b9d7ae07ff50ce727a0c2e53cba122c334de0",
+        "symlink": false,
+        "uid": 0
+      },
+      "new_api_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+      "running_identity": {
+        "compose_base_sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+        "compose_environment_sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a",
+        "compose_inputs_sha256": {
+          "compose-candidate.yaml": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+          "compose-pg03.yaml": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+          "compose-website-recovery-39957948359.json": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+          "docker-compose.prod.yml": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa"
+        },
+        "compose_override_sha256": "aee0bbc3a6f66a33ca37709c71a09c50ddded57d1f787088ac8723b27e0087db",
+        "container_created": "2026-10-23T14:07:58.190877394Z",
+        "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+        "deployment_state_file": "local-deploy-state.json",
+        "docker_engine_image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "docker_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+        "ghcr_digest": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "ghcr_repo_digest": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "oci_revision": "a032815cb6244a7ee5e812de82f8300c02554e99",
+        "original_incident": {
+          "controlled-launch-state.json": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+          "pg03-target-manifest.json": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+          "release-manifest.json": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3"
+        },
+        "release_manifest_sha256": "cdcea86687eb58c9ce06d31c9ea7e9dd67402b71f24bb3c39441143dbdc7d8ec"
+      }
+    },
+    "locks": [],
+    "production_deploy_config": {
+      "app_dir": "/opt/clearapi/app",
+      "archive_transport": true,
+      "backup_dir": "/opt/clearapi/backups",
+      "backup_service": "clearapi-backup.service",
+      "compose_file": "docker-compose.prod.yml",
+      "local_url": "http://127.0.0.1:3000/api/status",
+      "public_url": "https://www.clear999.com/api/status",
+      "runtime_identity_dir": "/opt/clearapi/runtime/new-api",
+      "service": "new-api"
+    },
+    "read_only": true,
+    "runtime_identity": {
+      "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+      "generated_at": "2026-10-23T14:08:00.400420+00:00",
+      "image_digest": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "oci_revision": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "started_at": "2026-10-23T14:07:58.383082222Z"
+    },
+    "ssh_ed25519_fingerprint": "256 SHA256:kVqtsCzwAanVxCoVB5OA4b1lvMVdF9bpxYhy8xjNuLc root@C202610061158942 (ED25519)",
+    "sudo_policy": "Matching Defaults entries for clearadmin on C202610061158942:\n    env_reset, mail_badpass, secure_path=/usr/local/sbin\\:/usr/local/bin\\:/usr/sbin\\:/usr/bin\\:/sbin\\:/bin\\:/snap/bin, use_pty\n\nUser clearadmin may run the following commands on C202610061158942:\n    (ALL : ALL) ALL\n    (ALL : ALL) NOPASSWD: ALL\n    (root) NOPASSWD: /opt/clearapi/bin/clearapi-local-deploy.py preflight, /opt/clearapi/bin/clearapi-local-deploy.py receive *\n",
+    "utc": "2026-10-24T14:24:21.235221+00:00"
+  }
+}

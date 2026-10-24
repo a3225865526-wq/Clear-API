@@ -1,0 +1,39 @@
+{
+  "exit": 0,
+  "stderr": "",
+  "result": {
+    "utc": "2026-10-24T14:31:11.959991+00:00",
+    "clearapi-new-api-1": {
+      "network_mode": "clearapi_internal",
+      "port_bindings": {
+        "3000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3000"
+          }
+        ]
+      },
+      "ports": {
+        "3000/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "3000"
+          }
+        ]
+      },
+      "networks": [
+        "clearapi_internal"
+      ]
+    },
+    "clearapi-pool-executor-1": {
+      "network_mode": "clearapi_internal",
+      "port_bindings": {},
+      "ports": {
+        "8317/tcp": null
+      },
+      "networks": [
+        "clearapi_internal"
+      ]
+    }
+  }
+}

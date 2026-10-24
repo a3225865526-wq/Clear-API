@@ -1,0 +1,2664 @@
+{
+  "C:/Users/Chen/Documents/Codex/2026-10-23/referenced-chatgpt-conversation-this-is-an-2/work/repo": {
+    "entries": [
+      {
+        "status": "M ",
+        "path": ".gitignore",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "MM",
+        "path": "CLEARAPI_MASTER_STATUS.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "docs/README-LOCAL-DEPLOY-CN.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/authority-append-proof.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/github-readonly-variables.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/image-id-check.ps1",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/isolated-compose-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/isolated-compose-test-debug.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/isolated-compose-test.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/isolated-compose-test.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/original-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/powershell51-dryrun.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/powershell51-image-id.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/powershell76-dryrun.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/powershell76-image-id.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/raw-build-and-cutover-logs.zip",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/real-override-preview-test.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/real-override-preview-test.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/ssh-host/Dockerfile",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/ssh-host/start.sh",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/transfer-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/transfer-test-classic.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/transfer-test.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/transfer-test.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/updated-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "A ",
+        "path": "evidence/local-deploy-isolated-20261023/workflow-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "AM",
+        "path": "scripts/deploy-local.ps1",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "AM",
+        "path": "scripts/local-deploy-vps.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "AM",
+        "path": "scripts/local-deploy.config.example.json",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "A ",
+        "path": "scripts/local-deploy.sudoers.example",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "AM",
+        "path": "scripts/local-deploy.vps-config.example.json",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "A ",
+        "path": "scripts/prepare-local-cutover.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": " M",
+        "path": "scripts/runtime-identity-refresh.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "A ",
+        "path": "tests/test_cutover_prepare.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "A ",
+        "path": "tests/test_local_deploy_vps.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/local-deploy-vps.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/local-deploy-vps.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/prepare-local-cutover.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/runtime-identity-refresh.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tests/__pycache__/test_cutover_prepare.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tests/__pycache__/test_local_deploy_vps.cpython-312.pyc",
+        "category": "local_artifact"
+      }
+    ],
+    "migration_selected": false,
+    "application_entries": []
+  },
+  "D:/AI/API/worktrees/clearapi-controlled-launch-20261020": {
+    "entries": [
+      {
+        "status": " M",
+        "path": ".github/workflows/ci.yml",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": " M",
+        "path": ".github/workflows/deploy-production.yml",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": " M",
+        "path": "CLEARAPI_MASTER_STATUS.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": " M",
+        "path": "evidence/non-pg03-20261021/RESULT.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": " M",
+        "path": "evidence/pg03-autonomous-progress-20261021.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": " M",
+        "path": "evidence/pg03-production-approval-package-20261021.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": " M",
+        "path": "scripts/ci/automatic-release.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": " M",
+        "path": "scripts/ci/test-automatic-release.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": " M",
+        "path": "scripts/ci/test-pg03-observation.py",
+        "category": "pg03_operator_tooling_not_selected"
+      },
+      {
+        "status": " M",
+        "path": "scripts/pg03-observation.py",
+        "category": "pg03_operator_tooling_not_selected"
+      },
+      {
+        "status": " M",
+        "path": "scripts/pg03-successor-host.py",
+        "category": "pg03_operator_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "CLEARAPI_READONLY_IDENTITY_ADMIN_CHECKLIST.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "container",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-install-compatibility-stop-20261020T075513Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-assets-supplement-rc39357150402-attempt1-20261020.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-assets-supplement-rc39357150402-attempt1-20261020.json.sha256",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-dependency-preflight-20261020T074500Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-independent-preflight-20261020T073948Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-independent-review-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-install-authorization-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-install-local-review-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/boot-recovery-preflight-followup-20261020T074134Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/controlled-recovery-local-review-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/controlled-recovery-ssh-audit-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/RESULT.before-approved-diagnostic.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/RESULT.before-continuation.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/RESULT.before-local-repair.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/approved-diagnostic-inventory.sha256.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/backend-ci.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/bounded-diagnostic-execution.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/bounded-diagnostic-findings.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/bounded-production-diagnostic.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/candidate-verification.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/ci-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/compose.non-pg03.candidate.yaml",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/continuation-inventory.sha256.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/continuation-local-audit.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/continuation-local-audit.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/final-boundary.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/boot-recovery-install.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/inventory.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/scripts/runtime-boot-recovery.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/scripts/runtime-identity-refresh.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/frontend-ci.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/inspection-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/inventory.sha256.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/latest-deployment-failure-projection.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-backup-diagnostic-after.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-backup-diagnostic-before.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-minimal-repair.patch",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-mode-proof-final-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-mode-proof-linux-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-mode-proof-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/billing-migrate",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/build-metadata.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/build.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/entrypoint-secure.sh",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/finance-migrate",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/image.tar",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/legacy-store-retire",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/production-bootstrap",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/boot-recovery-install.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/inventory.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/scripts/runtime-boot-recovery.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/scripts/runtime-identity-refresh.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/source-changes.txt",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/source-identity.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build1/source.tar",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/billing-migrate",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/build-metadata.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/build.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/entrypoint-secure.sh",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/finance-migrate",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/image.tar",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/legacy-store-retire",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/production-bootstrap",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/boot-recovery-install.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/inventory.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/scripts/runtime-boot-recovery.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/scripts/runtime-identity-refresh.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/source-changes.txt",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/source-identity.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build3/source.tar",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/billing-migrate",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/build-metadata.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/build.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/entrypoint-secure.sh",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/finance-migrate",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/image.tar",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/legacy-store-retire",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/production-bootstrap",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/boot-recovery-install.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/inventory.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/scripts/runtime-boot-recovery.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/scripts/runtime-identity-refresh.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/source-changes.txt",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/source-identity.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-off-rc-20261022T-build4/source.tar",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-producer-compatibility-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/local-repair-receipt.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/mysql-ci.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-backup-collision-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-backup-identity-tests-full.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-preparation-policy-tests-full.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-preparation-policy-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/automatic-deploy-skipped.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/local-evidence-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/rc-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/backup_restore.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/billing.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/mysql_upgrade_idempotency.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/ordinary_provider_usage_billing.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/pool_disabled.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/postgres_upgrade_idempotency.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/replay_and_duplicate_charge.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/runtime_integrity.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/safe_rollback.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/sqlite_upgrade_idempotency.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/receipts/state_isolation.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/rehearsal-jobs.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/rehearsal-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/release-proof.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/schema-observation.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/schema-rehearsal.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39808120659/schema-rehearsal.target.sql",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/FINAL-REVIEW.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/FRESH-BACKUP-JOURNAL-REPAIR-PLAN-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/FRESH-BACKUP-ONLY-PLAN-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/MINIMAL-PRODUCTION-RECOVERY-PLAN-20261023.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/OFF-HOST-CONTRACT-GAP-REVIEW-20261023.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/OFFLINE-RESTORE-PAIR-PLAN-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/OFFLINE-RESTORE-PAIR-UTC-Z-PLAN-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/OFFLINE-TRUST-BOOTSTRAP-PROPOSAL-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/PRODUCTION-DEPLOYMENT-REPORT.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-first-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-pair-result-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-utc-z-first-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-utc-z-second-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/artifact-metadata.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/asset-reconciliation-local-check-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/automatic-deploy-jobs.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/automatic-deploy-skipped.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/basic-recovery-local-identity-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/basic-site-readiness-20261023T035743Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/continuous-fence-writer-cgroup-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/continuous-fence-writer-mapped-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/continuous-fence-writer-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/diagnostics/schema-observation.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/edge-basic-access-projection-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/encrypted-backup-input-readiness-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/executor-activity-window-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/executor-channel-dependency-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/executor-independent-mechanisms-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/executor-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-authorized-execution-result-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-decryption-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-failure-cleanup-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-failure-diagnostic-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-journal-repair-authorized-result-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-journal-repair-execution-20261023.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-journal-repair-local-validation-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-offline-transfer-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-only-approval-readiness-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-only-execution-20261023.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-only-local-validation-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-preparation-compatibility-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-root-cause-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/historical-backup-payload-check-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/journal-fix-live-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/journal-fix-offline-candidate-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/journal-repair-formal-source-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/local-evidence-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/local-validation.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/main-ci-jobs.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/main-ci-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/CONTINUATION-BLOCKERS-0748.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/INDEPENDENT-REVIEW.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/compatible-tools-and-control-snapshot.tar",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/execution-plan.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/inventory.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/off-release-coverage-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-ciphertext-transfer-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-daemon-readiness-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-daemon-readiness-verified-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-decryption-discovery-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-engine-source-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-environment-preparation-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-policy-approved-install-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-policy-candidate-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-runtime-prerequisite-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/offline-trust-bootstrap-result-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pg03-checkpoint-reconciliation-result-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pg03-checkpoint-reconciliation-scope-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pg03-checkpoint-reconciliation-scope-invalid-newline-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pg03-empty-history-live-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pg03-journal-fix-validation-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pg03-off-local-validation-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pg03-running-binary-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/post-actual-restore-progress-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/post-backup-health-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pr-ci-jobs.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/pr-ci-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/production-current-state-20261023T0458.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/production-preflight-39823787085.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/backup_restore.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/billing.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/mysql_upgrade_idempotency.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/ordinary_provider_usage_billing.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/pool_disabled.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/postgres_upgrade_idempotency.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/replay_and_duplicate_charge.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/runtime_integrity.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/safe_rollback.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/sqlite_upgrade_idempotency.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/state_isolation.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/proof/release-proof.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/rc-jobs.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/rc-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/reconcile-empty-checkpoint-20261023.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/recovery-authority-trace-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/recovery-key-discovery-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/rehearsal-jobs.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/rehearsal-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/clearapi-backup.sh",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/inspection.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/pg03-release-control.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/production-deploy-v2.sh",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/restore-input-contract-check-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/boot-recovery-install.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/inventory.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/scripts/runtime-boot-recovery.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/scripts/runtime-identity-refresh.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/schema-rehearsal.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/schema-rehearsal.target.sql",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/scope-correction-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/shared-executor-source-contract-validation-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/source-identity.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/source-inventory-and-off-delta-validation-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/source-inventory-formal-ci-39942181557.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/source-inventory-live-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/source-inventory-main-ci-39944096489.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/source-inventory-prerequisites-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/startup-side-effect-counts-20261023T040432Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/website-effective-compose-preview-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/website-effective-compose-readonly-20261023.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/website-production-schema-staging-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/website-recovery-priority-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/website-recovery-scope-decision-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/website-schema-compatibility-invocation-20261023.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39817772180/website-startup-options-readonly-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/WEBSITE-RECOVERY-PREPARATION-20261023.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/authorized-boot-install-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/authorized-gateway-start-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/authorized-gateway-start.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/authorized-image-pull-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/authorized-recovery-stage.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/authorized-runtime-login-preparation.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/authorized-stage-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/image-pull-progress.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/image-pull-transfer-progress.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/local-identity-validation.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/production-image-store-details.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/production-image-store-identity.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/production-public-recovery-settings.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/production-schema-compatibility-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/production-source-refresh-comparison.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/production-source-refresh.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/production-source-schema-same-nonce-check.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/release-record-shape.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/boot-recovery-install.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/inventory.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/scripts/runtime-boot-recovery.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/scripts/runtime-identity-refresh.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/runtime-probe-session-metadata.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/schema-rehearsal.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/schema-rehearsal.target.sql",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-release-39957948359/schema-transport-identity-refusal.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-runtime-recovery-tests-full.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-workflow-integration-tests-full.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/off-workflow-integration-tests.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/postgres-ci.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/preflight.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-approval-package-20261022.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-bounded-diagnostic.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-db-readonly.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-readonly-v2.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-readonly.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-rollback-readonly.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-route-readonly.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/production-schema-readonly.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/rc-original.zip",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/rc-run.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/rc/artifact-hashes.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/rc/binary-build-info.txt",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/rc/gateway-image-release.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/rc/schema-rehearsal.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/rc/schema-rehearsal.target.sql",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/readonly-production-probe.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/sqlite-ci.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/non-pg03-20261021/vps-inspection/vps-authorization-inspection.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-actions-isolated-rehearsal-design-20261020T155803Z.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-actions-safe-integration-review-20261021.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-ci-39513279138.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-main-ci-39514438745.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-premerge-boundary-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/REPORT.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/adjacent-results.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/baseline.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/candidate-manifest.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/candidate-manifest.json.sha256",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/candidate.patch",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/candidate/scripts/ci/test-pg03-observation.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/candidate/scripts/pg03-observation.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/candidate/scripts/pg03-successor-host.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/diff-check.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-consistency.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-diff-check.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-document-diff-check.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-static-check.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-test-pg03-observation.py.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-test-pg03-successor-host.py.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-test-pg03-successor-plan.py.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/final-test-results.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/independent-final-review.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/independent-initial-review.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/original/scripts/ci/test-pg03-observation.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/original/scripts/pg03-observation.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/original/scripts/pg03-successor-adapter.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/original/scripts/pg03-successor-host.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/platform-final-linux.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/platform-final-results.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/platform-final-windows.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/regression-after-first.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/regression-after-result.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/regression-after.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/regression-before.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/rejected-admission-v1/scripts/ci/test-pg03-observation.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/rejected-admission-v1/scripts/pg03-observation.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/test-pg03-successor-host.py.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-control-race-20261021/test-pg03-successor-plan.py.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-exact-image-access-20261020T153750Z.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-final-boundary-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-fixed-candidate-binding-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-fixed-control-independent-review-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-hostname-ci-39516682473.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-hostname-ci-test-summary-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-hostname-premerge-boundary-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-latest-successor-local-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-logfix-ci-test-summary-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-offline-restore-ci-39578824035.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-offline-restore-ci-39578824035.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-package-read-approval-20261020T154609Z.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-policy-source-delivery-20261021.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-policy-source-independent-review-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-premerge-boundary-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-ci-39576186446-postgres.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-ci-39577444624-backend.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-ci-39577444624-postgres.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-ci-39578824035-attempt1.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-ci-39578824035-controls.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-ci-39578824035-frontend-attempt2.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-ci-39578824035-frontend.log",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-final-receipt-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-readiness-premerge-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-repair2-dispatch-boundary-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/pg03-successor-local-components-20261021.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/readonly-collection-authorization-execution-20261020T133917Z.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/readonly-collection-blocker-evidence-20261020T134321Z.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/readonly-observer-identity-plan-v1-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/readonly-observer-review-20261020-r2.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-entry-final-snapshot-20261020T082915Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-entry-leaves-20261020T083018Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-github-controls-20261020T082706Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-github-entry-audit-20261020.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-github-entry-audit-20261020T082313Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-pinned-indirect-source-audit-20261020.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-preflight-decision-20261020T081749Z.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-production-preflight-20261020T081749Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-quiescent-window-review-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-readonly-preflight-20261020.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-upgrade-review-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-vps-entry-audit-20261020.py",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-vps-entry-audit-20261020T082550Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-vps-indirect-20261020T082822Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-window-gate-local-review-20261020.md",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "evidence/recovery-tools-workflow-sources-20261020T082452Z.json",
+        "category": "historical_evidence_and_records"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/backup-identity.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/boot-recovery-install.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/caddy-state-reconcile.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/caddy-state-reconcile.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/clearapi-observer-gate.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/controlled-traffic-hold.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-candidate-qualification.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-failed-recovery.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-failed-recovery.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-legacy-transition.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-release-control.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-schema-rehearsal.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-schema-rehearsal.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-source-inventory.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-successor-adapter.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/pg03-successor-transaction.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-observer.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-observer.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-readers.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-readers.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-upgrade.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-vps-helper.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-vps-helper.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-vps-reader.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-vps-reader.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-window.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/recovery-tool-window.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/runtime-boot-recovery.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/__pycache__/runtime-probe-session.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/assemble-release-proof.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/assemble-release-proof.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/automatic-release.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/automatic-release.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/build-local-off-rc.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/build-runtime-assets.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/build-runtime-assets.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/inspect-vps-authorization.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/pg03-isolated-rehearsal.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/produce-gate-receipt.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/release_proof.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/release_proof.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-automatic-release.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-automatic-release.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-backup-identity.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-boot-recovery-install.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-caddy-state-reconcile.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-pg03-restore-acceptance.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-pg03-successor-plan.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-rehearsal-producer.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-rehearsal-producer.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/test-runtime-boot-recovery.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/verify-rehearsal-input.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/__pycache__/verify-rehearsal-input.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/build-local-off-rc.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/test-clearapi-observer-gate.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/test-off-host-contract.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/test-recovery-tool-observer.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/test-recovery-tool-readers.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/test-recovery-tool-upgrade.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/ci/test-recovery-tool-vps-reader.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/clearapi-observer-gate.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/off-host-contract.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/recovery-tool-observer.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/recovery-tool-readers.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/recovery-tool-upgrade.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/recovery-tool-vps-helper.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/recovery-tool-vps-reader.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "scripts/recovery-tool-window.py",
+        "category": "local_deploy_release_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/__pycache__/qualification-authority.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/__pycache__/qualification-authority.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/__pycache__/qualification-policy-source.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/__pycache__/qualification-policy-source.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/__pycache__/test-qualification-policy-source.cpython-312.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/__pycache__/test-qualification-policy-source.cpython-314.pyc",
+        "category": "local_artifact"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/qualification-authority.py",
+        "category": "pg03_operator_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/qualification-policy-source.py",
+        "category": "pg03_operator_tooling_not_selected"
+      },
+      {
+        "status": "??",
+        "path": "tools/pg03/test-qualification-policy-source.py",
+        "category": "pg03_operator_tooling_not_selected"
+      }
+    ],
+    "migration_selected": false,
+    "application_entries": []
+  }
+}

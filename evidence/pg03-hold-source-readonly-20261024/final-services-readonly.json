@@ -1,0 +1,40 @@
+{
+  "exit": 0,
+  "stderr": "",
+  "result": {
+    "utc": "2026-10-24T14:27:06.505212+00:00",
+    "backup_script": {
+      "path": "/opt/clearapi/backups/bin/clearapi-backup.sh",
+      "sha256": "8a59049196861273b2c0e2b59e9c46f7f70dbbfba6dddf2740fadb2760fff8cc",
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o750"
+    },
+    "containers": {
+      "clearapi-new-api-1": {
+        "id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+        "image": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "running": true,
+        "started_at": "2026-10-23T14:07:58.383082222Z"
+      },
+      "clearapi-postgres-1": {
+        "id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+        "image": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+        "running": true,
+        "started_at": "2026-10-20T00:46:43.870944528Z"
+      },
+      "clearapi-pool-executor-1": {
+        "id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+        "image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+        "running": true,
+        "started_at": "2026-10-20T00:46:43.85551099Z"
+      },
+      "clearapi-edge-caddy": {
+        "id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+        "image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+        "running": true,
+        "started_at": "2026-10-24T03:31:58.532588899Z"
+      }
+    }
+  }
+}

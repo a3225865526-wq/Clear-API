@@ -1,0 +1,16 @@
+{
+  "utc": "2026-10-24T14:26:49.801153+00:00",
+  "remote_command": "sudo -n /opt/clearapi/bin/clearapi-local-deploy.py preflight",
+  "production_service_writes": false,
+  "exit": 0,
+  "stderr": "",
+  "preflight": {
+    "arch": "amd64",
+    "commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+    "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+    "healthy": true,
+    "image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+    "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+    "service": "new-api"
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "exit": 0,
+  "stderr": "",
+  "production_writes": false,
+  "result": {
+    "backup_exec_start": "ExecStart={ path=/opt/clearapi/backups/bin/clearapi-backup.sh ; argv[]=/opt/clearapi/backups/bin/clearapi-backup.sh ; ignore_errors=no ; start_time=[Sat 2026-10-24 03:31:25 UTC] ; stop_time=[Sat 2026-10-24 03:31:46 UTC] ; pid=1402319 ; code=exited ; status=0 }",
+    "backup_script_candidates": {},
+    "boot_check": "Read-only check PASS: runtime=ready; Gateway=running; assets=ready; identity=current\n",
+    "boot_installed_check": "Installed boot assets PASS; effective ordering and enablement verified; no service started\n",
+    "db": {
+      "abilities": [
+        {
+          "channel_id": 1,
+          "enabled_abilities": 1
+        },
+        {
+          "channel_id": 2,
+          "enabled_abilities": 0
+        },
+        {
+          "channel_id": 3,
+          "enabled_abilities": 0
+        }
+      ],
+      "channels": [
+        {
+          "endpoint_authority": "api.88token.net",
+          "id": 1,
+          "pool_settings": [
+            {
+              "field": "setting",
+              "pool_routing_enabled": null,
+              "upstream_pool_present": false
+            },
+            {
+              "field": "settings",
+              "pool_routing_enabled": null,
+              "upstream_pool_present": false
+            }
+          ],
+          "status": 1,
+          "type": 1
+        },
+        {
+          "endpoint_authority": "api.uselunora.com",
+          "id": 2,
+          "pool_settings": [
+            {
+              "field": "setting",
+              "pool_routing_enabled": null,
+              "upstream_pool_present": false
+            },
+            {
+              "field": "settings",
+              "pool_routing_enabled": null,
+              "upstream_pool_present": false
+            }
+          ],
+          "status": 2,
+          "type": 1
+        },
+        {
+          "endpoint_authority": "api.88token.net",
+          "id": 3,
+          "pool_settings": [
+            {
+              "field": "setting",
+              "pool_routing_enabled": null,
+              "upstream_pool_present": false
+            },
+            {
+              "field": "settings",
+              "pool_routing_enabled": null,
+              "upstream_pool_present": false
+            }
+          ],
+          "status": 2,
+          "type": 1
+        }
+      ],
+      "options": {
+        "PasswordRegisterEnabled": "true",
+        "RegisterEnabled": "true"
+      },
+      "pool_routes": [],
+      "read_only": "on",
+      "route_candidates": [],
+      "route_chains": {
+        "enabled": 0,
+        "total": 0
+      }
+    },
+    "pool_capability_http": {
+      "body": {
+        "code": "NOT_FOUND",
+        "success": false
+      },
+      "exit": 0,
+      "status": "404"
+    },
+    "pool_endpoint_authorities": {
+      "CLEARAPI_POOL_CLIPROXY_URL": "pool-executor:8317",
+      "CLEARAPI_POOL_GROK_URL": ""
+    },
+    "read_only": true,
+    "running_process_flags": {
+      "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+      "CLEARAPI_PG03_IMAGES": null,
+      "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+      "CLEARAPI_POOL_ENABLED": "false",
+      "CLOSED_LAUNCH": null,
+      "DISABLE_RELAY": null,
+      "MASTER_NODE": null
+    },
+    "utc": "2026-10-24T14:25:56.753586+00:00"
+  }
+}
