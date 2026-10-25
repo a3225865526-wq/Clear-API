@@ -517,7 +517,7 @@ func TestConsoleProbeCostExecutorMatrix(t *testing.T) {
 				}
 				require.Positive(t, result.AttemptID)
 				require.Positive(t, result.ProbeID)
-				assert.Equal(t, "error", result.Status)
+				assert.Equal(t, "blocked", result.Status)
 				assert.Equal(t, "MONITOR_COST_UNVERIFIED", result.ErrorCode)
 				var attempt model.ConsoleMonitorAttempt
 				var probe model.ConsoleProbe

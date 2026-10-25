@@ -47,11 +47,11 @@ type ConsoleProbeResult struct {
 
 type ConsoleProbeExecutor struct {
 	DB       *gorm.DB
+	TaskID   string
 	Adapters map[string]ConsoleProbeAdapter
 }
 
-// RunScheduled performs one explicitly invoked scheduling pass. It is not
-// registered with host background tasks and creates no startup goroutine.
+// RunScheduled performs an interval scheduling pass without a startup goroutine.
 // All workers/processes use the same database admission gate as manual runs.
 func (e *ConsoleProbeExecutor) RunScheduled(ctx context.Context) error {
 	if !model.ConsoleMonitoringReady(e.DB) {
@@ -89,6 +89,35 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	if !model.ConsoleMonitoringReady(e.DB) {
 		return result, model.ErrMonitorNotReady
 	}
+	defer func() {
+		// Admission denials are real observations of a task that did not dispatch.
+		// Never report them as successful probes or consume a paid attempt.
+		if err == nil || result.ProbeID != 0 {
+			return
+		}
+		status, code := "blocked", "MONITOR_TARGET_DENIED"
+		switch {
+		case errors.Is(err, model.ErrMonitorPaused):
+			status, code = "skipped", "MONITOR_PAUSED"
+		case errors.Is(err, model.ErrMonitorBudget):
+			code = "MONITOR_BUDGET_OR_CONCURRENCY"
+		case errors.Is(err, model.ErrMonitorIntegration):
+			code = "MONITOR_INTEGRATION_PENDING"
+		case errors.Is(err, model.ErrMonitorLease), errors.Is(err, ErrMonitorLeaseUnresolved):
+			code = "MONITOR_LEASE_UNRESOLVED"
+		case errors.Is(err, model.ErrMonitorDenied):
+		default:
+			return
+		}
+		record := model.ConsoleProbe{MonitorID: id, CheckedAt: time.Now().Unix(), Status: status, ErrorCode: code, AttemptID: result.AttemptID, TaskID: e.TaskID}
+		persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if persistErr := e.DB.WithContext(persistCtx).Create(&record).Error; persistErr != nil {
+			err = errors.Join(err, persistErr)
+			return
+		}
+		result.ProbeID, result.Status, result.ErrorCode = record.ID, status, code
+	}()
 	var configured model.ConsoleMonitor
 	if err := e.DB.WithContext(ctx).First(&configured, id).Error; err != nil {
 		return result, err
@@ -135,14 +164,17 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	if err != nil {
 		outcome.Status = "error"
 		outcome.ErrorCode = consoleProbeFailureCode(err, probeCtx.Err())
+		if errors.Is(err, ErrMonitorCostUnverified) || errors.Is(err, ErrMonitorCostExceeded) {
+			outcome.Status = "blocked"
+		}
 	}
-	if outcome.Status != "normal" && outcome.Status != "degraded" && outcome.Status != "error" && outcome.Status != "unknown" {
+	if outcome.Status != "normal" && outcome.Status != "degraded" && outcome.Status != "error" && outcome.Status != "unknown" && outcome.Status != "blocked" {
 		outcome.Status = "unknown"
 		outcome.ErrorCode = "invalid_result"
 	}
 	// Never persist arbitrary provider or adapter error strings.
 	switch outcome.ErrorCode {
-	case "", "probe_failed", "probe_timeout", "probe_incomplete", "authorization_denied", "invalid_result", "MONITOR_COST_UNVERIFIED", "MONITOR_COST_EXCEEDED", "MONITOR_METERING_FAILED":
+	case "probe_transport_unresolved", "", "probe_failed", "probe_timeout", "probe_incomplete", "authorization_denied", "invalid_result", "MONITOR_COST_UNVERIFIED", "MONITOR_COST_EXCEEDED", "MONITOR_METERING_FAILED":
 	default:
 		outcome.ErrorCode = "probe_failed"
 	}
@@ -191,7 +223,7 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 			if code == "" {
 				code = "probe_failed"
 			}
-			probe := model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: "unknown", ErrorCode: code, LatencyMS: &latency, SourceKind: m.TargetKind}
+			probe := model.ConsoleProbe{TaskID: e.TaskID, AttemptID: attempt.ID, MonitorID: id, CheckedAt: now, Status: "unknown", ErrorCode: code, LatencyMS: &latency, SourceKind: m.TargetKind}
 			if err := tx.Create(&probe).Error; err != nil {
 				return err
 			}
@@ -211,7 +243,7 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 		if updated.RowsAffected != 1 {
 			return model.ErrMonitorDenied
 		}
-		probe := model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: outcome.Status, ErrorCode: outcome.ErrorCode, LatencyMS: &latency, SourceChannelID: outcome.SourceChannelID, SourceKind: m.TargetKind}
+		probe := model.ConsoleProbe{TaskID: e.TaskID, AttemptID: attempt.ID, MonitorID: id, CheckedAt: now, Status: outcome.Status, ErrorCode: outcome.ErrorCode, LatencyMS: &latency, SourceChannelID: outcome.SourceChannelID, SourceKind: m.TargetKind}
 		if err := tx.Create(&probe).Error; err != nil {
 			return err
 		}
@@ -236,6 +268,8 @@ func consoleProbeFailureCode(err, contextErr error) string {
 		return "MONITOR_METERING_FAILED"
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(contextErr, context.DeadlineExceeded):
 		return "probe_timeout"
+	case errors.Is(err, ErrMonitorLeaseUnresolved):
+		return "probe_transport_unresolved"
 	default:
 		return "probe_failed"
 	}
@@ -316,4 +350,50 @@ func (e *ConsoleProbeExecutor) reopenConsoleMonitorReconciliation(ctx context.Co
 		return errors.Join(ErrMonitorLeaseUnresolved, cause, result.Error)
 	}
 	return errors.Join(ErrMonitorLeaseUnresolved, cause)
+}
+
+type ConsoleMonitorDailyResult struct {
+	Normal  int `json:"normal"`
+	Failed  int `json:"failed"`
+	Blocked int `json:"blocked"`
+	Skipped int `json:"skipped"`
+}
+
+// The daily observation pass still records paused/budget-blocked published
+// targets. Only RunWithResult can authorize and reserve a real upstream call.
+func (e *ConsoleProbeExecutor) RunDailyScheduled(ctx context.Context) (ConsoleMonitorDailyResult, error) {
+	summary := ConsoleMonitorDailyResult{}
+	if !model.ConsoleMonitoringReady(e.DB) {
+		return summary, model.ErrMonitorNotReady
+	}
+	var monitors []model.ConsoleMonitor
+	if err := e.DB.WithContext(ctx).Where("published = ? AND archived = ?", true, false).Order("id").Find(&monitors).Error; err != nil {
+		return summary, err
+	}
+	for _, m := range monitors {
+		if err := ctx.Err(); err != nil {
+			return summary, err
+		}
+		result, err := e.RunWithResult(ctx, m.ID)
+		if result.ProbeID == 0 && err != nil {
+			return summary, err
+		}
+		switch result.Status {
+		case "normal", "degraded":
+			summary.Normal++
+		case "skipped":
+			summary.Skipped++
+		case "blocked":
+			summary.Blocked++
+		default:
+			summary.Failed++
+		}
+	}
+	if err := model.PruneConsoleMonitoringHistory(ctx, e.DB, time.Now()); err != nil {
+		return summary, err
+	}
+	if summary.Failed > 0 || summary.Blocked > 0 {
+		return summary, errors.New("MONITOR_DAILY_INCOMPLETE")
+	}
+	return summary, nil
 }

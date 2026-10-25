@@ -108,7 +108,12 @@ describe('announcement release lifecycle', () => {
     await user.click(screen.getByRole('button', { name: 'Save Settings' }))
     await waitFor(() => expect(mockPut).toHaveBeenCalledTimes(1))
     expect(JSON.parse(mockPut.mock.calls[0][1].value)).toEqual([
-      { ...draftRecord, content: 'Edited release announcement', extra: '' },
+      {
+        ...draftRecord,
+        content: 'Edited release announcement',
+        extra: '',
+        display: 'timeline',
+      },
     ])
   })
 
@@ -185,4 +190,37 @@ describe('announcement release lifecycle', () => {
       },
     ])
   })
+})
+
+describe('announcement display placement', () => {
+  it.each([
+    ['notice', 'Notice only'],
+    ['timeline', 'Timeline only'],
+    ['both', 'Both locations'],
+  ])(
+    'saves %s placement on the same announcement and retains legacy records',
+    async (placement, label) => {
+      mockPut.mockResolvedValue({ data: { success: true } })
+      const user = userEvent.setup()
+      renderSection([legacyRecord, { ...draftRecord, display: 'both' }])
+      const row = await screen.findByRole('row', { name: /Draft announcement/ })
+      await user.click(within(row).getByRole('button', { name: 'Edit' }))
+      const dialog = await screen.findByRole('dialog')
+      await user.click(
+        within(dialog).getByRole('combobox', { name: 'Display location' })
+      )
+      await user.click(await screen.findByRole('option', { name: label }))
+      await user.click(within(dialog).getByRole('button', { name: 'Update' }))
+      await user.click(screen.getByRole('button', { name: 'Save Settings' }))
+      await waitFor(() => expect(mockPut).toHaveBeenCalledTimes(1))
+      const saved = JSON.parse(mockPut.mock.calls[0][1].value)
+      expect(saved).toHaveLength(2)
+      expect(
+        saved.find((item: { id: number }) => item.id === draftRecord.id)
+      ).toEqual(expect.objectContaining({ ...draftRecord, display: placement }))
+      expect(
+        saved.find((item: { id: number }) => item.id === legacyRecord.id)
+      ).toEqual(expect.objectContaining(legacyRecord))
+    }
+  )
 })

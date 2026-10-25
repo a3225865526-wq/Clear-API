@@ -177,6 +177,9 @@ func validateAnnouncements(announcementsStr string) error {
 				}
 			}
 		}
+		if display, exists := ann["display"]; exists && display != "notice" && display != "timeline" && display != "both" {
+			return fmt.Errorf("第%d个公告的展示位置不合法", i+1)
+		}
 		if status, exists := ann["status"]; exists {
 			statusStr, ok := status.(string)
 			if !ok || !announcementStatuses[statusStr] {

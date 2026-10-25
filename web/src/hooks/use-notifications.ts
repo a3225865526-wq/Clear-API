@@ -16,60 +16,36 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useQuery } from '@tanstack/react-query'
-import { useState, useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 
-import { useStatus } from '@/hooks/use-status'
-import { getNotice } from '@/lib/api'
+import { api, getNotice } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
+import { statusQueryOptions } from '@/lib/status-query'
+import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationStore } from '@/stores/notification-store'
 
-function hashString(input: string): string {
-  let hash = 0
-  if (!input) return '0'
-
-  for (let i = 0; i < input.length; i += 1) {
-    const chr = input.charCodeAt(i)
-    hash = (hash << 5) - hash + chr
-    hash |= 0
-  }
-
-  return hash.toString(36)
+type Announcement = {
+  id?: number | string
+  content?: string
+  read_key?: string
+  [key: string]: unknown
+}
+type ReadResponse = {
+  success: boolean
+  data: { key: string }[]
+  notice_key: string
+  notice_content: string
 }
 
-/**
- * Generate a unique key for an announcement
- * Prefer backend id, fall back to a content hash so edits register
- */
-function getAnnouncementKey(item: Record<string, unknown>): string {
-  if (!item) return ''
-
-  if (item.id !== undefined && item.id !== null) {
-    return `id:${item.id}`
-  }
-
-  const fingerprint = JSON.stringify({
-    publishDate: (item?.publishDate as string) || '',
-    content: ((item?.content as string) || '').trim(),
-    extra: ((item?.extra as string) || '').trim(),
-    type: (item?.type as string) || '',
-    title: ((item?.title as string) || '').trim(),
-    link: ((item?.link as string) || '').trim(),
-  })
-  return `hash:${hashString(fingerprint)}`
-}
-
-/**
- * Hook to manage notifications (Notice + Announcements)
- * Provides unread counts and read status management
- */
 export function useNotifications() {
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'notice' | 'announcements'>(
     'notice'
   )
-
-  // Fetch Notice from API
+  const userId = useAuthStore((state) => state.auth.user?.id)
+  const client = useQueryClient()
+  const store = useNotificationStore()
   const {
     data: noticeResponse,
     isLoading: noticeLoading,
@@ -77,115 +53,129 @@ export function useNotifications() {
   } = useQuery({
     queryKey: ['notice'],
     queryFn: async () => requireServerSuccess(await getNotice()),
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 60000,
+    refetchInterval: 60000,
   })
-
-  // Fetch Announcements from status
-  const { status, loading: statusLoading } = useStatus()
-  const announcementsEnabled = status?.announcements_enabled ?? false
-  const announcements = useMemo<Record<string, unknown>[]>(() => {
-    if (!announcementsEnabled) return []
-    return ((status?.announcements || []) as Record<string, unknown>[]).slice(
-      0,
-      20
-    )
-  }, [announcementsEnabled, status?.announcements])
-
-  // Notification store
-  const {
-    lastReadNotice,
-    markNoticeRead,
-    markAnnouncementsRead,
-    isAnnouncementRead,
-  } = useNotificationStore()
-
-  // Extract notice content
-  const noticeContent = noticeResponse?.success
-    ? (noticeResponse.data || '').trim()
-    : ''
-
-  // Calculate unread counts
-  const unreadCounts = useMemo(() => {
-    const noticeUnread =
-      noticeContent && noticeContent !== lastReadNotice ? 1 : 0
-
-    const announcementsUnread = announcements.filter(
-      (item: Record<string, unknown>) => {
-        const key = getAnnouncementKey(item)
-        return !isAnnouncementRead(key)
-      }
-    ).length
-
-    return {
-      notice: noticeUnread,
-      announcements: announcementsUnread,
-      total: noticeUnread + announcementsUnread,
-    }
-  }, [noticeContent, lastReadNotice, announcements, isAnnouncementRead])
-
-  const markAnnouncementsAsRead = () => {
-    if (announcements.length > 0) {
-      const allKeys = announcements.map((item: Record<string, unknown>) =>
-        getAnnouncementKey(item)
+  const { data: status, isLoading: statusLoading } = useQuery({
+    ...statusQueryOptions,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
+  })
+  const enabled = status?.announcements_enabled ?? false
+  const announcements = useMemo(
+    () => (enabled ? ((status?.announcements ?? []) as Announcement[]) : []),
+    [enabled, status?.announcements]
+  )
+  const notificationAnnouncements = useMemo(
+    () =>
+      enabled
+        ? ((status?.notification_announcements ?? []) as Announcement[])
+        : [],
+    [enabled, status?.notification_announcements]
+  )
+  const readQuery = useQuery({
+    queryKey: ['announcement-reads', userId],
+    enabled: Boolean(userId),
+    queryFn: async () =>
+      requireServerSuccess(
+        (await api.get<ReadResponse>('/api/console/announcement-reads')).data
+      ),
+  })
+  const mark = useMutation({
+    mutationFn: async (request: { userId: number; keys: string[] }) =>
+      requireServerSuccess(
+        (
+          await api.post('/api/console/announcement-reads', {
+            keys: request.keys,
+          })
+        ).data
+      ),
+    onSuccess: (_data, request) => {
+      client.setQueryData<ReadResponse>(
+        ['announcement-reads', request.userId],
+        (old) =>
+          old
+            ? {
+                ...old,
+                data: [...old.data, ...request.keys.map((key) => ({ key }))],
+              }
+            : old
       )
-      markAnnouncementsRead(allKeys)
+    },
+  })
+  const notice = noticeResponse?.success
+    ? (noticeResponse.data ?? '').trim()
+    : ''
+  const readKeys = new Set(
+    userId
+      ? readQuery.data?.data.map((item) => item.key)
+      : store.readAnnouncementKeys
+  )
+  const keyFor = (item: Announcement) => item.read_key ?? JSON.stringify(item)
+  const noticeRead = userId
+    ? Boolean(
+        readQuery.data?.notice_content === notice &&
+        readKeys.has(readQuery.data.notice_key)
+      )
+    : store.lastReadNotice === notice
+  const unreadNoticeCount =
+    (notice && !noticeRead ? 1 : 0) +
+    notificationAnnouncements.filter((item) => !readKeys.has(keyFor(item)))
+      .length
+  const unreadAnnouncementsCount = announcements.filter(
+    (item) => !readKeys.has(keyFor(item))
+  ).length
+  // A both-locations announcement contributes once to the bell badge.
+  const allUnread = new Set(
+    [...announcements, ...notificationAnnouncements]
+      .filter((item) => !readKeys.has(keyFor(item)))
+      .map(keyFor)
+  )
+  const markVisibleAsRead = () => {
+    const visible =
+      activeTab === 'notice' ? notificationAnnouncements : announcements
+    const keys = visible.map(keyFor).filter((key) => !readKeys.has(key))
+    if (userId) {
+      if (!readQuery.isSuccess || mark.isPending) return
+      if (
+        activeTab === 'notice' &&
+        notice &&
+        !noticeRead &&
+        readQuery.data.notice_content === notice
+      ) {
+        keys.push(readQuery.data.notice_key)
+      }
+      if (keys.length) mark.mutate({ userId, keys: [...new Set(keys)] })
+    } else {
+      store.markAnnouncementsRead(keys)
+      if (activeTab === 'notice' && notice) store.markNoticeRead(notice)
     }
   }
-
-  // Handle popover open
-  const handleOpenPopover = (tab?: 'notice' | 'announcements') => {
-    const nextTab = tab || activeTab
-
-    // Mark currently visible content as read when opening the notification center
-    if (noticeContent) {
-      markNoticeRead(noticeContent)
-    }
-    if (nextTab === 'announcements') {
-      markAnnouncementsAsRead()
-    }
-
-    setActiveTab(nextTab)
+  const openPopover = (tab?: 'notice' | 'announcements') => {
+    if (tab) setActiveTab(tab)
     setPopoverOpen(true)
+    void client.invalidateQueries({ queryKey: ['status'] })
+    void refetchNotice()
+    if (userId) void readQuery.refetch()
   }
-
-  const handlePopoverOpenChange = (open: boolean) => {
-    if (open) {
-      handleOpenPopover(activeTab)
-      return
-    }
-
-    setPopoverOpen(false)
-  }
-
-  // Handle tab change - mark announcements as read when switching to that tab
-  const handleTabChange = (tab: 'notice' | 'announcements') => {
-    setActiveTab(tab)
-
-    if (tab === 'announcements') {
-      markAnnouncementsAsRead()
-    }
-  }
-
   return {
-    // Data
-    notice: noticeContent,
+    notice,
     announcements,
-    loading: noticeLoading || statusLoading,
-
-    // Unread counts
-    unreadCount: unreadCounts.total,
-    unreadNoticeCount: unreadCounts.notice,
-    unreadAnnouncementsCount: unreadCounts.announcements,
-
-    // Popover state
+    notificationAnnouncements,
+    loading:
+      noticeLoading || statusLoading || Boolean(userId && readQuery.isPending),
+    unreadCount: allUnread.size + (notice && !noticeRead ? 1 : 0),
+    unreadNoticeCount,
+    unreadAnnouncementsCount,
     popoverOpen,
-    setPopoverOpen: handlePopoverOpenChange,
     activeTab,
-    setActiveTab: handleTabChange,
-
-    // Actions
-    openPopover: handleOpenPopover,
+    setActiveTab,
+    setPopoverOpen: (open: boolean) =>
+      open ? openPopover() : setPopoverOpen(false),
+    openPopover,
     closePopover: () => setPopoverOpen(false),
     refetchNotice,
+    markVisibleAsRead,
+    markingRead: mark.isPending,
   }
 }

@@ -83,6 +83,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
       void client.invalidateQueries({ queryKey: ['monitor-admin-catalog'] })
       void client.invalidateQueries({ queryKey: ['monitor-allowlist-catalog'] })
       void client.invalidateQueries({ queryKey: ['console-monitoring'] })
+      void client.invalidateQueries({ queryKey: ['console-monitor-history'] })
     },
   })
   const probe = useMutation({
@@ -103,6 +104,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
       setConfirmation(null)
       setProbeResult(result)
       void client.invalidateQueries({ queryKey: ['console-monitoring'] })
+      void client.invalidateQueries({ queryKey: ['console-monitor-history'] })
     },
   })
   return (

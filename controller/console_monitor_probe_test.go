@@ -66,7 +66,7 @@ func TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch(t *testing.T) {
 	}
 	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &body))
 	require.True(t, body.Success)
-	assert.Equal(t, "error", body.Data.Status)
+	assert.Equal(t, "blocked", body.Data.Status)
 	assert.Equal(t, "MONITOR_COST_UNVERIFIED", body.Data.ErrorCode)
 	var probe model.ConsoleProbe
 	require.NoError(t, db.First(&probe, body.Data.ProbeID).Error)
@@ -144,7 +144,7 @@ func TestConsoleMonitorConfiguredHTTPFlow(t *testing.T) {
 	assert.EqualValues(t, 1, calls.Load())
 	assert.True(t, (consoleMonitorHandler{}).Enabled())
 	require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, MaxConcurrent: 1, RetentionDays: 90}))
-	assert.False(t, (consoleMonitorHandler{}).Enabled())
+	assert.True(t, (consoleMonitorHandler{}).Enabled(), "daily observations continue while paid execution is paused")
 }
 
 func TestManualChannelStatusSynchronizesCacheAndRouting(t *testing.T) {

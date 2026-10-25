@@ -33,6 +33,7 @@ export type Announcement = {
   publishDate: string
   type: AnnouncementType
   status: AnnouncementStatus
+  display?: 'notice' | 'timeline' | 'both'
   extra?: string
 }
 
@@ -108,3 +109,9 @@ export function getAnnouncementTypeOption(type: string) {
 export function getAnnouncementStatusOption(status: AnnouncementStatus) {
   return ANNOUNCEMENT_STATUSES.find((option) => option.value === status)
 }
+
+export const ANNOUNCEMENT_DISPLAYS = [
+  { value: 'notice', labelKey: 'Notice only' },
+  { value: 'timeline', labelKey: 'Timeline only' },
+  { value: 'both', labelKey: 'Both locations' },
+] as const

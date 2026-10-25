@@ -1,3 +1,16 @@
+## 2026-10-25 — 公告位置/持久化已读 + 每日监测历史：隔离候选完成，未部署生产
+
+- 独立工作区 `D:/Codex/worktrees/clearapi-notice-history-fix/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-notice-history-fix-20261025`，基于 879eff62（包含已部署 1aef1aec）。原 a032 工作区 152 项现有文件、动态线 72d26b26、运行适配 3124d8a1 的 5 项修改和正式源码 879eff62 原样保留，未 reset/clean/覆盖。保护 manifest/patch 在 D:/Codex/backups/clearapi-notice-history-20261025/。
+- **生产重新只读确认未变：** 06:31:37–07:16:08 UTC，运行仍 `1aef1aec0e6337992f382836aaeea62c07eb41fd` / engine `sha256:61614562f14aeb12bfd060e766510a1c727802fe92eea588afe6c652484b9c08`，Gateway CID/StartedAt 不变；2 条公告 hash 一致。runner 已启动，但 policy=false、预算0、目标归档/未发布/未allowlist/未启用，task/attempt/probe=0，费用合同0。不能称每日监测已在线运行。
+- **公告候选完成：** 真正根因为通知读取单条 Notice、时间线读取多公告，并非缓存修复未生效。现逐条 display=notice/timeline/both 存入原 options JSON，旧公告默认时间线，双位置同记录；按用户/内容键持久化 read，唯一约束保证幂等，写失败不假已读。后台修改保存后及时失效共享查询，并每分钟刷新通知。
+- **每日历史候选完成：** 复用 SystemTask，每次任务结束24小时后再次到期；暂停时记录已发布目标 skipped，admission 预算/权限阻断可见，传输未知保留租约；复用 probe 表关联 task/attempt。用户历史 API 有权限、UTC+8 日期、稳定排序/分页；原渠道详情补表格、原因、运行中状态及业务启停区别。未改普通渠道状态。
+- **必要迁移：** 正常主库新增 announcement_reads；已有 console_probes 增 task_id/attempt_id，由显式 monitor-init 迁移。镜像已交付工具。SQLite3.50.4/MySQL8.4.11/PG17.6新建/升级/重复迁移/重连和联合HTTP链通过；前端31项、typecheck、定向lint、Go/relaykit与完整Docker构建通过。fixture断言修正后的定向重跑结果与原始失败日志均保留。
+- **实际隔离浏览器与重启通过：** 展示过滤/同记录改位置/旧公告/确认已读、真实本地HTTP正常记录+预算阻断、main自动产生每日skipped；3条read、3条probe、1条daily task重启保留且无重复调度。所有测试上游均显式合成，真实供应商收费请求0。
+- **边界：** 未部署/重启生产，未修改生产公告、已读、渠道或预算；未Push/main合并/远端CI，未跑无关30项E2E。验证镜像SOURCE_COMMIT留空，仅作隔离验证；本地候选完整SHA在最终交付与外部receipt中记录。未来发布仍须按现有门禁从干净候选重建、迁移。供应商费用/硬上界证据及显式合法费用配置未补，生产真实跨日运行尚未验证；PG03继续暂缓，D不纳入。
+- 专项报告：`CLEARAPI_NOTICE_HISTORY_FIX_20261025.md`；截图、版本核对、三库/前端/迁移日志：`evidence/notice-history-20261025/`。
+
+---
+
 ## 2026-10-25 — 公告/普通渠道与动态监测软件正式发布；真实监测费用激活尚未完成
 
 - **实际运行应用 `1aef1aec0e6337992f382836aaeea62c07eb41fd`**，生产 OCI config `sha256:3c2f84e2b4a162313676320f4aa640114136993dc03fbb20c159c505b9d7a47f`，engine `sha256:61614562f14aeb12bfd060e766510a1c727802fe92eea588afe6c652484b9c08`；Gateway `3c1e4ab2ae3c4680bde376d9893492ed79b5174a8b9362ff86887064ae474f2c`。源码、正式构建、归档 `996d0af25b4113070b0c83f6436425d2ca7dabac346e41f0044c0b323709919d`、生产二进制及 JS/CSS 精确对应；正式 DryRun 后实际执行本地一键部署，health PASS / rollback false。

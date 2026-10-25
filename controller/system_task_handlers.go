@@ -25,28 +25,24 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(consoleMonitorHandler{})
 }
 
-// Reuse the host task lease and admission ledger. A paused policy schedules
-// nothing and enabling monitoring never enables ordinary channel auto-tests.
+// Reuse the durable host task lease. The daily observation still runs while
+// paid execution is paused, recording skipped targets without upstream calls.
 type consoleMonitorHandler struct{}
 
 func (consoleMonitorHandler) Type() string            { return model.SystemTaskTypeConsoleMonitor }
-func (consoleMonitorHandler) Interval() time.Duration { return time.Minute }
+func (consoleMonitorHandler) Interval() time.Duration { return model.ConsoleMonitorDailyInterval }
 func (consoleMonitorHandler) NewPayload() any         { return nil }
 func (consoleMonitorHandler) Enabled() bool {
-	if !model.ConsoleMonitoringReady(model.DB) {
-		return false
-	}
-	var policy model.ConsoleMonitorPolicy
-	return model.DB.First(&policy, 1).Error == nil && policy.Enabled
+	return model.ConsoleMonitoringReady(model.DB)
 }
 func (consoleMonitorHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
-	executor := service.ConsoleProbeExecutor{DB: model.DB, Adapters: map[string]service.ConsoleProbeAdapter{"channel": channelConsoleProbeAdapter{}}}
-	err := executor.RunScheduled(ctx)
+	executor := service.ConsoleProbeExecutor{DB: model.DB, TaskID: task.TaskID, Adapters: map[string]service.ConsoleProbeAdapter{"channel": channelConsoleProbeAdapter{}}}
+	summary, err := executor.RunDailyScheduled(ctx)
 	status := model.SystemTaskStatusSucceeded
 	if err != nil {
 		status = model.SystemTaskStatusFailed
 	}
-	finishSystemTaskHandler(task, runnerID, status, nil, err)
+	finishSystemTaskHandler(task, runnerID, status, summary, err)
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and

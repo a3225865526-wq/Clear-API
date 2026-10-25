@@ -231,7 +231,7 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			require.ErrorIs(t, executor.Run(ctx, m.ID), model.ErrMonitorBudget)
 			assert.Equal(t, 1, mock.calls)
 			var probe model.ConsoleProbe
-			require.NoError(t, db.Where("monitor_id = ?", m.ID).First(&probe).Error)
+			require.NoError(t, db.Where("monitor_id = ? AND status = ?", m.ID, "normal").First(&probe).Error)
 			assert.Equal(t, "normal", probe.Status)
 			assert.Equal(t, 1, probe.SourceChannelID)
 			// A different model has its own records; failed probes preserve channels.
@@ -268,7 +268,7 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			assert.False(t, restarted.Enabled)
 			assert.False(t, restarted.Published)
 			require.NoError(t, db.Model(&model.ConsoleProbe{}).Count(&history).Error)
-			assert.EqualValues(t, 3, history)
+			assert.EqualValues(t, 10, history) // Three execution records plus seven recorded admission denials.
 			require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 10, DailyCostMicros: 100, RetentionDays: 90}))
 			// Two processes racing for the same target must reserve only once.
 			start := make(chan struct{})
@@ -433,7 +433,7 @@ func TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled(t *testin
 	require.Positive(t, result.AttemptID)
 	require.Positive(t, result.ProbeID)
 	assert.Equal(t, "unknown", result.Status)
-	assert.Equal(t, "probe_failed", result.ErrorCode)
+	assert.Equal(t, "probe_transport_unresolved", result.ErrorCode)
 	assert.NotContains(t, err.Error(), "fixture-cleanup-secret")
 	var attempt model.ConsoleMonitorAttempt
 	require.NoError(t, db.Where("monitor_id = ?", m.ID).First(&attempt).Error)

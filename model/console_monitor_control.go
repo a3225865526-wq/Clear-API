@@ -83,7 +83,7 @@ func MigrateConsoleMonitoringDB(db *gorm.DB) error {
 }
 
 func ConsoleMonitoringReady(db *gorm.DB) bool {
-	if db == nil || !db.Migrator().HasTable(&ConsoleMonitor{}) || !db.Migrator().HasTable(&ConsoleProbe{}) || !db.Migrator().HasTable(&ConsoleMonitorPolicy{}) || !db.Migrator().HasTable(&ConsoleMonitorAttempt{}) || !db.Migrator().HasColumn(&ConsoleMonitorPolicy{}, "schema_version") {
+	if db == nil || !db.Migrator().HasTable(&ConsoleMonitor{}) || !db.Migrator().HasTable(&ConsoleProbe{}) || !db.Migrator().HasTable(&ConsoleMonitorPolicy{}) || !db.Migrator().HasTable(&ConsoleMonitorAttempt{}) || !db.Migrator().HasColumn(&ConsoleMonitorPolicy{}, "schema_version") || !db.Migrator().HasColumn(&ConsoleProbe{}, "task_id") {
 		return false
 	}
 	var policy ConsoleMonitorPolicy

@@ -26,6 +26,8 @@ export interface Probe {
   latency_ms: number | null
   endpoint_ms: number | null
   error_code: string
+  attempt_id?: number
+  task_id?: string
 }
 export interface Availability {
   percent: number | null
@@ -38,6 +40,7 @@ export interface Monitor {
   model: string
   status: string
   latest: Probe | null
+  running?: { attempt_id: number; started_at: number; unresolved: boolean }
   history: Probe[]
   windows: Record<string, Availability>
 }
@@ -46,12 +49,21 @@ export interface Channel {
   name: string
   platform: string
   models: Monitor[]
+  business_status?: number
 }
 export interface MonitoringData {
   ready: boolean
   read_at: number
   stale_after_seconds: number
   channels: Channel[]
+  schedule?: {
+    timezone: string
+    interval_seconds: number
+    execution_enabled: boolean
+    last_run_at: number
+    next_run_at: number
+    task_status: string
+  }
 }
 
 export async function getMonitoring(signal: AbortSignal) {
@@ -65,7 +77,34 @@ export async function getMonitoring(signal: AbortSignal) {
 export function aggregateMonitorStatus(statuses: string[]): string {
   if (statuses.includes('error')) return 'error'
   if (statuses.includes('degraded')) return 'degraded'
-  if (statuses.length === 0 || statuses.some((status) => status !== 'normal'))
-    {return 'unknown'}
+  if (statuses.length === 0 || statuses.some((status) => status !== 'normal')) {
+    return 'unknown'
+  }
   return 'normal'
+}
+
+export interface MonitorHistoryData {
+  items: Probe[]
+  total: number
+  page: number
+  page_size: number
+  timezone: string
+}
+
+export async function getMonitorHistory(
+  id: number,
+  page: number,
+  size: number,
+  from: string,
+  to: string,
+  signal: AbortSignal
+) {
+  const response = await api.get<{
+    success: boolean
+    data: MonitorHistoryData
+  }>(`/api/console/channel-status/${id}/history`, {
+    signal,
+    params: { page, page_size: size, from, to },
+  })
+  return requireServerSuccess(response.data).data
 }
