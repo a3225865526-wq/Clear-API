@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"reflect"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
@@ -26,6 +24,8 @@ import (
 	hosttypes "github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 func modelPriceNotConfiguredError(modelName string, userId int) error {
@@ -490,11 +490,22 @@ func requestOutputBudget(info *relaycommon.RelayInfo, meta *types.TokenCountMeta
 	generation := false
 	switch request := info.Request.(type) {
 	case *dto.GeneralOpenAIRequest:
+		if ExceedsMaxTokensLimit(request.MaxTokens, request.MaxCompletionTokens) {
+			return 0, fmt.Errorf("output token limit is out of range")
+		}
 		generation = info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions
 		if request.N != nil {
 			count = *request.N
 		}
-	case *dto.ClaudeRequest, *dto.OpenAIResponsesRequest:
+	case *dto.ClaudeRequest:
+		if ExceedsMaxTokensLimit(request.MaxTokens, request.MaxTokensToSample) {
+			return 0, fmt.Errorf("output token limit is out of range")
+		}
+		generation = true
+	case *dto.OpenAIResponsesRequest:
+		if ExceedsMaxTokensLimit(request.MaxOutputTokens) {
+			return 0, fmt.Errorf("output token limit is out of range")
+		}
 		generation = true
 	case *dto.OpenAIResponsesCompactionRequest:
 		generation = service.BillingProtectionEnabled() || service.DurableWalletBillingEnabled()
@@ -507,12 +518,15 @@ func requestOutputBudget(info *relaycommon.RelayInfo, meta *types.TokenCountMeta
 		copyMeta.MaxTokens = info.BillingOutputLimit
 		meta = &copyMeta
 	case *dto.GeminiChatRequest:
+		if ExceedsMaxTokensLimit(request.GenerationConfig.MaxOutputTokens) {
+			return 0, fmt.Errorf("output token limit is out of range")
+		}
 		generation = !strings.Contains(info.RequestURLPath, ":embedContent") && !strings.Contains(info.RequestURLPath, ":batchEmbedContents")
 		if !generation {
 			return 0, nil
 		}
 		if len(request.Requests) > 0 {
-			if !constant.CountToken || len(request.Requests) > dto.MaxImageN || len(request.Contents) > 0 {
+			if len(request.Requests) > dto.MaxImageN || len(request.Contents) > 0 {
 				return 0, fmt.Errorf("invalid Gemini batch billing budget")
 			}
 			total := 0.0
@@ -541,10 +555,10 @@ func requestOutputBudget(info *relaycommon.RelayInfo, meta *types.TokenCountMeta
 	if !generation {
 		return 0, nil
 	}
-	if generation && (!constant.CountToken || meta.MaxTokens <= 0 || meta.MaxTokens > maxTokensLimit) {
-		return 0, fmt.Errorf("paid generation requires token counting and an explicit bounded output limit")
+	if meta.MaxTokens <= 0 || meta.MaxTokens > maxTokensLimit {
+		return 0, fmt.Errorf("generation requires an enforceable bounded output limit")
 	}
-	return float64(max(0, meta.MaxTokens)) * float64(count), nil
+	return float64(meta.MaxTokens) * float64(count), nil
 }
 
 func requestToolBudget(info *relaycommon.RelayInfo) (float64, error) {
@@ -662,14 +676,15 @@ func RequiresOutboundTextBudget(info *relaycommon.RelayInfo) bool {
 	return info != nil && info.Request != nil && !info.IsChannelTest && !info.PriceData.FreeModel && (info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions || info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact || info.RelayMode == relayconstant.RelayModeAudioSpeech || info.RelayFormat == types.RelayFormatClaude || info.RelayFormat == types.RelayFormatGemini)
 }
 
-// PrepareOutboundTextBudget repeats reservation after conversion, injected
-// prompts and administrator overrides, using the frozen pricing snapshot.
+// PrepareOutboundTextBudget returns the budgeted wire body and raises the
+// reservation after conversion, injected prompts and administrator overrides,
+// using the frozen pricing snapshot.
 // With reservation hardening enforced it resolves the approved hidden usage
 // envelope for the dispatch candidate and rejects before dispatch when the
 // required reservation is unobtainable — it never clamps and sends.
-func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body []byte) error {
+func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body []byte) ([]byte, error) {
 	if !RequiresOutboundTextBudget(info) {
-		return nil
+		return body, nil
 	}
 	copyInfo := *info
 	switch info.GetFinalRequestRelayFormat() {
@@ -686,37 +701,60 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 	case types.RelayFormatOpenAIAudio:
 		copyInfo.Request = &dto.AudioRequest{}
 	default:
-		return fmt.Errorf("cannot verify outbound generation budget for this provider")
+		return nil, fmt.Errorf("cannot verify outbound generation budget for this provider")
 	}
 	if err := common.Unmarshal(body, copyInfo.Request); err != nil {
-		return fmt.Errorf("cannot verify outbound request budget")
+		return nil, fmt.Errorf("cannot verify outbound request budget")
 	}
 	if (service.BillingProtectionEnabled() || service.DurableWalletBillingEnabled()) && (info.ChannelSetting.PassThroughBodyEnabled || model_setting.GetGlobalSettings().PassThroughRequestEnabled) {
-		var fields map[string]common.RawMessage
-		if err := common.Unmarshal(body, &fields); err != nil {
-			return err
-		}
-		// Passthrough skips DTO serialization. Derive the supported fields from
-		// the protocol DTO so an unparsed cost multiplier cannot reach upstream.
-		for _, field := range reflect.VisibleFields(reflect.TypeOf(copyInfo.Request).Elem()) {
-			name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
-			delete(fields, name)
-		}
-		for field := range fields {
-			return fmt.Errorf("billing cannot meter unrecognized passthrough field %q", field)
+		// Retain the accounting boundary for alternate provider cost fields;
+		// unrelated extension fields do not require a billing whitelist.
+		for _, path := range []string{"best_of", "parameters.n", "parameters.max_tokens", "parameters.max_new_tokens", "generation_config"} {
+			if gjson.GetBytes(body, path).Exists() {
+				return nil, fmt.Errorf("billing cannot meter passthrough cost field %q", path)
+			}
 		}
 	}
-	if err := PrepareBillingRequest(c, &copyInfo, false); err != nil {
-		return err
+	// Normalize the effective wire request too: passthrough and administrator
+	// overrides can bypass the DTO serialized at admission. Preserve protocol
+	// extensions while imposing the same output allowance on the actual body.
+	if err := PrepareBillingRequest(c, &copyInfo, true); err != nil {
+		return nil, err
+	}
+	encoded, err := common.Marshal(copyInfo.Request)
+	if err != nil {
+		return nil, err
+	}
+	paths := []string{}
+	switch request := copyInfo.Request.(type) {
+	case *dto.GeneralOpenAIRequest:
+		paths = []string{"max_tokens", "max_completion_tokens"}
+	case *dto.ClaudeRequest:
+		paths = []string{"max_tokens"}
+	case *dto.OpenAIResponsesRequest:
+		paths = []string{"max_output_tokens"}
+	case *dto.GeminiChatRequest:
+		paths = []string{"generationConfig.maxOutputTokens"}
+		for i := range request.Requests {
+			paths = append(paths, fmt.Sprintf("requests.%d.generationConfig.maxOutputTokens", i))
+		}
+	}
+	for _, path := range paths {
+		if value := gjson.GetBytes(encoded, path); value.Exists() {
+			body, err = sjson.SetRawBytes(body, path, []byte(value.Raw))
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
 	meta := copyInfo.Request.GetTokenCountMeta()
 	output, err := requestOutputBudget(&copyInfo, meta)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	prompt, err := service.EstimateRequestToken(c, meta, &copyInfo)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	price := info.PriceData
 	quota := 0.0
@@ -727,7 +765,7 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 		}
 		upper, err := billingexpr.ReservationUpperBound(snap.ExprString, float64(prompt)*max(1.0, snap.PreConsumeMultiplier), output, images)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		quota = upper / 1_000_000 * common.QuotaPerUnit * snap.GroupRatio
 	} else if !price.UsePrice {
@@ -739,15 +777,15 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 	}
 	toolQuota, err := requestToolBudget(&copyInfo)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	quota = max(float64(price.QuotaToPreConsume), quota+toolQuota*price.GroupRatioInfo.GroupRatio)
 	legacyTarget, err := common.QuotaFromFloatStrict(math.Ceil(quota))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if info.Billing == nil {
-		return fmt.Errorf("paid outbound request has no billing reservation")
+		return nil, fmt.Errorf("paid outbound request has no billing reservation")
 	}
 
 	if hardening := operation_setting.ReservationHardeningMode(); hardening != operation_setting.ReserveModeOff {
@@ -756,21 +794,21 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 			switch hardening {
 			case operation_setting.ReserveModeEnforce:
 				if estimateErr != nil {
-					return fmt.Errorf("billing admission rejected before dispatch: %w", estimateErr)
+					return nil, fmt.Errorf("billing admission rejected before dispatch: %w", estimateErr)
 				}
 				target := max(legacyTarget, estimate.RequiredQuota)
 				if target > estimate.CapQuota {
-					return fmt.Errorf("billing admission rejected before dispatch: required reservation %d exceeds authorization cap %d (profile %s)", target, estimate.CapQuota, estimate.ProfileSource)
+					return nil, fmt.Errorf("billing admission rejected before dispatch: required reservation %d exceeds authorization cap %d (profile %s)", target, estimate.CapQuota, estimate.ProfileSource)
 				}
 				estimate.ReservedQuota = target
 				session.SetDispatchAuth(estimate.ToAuthSnapshot(info.RequestId))
 				if err := info.Billing.Reserve(target); err != nil {
-					return fmt.Errorf("billing admission reservation failed before dispatch: %w", err)
+					return nil, fmt.Errorf("billing admission reservation failed before dispatch: %w", err)
 				}
 				if err := session.PersistDispatchAuth(); err != nil {
-					return fmt.Errorf("billing authorization snapshot could not be persisted: %w", err)
+					return nil, fmt.Errorf("billing authorization snapshot could not be persisted: %w", err)
 				}
-				return nil
+				return body, nil
 			case operation_setting.ReserveModeMonitor:
 				if estimateErr != nil {
 					logger.LogWarn(c, "reserve hardening monitor: dispatch would be rejected: "+estimateErr.Error())
@@ -784,5 +822,5 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 			}
 		}
 	}
-	return info.Billing.Reserve(legacyTarget)
+	return body, info.Billing.Reserve(legacyTarget)
 }

@@ -251,7 +251,12 @@ func prepareAwsBudget(c *gin.Context, info *relaycommon.RelayInfo, body []byte, 
 				return types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 			}
 		}
-		if err := helper.PrepareOutboundTextBudget(c, &copyInfo, body); err != nil {
+		// The SDK sends the original body; its limit must already be on wire.
+		var wire dto.ClaudeRequest
+		if err := common.Unmarshal(body, &wire); err != nil || wire.MaxTokens == nil || *wire.MaxTokens == 0 {
+			return types.NewError(errors.New("cannot verify AWS output budget"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
+		}
+		if _, err := helper.PrepareOutboundTextBudget(c, &copyInfo, body); err != nil {
 			return types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
 		}
 	}

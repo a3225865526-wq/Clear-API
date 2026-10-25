@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -558,9 +559,14 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		if err != nil {
 			return nil, err
 		}
-		if err = helper.PrepareOutboundTextBudget(c, info, data); err != nil {
+		data, err = helper.PrepareOutboundTextBudget(c, info, data)
+		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
 		}
+		_ = req.Body.Close()
+		req.Body = io.NopCloser(bytes.NewReader(data))
+		req.ContentLength = int64(len(data))
+		req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(data)), nil }
 	}
 	client, err := service.GetHttpClientWithProxySettings(info.ChannelSetting.Proxy, info.ChannelSetting)
 	if err != nil {

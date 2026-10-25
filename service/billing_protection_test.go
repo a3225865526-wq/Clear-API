@@ -1,8 +1,11 @@
 package service_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -13,6 +16,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	relayapi "github.com/QuantumNous/new-api/relay"
+	"github.com/QuantumNous/new-api/relay/channel"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
@@ -22,10 +26,12 @@ import (
 	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	hosttypes "github.com/QuantumNous/new-api/types"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -347,14 +353,14 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 		request          dto.Request
 		usage            *dto.BillingUsage
 	}{
-		{"chat-json", "/v1/chat/completions", `{"model":"protocol-fixture","messages":[{"role":"assistant","content":null,"tool_calls":[{"id":"a","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"result"}],"max_tokens":1024,"max_completion_tokens":512,"n":2,"response_format":{"type":"json_object"},"metadata":{"case":"fixture"}}`, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
+		{"chat-json", "/v1/chat/completions", `{"model":"protocol-fixture","messages":[{"role":"assistant","content":null,"tool_calls":[{"id":"a","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"result"}],"n":2,"response_format":{"type":"json_object"},"metadata":{"case":"fixture"}}`, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
 		{"chat-sse", "/v1/chat/completions", `{"model":"protocol-fixture","stream":true,"messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1024,"reasoning_effort":"high"}`, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
 		{"completions", "/v1/completions", `{"model":"protocol-fixture","prompt":"hello","max_tokens":1024}`, types.RelayFormatOpenAI, relayconstant.RelayModeCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
-		{"responses-json", "/v1/responses", `{"model":"protocol-fixture","input":[{"type":"function_call","call_id":"a","name":"lookup","arguments":"{\"key\":\"argument-fixture\"}"},{"type":"function_call_output","call_id":"a","output":"result-fixture"},{"role":"assistant","content":[{"type":"output_text","text":"assistant-fixture","annotations":[]}]}],"max_output_tokens":1024,"reasoning":{"effort":"high"},"text":{"format":{"type":"json_object"}},"store":false,"temperature":0,"top_p":1,"metadata":{"tag":"fixture"}}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
+		{"responses-json", "/v1/responses", `{"model":"protocol-fixture","input":[{"type":"function_call","call_id":"a","name":"lookup","arguments":"{\"key\":\"argument-fixture\"}"},{"type":"function_call_output","call_id":"a","output":"result-fixture"},{"role":"assistant","content":[{"type":"output_text","text":"assistant-fixture","annotations":[]}]}],"reasoning":{"effort":"high"},"text":{"format":{"type":"json_object"}},"store":false,"temperature":0,"top_p":1,"metadata":{"tag":"fixture"}}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
 		{"responses-sse", "/v1/responses", `{"model":"protocol-fixture","stream":true,"input":"hello encrypted_content item_reference","max_output_tokens":1024,"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"include":["reasoning.encrypted_content"]}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
-		{"claude-json", "/v1/messages", `{"model":"protocol-fixture","system":"system-fixture","max_tokens":1024,"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"lookup","input":{"key":"argument-fixture"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"result-fixture"}]}],"metadata":{"user_id":"fixture"},"thinking":{"type":"enabled","budget_tokens":100}}`, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, &dto.ClaudeRequest{}, dto.NewClaudeMessagesBillingUsage(&dto.ClaudeUsage{InputTokens: 800, CacheReadInputTokens: 200, OutputTokens: 20})},
+		{"claude-json", "/v1/messages", `{"model":"protocol-fixture","system":"system-fixture","messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"lookup","input":{"key":"argument-fixture"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"result-fixture"}]}],"metadata":{"user_id":"fixture"},"thinking":{"type":"enabled","budget_tokens":100}}`, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, &dto.ClaudeRequest{}, dto.NewClaudeMessagesBillingUsage(&dto.ClaudeUsage{InputTokens: 800, CacheReadInputTokens: 200, OutputTokens: 20})},
 		{"claude-sse", "/v1/messages", `{"model":"protocol-fixture","stream":true,"max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, &dto.ClaudeRequest{}, dto.NewClaudeMessagesBillingUsage(&dto.ClaudeUsage{InputTokens: 800, CacheReadInputTokens: 200, OutputTokens: 20})},
-		{"gemini-json", "/v1beta/models/protocol-fixture:generateContent", `{"systemInstruction":{"parts":[{"text":"system-fixture"}]},"contents":[{"role":"model","parts":[{"functionCall":{"name":"lookup","args":{"key":"argument-fixture"}}}]},{"role":"user","parts":[{"functionResponse":{"name":"lookup","response":{"result":"result-fixture"}}}]}],"generationConfig":{"maxOutputTokens":1024},"tools":[{"functionDeclarations":[{"name":"lookup","parameters":{"type":"OBJECT"}}]}]}`, types.RelayFormatGemini, relayconstant.RelayModeGemini, &dto.GeminiChatRequest{}, dto.NewGeminiChatBillingUsage(&dto.GeminiUsageMetadata{PromptTokenCount: 1000, CachedContentTokenCount: 200, CandidatesTokenCount: 20, TotalTokenCount: 1020})},
+		{"gemini-json", "/v1beta/models/protocol-fixture:generateContent", `{"systemInstruction":{"parts":[{"text":"system-fixture"}]},"contents":[{"role":"model","parts":[{"functionCall":{"name":"lookup","args":{"key":"argument-fixture"}}}]},{"role":"user","parts":[{"functionResponse":{"name":"lookup","response":{"result":"result-fixture"}}}]}],"tools":[{"functionDeclarations":[{"name":"lookup","parameters":{"type":"OBJECT"}}]}]}`, types.RelayFormatGemini, relayconstant.RelayModeGemini, &dto.GeminiChatRequest{}, dto.NewGeminiChatBillingUsage(&dto.GeminiUsageMetadata{PromptTokenCount: 1000, CachedContentTokenCount: 200, CandidatesTokenCount: 20, TotalTokenCount: 1020})},
 		{"gemini-sse", "/v1beta/models/protocol-fixture:streamGenerateContent?alt=sse", `{"contents":[{"role":"user","parts":[{"text":"hello"}]}],"generationConfig":{"maxOutputTokens":1024}}`, types.RelayFormatGemini, relayconstant.RelayModeGemini, &dto.GeminiChatRequest{}, dto.NewGeminiChatBillingUsage(&dto.GeminiUsageMetadata{PromptTokenCount: 1000, CachedContentTokenCount: 200, CandidatesTokenCount: 20, TotalTokenCount: 1020})},
 		{"embedding", "/v1/embeddings", `{"model":"protocol-fixture","input":"hello"}`, types.RelayFormatEmbedding, relayconstant.RelayModeEmbeddings, &dto.EmbeddingRequest{}, nil},
 		{"rerank", "/v1/rerank", `{"model":"protocol-fixture","query":"hello","documents":["document"]}`, types.RelayFormatRerank, relayconstant.RelayModeRerank, &dto.RerankRequest{}, nil},
@@ -379,7 +385,8 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			require.Nil(t, relayapi.PrepareRequestBilling(c, info))
 			body, err := common.Marshal(tc.request)
 			require.NoError(t, err)
-			require.NoError(t, helper.PrepareOutboundTextBudget(c, info, body))
+			_, budgetErr := helper.PrepareOutboundTextBudget(c, info, body)
+			require.NoError(t, budgetErr)
 			reserved := info.Billing.GetPreConsumedQuota()
 			expected := 890
 			usage := &dto.Usage{BillingUsage: tc.usage}
@@ -411,7 +418,8 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			info.RequestId += "-raise"
 			info.Billing = nil
 			require.Nil(t, service.PreConsumeBilling(c, 10, info))
-			require.NoError(t, helper.PrepareOutboundTextBudget(c, info, body))
+			_, budgetErr = helper.PrepareOutboundTextBudget(c, info, body)
+			require.NoError(t, budgetErr)
 			assert.GreaterOrEqual(t, info.Billing.GetPreConsumedQuota(), 10)
 			require.Error(t, info.Billing.Reserve(200000))
 			assert.False(t, c.GetBool("upstream_attempted"))
@@ -479,5 +487,78 @@ func TestProtocolBillingUnmeasuredInputs(t *testing.T) {
 	require.NoError(t, helper.PrepareBillingRequest(c, info, false))
 	assert.Nil(t, r.MaxOutputTokens)
 	r.ServiceTier = "priority"
-	require.ErrorContains(t, helper.PrepareBillingRequest(c, info, false), "service_tier")
+	require.NoError(t, helper.PrepareBillingRequest(c, info, false))
+}
+
+// A real HTTP transport must send the normalized allowance and must not send
+// anything if reserving that allowance fails.
+type allowanceReservation struct{ held, available int }
+
+func (s *allowanceReservation) Settle(int) error         { return nil }
+func (s *allowanceReservation) Refund(*gin.Context)      {}
+func (s *allowanceReservation) NeedsRefund() bool        { return false }
+func (s *allowanceReservation) GetPreConsumedQuota() int { return s.held }
+func (s *allowanceReservation) Reserve(quota int) error {
+	if quota > s.available {
+		return errors.New("insufficient quota")
+	}
+	s.held = max(s.held, quota)
+	return nil
+}
+
+func TestBillingOutputAllowanceTransport(t *testing.T) {
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	setPolicy(t, operation_setting.ReserveModeOff, "{}")
+	protectedEncoderInit.Do(service.InitTokenEncoders)
+	for _, tc := range []struct {
+		name, path, body, field string
+		request                 dto.Request
+		format                  types.RelayFormat
+		mode                    int
+	}{
+		{"chat", "/v1/chat/completions", `{"model":"fixture","messages":[{"role":"user","content":"hello"}],"extension":true}`, "max_tokens", &dto.GeneralOpenAIRequest{}, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions},
+		{"responses", "/v1/responses", `{"model":"fixture","input":"hello","extension":true}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses},
+		{"claude", "/v1/messages", `{"model":"fixture","messages":[{"role":"user","content":"hello"}],"extension":true}`, "max_tokens", &dto.ClaudeRequest{}, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions},
+		{"gemini", "/v1beta/models/fixture:generateContent", `{"contents":[{"parts":[{"text":"hello"}]}],"extension":true}`, "generationConfig.maxOutputTokens", &dto.GeminiChatRequest{}, types.RelayFormatGemini, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var received []byte
+			var receivedLength int64
+			seen := make(chan struct{}, 1)
+			calls := 0
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				received, _ = io.ReadAll(r.Body)
+				receivedLength = r.ContentLength
+				seen <- struct{}{}
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer upstream.Close()
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", tc.path, nil)
+			reservation := &allowanceReservation{available: 100000}
+			info := &relaycommon.RelayInfo{Request: tc.request, RelayFormat: tc.format, RelayMode: tc.mode, RequestURLPath: tc.path, OriginModelName: "fixture", ChannelMeta: &relaycommon.ChannelMeta{}, Billing: reservation, PriceData: hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}}}
+			info.ChannelSetting.PassThroughBodyEnabled = true
+			req, err := http.NewRequest("POST", upstream.URL, bytes.NewBufferString(tc.body))
+			require.NoError(t, err)
+			response, err := channel.DoRequest(c, req, info)
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			<-seen
+			assert.Positive(t, gjson.GetBytes(received, tc.field).Int())
+			assert.True(t, gjson.GetBytes(received, "extension").Bool())
+			assert.GreaterOrEqual(t, reservation.held, int(gjson.GetBytes(received, tc.field).Int()))
+			assert.Equal(t, int64(len(received)), receivedLength)
+			// Rejection happens before HTTP dispatch, with no synthetic usage.
+			reservation.available = 1
+			req, err = http.NewRequest("POST", upstream.URL, bytes.NewBufferString(tc.body))
+			require.NoError(t, err)
+			c.Set("upstream_attempted", false)
+			response, err = channel.DoRequest(c, req, info)
+			require.ErrorContains(t, err, "insufficient quota")
+			assert.Nil(t, response)
+			assert.Equal(t, 1, calls)
+			assert.False(t, c.GetBool("upstream_attempted"))
+		})
+	}
 }

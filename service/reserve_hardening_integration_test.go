@@ -213,7 +213,8 @@ func startHardeningFlow(t testing.TB, u hardeningUser, channelID int, modelName,
 
 func (f *hardeningFlow) dispatch(t testing.TB) error {
 	t.Helper()
-	return helper.PrepareOutboundTextBudget(f.Ctx, f.Info, []byte(f.OutboundBody))
+	_, err := helper.PrepareOutboundTextBudget(f.Ctx, f.Info, []byte(f.OutboundBody))
+	return err
 }
 
 func (f *hardeningFlow) settle(t testing.TB, usage *dto.Usage) {

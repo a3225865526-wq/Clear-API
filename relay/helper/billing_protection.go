@@ -2,7 +2,6 @@ package helper
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/QuantumNous/new-api/common"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -10,9 +9,14 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 )
+
+// This is an enforced gateway output allowance, not a claim about a model's
+// maximum capacity. Approved model profiles take precedence.
+const defaultBillingOutputTokens = 4096
 
 // PrepareBillingRequest uses each protocol's own DTO. It checks only facts
 // that affect accounting; serialization and protocol validation stay with the
@@ -36,20 +40,16 @@ func PrepareBillingRequest(c *gin.Context, info *relaycommon.RelayInfo, defaultO
 	}
 	profile, approved := operation_setting.ResolveReserveProfile(policy, admission.GetChannelID(), model)
 	hidden := ""
-	tier := ""
 	var cap **uint
 	switch r := info.Request.(type) {
 	case *dto.GeneralOpenAIRequest:
-		if len(r.ServiceTier) > 0 {
-			if err := common.Unmarshal(r.ServiceTier, &tier); err != nil {
-				return fmt.Errorf("invalid service_tier")
+		if (info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions) && r.MaxTokens == nil && r.MaxCompletionTokens == nil {
+			cap = &r.MaxTokens
+			if info.RelayMode == relayconstant.RelayModeChatCompletions && dto.GetOpenAIChatCapabilities(r.Model, info.ReasoningEffort).UseMaxCompletionTokens {
+				cap = &r.MaxCompletionTokens
 			}
 		}
-		if r.MaxTokens == nil && r.MaxCompletionTokens == nil {
-			cap = &r.MaxCompletionTokens
-		}
 	case *dto.OpenAIResponsesRequest:
-		tier = r.ServiceTier
 		cap = &r.MaxOutputTokens
 		if r.PreviousResponseID != "" {
 			hidden = "previous_response_id"
@@ -68,7 +68,6 @@ func PrepareBillingRequest(c *gin.Context, info *relaycommon.RelayInfo, defaultO
 			hidden = reference
 		}
 	case *dto.OpenAIResponsesCompactionRequest:
-		tier = r.ServiceTier
 		if r.PreviousResponseID != "" {
 			hidden = "compact previous_response_id"
 		}
@@ -87,7 +86,6 @@ func PrepareBillingRequest(c *gin.Context, info *relaycommon.RelayInfo, defaultO
 			hidden = reference
 		}
 	case *dto.ClaudeRequest:
-		tier = r.ServiceTier
 		cap = &r.MaxTokens
 		if len(r.McpServers) > 0 && string(r.McpServers) != "null" && string(r.McpServers) != "[]" {
 			return fmt.Errorf("billing cannot bound Claude server-side MCP tool charges")
@@ -135,22 +133,25 @@ func PrepareBillingRequest(c *gin.Context, info *relaycommon.RelayInfo, defaultO
 			}
 		}
 	}
-	// Inspect the effective outbound tier after the channel's existing field
-	// filtering. A standard tariff cannot silently price a different service.
-	if !defaultOutput && tier != "" && tier != "auto" && tier != "default" {
-		return fmt.Errorf("billing has no verified service_tier tariff for %q", tier)
-	}
-	if strings.HasPrefix(hidden, "unsupported ") {
-		return fmt.Errorf("billing cannot meter %s", hidden)
-	}
 	if hidden != "" && (policy.Mode != operation_setting.ReserveModeEnforce || !approved || profile.HiddenTotalMax <= 0) {
 		return fmt.Errorf("billing cannot estimate %s without an enforced approved hidden-input reserve profile", hidden)
 	}
-	// A configured server ceiling is imposed on the actual outbound request,
-	// never merely assumed by the estimator. No arbitrary default is invented.
-	if defaultOutput && cap != nil && *cap == nil && approved && profile.ModelOutputMax > 0 && profile.ModelOutputMax <= maxTokensLimit {
-		limit := uint(profile.ModelOutputMax)
-		*cap = &limit
+	if defaultOutput && cap != nil && *cap == nil {
+		limit := defaultBillingOutputTokens
+		if _, claude := info.Request.(*dto.ClaudeRequest); claude {
+			limit = model_setting.GetClaudeSettings().GetDefaultMaxTokens(model)
+		}
+		if approved && profile.ModelOutputMax > 0 {
+			if profile.ModelOutputMax > maxTokensLimit {
+				return fmt.Errorf("model_output_max exceeds the billing token limit")
+			}
+			limit = int(profile.ModelOutputMax)
+		}
+		if limit <= 0 || limit > maxTokensLimit {
+			return fmt.Errorf("invalid server output allowance")
+		}
+		value := uint(limit)
+		*cap = &value
 	}
 	return nil
 }
@@ -166,11 +167,6 @@ func responsesHiddenInput(input any) string {
 		}
 	case map[string]any:
 		kind, _ := value["type"].(string)
-		switch kind {
-		case "", "message", "input_text", "output_text", "text", "input_image", "input_file", "function_call", "function_call_output", "reasoning", "compaction", "item_reference":
-		default:
-			return "unsupported Responses input type " + kind
-		}
 		if kind == "item_reference" {
 			return "Responses item_reference"
 		}

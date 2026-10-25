@@ -658,7 +658,8 @@ func buildResponsesWSCreatePayload(c *gin.Context, info *relaycommon.RelayInfo, 
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeReadRequestBodyFailed, types.ErrOptionWithSkipRetry())
 	}
-	if err := helper.PrepareOutboundTextBudget(c, info, jsonData); err != nil {
+	jsonData, err = helper.PrepareOutboundTextBudget(c, info, jsonData)
+	if err != nil {
 		return nil, newResponsesWSInvalidRequestError(err)
 	}
 	event, err := buildResponsesWSCreateEvent(jsonData, generate, streamID)
