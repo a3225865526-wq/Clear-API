@@ -1,0 +1,560 @@
+{
+  "captured_head": "a9fe76f301c023fb8ae716901bbe4f94a4184b3e",
+  "branch": "codex/clearapi-abce-release-20261024",
+  "worktrees": [
+    {
+      "worktree": "D:/AI/API/upstream/new-api",
+      "HEAD": "d021bf6f73a0fdc81bfaaabdeb5554852d794764",
+      "branch": "refs/heads/codex/clearapi-shop-catalog-cleanup-20261018",
+      "tracked_changed": 0,
+      "untracked": 1,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "C:/Users/Chen/AppData/Local/Temp/opencode/clearapi-probe-cost-policy",
+      "HEAD": "7af3b1292793ae1def4df59e680f8107cb946c39",
+      "branch": "refs/heads/codex/probe-cost-policy",
+      "state": "UNAVAILABLE"
+    },
+    {
+      "worktree": "C:/Users/Chen/AppData/Local/Temp/opencode/pg03-phase1-baseline",
+      "HEAD": "d0c837b4ea8bb5a7d292cfe8ec51a50a4a5510bd",
+      "branch": null,
+      "state": "UNAVAILABLE"
+    },
+    {
+      "worktree": "C:/Users/Chen/Documents/Codex/2026-10-23/referenced-chatgpt-conversation-this-is-an-2/work/repo",
+      "HEAD": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "branch": "refs/heads/codex/local-deploy-isolated-20261023",
+      "tracked_changed": 35,
+      "untracked": 6,
+      "relevant_changes": [
+        "scripts/deploy-local.ps1",
+        "scripts/local-deploy-vps.py",
+        "scripts/local-deploy.config.example.json",
+        "scripts/local-deploy.sudoers.example",
+        "scripts/local-deploy.vps-config.example.json"
+      ]
+    },
+    {
+      "worktree": "D:/AI/API/runtime/console-release-f2e46f4",
+      "HEAD": "c391b000cebdfc01ac7527c295010d89ee343ae3",
+      "branch": null,
+      "tracked_changed": 80,
+      "untracked": 7,
+      "relevant_changes": [
+        "controller/channel-test.go",
+        "controller/console_monitor.go",
+        "model/console_monitor.go"
+      ]
+    },
+    {
+      "worktree": "D:/AI/API/runtime/owner-finance-zh-release-20261003",
+      "HEAD": "da409e22bc08f107fcece92cd9d8f7c0e7320313",
+      "branch": null,
+      "tracked_changed": 7,
+      "untracked": 1,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/runtime/owner-overview-release-20261002",
+      "HEAD": "9e33f168e2b2c09216e345651dec3bd95d7ebf54",
+      "branch": null,
+      "tracked_changed": 11,
+      "untracked": 7,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/runtime/rc7/baseline-vet",
+      "HEAD": "97e620437a2f77c9324e3fd0317201647154186f",
+      "branch": null,
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/tmp/main-baseline-check",
+      "HEAD": "fd8f27641d49f6c5a5b5b6c30fac230d3c074cd1",
+      "branch": null,
+      "tracked_changed": 0,
+      "untracked": 5,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/_audit-pr72-readonly-20261019",
+      "HEAD": "9624a2cf8e69a899d64268f76714af643dd7a3e9",
+      "branch": null,
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-announcements",
+      "HEAD": "f7b4884dbc3bdba2633ff661a3adb3c407f8472a",
+      "branch": "refs/heads/codex/clearapi-announcements",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-auto-cicd-20261015",
+      "HEAD": "520007d535b545a8742c1a6de70a74a9367c619d",
+      "branch": "refs/heads/codex/clearapi-auto-cicd-20261015",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-auto-deploy-v2-proof-20261017",
+      "HEAD": "598988a6110fa2a15964a1e4b2201c7f6dbb71e7",
+      "branch": "refs/heads/codex/auto-deploy-v2-proof-20261017",
+      "tracked_changed": 0,
+      "untracked": 11,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-auto-rehearsal-20261017",
+      "HEAD": "0e15d7ace5e20a4e257fbb1afba65d98c04d23b6",
+      "branch": "refs/heads/codex/rehearsal-failure-remediation-20261017",
+      "tracked_changed": 0,
+      "untracked": 11,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-commercial-autodeploy-20261016",
+      "HEAD": "6edc66f7c70b7a459832a8851e166fa8e8206f10",
+      "branch": "refs/heads/codex/clearapi-rc-event-contract-20261017",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-controlled-launch-20261020",
+      "HEAD": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "branch": "refs/heads/codex/clearapi-non-pg03-rc-20261022",
+      "tracked_changed": 11,
+      "untracked": 478,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-gate-audit",
+      "HEAD": "33fcb21d54d7a1e160f8a6a95b66677d61b91eab",
+      "branch": "refs/heads/codex/clearapi-gate-audit",
+      "tracked_changed": 0,
+      "untracked": 6,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-image-generation",
+      "HEAD": "112f1cad3127d625bf94aaec7b77e7c32b13dab4",
+      "branch": "refs/heads/codex/clearapi-image-generation",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-integration-b",
+      "HEAD": "1b04b8bc0e2ad92d42e3bc7e6900a6692a31085f",
+      "branch": "refs/heads/integrate/clearapi-announcements",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-local-deploy-integration",
+      "HEAD": "2c5f575750b7def1ed55848d3420502e96ad7ca5",
+      "branch": "refs/heads/codex/clearapi-local-deploy-integration",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-maintenance-reissue-20261017",
+      "HEAD": "61ec2ac2abdfb341e2f4ed877a9f35c6aec38462",
+      "branch": "refs/heads/codex/clearapi-maintenance-reissue-20261017",
+      "tracked_changed": 0,
+      "untracked": 9,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-master-status-20261016",
+      "HEAD": "c0aded7b82ae0601e3c5a430e20dbc5866f52ce4",
+      "branch": "refs/heads/codex/clearapi-master-status-20261016",
+      "tracked_changed": 1,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-master-status-unification",
+      "HEAD": "c7a9a23b2013e4f2348c55222e41329444f47ef6",
+      "branch": "refs/heads/codex/clearapi-master-status-unification",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-pg03-full-launch",
+      "HEAD": "fe8a8d12512b6e921cbe6e6566a6ad0b825fe708",
+      "branch": null,
+      "tracked_changed": 0,
+      "untracked": 7,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-pricing",
+      "HEAD": "b140f5a7b73c00f022eae00062b41759b25cec56",
+      "branch": "refs/heads/codex/clearapi-pricing",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-providers",
+      "HEAD": "88e935b934b3eb04f2619a8b6bf94997acea498c",
+      "branch": "refs/heads/codex/clearapi-providers",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-providers-integration",
+      "HEAD": "7de1273925d445e6ba8d68f2053e4daa35dc4d40",
+      "branch": "refs/heads/integrate/clearapi-providers",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-runtime-store-policy-20261019",
+      "HEAD": "550c2b2e9a8a33a4c28d96bcd5ed1770c5766c3d",
+      "branch": "refs/heads/codex/pg03-runtime-store-policy-20261019",
+      "tracked_changed": 0,
+      "untracked": 5,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-unified-integration",
+      "HEAD": "f1a75fb9c92908e46e73b806a53571d2de1635df",
+      "branch": "refs/heads/integrate/clearapi-pg03-abce",
+      "tracked_changed": 0,
+      "untracked": 13,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-images-v1-acceptance-20261019",
+      "HEAD": "9a3e6585737d823896137346faf94c2e1f4d1b04",
+      "branch": null,
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-images-v1-gateway-20261019",
+      "HEAD": "b84876e901406a70c85be7700c48a2b13425cc1a",
+      "branch": "refs/heads/codex/pg03-images-v1-gateway-20261019",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-images-v1-integration-20261019",
+      "HEAD": "0551bc982991b445189ae577304f59795223f669",
+      "branch": "refs/heads/codex/pg03-images-v1-integration-20261019",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-images-v1-public-images-20261019",
+      "HEAD": "bd7be6e9dae4f55cf32249dfda4f72dfff67ef42",
+      "branch": "refs/heads/codex/pg03-images-v1-public-20261019",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-images-v1-review-fixes-20261019",
+      "HEAD": "c160512f12e61c084f7b3494844a67b52289e586",
+      "branch": "refs/heads/codex/pg03-images-v1-review-fixes-20261019",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-mainline-integration-20261015",
+      "HEAD": "0a5884fd894b0dac1fae5073e4d37265970df530",
+      "branch": "refs/heads/codex/pg03-rc-containerd-20261016",
+      "tracked_changed": 0,
+      "untracked": 18,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-prelaunch-evidence-20261015",
+      "HEAD": "a5e5e05275aa963c0d0b3f3fca1fde9b52cff329",
+      "branch": "refs/heads/codex/pg03-prelaunch-evidence-20261015",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-production-wrapper",
+      "HEAD": "29fcafdce455b348863763f7370e418877a78f82",
+      "branch": "refs/heads/codex/pg03-production-wrapper",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-reviewed-rc-entrypoint-20261015",
+      "HEAD": "1f7f946c62a3c3473506c6723137461cb318a920",
+      "branch": "refs/heads/codex/pg03-reviewed-rc-entrypoint-20261015",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/pg03-runtime-integrity-repair-20261015",
+      "HEAD": "e4eafdc5cdafe47eb2ce96adab9ad50bb824a9af",
+      "branch": "refs/heads/codex/pg03-runtime-integrity-repair-20261015",
+      "tracked_changed": 0,
+      "untracked": 4,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/safe-rollback-55ac5441",
+      "HEAD": "59953db9fe7ec36a35096a81cb5984572efdeb31",
+      "branch": "refs/heads/audit/safe-rollback-contract-20261017",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/runtime/clearapi-monitor-init-3124d8a1",
+      "HEAD": "3124d8a1b6bbc44e8a6203266567f72c1734c877",
+      "branch": null,
+      "tracked_changed": 1,
+      "untracked": 1,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/runtime/clearapi-monitor-runtime-activation",
+      "HEAD": "3124d8a1b6bbc44e8a6203266567f72c1734c877",
+      "branch": "refs/heads/codex/monitor-runtime-activation",
+      "tracked_changed": 4,
+      "untracked": 1,
+      "relevant_changes": [
+        "controller/console_monitor_admin.go",
+        "model/console_monitor_control.go",
+        "service/console_probe.go",
+        "service/console_probe_test.go",
+        "controller/console_monitor_probe.go"
+      ]
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-admin-audit-log",
+      "HEAD": "4b7831a2fbf4f20aecbcae5071183dfb14f3737b",
+      "branch": "refs/heads/codex/clearapi-admin-audit-log",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-docs-center",
+      "HEAD": "5204976d2dae3c22c384f0b59a41c42cfc4f88b2",
+      "branch": "refs/heads/clearapi-docs-docker-fix",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-dynamic-monitor",
+      "HEAD": "72d26b2693b6ad290992caff22044860968f43c7",
+      "branch": "refs/heads/feat/dynamic-channel-monitor",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-finance-pg-fix",
+      "HEAD": "4a0edf064054eb621ca246f41cf653d57e5954e2",
+      "branch": "refs/heads/codex/clearapi-finance-pg-fix-20261011",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-ghcr-stdin-fix",
+      "HEAD": "c5cdf2e29bf1eb77011a0f951a5f8a5a9092ea8b",
+      "branch": "refs/heads/codex/clearapi-ghcr-stdin-fix",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-live-deploy-gate-fix",
+      "HEAD": "77b8770547c32ec2fa1390d5932dc0725d51f38d",
+      "branch": "refs/heads/codex/clearapi-live-deploy-gate-fix",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-pr-rules",
+      "HEAD": "dd04e83e1de1a258550d67e16b061595abfcb4ea",
+      "branch": "refs/heads/codex/pr-rules-automation",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-production-deploy-safety",
+      "HEAD": "fc7d0d26aa445c9981017d283506433229c18a36",
+      "branch": "refs/heads/codex/installer-run-lock-compat",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-public-docs",
+      "HEAD": "7d5bf650e236f85cf727c8fc3ae91fbac9bc347c",
+      "branch": "refs/heads/clearapi-public-docs",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-release-manifest-lite",
+      "HEAD": "d21e113ed25d3865664487945c2b483559cc0832",
+      "branch": "refs/heads/codex/release-manifest-lite-v1",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-email-baseline-check",
+      "HEAD": "0067558c6c835238debae6a1285a3cea6f4c939a",
+      "branch": null,
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-email-registration",
+      "HEAD": "37f1e0152f248c2177b1a7115e920b02fb4f736f",
+      "branch": "refs/heads/codex/clearapi-shop-email-registration",
+      "tracked_changed": 0,
+      "untracked": 10,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-referral-rewards",
+      "HEAD": "6e3cdc45d4872bbc283eb288bff9275989649007",
+      "branch": "refs/heads/codex/shop-referral-rewards-20261010",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-store-link",
+      "HEAD": "604183c27f92e0ffeb96db7cffd399e5274987f4",
+      "branch": "refs/heads/fix/clearapi-shop-store-link",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-typecheck-baseline",
+      "HEAD": "da6e5f1715e921d6750dca45befbf1c50a4887d3",
+      "branch": null,
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-store-approval",
+      "HEAD": "cd4ee62d3b247a3b95567305078282ea68d9c11d",
+      "branch": "refs/heads/feat/clearapi-store-approval",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-store-deploy-gate",
+      "HEAD": "b95c88c7f1cacc3b948d2c74b098a305668c2977",
+      "branch": "refs/heads/fix/clearapi-store-deploy-gate",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/AI/worktrees/h2-reservation-hardening",
+      "HEAD": "0000000000000000000000000000000000000000",
+      "branch": "refs/heads/codex/h2-reservation-hardening",
+      "state": "UNAVAILABLE"
+    },
+    {
+      "worktree": "D:/AI/worktrees/production-bootstrap-new-api",
+      "HEAD": "0000000000000000000000000000000000000000",
+      "branch": "refs/heads/codex/production-bootstrap",
+      "state": "UNAVAILABLE"
+    },
+    {
+      "worktree": "D:/AI/worktrees/production-cicd",
+      "HEAD": "0000000000000000000000000000000000000000",
+      "branch": "refs/heads/codex/production-cicd",
+      "state": "UNAVAILABLE"
+    },
+    {
+      "worktree": "D:/Codex/worktrees/clearapi-abce-release-20261024/clearapi-controlled-launch-20261020",
+      "HEAD": "a9fe76f301c023fb8ae716901bbe4f94a4184b3e",
+      "branch": "refs/heads/codex/clearapi-abce-release-20261024",
+      "tracked_changed": 1,
+      "untracked": 5,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/Codex/worktrees/clearapi-local-formal-integration/clearapi-controlled-launch-20261020",
+      "HEAD": "80d3dc5b3a58655f736e4fcd49372971c30014b4",
+      "branch": "refs/heads/codex/clearapi-local-deploy-formal-integration",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/Codex/worktrees/clearapi-monitor-allowlist/clearapi-store-deploy-gate",
+      "HEAD": "a55fffb9a1c4ab17c0c219546a04c2aae973f888",
+      "branch": "refs/heads/codex/monitor-admin-allowlist",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/Codex/worktrees/pg03-legacy-retirement/pg03-mainline-integration-20261015",
+      "HEAD": "fbe2140576009be893f3c3644d2bcc747cf3b086",
+      "branch": "refs/heads/codex/pg03-legacy-retirement-20261016",
+      "tracked_changed": 0,
+      "untracked": 6,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/Codex/worktrees/pg03-v2-deploy-unblock/pg03-mainline-integration-20261015",
+      "HEAD": "3a645b4fdafa11e90481317e18ac0114a6f054dd",
+      "branch": "refs/heads/codex/pg03-ci-time-budget-20261016",
+      "tracked_changed": 0,
+      "untracked": 3,
+      "relevant_changes": []
+    },
+    {
+      "worktree": "D:/Codex/worktrees/runtime-identity-v1/clearapi-store-deploy-gate",
+      "HEAD": "0e31977683e6f660959af43d2c50f75ae492e25f",
+      "branch": "refs/heads/feat/runtime-identity-v1",
+      "tracked_changed": 0,
+      "untracked": 0,
+      "relevant_changes": []
+    }
+  ],
+  "application_committed_diff_from_running_candidate": [],
+  "application_working_changes": [
+    "web/src/features/system-settings/hooks/use-update-option.ts"
+  ]
+}

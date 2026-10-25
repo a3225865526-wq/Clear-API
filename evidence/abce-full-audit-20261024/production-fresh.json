@@ -1,0 +1,612 @@
+{
+  "captured_utc": "2026-10-24T15:57:03.685230+00:00",
+  "gateway": {
+    "container_id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+    "created": "2026-10-24T15:18:11.361128443Z",
+    "started": "2026-10-24T15:18:11.692823281Z",
+    "engine_image_id": "sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020",
+    "state": "running",
+    "image_reference": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7",
+    "image_labels": {
+      "org.opencontainers.image.created": "2026-10-24T15:10:51Z",
+      "org.opencontainers.image.revision": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+      "org.opencontainers.image.source": "https://github.com/a3225865526-wq/Clear-API",
+      "org.opencontainers.image.version": ""
+    },
+    "repo_digests": [
+      "clearapi-local@sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020"
+    ],
+    "image_created": "2026-10-24T15:12:07.348029029Z"
+  },
+  "services": {
+    "/clearapi-new-api-1": {
+      "id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+      "image": "sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020",
+      "created": "2026-10-24T15:18:11.361128443Z",
+      "started": "2026-10-24T15:18:11.692823281Z",
+      "status": "running"
+    },
+    "/clearapi-postgres-1": {
+      "id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+      "image": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "created": "2026-10-06T11:43:39.052857803Z",
+      "started": "2026-10-20T00:46:43.870944528Z",
+      "status": "running"
+    },
+    "/clearapi-pool-executor-1": {
+      "id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+      "image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+      "created": "2026-10-20T00:17:09.539832461Z",
+      "started": "2026-10-20T00:46:43.85551099Z",
+      "status": "running"
+    },
+    "/clearapi-edge-caddy": {
+      "id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+      "image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+      "created": "2026-10-06T14:46:12.053051075Z",
+      "started": "2026-10-24T03:31:58.532588899Z",
+      "status": "running"
+    }
+  },
+  "errors": {},
+  "environment": {
+    "CLEARAPI_POOL_ENABLED": "false",
+    "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+    "CLEARAPI_CLOSED_LAUNCH": "false",
+    "CLEARAPI_PG03_IMAGES": null,
+    "MEMORY_CACHE_ENABLED": null,
+    "SYNC_FREQUENCY": null,
+    "SQL_DSN": null
+  },
+  "running_image_export_configs": [
+    {
+      "sha256": "sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728",
+      "revision": "dc685cbe338e8f700cae347e2eaac351d984c9c7"
+    }
+  ],
+  "assets": {
+    "helper": {
+      "path": "/opt/clearapi/bin/clearapi-local-deploy.py",
+      "sha256": "b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f",
+      "mode": "0o750"
+    },
+    "state_helper": {
+      "path": "/opt/clearapi/bin/local-deploy-state.py",
+      "sha256": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "mode": "0o750"
+    },
+    "backup_script": {
+      "path": "/opt/clearapi/backups/bin/clearapi-backup.sh",
+      "sha256": "8a59049196861273b2c0e2b59e9c46f7f70dbbfba6dddf2740fadb2760fff8cc",
+      "mode": "0o750"
+    },
+    "activation": {
+      "path": "/opt/clearapi/config/local-deploy.enabled",
+      "sha256": "00d09becb7e5b07482cf917cf361befd457a12e664d193645454e0e6a4904f16",
+      "mode": "0o600"
+    },
+    "config": {
+      "path": "/opt/clearapi/config/local-deploy.json",
+      "sha256": "22833e916fc368b208959d55442f006e5b551e81dc5261be40a92803bb188286",
+      "mode": "0o600"
+    }
+  },
+  "release_state_files": {
+    "local-deploy-state.json": {
+      "sha256": "7e3f6037e57df6cd24eb0eb632ddca5cb42400412afe044b3a55654bc4eebb7a",
+      "data": {
+        "adoption": {
+          "compose_hash": "a2ab7e6c055fe0e7ef37b5dad6ef6a5cdceb855f852f8133ea40f7a1d65ce3e7",
+          "compose_sha256": {
+            "compose-candidate.yaml": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+            "compose-pg03.yaml": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+            "compose-website-recovery-39957948359.json": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+            "docker-compose.prod.yml": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa"
+          },
+          "environment_sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a",
+          "gateway": {
+            "commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+            "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+            "image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+            "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+            "started_at": "2026-10-23T14:07:58.383082222Z"
+          },
+          "original_incident": {
+            "controlled-launch-state.json": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+            "pg03-target-manifest.json": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+            "release-manifest.json": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3"
+          },
+          "recorded_at": "2026-10-24T02:47:44.007088+00:00",
+          "shared": {
+            "clearapi-pool-executor-1": {
+              "container_id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+              "image_id": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58"
+            },
+            "clearapi-postgres-1": {
+              "container_id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+              "image_id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+            }
+          },
+          "source_commit": "1aa591f4bb230c4fce5770114e45e9311beb87a4"
+        },
+        "releases": {
+          "current": {
+            "archive_sha256": "94101ca6fb96c2b7dc653de29f299e4ca4b5d0535a253547f1a3ad6308c3edce",
+            "candidate_commit": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+            "deployed_at_utc": "2026-10-24T15:18:26Z",
+            "deployment_method": "local-build-ssh-archive-v1",
+            "image_ref": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7",
+            "migration_mode": "preflight-only (no flags configured)",
+            "new_api_image_id": "sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728",
+            "previous_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+            "status": "success",
+            "tag": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7",
+            "workflow_run": "local-ssh"
+          },
+          "previous": {
+            "candidate_commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+            "deployment_method": "existing-running-adoption-v1",
+            "docker_engine_image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+            "image_digest": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+            "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+            "new_api_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+            "status": "adopted"
+          }
+        },
+        "schema": "clearapi.local-deploy-state/v1",
+        "updated_at_utc": "2026-10-24T15:18:26Z"
+      }
+    },
+    "release-manifest.json": {
+      "sha256": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3",
+      "data": {
+        "schema_version": 1,
+        "updated_at_utc": "2026-10-20T00:25:55Z",
+        "releases": {
+          "current": {
+            "tag": "ghcr.io/a3225865526-wq/clearapi@sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+            "candidate_commit": "c50a53c1b89e121bcade7dac41d3f11e53a9832a",
+            "new_api_image_id": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+            "image_digest": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+            "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+            "previous_image_id": "sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5",
+            "workflow_run": "39347012653",
+            "deployed_at_utc": "2026-10-20T00:25:55Z",
+            "deployment_method": "ghcr-exact-digest",
+            "migration_mode": "preflight-only (no flags configured)",
+            "status": "failed",
+            "postgres_image": "postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+            "pool_mode": "pg03",
+            "components": {
+              "gateway": {
+                "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+                "image_digest": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+                "image_id": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+                "oci_revision": "c50a53c1b89e121bcade7dac41d3f11e53a9832a"
+              },
+              "executor": {
+                "image_ref": "ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+                "image_digest": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+                "image_id": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+                "oci_revision": "b6e5a90fce6c0b3fa231d43ab07a65622f981be2",
+                "binary_sha256": "e99b4dceee9b857c67e7b2b5101552511dbce60c789b2bec3c8fdd6bb5a33523",
+                "container_id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+                "executor_id": "pg03-executor-708f531cb6a33e71",
+                "process_epoch": "750b44804f1fd150971bd24de60a7249"
+              }
+            },
+            "deployment_attempt": {
+              "id": "9e37b9c3-9987-453f-bd49-f4a28fa77c81",
+              "status": "failed",
+              "executor_start": "forbidden"
+            },
+            "validation": {
+              "manifest_sha256": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+              "executor_prepared": true,
+              "secrets": "presence-only",
+              "gateway_executor_connection": "pending",
+              "authorization": {
+                "mode": "owner-dispatch-v1",
+                "actor": "a3225865526-wq",
+                "run": "39347012653"
+              },
+              "result": "blocked"
+            }
+          },
+          "previous": {
+            "tag": "ghcr.io/a3225865526-wq/clearapi@sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5",
+            "candidate_commit": "eb67c5f21639716eed7489d32ca322c249e5fdf3",
+            "new_api_image_id": "sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5",
+            "image_digest": "sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5",
+            "image_ref": "ghcr.io/a3225865526-wq/clearapi@sha256:51ddf6df27129df0fe7ab7205c1e8bef0da6e2ca9b7bb9ede93ab77c863d24a5",
+            "previous_image_id": "sha256:f960bea98313b7b5e2472c0746fe04bc65e4cbc569798e4d5cc0e430df148395",
+            "workflow_run": "39060814419",
+            "deployed_at_utc": "2026-10-17T19:28:11Z",
+            "deployment_method": "ghcr-exact-digest",
+            "migration_mode": "preflight-only (no flags configured)",
+            "status": "success",
+            "postgres_image": "postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+            "pool_mode": "off",
+            "runtime_product_view": {
+              "catalog_version": 22,
+              "effective_product_count": 2,
+              "credit_1": {
+                "revision": 4,
+                "approval_id": 38,
+                "evidence_batch_id": 3,
+                "legacy_store_id": 1,
+                "state": "published",
+                "published": true
+              }
+            },
+            "deployment_tools": {
+              "production_deploy_v2_sha256": "10d12caa9f58d5abe3988772c0ce63d4d22fae96c23c73c54e807c5d98b0e45d",
+              "pg03_release_control_sha256": "bf6bc8cbdcb242504ffdc29afeb0a78f43bd7bbeb3a391dc7ce44fe28323189d",
+              "rollback_dir": "/opt/clearapi/bin/release-tools-10d12caa-20261018"
+            }
+          }
+        },
+        "rollback": {
+          "method": "Redeploy from content-addressed image ID in new_api_image_id (no floating latest, no registry dependency). Release switching is by editing release-manifest.json + compose image reference, then verifying docker inspect .Image == pinned ID before health checks.",
+          "verified_drill": "Stage 2 restore drill started clearapi-restore-newapi directly from sha256:bfaba78a... (production gate PASS, /api/status 200, /api/setup locked, isolated restore DB, loopback-only port)",
+          "prerequisite": "migration rollback requires verified encrypted backup (backup-before-migrate + restore-to-new-DB)"
+        }
+      }
+    }
+  },
+  "app_state_names": [
+    "controlled-launch-state.json",
+    "local-deploy-state.json"
+  ],
+  "release_backup": {
+    "manifest_sha256": "7365b80bb85fdc21472d79abaa96a04c9ccaab17816971b9792123c3e264b2bf",
+    "metadata": {
+      "backup_schema_version": 2,
+      "backup_id": "20261024T151740Z",
+      "created_at_utc": "2026-10-24T15:17:54Z",
+      "hostname": "C202610061158942",
+      "environment": "production-internal",
+      "candidate_commit": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "new_api_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+      "postgres_image_digest": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "postgres_version": "PostgreSQL 17.6",
+      "database_name": "clearapi",
+      "finance_schema_version": 9,
+      "completion_marker_md5": "52a79a37ae4fee35f485a5cf0c2ccd7b",
+      "completion_marker_sha256": "a40a2e0335c95644eb4de25c2a02994531d1d19b0bf8fa4404112d963bae9aed",
+      "terms_hash": "4a9106b6b0221122f9347546b7ee9e996453c172ab2f57b945fdab6f2519ace8",
+      "privacy_hash": "137446cfe8a22c53f2dfe92915d4be365310d5823ebc54f433405a8b9224040d",
+      "artifacts": {
+        "database_dump": {
+          "name": "clearapi-pg-dump-20261024T151740Z.dump",
+          "format": "pg_dump custom -Fc",
+          "sha256": "0aab0a3ce14d3ef376834d3c3e5ced94c143836ff58b86ad2619bf4916643466"
+        },
+        "globals": {
+          "name": "clearapi-pg-globals-20261024T151740Z.sql",
+          "sha256": "90acab7859ab2ca373af852b5a528f100bdcf44ef1181625e1be3819d64067f9"
+        },
+        "config_archive": {
+          "name": "clearapi-config-20261024T151740Z.tar.gz",
+          "sha256": "46a783074cdc232617bb21902bc5744c09bb43196f6f8698c7e127fba12633e0"
+        },
+        "legal_archive": {
+          "name": "clearapi-legal-20261024T151740Z.tar.gz",
+          "sha256": "d8f8bede1aa706543c084b558e1b3fdd921817ced9273d9e46672b15a468d460"
+        },
+        "edge_archive": {
+          "name": "clearapi-edge-20261024T151740Z.tar.gz",
+          "sha256": "be12fa79f45e651c3334abc310ab440a68c9faa16e1d10aeb22149c4760a0698",
+          "contents": "opt/clearapi/edge (Caddyfile + docker-compose.yml, non-secret)",
+          "acme_private_state": "excluded by design; Caddy re-issues via production ACME on restore"
+        },
+        "secrets_archive": {
+          "name": "clearapi-secrets-20261024T151740Z.tar",
+          "sha256": "fa0043741e5170b0b77e30566adbcccdd903fd58feeeb4770f3e60c2fb742144",
+          "semantics": "sha256 of plaintext tar input; inside encrypted bundle only"
+        },
+        "deploy_control_archive": {
+          "name": "clearapi-deployctl-20261024T151740Z.tar.gz",
+          "sha256": "ddd11070fdb2a0222af4b2b74dcf63720919ea36e1aab05c734fe52e5f5fc1b3",
+          "contents": "opt/clearapi/app/release-manifest.json + opt/clearapi/bin (root-owned deploy wrapper) + opt/clearapi/config (deploy.env, non-secret parameters) + existing legacy transition proof/journal/audit"
+        },
+        "pg03_state_archive": {
+          "name": "clearapi-pg03-20261024T151740Z.tar.gz",
+          "sha256": "05b29e1a06445f523cdbbb4c8765fdb3f564dd4aaad06b3b9a12c1c268ebeb55"
+        },
+        "pg03_state_snapshot": {
+          "name": "pg03-state-20261024T151740Z.json",
+          "sha256": "3feb64914a1a9c87b38a1cd3085523a8d082f250e0d7a8e40c2653f7fd7893d4"
+        }
+      },
+      "bundle": {
+        "name": "bundle-20261024T151740Z.tar.gz",
+        "sha256": "a3a0044d7b9a3aa61f08212f402150689478530d426ed16b37d6c19c5ab6d1d2"
+      },
+      "encryption": {
+        "method": "GnuPG OpenPGP; ECDH Curve25519; AES256 + OCB AEAD (--force-ocb)",
+        "key_fingerprint": "D675187C7097EF9D8C3BFF966B1439F896043FFD",
+        "key_location": "private key OFFSITE only",
+        "encrypted_artifact": {
+          "name": "clearapi-backup-20261024T151740Z.tar.gz.gpg",
+          "bytes": 12416579,
+          "sha256": "e5a171ab877977c2c3ba5741dd715b46458416bd6e40444880e302108ca3c756"
+        }
+      },
+      "ghcr_repo_digest": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "backup_identity_schema_version": 1,
+      "running_identity": {
+        "compose_base_sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+        "compose_environment_sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a",
+        "compose_inputs_sha256": {
+          "compose-candidate.yaml": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+          "compose-pg03.yaml": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+          "compose-website-recovery-39957948359.json": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+          "docker-compose.prod.yml": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa"
+        },
+        "compose_override_sha256": "aee0bbc3a6f66a33ca37709c71a09c50ddded57d1f787088ac8723b27e0087db",
+        "container_created": "2026-10-23T14:07:58.190877394Z",
+        "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+        "deployment_state_file": "local-deploy-state.json",
+        "docker_engine_image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "docker_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+        "ghcr_digest": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "ghcr_repo_digest": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+        "oci_revision": "a032815cb6244a7ee5e812de82f8300c02554e99",
+        "original_incident": {
+          "controlled-launch-state.json": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+          "pg03-target-manifest.json": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+          "release-manifest.json": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3"
+        },
+        "release_manifest_sha256": "cdcea86687eb58c9ce06d31c9ea7e9dd67402b71f24bb3c39441143dbdc7d8ec"
+      },
+      "legacy_baseline_metadata_fields": [
+        "postgres_version",
+        "finance_schema_version",
+        "terms_hash",
+        "privacy_hash"
+      ],
+      "database_recovery_point": {
+        "database": "clearapi",
+        "dump_started_at_utc": "2026-10-24T15:17:45Z",
+        "dump_completed_at_utc": "2026-10-24T15:17:46Z",
+        "dump_sha256": "0aab0a3ce14d3ef376834d3c3e5ced94c143836ff58b86ad2619bf4916643466",
+        "semantics": "pg_dump consistent MVCC snapshot within this interval; not a PITR WAL position"
+      },
+      "pg03_recovery": {
+        "schema_version": 1,
+        "consistency": "unchanged_across_dump_and_bundle",
+        "scope": [
+          "compose-pg03.yaml",
+          "config/pg03",
+          "pool-executor/auths",
+          "pool-executor/pool",
+          "pool-executor/receipts"
+        ],
+        "restore_policy": "isolated_only; reconcile live runtime high-water marks before production recovery"
+      }
+    },
+    "ciphertext_matches": true
+  },
+  "backup_service": "Result=success\nExecMainStatus=0\nActiveState=inactive\nSubState=dead\n",
+  "systemd_timers": "Sat 2026-10-24 16:26:40 UTC    29min Sat 2026-10-24 09:33:56 UTC       6h ago motd-news.timer                     motd-news.service\nSat 2026-10-24 17:51:05 UTC 1h 53min Fri 2026-10-23 18:15:10 UTC      21h ago apt-daily.timer                     apt-daily.service\nSat 2026-10-24 19:30:25 UTC 3h 33min Fri 2026-10-23 19:30:30 UTC      20h ago clearapi-backup.timer               clearapi-backup.service\nSun 2026-10-25 00:00:00 UTC       8h Sat 2026-10-24 00:00:16 UTC      15h ago dpkg-db-backup.timer                dpkg-db-backup.service\nSun 2026-10-25 00:00:00 UTC       8h Sat 2026-10-24 00:00:16 UTC      15h ago logrotate.timer                     logrotate.service\nSun 2026-10-25 00:52:24 UTC       8h Sat 2026-10-24 00:52:24 UTC      15h ago update-notifier-download.timer      update-notifier-download.service\nSun 2026-10-25 01:02:04 UTC       9h Sat 2026-10-24 01:02:04 UTC      14h ago systemd-tmpfiles-clean.timer        systemd-tmpfiles-clean.service\nSun 2026-10-25 03:10:15 UTC      11h Sun 2026-10-18 03:11:03 UTC            - e2scrub_all.timer                   e2scrub_all.service\nSun 2026-10-25 04:26:08 UTC      12h Sat 2026-10-24 04:18:45 UTC      11h ago cloudflare-origin-ranges-sync.timer cloudflare-origin-ranges-sync.service\nSun 2026-10-25 06:09:02 UTC      14h Sat 2026-10-24 06:44:45 UTC       9h ago apt-daily-upgrade.timer             apt-daily-upgrade.service\nSun 2026-10-25 09:59:25 UTC      18h Sat 2026-10-24 10:58:16 UTC 4h 58min ago man-db.timer                        man-db.service\nMon 2026-10-26 01:22:54 UTC 1 day 9h Mon 2026-10-19 00:01:55 UTC            - fstrim.timer                        fstrim.service\nThu 2026-10-29 15:57:21 UTC   5 days Fri 2026-10-23 07:07:16 UTC 1 day 8h ago update-notifier-motd.timer          update-notifier-motd.service\n-                                  - -                                      - apport-autoreport.timer             apport-autoreport.service\n-                                  - -                                      - fwupd-refresh.timer                 -\n-                                  - -                                      - snapd.snap-repair.timer             snapd.snap-repair.service\n-                                  - -                                      - ua-timer.timer                      ua-timer.service\n",
+  "deploy_units": "clearapi-backup.service            disabled enabled\nclearapi-runtime-directory.service static   -\nclearapi-runtime-identity.service  enabled  enabled\nclearapi-backup.timer              enabled  enabled\n",
+  "known_cron_entries": {},
+  "frontend": {
+    "origin": {
+      "html_sha256": "9e07389a40656f1663a5f63fe873bc65db268bb11f41dac7100a188d8b56ae9d",
+      "scripts": [
+        "/static/js/vendor-ui-primitives.5564bb5e9e.js",
+        "/static/js/vendor-tanstack.e331468f06.js",
+        "/static/js/lib-react.91bc21a6cf.js",
+        "/static/js/59486.358f4047ce.js",
+        "/static/js/index.55158802f7.js"
+      ],
+      "styles": [
+        "/static/css/index.d36ff0d4f8.css"
+      ]
+    },
+    "public": {
+      "html_sha256": "9e07389a40656f1663a5f63fe873bc65db268bb11f41dac7100a188d8b56ae9d",
+      "scripts": [
+        "/static/js/vendor-ui-primitives.5564bb5e9e.js",
+        "/static/js/vendor-tanstack.e331468f06.js",
+        "/static/js/lib-react.91bc21a6cf.js",
+        "/static/js/59486.358f4047ce.js",
+        "/static/js/index.55158802f7.js"
+      ],
+      "styles": [
+        "/static/css/index.d36ff0d4f8.css"
+      ]
+    }
+  },
+  "status": {
+    "origin": {
+      "success": true,
+      "data": {
+        "announcements": [
+          {
+            "content": "ClearAPI首发范围：88token / gpt-6-luna / default，仅纯文本 Chat Completions。充值：云猫购买 → 钱包 → 其他兑换方式 → Legacy兑换码。500000 Quota 对应 $1 平台标称额度，不可提现。客服、退款与售后：QQ 3225865526。",
+            "extra": "使用步骤、模型价格及调用示例请查看使用指南。",
+            "publishDate": "2026-10-09T12:10:56Z",
+            "type": "default"
+          }
+        ],
+        "announcements_enabled": true,
+        "register_enabled": true,
+        "password_login_enabled": true,
+        "password_register_enabled": true
+      }
+    },
+    "public": {
+      "success": true,
+      "data": {
+        "announcements": [
+          {
+            "content": "ClearAPI首发范围：88token / gpt-6-luna / default，仅纯文本 Chat Completions。充值：云猫购买 → 钱包 → 其他兑换方式 → Legacy兑换码。500000 Quota 对应 $1 平台标称额度，不可提现。客服、退款与售后：QQ 3225865526。",
+            "extra": "使用步骤、模型价格及调用示例请查看使用指南。",
+            "publishDate": "2026-10-09T12:10:56Z",
+            "type": "default"
+          }
+        ],
+        "announcements_enabled": true,
+        "register_enabled": true,
+        "password_login_enabled": true,
+        "password_register_enabled": true
+      }
+    }
+  },
+  "initial_errors": {
+    "database_readonly": "Expecting value: line 1 column 285 (char 284)"
+  },
+  "database_readonly": {
+    "role_counts": [
+      {
+        "role": 1,
+        "count": 4
+      },
+      {
+        "role": 100,
+        "count": 1
+      }
+    ],
+    "ability_rows": [
+      {
+        "group": "default",
+        "model": "gpt-6-luna",
+        "enabled": true,
+        "channel_id": 1
+      },
+      {
+        "group": "default",
+        "model": "gpt-5.5",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-5.6-sol",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-5.6-terra",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-6-astra",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-6-sol",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-6.1-sol",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-image-2",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-image-2.5-flare",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-image-2.5-sunburst",
+        "enabled": false,
+        "channel_id": 2
+      },
+      {
+        "group": "default",
+        "model": "gpt-6.1-sol",
+        "enabled": false,
+        "channel_id": 3
+      }
+    ],
+    "channel_rows": [
+      {
+        "id": 1,
+        "name": "OpenAI",
+        "type": 1,
+        "models": "gpt-6-luna",
+        "status": 1,
+        "test_time": 0,
+        "model_mapping": null,
+        "response_time": 0
+      },
+      {
+        "id": 2,
+        "name": "lunora",
+        "type": 1,
+        "models": "gpt-6.1-sol,gpt-5.6-sol,gpt-5.6-terra,gpt-6-astra,gpt-5.5,gpt-image-2,gpt-image-2.5-flare,gpt-image-2.5-sunburst,gpt-6-sol",
+        "status": 2,
+        "test_time": 0,
+        "model_mapping": "",
+        "response_time": 0
+      },
+      {
+        "id": 3,
+        "name": "瑞云桥",
+        "type": 1,
+        "models": "gpt-6.1-sol",
+        "status": 2,
+        "test_time": 0,
+        "model_mapping": null,
+        "response_time": 0
+      }
+    ],
+    "monitor_policy": {},
+    "database_version": "PostgreSQL 17.6 on x86_64-pc-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit",
+    "announcement_options": {
+      "console_setting.announcements": "[{\"content\": \"ClearAPI首发范围：88token / gpt-6-luna / default，仅纯文本 Chat Completions。充值：云猫购买 → 钱包 → 其他兑换方式 → Legacy兑换码。500000 Quota 对应 $1 平台标称额度，不可提现。客服、退款与售后：QQ 3225865526。\", \"publishDate\": \"2026-10-09T12:10:56Z\", \"type\": \"default\", \"extra\": \"使用步骤、模型价格及调用示例请查看使用指南。\"}]"
+    },
+    "pricing_option_hashes": [
+      {
+        "key": "CacheRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b",
+        "length": 2
+      },
+      {
+        "key": "CompletionRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b",
+        "length": 2
+      },
+      {
+        "key": "ModelPrice",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b",
+        "length": 2
+      },
+      {
+        "key": "ModelRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b",
+        "length": 2
+      },
+      {
+        "key": "billing_setting.billing_expr",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b",
+        "length": 2
+      },
+      {
+        "key": "billing_setting.billing_mode",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b",
+        "length": 2
+      }
+    ],
+    "transaction_read_only": "on"
+  }
+}

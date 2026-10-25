@@ -1,0 +1,471 @@
+{
+  "main_js_sha256": "55a9a87b926bea4f36f8f167759869d56cbf9aebef1b32565e538a83eb254e1a",
+  "matches_public": true,
+  "locales": {
+    "en": {
+      "count": 1,
+      "checks": {
+        "Failed to load model pricing records": {
+          "value": "Failed to load model pricing records",
+          "in_candidate_bundle": true
+        }
+      }
+    },
+    "zh": {
+      "count": 1,
+      "checks": {
+        "Failed to load model pricing records": {
+          "value": "加载模型定价记录失败",
+          "in_candidate_bundle": true
+        }
+      }
+    },
+    "zh-TW": {
+      "count": 21,
+      "checks": {
+        "Already clear": {
+          "value": "已清空",
+          "in_candidate_bundle": true
+        },
+        "Cleanup": {
+          "value": "清理",
+          "in_candidate_bundle": true
+        },
+        "Clear model pricing": {
+          "value": "清空模型定價",
+          "in_candidate_bundle": true
+        },
+        "Clear stored pricing": {
+          "value": "清空已儲存定價",
+          "in_candidate_bundle": true
+        },
+        "Clear {{count}} models": {
+          "value": "清空 {{count}} 個模型",
+          "in_candidate_bundle": true
+        },
+        "Cleared pricing for {{count}} models": {
+          "value": "已清空 {{count}} 個模型的定價",
+          "in_candidate_bundle": true
+        },
+        "Clearing...": {
+          "value": "清空中…",
+          "in_candidate_bundle": true
+        },
+        "Failed to clean up model pricing": {
+          "value": "清理模型定價失敗",
+          "in_candidate_bundle": true
+        },
+        "Failed to load model pricing records": {
+          "value": "載入模型定價紀錄失敗",
+          "in_candidate_bundle": true
+        },
+        "Generate price table from expression": {
+          "value": "從運算式產生價格表",
+          "in_candidate_bundle": true
+        },
+        "Generated prices applied to the draft. Save model pricing to activate them.": {
+          "value": "產生的價格已套用至草稿。儲存模型定價後生效。",
+          "in_candidate_bundle": true
+        },
+        "Model pricing cleanup": {
+          "value": "模型定價清理",
+          "in_candidate_bundle": true
+        },
+        "No model pricing records were found": {
+          "value": "找不到模型定價紀錄",
+          "in_candidate_bundle": true
+        },
+        "No stored pricing": {
+          "value": "無已儲存定價",
+          "in_candidate_bundle": true
+        },
+        "Pricing changed since this plan was prepared. Reload before clearing.": {
+          "value": "定價在此計畫建立後已變更。請重新載入再清空。",
+          "in_candidate_bundle": true
+        },
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.": {
+          "value": "移除已儲存的模型售價，讓定價清單留空。不影響模型定義、通道、群組、API 金鑰、使用者及使用紀錄，也不會寫回內建價格。",
+          "in_candidate_bundle": true
+        },
+        "Select all models with pricing to clear": {
+          "value": "選取所有有定價待清空的模型",
+          "in_candidate_bundle": true
+        },
+        "Select {{model}}": {
+          "value": "選取 {{model}}",
+          "in_candidate_bundle": true
+        },
+        "Stored pricing: {{fields}}": {
+          "value": "已儲存定價：{{fields}}",
+          "in_candidate_bundle": true
+        },
+        "The built-in upstream price is not written back; the engine resolves it at billing time.": {
+          "value": "不會寫回內建上游價格；引擎會在計費時解析。",
+          "in_candidate_bundle": true
+        },
+        "{{count}} models have stored pricing to clear": {
+          "value": "{{count}} 個模型有已儲存定價待清空",
+          "in_candidate_bundle": true
+        }
+      }
+    },
+    "fr": {
+      "count": 21,
+      "checks": {
+        "Already clear": {
+          "value": "Déjà vide",
+          "in_candidate_bundle": true
+        },
+        "Cleanup": {
+          "value": "Nettoyage",
+          "in_candidate_bundle": true
+        },
+        "Clear model pricing": {
+          "value": "Effacer les tarifs des modèles",
+          "in_candidate_bundle": true
+        },
+        "Clear stored pricing": {
+          "value": "Effacer les tarifs enregistrés",
+          "in_candidate_bundle": true
+        },
+        "Clear {{count}} models": {
+          "value": "Effacer {{count}} modèles",
+          "in_candidate_bundle": true
+        },
+        "Cleared pricing for {{count}} models": {
+          "value": "Tarifs effacés pour {{count}} modèles",
+          "in_candidate_bundle": true
+        },
+        "Clearing...": {
+          "value": "Effacement…",
+          "in_candidate_bundle": true
+        },
+        "Failed to clean up model pricing": {
+          "value": "Échec du nettoyage des tarifs",
+          "in_candidate_bundle": true
+        },
+        "Failed to load model pricing records": {
+          "value": "Impossible de charger les tarifs des modèles",
+          "in_candidate_bundle": true
+        },
+        "Generate price table from expression": {
+          "value": "Générer les tarifs depuis l’expression",
+          "in_candidate_bundle": true
+        },
+        "Generated prices applied to the draft. Save model pricing to activate them.": {
+          "value": "Tarifs générés appliqués au brouillon. Enregistrez les tarifs du modèle pour les activer.",
+          "in_candidate_bundle": true
+        },
+        "Model pricing cleanup": {
+          "value": "Nettoyage des tarifs des modèles",
+          "in_candidate_bundle": true
+        },
+        "No model pricing records were found": {
+          "value": "Aucun tarif de modèle trouvé",
+          "in_candidate_bundle": true
+        },
+        "No stored pricing": {
+          "value": "Aucun tarif enregistré",
+          "in_candidate_bundle": true
+        },
+        "Pricing changed since this plan was prepared. Reload before clearing.": {
+          "value": "Les tarifs ont changé depuis la préparation du plan. Rechargez avant de les effacer.",
+          "in_candidate_bundle": true
+        },
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.": {
+          "value": "Supprime les prix de vente enregistrés pour vider la liste. Les définitions de modèles, canaux, groupes, clés API, utilisateurs et historiques d’utilisation restent inchangés. Les tarifs intégrés ne sont pas réécrits.",
+          "in_candidate_bundle": true
+        },
+        "Select all models with pricing to clear": {
+          "value": "Sélectionner tous les modèles dont les tarifs sont à effacer",
+          "in_candidate_bundle": true
+        },
+        "Select {{model}}": {
+          "value": "Sélectionner {{model}}",
+          "in_candidate_bundle": true
+        },
+        "Stored pricing: {{fields}}": {
+          "value": "Tarifs enregistrés : {{fields}}",
+          "in_candidate_bundle": true
+        },
+        "The built-in upstream price is not written back; the engine resolves it at billing time.": {
+          "value": "Le tarif amont intégré n’est pas réécrit ; le moteur le détermine lors de la facturation.",
+          "in_candidate_bundle": true
+        },
+        "{{count}} models have stored pricing to clear": {
+          "value": "{{count}} modèles ont des tarifs enregistrés à effacer",
+          "in_candidate_bundle": true
+        }
+      }
+    },
+    "ja": {
+      "count": 21,
+      "checks": {
+        "Already clear": {
+          "value": "消去済み",
+          "in_candidate_bundle": true
+        },
+        "Cleanup": {
+          "value": "整理",
+          "in_candidate_bundle": true
+        },
+        "Clear model pricing": {
+          "value": "モデル料金を消去",
+          "in_candidate_bundle": true
+        },
+        "Clear stored pricing": {
+          "value": "保存済み料金を消去",
+          "in_candidate_bundle": true
+        },
+        "Clear {{count}} models": {
+          "value": "{{count}} モデルを消去",
+          "in_candidate_bundle": true
+        },
+        "Cleared pricing for {{count}} models": {
+          "value": "{{count}} モデルの料金を消去しました",
+          "in_candidate_bundle": true
+        },
+        "Clearing...": {
+          "value": "消去中…",
+          "in_candidate_bundle": true
+        },
+        "Failed to clean up model pricing": {
+          "value": "モデル料金の整理に失敗しました",
+          "in_candidate_bundle": true
+        },
+        "Failed to load model pricing records": {
+          "value": "モデル料金の読み込みに失敗しました",
+          "in_candidate_bundle": true
+        },
+        "Generate price table from expression": {
+          "value": "式から料金表を生成",
+          "in_candidate_bundle": true
+        },
+        "Generated prices applied to the draft. Save model pricing to activate them.": {
+          "value": "生成した料金を下書きに適用しました。モデル料金を保存すると有効になります。",
+          "in_candidate_bundle": true
+        },
+        "Model pricing cleanup": {
+          "value": "モデル料金の整理",
+          "in_candidate_bundle": true
+        },
+        "No model pricing records were found": {
+          "value": "モデル料金の記録がありません",
+          "in_candidate_bundle": true
+        },
+        "No stored pricing": {
+          "value": "保存済み料金なし",
+          "in_candidate_bundle": true
+        },
+        "Pricing changed since this plan was prepared. Reload before clearing.": {
+          "value": "計画の作成後に料金が変更されました。再読み込みしてから消去してください。",
+          "in_candidate_bundle": true
+        },
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.": {
+          "value": "保存済みのモデル販売価格を削除し、料金一覧を空にします。モデル定義、チャネル、グループ、API キー、ユーザー、利用履歴には影響せず、組み込み料金も書き戻しません。",
+          "in_candidate_bundle": true
+        },
+        "Select all models with pricing to clear": {
+          "value": "消去する料金があるモデルをすべて選択",
+          "in_candidate_bundle": true
+        },
+        "Select {{model}}": {
+          "value": "{{model}} を選択",
+          "in_candidate_bundle": true
+        },
+        "Stored pricing: {{fields}}": {
+          "value": "保存済み料金：{{fields}}",
+          "in_candidate_bundle": true
+        },
+        "The built-in upstream price is not written back; the engine resolves it at billing time.": {
+          "value": "組み込みの上流料金は書き戻さず、課金時にエンジンが解決します。",
+          "in_candidate_bundle": true
+        },
+        "{{count}} models have stored pricing to clear": {
+          "value": "{{count}} モデルに消去する保存済み料金があります",
+          "in_candidate_bundle": true
+        }
+      }
+    },
+    "ru": {
+      "count": 21,
+      "checks": {
+        "Already clear": {
+          "value": "Уже очищено",
+          "in_candidate_bundle": true
+        },
+        "Cleanup": {
+          "value": "Очистка",
+          "in_candidate_bundle": true
+        },
+        "Clear model pricing": {
+          "value": "Очистить цены моделей",
+          "in_candidate_bundle": true
+        },
+        "Clear stored pricing": {
+          "value": "Очистить сохранённые цены",
+          "in_candidate_bundle": true
+        },
+        "Clear {{count}} models": {
+          "value": "Очистить {{count}} моделей",
+          "in_candidate_bundle": true
+        },
+        "Cleared pricing for {{count}} models": {
+          "value": "Цены {{count}} моделей очищены",
+          "in_candidate_bundle": true
+        },
+        "Clearing...": {
+          "value": "Очистка…",
+          "in_candidate_bundle": true
+        },
+        "Failed to clean up model pricing": {
+          "value": "Не удалось очистить цены моделей",
+          "in_candidate_bundle": true
+        },
+        "Failed to load model pricing records": {
+          "value": "Не удалось загрузить цены моделей",
+          "in_candidate_bundle": true
+        },
+        "Generate price table from expression": {
+          "value": "Создать таблицу цен из выражения",
+          "in_candidate_bundle": true
+        },
+        "Generated prices applied to the draft. Save model pricing to activate them.": {
+          "value": "Созданные цены применены к черновику. Сохраните цены модели, чтобы активировать их.",
+          "in_candidate_bundle": true
+        },
+        "Model pricing cleanup": {
+          "value": "Очистка цен моделей",
+          "in_candidate_bundle": true
+        },
+        "No model pricing records were found": {
+          "value": "Записи цен моделей не найдены",
+          "in_candidate_bundle": true
+        },
+        "No stored pricing": {
+          "value": "Нет сохранённых цен",
+          "in_candidate_bundle": true
+        },
+        "Pricing changed since this plan was prepared. Reload before clearing.": {
+          "value": "Цены изменились после подготовки плана. Обновите данные перед очисткой.",
+          "in_candidate_bundle": true
+        },
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.": {
+          "value": "Удаляет сохранённые цены продажи моделей, очищая список цен. Определения моделей, каналы, группы, ключи API, пользователи и история использования не затрагиваются. Встроенные цены не записываются обратно.",
+          "in_candidate_bundle": true
+        },
+        "Select all models with pricing to clear": {
+          "value": "Выбрать все модели с ценами для очистки",
+          "in_candidate_bundle": true
+        },
+        "Select {{model}}": {
+          "value": "Выбрать {{model}}",
+          "in_candidate_bundle": true
+        },
+        "Stored pricing: {{fields}}": {
+          "value": "Сохранённые цены: {{fields}}",
+          "in_candidate_bundle": true
+        },
+        "The built-in upstream price is not written back; the engine resolves it at billing time.": {
+          "value": "Встроенная цена поставщика не записывается обратно; движок определяет её при расчёте оплаты.",
+          "in_candidate_bundle": true
+        },
+        "{{count}} models have stored pricing to clear": {
+          "value": "У {{count}} моделей есть сохранённые цены для очистки",
+          "in_candidate_bundle": true
+        }
+      }
+    },
+    "vi": {
+      "count": 21,
+      "checks": {
+        "Already clear": {
+          "value": "Đã xóa",
+          "in_candidate_bundle": true
+        },
+        "Cleanup": {
+          "value": "Dọn dẹp",
+          "in_candidate_bundle": true
+        },
+        "Clear model pricing": {
+          "value": "Xóa giá mô hình",
+          "in_candidate_bundle": true
+        },
+        "Clear stored pricing": {
+          "value": "Xóa giá đã lưu",
+          "in_candidate_bundle": true
+        },
+        "Clear {{count}} models": {
+          "value": "Xóa {{count}} mô hình",
+          "in_candidate_bundle": true
+        },
+        "Cleared pricing for {{count}} models": {
+          "value": "Đã xóa giá của {{count}} mô hình",
+          "in_candidate_bundle": true
+        },
+        "Clearing...": {
+          "value": "Đang xóa…",
+          "in_candidate_bundle": true
+        },
+        "Failed to clean up model pricing": {
+          "value": "Không thể dọn dẹp giá mô hình",
+          "in_candidate_bundle": true
+        },
+        "Failed to load model pricing records": {
+          "value": "Không thể tải bản ghi giá mô hình",
+          "in_candidate_bundle": true
+        },
+        "Generate price table from expression": {
+          "value": "Tạo bảng giá từ biểu thức",
+          "in_candidate_bundle": true
+        },
+        "Generated prices applied to the draft. Save model pricing to activate them.": {
+          "value": "Giá đã tạo được áp dụng vào bản nháp. Lưu giá mô hình để kích hoạt.",
+          "in_candidate_bundle": true
+        },
+        "Model pricing cleanup": {
+          "value": "Dọn dẹp giá mô hình",
+          "in_candidate_bundle": true
+        },
+        "No model pricing records were found": {
+          "value": "Không tìm thấy bản ghi giá mô hình",
+          "in_candidate_bundle": true
+        },
+        "No stored pricing": {
+          "value": "Không có giá đã lưu",
+          "in_candidate_bundle": true
+        },
+        "Pricing changed since this plan was prepared. Reload before clearing.": {
+          "value": "Giá đã thay đổi kể từ khi lập kế hoạch. Tải lại trước khi xóa.",
+          "in_candidate_bundle": true
+        },
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.": {
+          "value": "Xóa giá bán mô hình đã lưu để làm trống danh sách giá. Định nghĩa mô hình, kênh, nhóm, khóa API, người dùng và lịch sử sử dụng không bị ảnh hưởng; giá tích hợp không được ghi lại.",
+          "in_candidate_bundle": true
+        },
+        "Select all models with pricing to clear": {
+          "value": "Chọn mọi mô hình có giá cần xóa",
+          "in_candidate_bundle": true
+        },
+        "Select {{model}}": {
+          "value": "Chọn {{model}}",
+          "in_candidate_bundle": true
+        },
+        "Stored pricing: {{fields}}": {
+          "value": "Giá đã lưu: {{fields}}",
+          "in_candidate_bundle": true
+        },
+        "The built-in upstream price is not written back; the engine resolves it at billing time.": {
+          "value": "Giá nhà cung cấp tích hợp không được ghi lại; hệ thống xác định giá khi tính phí.",
+          "in_candidate_bundle": true
+        },
+        "{{count}} models have stored pricing to clear": {
+          "value": "{{count}} mô hình có giá đã lưu cần xóa",
+          "in_candidate_bundle": true
+        }
+      }
+    }
+  },
+  "total_changed_values": 107,
+  "all_values_found": true
+}

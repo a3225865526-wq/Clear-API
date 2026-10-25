@@ -1,3 +1,17 @@
+## 2026-10-25 10:56 Asia/Shanghai — A/B/C/E重新审计：版本一致；公告缓存与独立监测遗漏已证实
+
+- **本节替代下方历史“全面PASS”结论，历史记录保留：** 生产仍为 `dc685cbe338e8f700cae347e2eaac351d984c9c7`；Gateway CID `aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0`，engine digest `sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020`，OCI config `sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728`。本轮重新比对实际二进制、5JS+1CSS、构建记录、接收归档和备份，未发现工具工作区替代应用或旧前端产物；用户浏览器自身缓存仍UNKNOWN。
+- **A PARTIAL：** 真实SQLite3.50.4/MySQL8.4.11/PG17.6定价测试、97项前端及关键结算回归PASS，107条语言值全部进入生产同哈希主包。生产PG17.6方言匹配；gpt-6-luna覆盖map为空、公开ratio37.5是源码回退，不能推定符合用户商业价格。生产双页登录操作/实际消费/历史账单逐笔对账未执行，未改价格或余额。
+- **B 当前生产FAIL，本地最小修复PASS：** 用户澄清“找不到新增/发布”。实测“站点与品牌→系统公告”是单条Notice编辑器，只能保存通知；多条历史/新增/发布在“控制台内容→公告”。系统设置仅超级管理员可进；用户生产会话角色仍UNKNOWN，未武断判为权限故障。另已在原镜像复现保存发布成功但通知缓存不刷新；本地+6行修复、3个先失败后通过回归及真实管理员→发布→普通用户读取→清理链路通过，尚未部署。
+- **旧公告保留：** 新增追加、编辑/发布按ID更新，未引入自动删除/过期清理；聚焦用例确认发布新公告仍保存旧公告。弹窗最近20条仅显示限制；生产旧公告未操作，只有本轮专用隔离测试公告按方案清理。
+- **C 每家PARTIAL：** Grok/DeepSeek/Qwen/智谱/Kimi源码、候选、镜像各自确认；7包定向测试及同生产二进制隔离10次模拟流/非流PASS，智谱DONE/nil修复保留。真实供应商调用/真实计费均UNKNOWN，未发起收费请求；生产并未配置五种独立厂商渠道，不能称全部上线可用。
+- **E PASS限定当前门禁：** 安装helper/state/backup与源码hash一致，17+7+2聚焦测试PASS；备份 `20261024T151740Z` 的12416579-byte密文SHA `e5a171ab877977c2c3ba5741dd715b46458416bd6e40444880e302108ca3c756` 重新计算一致，绑定切换前身份；没有重跑30项E2E或做生产故障注入。四项旧发布workflow仍disabled_manually，两AUTO变量false。
+- **独立渠道监测FAIL，与PG03分开：** `D:/AI/runtime/clearapi-monitor-runtime-activation` HEAD `3124d8a1b6bbc44e8a6203266567f72c1734c877` 的4改+1新增运行适配未提交/未集成，生产Trigger仍ErrMonitorIntegration；策略false、唯一目标归档且未发布/未allowlist、探测0条。普通Channel2数据库status2/9项ability false一致，生产进程缓存UNKNOWN；未做状态切换或直接DB修补。
+- **本轮边界：** D的3提交和专属image-generation前端未进入候选；PG03继续暂缓商业。生产四服务CID/StartedAt未变；首页/status/登录注册壳可达，匿名普通API预期401，未冒称真实业务交易验证。无生产写入/部署/重启/DNS变更、无Push或main合并。当前HEAD仍a9fe76f3，本地修复/测试/报告未提交；下一次仅B修复可准备申请，须另形成干净候选、CI与新部署授权，监测激活仍不具备发布验收条件。
+- 完整报告：[CLEARAPI_ABCE_FULL_AUDIT_20261024.md](CLEARAPI_ABCE_FULL_AUDIT_20261024.md)；本轮可复核证据与日志在 `evidence/abce-full-audit-20261024/`。
+
+---
+
 ## 2026-10-24 23:18–23:24 Asia/Shanghai — A/B/C/E 应用候选已正式部署，D 生图排除
 
 - **生产发布成功：** 候选 `dc685cbe338e8f700cae347e2eaac351d984c9c7`；镜像 `clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7`，规范 OCI config ID `sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728`（Docker engine/store ID `sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020`）；新 Gateway CID `aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0`。生产独立只读复核与正式成功回执一致。

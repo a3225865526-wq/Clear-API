@@ -1,0 +1,14 @@
+{
+  "completed_utc": "2026-10-25T03:01:58.8873110Z",
+  "removed_containers": [
+    "clearapi-audit-mock-20261024",
+    "clearapi-audit-fixed-20261024",
+    "clearapi-audit-app-20261024",
+    "clearapi-audit-mysql-20261024",
+    "clearapi-audit-pg-20261024"
+  ],
+  "removed_network": "clearapi-audit-20261024",
+  "remaining_matching_containers": [],
+  "production_mutation": false,
+  "isolated_announcement_options_cleared_before_removal": true
+}

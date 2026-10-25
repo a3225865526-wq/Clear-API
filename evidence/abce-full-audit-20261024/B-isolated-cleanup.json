@@ -1,0 +1,7 @@
+{
+  "production_mutation": false,
+  "isolated_options": {
+    "clearapi_audit": "[]",
+    "clearapi_audit_fixed": "[]"
+  }
+}

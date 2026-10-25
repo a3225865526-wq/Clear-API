@@ -1,0 +1,10 @@
+[
+  {
+    "name": "CLEARAPI_AUTO_PRODUCTION_ENABLED",
+    "value": "false"
+  },
+  {
+    "name": "CLEARAPI_AUTO_RC_ENABLED",
+    "value": "false"
+  }
+]

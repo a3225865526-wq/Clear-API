@@ -1,0 +1,57 @@
+[
+  {
+    "id": 377545312,
+    "name": "CI",
+    "state": "active"
+  },
+  {
+    "id": 378068457,
+    "name": "Release Candidate",
+    "state": "active"
+  },
+  {
+    "id": 384204592,
+    "name": "PG03 reviewed main Gateway RC",
+    "state": "active"
+  },
+  {
+    "id": 387553097,
+    "name": "Deployment rehearsal",
+    "state": "active"
+  },
+  {
+    "id": 389079463,
+    "name": "PG03 release state audit",
+    "state": "active"
+  },
+  {
+    "id": 390820963,
+    "name": "PG03 isolated exact-image schema rehearsal",
+    "state": "active"
+  },
+  {
+    "id": 391551026,
+    "name": "PG03 successor independent grant",
+    "state": "active"
+  },
+  {
+    "id": 378101050,
+    "name": "Deploy Production",
+    "state": "disabled_manually"
+  },
+  {
+    "id": 378227091,
+    "name": "GHCR Pull Rehearsal",
+    "state": "disabled_manually"
+  },
+  {
+    "id": 387486994,
+    "name": "Automatic production release",
+    "state": "disabled_manually"
+  },
+  {
+    "id": 390042545,
+    "name": "Failed production recovery",
+    "state": "disabled_manually"
+  }
+]

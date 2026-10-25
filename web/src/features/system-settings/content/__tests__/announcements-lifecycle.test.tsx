@@ -154,18 +154,22 @@ describe('announcement release lifecycle', () => {
     expect(within(rows[3]).getByText('Published')).toBeVisible()
   })
 
-  it('publishes a draft through the row menu and saves the new status', async () => {
+  it('publishes a draft while preserving the old announcement until explicitly deleted', async () => {
     mockPut.mockResolvedValue({
       data: { success: true, message: '', data: null },
     })
     const user = userEvent.setup()
-    renderSection([draftRecord])
+    renderSection([legacyRecord, draftRecord])
 
     await screen.findByText('Draft announcement')
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
+    const draftRow = screen.getByRole('row', { name: /Draft announcement/ })
+    await user.click(
+      within(draftRow).getByRole('button', { name: 'Open menu' })
+    )
     await user.click(await screen.findByRole('menuitem', { name: 'Publish' }))
 
-    expect(await screen.findByText('Published')).toBeVisible()
+    expect(within(draftRow).getByText('Published')).toBeVisible()
+    expect(screen.getByText('Legacy announcement')).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: 'Save Settings' }))
 
@@ -174,6 +178,7 @@ describe('announcement release lifecycle', () => {
     const saved = JSON.parse(payload.value)
     expect(payload.key).toBe('console_setting.announcements')
     expect(saved).toEqual([
+      { ...legacyRecord, status: 'published' },
       {
         ...draftRecord,
         status: 'published',
