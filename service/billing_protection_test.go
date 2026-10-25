@@ -38,6 +38,8 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+const codexNamespaceTools = `[{"type":"namespace","name":"functions","description":"Client tools","tools":[{"type":"function","name":"shell","parameters":{"type":"object","properties":{"command":{"type":"string"}}}},{"type":"custom","name":"apply_patch","format":{"type":"text"}}]}]`
+
 func TestProtectedBillingDatabase(t *testing.T) {
 	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
 	oldDB, oldRedis, oldBatch := model.DB, common.RedisEnabled, common.BatchUpdateEnabled
@@ -358,6 +360,8 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 		{"completions", "/v1/completions", `{"model":"protocol-fixture","prompt":"hello","max_tokens":1024}`, types.RelayFormatOpenAI, relayconstant.RelayModeCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
 		{"responses-json", "/v1/responses", `{"model":"protocol-fixture","input":[{"type":"function_call","call_id":"a","name":"lookup","arguments":"{\"key\":\"argument-fixture\"}"},{"type":"function_call_output","call_id":"a","output":"result-fixture"},{"role":"assistant","content":[{"type":"output_text","text":"assistant-fixture","annotations":[]}]}],"reasoning":{"effort":"high"},"text":{"format":{"type":"json_object"}},"store":false,"temperature":0,"top_p":1,"metadata":{"tag":"fixture"}}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
 		{"responses-sse", "/v1/responses", `{"model":"protocol-fixture","stream":true,"input":"hello encrypted_content item_reference","max_output_tokens":1024,"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"include":["reasoning.encrypted_content"]}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
+		{"codex-namespace-json", "/v1/responses", `{"model":"protocol-fixture","input":"hello","tools":` + codexNamespaceTools + `}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
+		{"codex-namespace-sse", "/v1/responses", `{"model":"protocol-fixture","stream":true,"input":"hello","tools":` + codexNamespaceTools + `}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
 		{"claude-json", "/v1/messages", `{"model":"protocol-fixture","system":"system-fixture","messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"lookup","input":{"key":"argument-fixture"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"result-fixture"}]}],"metadata":{"user_id":"fixture"},"thinking":{"type":"enabled","budget_tokens":100}}`, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, &dto.ClaudeRequest{}, dto.NewClaudeMessagesBillingUsage(&dto.ClaudeUsage{InputTokens: 800, CacheReadInputTokens: 200, OutputTokens: 20})},
 		{"claude-sse", "/v1/messages", `{"model":"protocol-fixture","stream":true,"max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, &dto.ClaudeRequest{}, dto.NewClaudeMessagesBillingUsage(&dto.ClaudeUsage{InputTokens: 800, CacheReadInputTokens: 200, OutputTokens: 20})},
 		{"gemini-json", "/v1beta/models/protocol-fixture:generateContent", `{"systemInstruction":{"parts":[{"text":"system-fixture"}]},"contents":[{"role":"model","parts":[{"functionCall":{"name":"lookup","args":{"key":"argument-fixture"}}}]},{"role":"user","parts":[{"functionResponse":{"name":"lookup","response":{"result":"result-fixture"}}}]}],"tools":[{"functionDeclarations":[{"name":"lookup","parameters":{"type":"OBJECT"}}]}]}`, types.RelayFormatGemini, relayconstant.RelayModeGemini, &dto.GeminiChatRequest{}, dto.NewGeminiChatBillingUsage(&dto.GeminiUsageMetadata{PromptTokenCount: 1000, CachedContentTokenCount: 200, CandidatesTokenCount: 20, TotalTokenCount: 1020})},
@@ -385,8 +389,11 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			require.Nil(t, relayapi.PrepareRequestBilling(c, info))
 			body, err := common.Marshal(tc.request)
 			require.NoError(t, err)
-			_, budgetErr := helper.PrepareOutboundTextBudget(c, info, body)
+			wire, budgetErr := helper.PrepareOutboundTextBudget(c, info, body)
 			require.NoError(t, budgetErr)
+			if tools := gjson.Get(tc.body, "tools"); tools.Exists() {
+				assert.JSONEq(t, tools.Raw, gjson.GetBytes(wire, "tools").Raw)
+			}
 			reserved := info.Billing.GetPreConsumedQuota()
 			expected := 890
 			usage := &dto.Usage{BillingUsage: tc.usage}
@@ -509,17 +516,29 @@ func (s *allowanceReservation) Reserve(quota int) error {
 func TestBillingOutputAllowanceTransport(t *testing.T) {
 	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
 	setPolicy(t, operation_setting.ReserveModeOff, "{}")
+	previous := config.GlobalConfig.ExportAllConfigs()
+	t.Cleanup(func() { require.NoError(t, config.GlobalConfig.LoadFromDB(previous)) })
+	operation_setting.SetToolPriceForTest(dto.BuildInToolWebSearch, 10)
 	protectedEncoderInit.Do(service.InitTokenEncoders)
 	for _, tc := range []struct {
 		name, path, body, field string
 		request                 dto.Request
 		format                  types.RelayFormat
 		mode                    int
+		wantErr                 string
 	}{
-		{"chat", "/v1/chat/completions", `{"model":"fixture","messages":[{"role":"user","content":"hello"}],"extension":true}`, "max_tokens", &dto.GeneralOpenAIRequest{}, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions},
-		{"responses", "/v1/responses", `{"model":"fixture","input":"hello","extension":true}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses},
-		{"claude", "/v1/messages", `{"model":"fixture","messages":[{"role":"user","content":"hello"}],"extension":true}`, "max_tokens", &dto.ClaudeRequest{}, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions},
-		{"gemini", "/v1beta/models/fixture:generateContent", `{"contents":[{"parts":[{"text":"hello"}]}],"extension":true}`, "generationConfig.maxOutputTokens", &dto.GeminiChatRequest{}, types.RelayFormatGemini, 0},
+		{"chat", "/v1/chat/completions", `{"model":"fixture","messages":[{"role":"user","content":"hello"}],"extension":true}`, "max_tokens", &dto.GeneralOpenAIRequest{}, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, ""},
+		{"responses", "/v1/responses", `{"model":"fixture","input":"hello","extension":true}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
+		{"claude", "/v1/messages", `{"model":"fixture","messages":[{"role":"user","content":"hello"}],"extension":true}`, "max_tokens", &dto.ClaudeRequest{}, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, ""},
+		{"gemini", "/v1beta/models/fixture:generateContent", `{"contents":[{"parts":[{"text":"hello"}]}],"extension":true}`, "generationConfig.maxOutputTokens", &dto.GeminiChatRequest{}, types.RelayFormatGemini, 0, ""},
+		{"codex-namespace", "/v1/responses", `{"model":"fixture","stream":true,"input":"hello","extension":true,"tools":` + codexNamespaceTools + `}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
+		{"custom-tool", "/v1/responses", `{"model":"fixture","input":"hello","extension":true,"tools":[{"type":"custom","name":"apply_patch","format":{"type":"text"}}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
+		{"extension-tool", "/v1/responses", `{"model":"fixture","input":"hello","extension":true,"tools":[{"type":"client_extension","name":"local_tool"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
+		{"paid-search", "/v1/responses", `{"model":"fixture","input":"hello","extension":true,"tools":[{"type":"web_search"}],"max_tool_calls":2}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
+		{"unbounded-search", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"web_search"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "bounded call limit"},
+		{"code-interpreter", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"code_interpreter","container":{"type":"auto"}}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "code_interpreter"},
+		{"file-search", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"file_search","vector_store_ids":["vs_fixture"]}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "file_search"},
+		{"image-generation", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"image_generation"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "image_generation"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var received []byte
@@ -542,6 +561,14 @@ func TestBillingOutputAllowanceTransport(t *testing.T) {
 			req, err := http.NewRequest("POST", upstream.URL, bytes.NewBufferString(tc.body))
 			require.NoError(t, err)
 			response, err := channel.DoRequest(c, req, info)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				assert.Nil(t, response)
+				assert.Zero(t, calls)
+				assert.Zero(t, reservation.held)
+				assert.False(t, c.GetBool("upstream_attempted"))
+				return
+			}
 			require.NoError(t, err)
 			require.NoError(t, response.Body.Close())
 			<-seen
@@ -549,6 +576,13 @@ func TestBillingOutputAllowanceTransport(t *testing.T) {
 			assert.True(t, gjson.GetBytes(received, "extension").Bool())
 			assert.GreaterOrEqual(t, reservation.held, int(gjson.GetBytes(received, tc.field).Int()))
 			assert.Equal(t, int64(len(received)), receivedLength)
+			if tools := gjson.Get(tc.body, "tools"); tools.Exists() {
+				assert.JSONEq(t, tools.Raw, gjson.GetBytes(received, "tools").Raw)
+			}
+			if tc.name == "paid-search" {
+				toolQuota := 2 * operation_setting.GetToolPriceForModel(dto.BuildInToolWebSearch, "fixture") / 1000 * common.QuotaPerUnit
+				assert.GreaterOrEqual(t, float64(reservation.held), float64(gjson.GetBytes(received, tc.field).Int())+toolQuota)
+			}
 			// Rejection happens before HTTP dispatch, with no synthetic usage.
 			reservation.available = 1
 			req, err = http.NewRequest("POST", upstream.URL, bytes.NewBufferString(tc.body))

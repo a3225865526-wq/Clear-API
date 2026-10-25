@@ -631,7 +631,10 @@ func requestToolBudget(info *relaycommon.RelayInfo) (float64, error) {
 		if len(tool.CodeExecution) > 0 || len(tool.CodeExecutionSnake) > 0 || len(tool.URLContext) > 0 {
 			return 0, fmt.Errorf("cannot bound this provider-hosted tool before dispatch")
 		}
-		if tool.Type != "" && tool.Type != "function" && tool.Type != "custom" && !strings.HasPrefix(tool.Type, "web_search") {
+		// Only concrete separately charged features without a complete reserve
+		// path are restricted. A tool declaration's type is not a billing allowlist.
+		switch tool.Type {
+		case "code_interpreter", dto.BuildInToolFileSearch, dto.BuildInToolImageGeneration:
 			return 0, fmt.Errorf("cannot bound provider-hosted tool %s before dispatch", tool.Type)
 		}
 		name, count := "", 1

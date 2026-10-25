@@ -1,3 +1,13 @@
+## 2026-10-26 Asia/Shanghai — 删除普通工具声明整体拒绝门禁（独立本地提交，未部署）
+
+- **基线与范围：** 以用户指定的生产 Commit `517158135021d4800ee84b333ccb593cedb2c76f` 建立独立分支 `codex/remove-tool-budget-gate`，工作区 `D:/Codex/worktrees/remove-tool-budget-gate/clearapi-controlled-launch-20261020`。本节所在提交是修复 Commit；保留原工作区未提交内容。未连接生产读取请求日志，Request ID `202610251709081606250048268d9d64WeB7Pqk` 仅作为用户提供的事故关联信息，不声称已重放该请求。
+- **根因与历史：** `793fd7476` 新增 `requestToolBudget`，把非空且不是 function/custom/web_search 的工具类型一律视作无法预先计费；`type=namespace` 精确产生用户提供的错误。入站链为 `controller.Relay → relay.PrepareRequestBilling → helper.ModelPriceHelper → requestToolBudget`（表达式定价同样调用）；出站 HTTP 的 `channel.DoRequest → PrepareOutboundTextBudget` 再调用该估算器，因此绕过其中一处仍会失败。引入前普通声明正常转发，收费工具按响应调用事实结算；当前基线中的旧 protected text 工具白名单已由 `382d52108` 删除，不重复恢复或修改它。
+- **实际删除：** 从公共估算器删除工具类型准入白名单，两个调用阶段均不再因 namespace 或未知普通扩展类型整体拒绝；没有 namespace 白名单、模型特例或替代门禁。工具声明沿用原 DTO/适配器和透传路径，声明本身不制造调用次数。保留原价格、输入/输出预算、余额预扣、补预留、usage/cache 结算、差额退款、outbox 和幂等实现。
+- **具体收费限制：** 保留原来已被拒绝且没有完整预留路径的 `code_interpreter`、`file_search`、`image_generation`；原 Gemini `codeExecution`/`code_execution`/`url_context` 限制不变。搜索继续沿用已配置价格与有界调用预算，缺少调用上限仍拒绝。没有新增收费工具支持，不能把放行普通声明解释为所有上游独立收费能力均已接入。
+- **实际验证（Docker `golang:1.25.1`）：** `go test ./service -run 'TestProtocolBillingCompatibility/(codex-namespace-json|codex-namespace-sse|chat-json)$|TestBillingOutputAllowanceTransport/(codex-namespace|custom-tool|extension-tool|paid-search|unbounded-search|code-interpreter|file-search|image-generation)$|TestCalculateTextToolCallSurchargeGeneralizedBuiltInTools$|TestComposeTieredTextQuotaKeepsToolCallSurcharges$|TestCalculateTextQuotaSummaryZeroTokensStillBillsToolSurcharge$' -count=1 -v` 通过（14 个叶级场景）。覆盖 namespace JSON/SSE 入站定价、预扣、提供的 usage/cache 结算、差额退款、重复完成和日志幂等；本地 HTTP 接收的工具声明等价、收费搜索预留、余额不足和具体收费限制在发出前拒绝；既有收费结算回归通过。测试 usage 为夹具，非真实厂商用量。
+- **实际用量回归：** `go test ./relay/channel/openai -run '^TestOaiResponsesHandler(CountsOutputCallsNotDeclarations|DeclaredToolsWithoutOutputCountZero)$' -count=1 -v` 两项通过，确认按响应工具调用计数、仅声明而无调用计数为零。修改的 Go 文件已 `gofmt`；`git diff --check` 通过。没有重跑完整协议测试或三数据库矩阵；未修改 SQL/schema/驱动/持久化实现，未修改 relaykit。
+- **交付边界：** 自动化和本地 HTTP 隔离验证通过，真实上游验证未执行，原生产 Request ID 未重放。没有 Push、合并 main、构建发布镜像或生产部署；生产状态不由本次本地提交改变。PG03 与 D 生图的既有暂缓状态不变。
+
 ## 2026-10-26 Asia/Shanghai — 计费门禁精简与缺省输出预算修复（仅候选，禁止生产部署）
 
 - **接管身份：** 继续使用既有独立工作区 `D:/Codex/worktrees/clearapi-billing-simplify-20261025/clearapi-controlled-launch-20261020`；基线 `382d521086a46310f3783102e9fedfcc090057ec`，分支 `codex/clearapi-billing-simplify-20261026`。原工作区仍有158项未提交路径，未清理、覆盖或重置。初始三个计费文件的修改已接续修复，未整体套用未完成补丁。
