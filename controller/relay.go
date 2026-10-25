@@ -111,6 +111,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	defer func() {
 		if newAPIError != nil {
+			if newAPIError.StatusCode == http.StatusTooManyRequests {
+				if retryAfter := c.GetString(routechain.UpstreamRetryAfterKey); retryAfter != "" {
+					c.Header("Retry-After", fmt.Sprint(routechain.ParseRetryAfterSeconds(retryAfter, routechain.ResolveCircuitConfig(nil).RetryAfterMax)))
+				}
+			}
 			service.RecordRequestPolicyTermination(c, newAPIError)
 			logger.LogError(c, fmt.Sprintf("relay error: %s", common.LocalLogPreview(newAPIError.Error())))
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))

@@ -55,6 +55,7 @@ type GeneralOpenAIRequest struct {
 	ParallelTooCalls    *bool             `json:"parallel_tool_calls,omitempty"`
 	Tools               []ToolCallRequest `json:"tools,omitempty"`
 	ToolChoice          any               `json:"tool_choice,omitempty"`
+	Provider            json.RawMessage   `json:"provider,omitempty"`
 	FunctionCall        json.RawMessage   `json:"function_call,omitempty"`
 	User                json.RawMessage   `json:"user,omitempty"`
 	// ServiceTier specifies upstream service level and may affect billing.
@@ -214,6 +215,12 @@ func (r *GeneralOpenAIRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	for _, message := range r.Messages {
 		tokenCountMeta.MessagesCount++
 		texts = append(texts, message.Role)
+		if message.ToolCallId != "" {
+			texts = append(texts, message.ToolCallId)
+		}
+		if len(message.ToolCalls) > 0 {
+			texts = append(texts, string(message.ToolCalls))
+		}
 		if len(message.Tools) > 0 {
 			// Kimi K3 dynamic tool loading: tools declared on a message are
 			// visible to the model and are counted like top-level tools.
@@ -1015,6 +1022,7 @@ type OpenAIResponsesRequest struct {
 	Metadata          json.RawMessage `json:"metadata,omitempty"`
 	Moderation        json.RawMessage `json:"moderation,omitempty"`
 	ParallelToolCalls json.RawMessage `json:"parallel_tool_calls,omitempty"`
+	Provider          json.RawMessage `json:"provider,omitempty"`
 	// FrequencyPenalty/PresencePenalty are not part of the official OpenAI
 	// Responses API; they are forwarded verbatim for OpenAI-compatible upstreams
 	// (e.g. vLLM) that accept them.

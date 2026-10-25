@@ -20,8 +20,8 @@ import (
 )
 
 // Only the bounded, single-output OpenAI text path is currently admitted.
-// Tool surcharges, multimodal quantities, provider-specific passthrough fields
-// and arbitrary expressions cannot be bounded by evaluating one sample.
+// Multimodal quantities and arbitrary expressions cannot be bounded by
+// evaluating one sample.
 func protectedTextLimit(info *relaycommon.RelayInfo) (int, error) {
 	if info != nil && info.RelayFormat == types.RelayFormatOpenAIResponses {
 		return protectedResponsesTextLimit(info)
@@ -63,7 +63,7 @@ func protectedTextLimit(info *relaycommon.RelayInfo) (int, error) {
 	if err := json.Unmarshal(body, &fields); err != nil {
 		return 0, err
 	}
-	allowed := map[string]bool{"model": true, "messages": true, "stream": true, "stream_options": true, "max_tokens": true, "max_completion_tokens": true, "n": true, "temperature": true, "top_p": true, "stop": true, "frequency_penalty": true, "presence_penalty": true, "seed": true, "user": true}
+	allowed := map[string]bool{"model": true, "messages": true, "stream": true, "stream_options": true, "max_tokens": true, "max_completion_tokens": true, "n": true, "temperature": true, "top_p": true, "stop": true, "frequency_penalty": true, "presence_penalty": true, "seed": true, "user": true, "tools": true, "tool_choice": true, "parallel_tool_calls": true, "provider": true}
 	for key := range fields {
 		if !allowed[key] {
 			return 0, errors.New("protected billing does not admit optional provider, tool or multimodal fields")
@@ -73,9 +73,14 @@ func protectedTextLimit(info *relaycommon.RelayInfo) (int, error) {
 	if err := json.Unmarshal(fields["messages"], &messages); err != nil {
 		return 0, err
 	}
+	for _, tool := range r.Tools {
+		if tool.Type != "function" {
+			return 0, errors.New("protected billing does not admit tools with separate usage charges")
+		}
+	}
 	for _, message := range messages {
 		for key := range message {
-			if key != "role" && key != "content" && key != "name" {
+			if key != "role" && key != "content" && key != "name" && key != "tool_call_id" && key != "tool_calls" {
 				return 0, errors.New("protected billing requires plain text messages")
 			}
 		}
@@ -129,7 +134,7 @@ func validateProtectedResponsesText(body []byte) (*dto.OpenAIResponsesRequest, e
 	}
 	for key := range fields {
 		switch key {
-		case "model", "input", "instructions", "max_output_tokens", "stream":
+		case "model", "input", "instructions", "max_output_tokens", "stream", "tools", "tool_choice", "parallel_tool_calls", "stream_options", "provider", "include", "metadata", "user":
 		default:
 			return nil, errors.New("protected billing does not admit optional provider, tool or reference fields")
 		}
@@ -137,6 +142,18 @@ func validateProtectedResponsesText(body []byte) (*dto.OpenAIResponsesRequest, e
 	var r dto.OpenAIResponsesRequest
 	if err := common.Unmarshal(body, &r); err != nil {
 		return nil, err
+	}
+	if len(r.Tools) > 0 {
+		var tools []map[string]common.RawMessage
+		if err := common.Unmarshal(r.Tools, &tools); err != nil {
+			return nil, errors.New("protected billing requires function tools")
+		}
+		for _, tool := range tools {
+			var kind string
+			if err := common.Unmarshal(tool["type"], &kind); err != nil || kind != "function" {
+				return nil, errors.New("protected billing does not admit tools with separate usage charges")
+			}
+		}
 	}
 	if r.Stream == nil || !*r.Stream {
 		return nil, errors.New("protected billing requires Responses SSE")
@@ -160,7 +177,7 @@ func validateProtectedResponsesText(body []byte) (*dto.OpenAIResponsesRequest, e
 	}
 	for _, message := range messages {
 		for key := range message {
-			if key != "type" && key != "role" && key != "content" {
+			if key != "type" && key != "role" && key != "content" && key != "id" {
 				return nil, errors.New("protected billing does not admit input references or tool calls")
 			}
 		}
@@ -279,7 +296,7 @@ func ValidateProtectedTextBody(info *relaycommon.RelayInfo, body []byte) error {
 				return err
 			}
 		}
-		if limit != originalLimit || !reflect.DeepEqual(originalInput, outboundInput) || !reflect.DeepEqual(originalInstructions, outboundInstructions) {
+		if limit != originalLimit || !reflect.DeepEqual(originalInput, outboundInput) || !reflect.DeepEqual(originalInstructions, outboundInstructions) || !reflect.DeepEqual(original.Tools, outbound.Tools) || !reflect.DeepEqual(original.ToolChoice, outbound.ToolChoice) || !reflect.DeepEqual(original.ParallelToolCalls, outbound.ParallelToolCalls) || !reflect.DeepEqual(original.StreamOptions, outbound.StreamOptions) || !reflect.DeepEqual(original.Include, outbound.Include) || !reflect.DeepEqual(original.Metadata, outbound.Metadata) || !reflect.DeepEqual(original.User, outbound.User) || !reflect.DeepEqual(original.Provider, outbound.Provider) {
 			return errors.New("outbound text or output budget changed after reservation")
 		}
 		return nil
@@ -300,7 +317,8 @@ func ValidateProtectedTextBody(info *relaycommon.RelayInfo, body []byte) error {
 	if err != nil {
 		return err
 	}
-	if limit != originalLimit || !reflect.DeepEqual(outbound.Messages, info.Request.(*dto.GeneralOpenAIRequest).Messages) {
+	original := info.Request.(*dto.GeneralOpenAIRequest)
+	if limit != originalLimit || !reflect.DeepEqual(outbound.Messages, original.Messages) || !reflect.DeepEqual(outbound.Tools, original.Tools) || !reflect.DeepEqual(outbound.ToolChoice, original.ToolChoice) || !reflect.DeepEqual(outbound.Provider, original.Provider) || !reflect.DeepEqual(outbound.ParallelTooCalls, original.ParallelTooCalls) {
 		return errors.New("outbound text or output budget changed after reservation")
 	}
 	return nil

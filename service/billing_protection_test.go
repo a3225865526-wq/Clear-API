@@ -329,6 +329,9 @@ func TestProtectedTextBudget(t *testing.T) {
 	}{
 		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100}`, true},
 		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":100}`, true},
+		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"provider":{"order":["openai"]}}`, true},
+		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"tools":[{"type":"function","function":{"name":"lookup","parameters":{"type":"object"}}}],"tool_choice":"auto","parallel_tool_calls":true}`, true},
+		{`{"model":"protected-test","messages":[{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"role":"tool","tool_call_id":"call_1","content":"done"}],"max_tokens":100}`, true},
 		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}]}`, false},
 		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"n":2}`, false},
 		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"max_completion_tokens":200}`, false},
@@ -380,12 +383,15 @@ func TestProtectedResponsesTextBudget(t *testing.T) {
 		{name: "text messages", input: `[{"role":"user","content":[{"type":"input_text","text":"hello"}]}]`, limit: 100, ok: true},
 		{name: "string messages", input: `[{"type":"message","role":"user","content":"hello"}]`, limit: 100, ok: true},
 		{name: "null text type", input: `[{"role":"user","content":[{"type":"input_text","text":"hello"},{"type":null,"text":"unknown"}]}]`, limit: 100},
-		{name: "tools", input: `"hello"`, extra: `,"tools":[{"type":"web_search"}]`, limit: 100},
+		{name: "metered built-in tool", input: `"hello"`, extra: `,"tools":[{"type":"web_search"}]`, limit: 100},
+		{name: "function tools", input: `"hello"`, extra: `,"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true`, limit: 100, ok: true},
+		{name: "provider routing", input: `"hello"`, extra: `,"provider":{"order":["openai"]}`, limit: 100, ok: true},
+		{name: "message item reference", input: `[{"type":"message","id":"msg_1","role":"user","content":"hello"}]`, limit: 100, ok: true},
 		{name: "tool call", input: `[{"type":"function_call","call_id":"call","name":"lookup","arguments":"{}"}]`, limit: 100},
 		{name: "image", input: `[{"role":"user","content":[{"type":"input_image","image_url":"synthetic"}]}]`, limit: 100},
 		{name: "file", input: `[{"role":"user","content":[{"type":"input_file","file_id":"synthetic"}]}]`, limit: 100},
 		{name: "item reference", input: `[{"type":"item_reference","id":"synthetic"}]`, limit: 100},
-		{name: "message reference", input: `[{"role":"user","content":"hello","id":"synthetic"}]`, limit: 100},
+		{name: "message reference", input: `[{"role":"user","content":"hello","id":"synthetic"}]`, limit: 100, ok: true},
 		{name: "previous response", input: `"hello"`, extra: `,"previous_response_id":"synthetic"`, limit: 100},
 		{name: "conversation", input: `"hello"`, extra: `,"conversation":"synthetic"`, limit: 100},
 		{name: "prompt reference", input: `"hello"`, extra: `,"prompt":{"id":"synthetic"}`, limit: 100},
@@ -418,6 +424,7 @@ func TestProtectedResponsesTextBudget(t *testing.T) {
 				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":101}`,
 				`{"model":"protected-responses-test","stream":true,"input":"hello","instructions":"changed","max_output_tokens":100}`,
 				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":100,"unknown_budget":1}`,
+				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":100,"tools":[{"type":"function","name":"changed"}],"tool_choice":"auto","parallel_tool_calls":true}`,
 			} {
 				require.Error(t, helper.ValidateProtectedTextBody(info, []byte(outbound)))
 			}
