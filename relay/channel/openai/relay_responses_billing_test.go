@@ -36,6 +36,53 @@ func TestOaiResponsesHandlerEstimatesMissingUsageFromOutput(t *testing.T) {
 	assert.Nil(t, observation.Total)
 }
 
+func TestOaiCompactAndAudioMetering(t *testing.T) {
+	t.Run("compact JSON cache usage", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest("POST", "/v1/responses/compact", nil)
+		resp := &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"id":"fixture","usage":{"input_tokens":1000,"output_tokens":20,"total_tokens":1020,"input_tokens_details":{"cached_tokens":200,"cache_write_tokens":40}}}`))}
+		usage, apiErr := OaiResponsesCompactionHandler(c, resp)
+		require.Nil(t, apiErr)
+		assert.Equal(t, 1000, usage.PromptTokens)
+		assert.Equal(t, 20, usage.CompletionTokens)
+		assert.Equal(t, 200, usage.PromptTokensDetails.CachedTokens)
+		assert.Equal(t, 40, usage.PromptTokensDetails.CacheWriteTokens)
+	})
+	t.Run("transcription JSON usage", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest("POST", "/v1/audio/transcriptions", nil)
+		resp := &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{"text":"fixture","usage":{"input_tokens":100,"output_tokens":20,"total_tokens":120}}`))}
+		apiErr, usage := OpenaiSTTHandler(c, resp, &relaycommon.RelayInfo{}, "json")
+		require.Nil(t, apiErr)
+		assert.Equal(t, 100, usage.PromptTokens)
+		assert.Equal(t, 20, usage.CompletionTokens)
+	})
+	t.Run("speech PCM duration estimate", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest("POST", "/v1/audio/speech", nil)
+		info := &relaycommon.RelayInfo{Request: &dto.AudioRequest{ResponseFormat: "pcm"}}
+		info.SetEstimatePromptTokens(10)
+		resp := &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(bytes.NewReader(make([]byte, 48000)))}
+		usage := OpenaiTTSHandler(c, resp, info)
+		assert.Equal(t, 10, usage.PromptTokens)
+		assert.Equal(t, 17, usage.CompletionTokenDetails.AudioTokens)
+		assert.True(t, common.GetContextKeyBool(c, constant.ContextKeyLocalCountTokens))
+	})
+	t.Run("speech SSE terminal usage", func(t *testing.T) {
+		previousTimeout := constant.StreamingTimeout
+		constant.StreamingTimeout = 10
+		t.Cleanup(func() { constant.StreamingTimeout = previousTimeout })
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest("POST", "/v1/audio/speech", nil)
+		info := &relaycommon.RelayInfo{IsStream: true}
+		resp := &http.Response{StatusCode: 200, Header: http.Header{}, Body: io.NopCloser(strings.NewReader("data: {\"type\":\"speech.audio.done\",\"usage\":{\"input_tokens\":10,\"output_tokens\":20,\"total_tokens\":30}}\n\ndata: [DONE]\n\n"))}
+		usage := OpenaiTTSHandler(c, resp, info)
+		assert.Equal(t, 10, usage.PromptTokens)
+		assert.Equal(t, 20, usage.CompletionTokens)
+		assert.Equal(t, 30, usage.TotalTokens)
+	})
+}
+
 func TestOaiResponsesHandlerCountsOutputCallsNotDeclarations(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	operation_setting.SetToolPriceForTest("priced_fn", 5.0)

@@ -13,8 +13,9 @@ import (
 // Protection is opt-in and never migrates a running database automatically.
 func BillingProtectionEnabled() bool { return os.Getenv("CLEARAPI_BILLING_PROTECTION") == "true" }
 
-// Durable wallet accounting does not impose the narrow text-only admission
-// rules of billing protection. It still requires an explicit schema migration.
+// Both deployment flags use the same durable wallet ledger. Protocol adapters
+// supply billing facts; neither flag imposes a text-only request whitelist.
+// The ledger still requires an explicit schema migration.
 func DurableWalletBillingEnabled() bool { return os.Getenv("CLEARAPI_DURABLE_WALLET") == "true" }
 
 func ValidateBillingProtection() error {

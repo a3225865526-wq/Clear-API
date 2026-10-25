@@ -31,7 +31,7 @@ type AudioRequest struct {
 
 func (r *AudioRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	meta := &types.TokenCountMeta{
-		CombineText: r.Input,
+		CombineText: strings.TrimSpace(r.Input + "\n" + r.Instructions),
 		TokenType:   types.TokenTypeTextNumber,
 	}
 	if strings.Contains(r.Model, "gpt") {

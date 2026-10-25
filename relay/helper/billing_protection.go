@@ -1,325 +1,187 @@
 package helper
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
-	"math"
-	"os"
-	"reflect"
+	"fmt"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting/model_setting"
-	hosttypes "github.com/QuantumNous/new-api/types"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/gin-gonic/gin"
 )
 
-// Only the bounded, single-output OpenAI text path is currently admitted.
-// Multimodal quantities and arbitrary expressions cannot be bounded by
-// evaluating one sample.
-func protectedTextLimit(info *relaycommon.RelayInfo) (int, error) {
-	if info != nil && info.RelayFormat == types.RelayFormatOpenAIResponses {
-		return protectedResponsesTextLimit(info)
+// PrepareBillingRequest uses each protocol's own DTO. It checks only facts
+// that affect accounting; serialization and protocol validation stay with the
+// adapters. TokenCountMeta, Usage/BillingUsage and BillingSession are the shared
+// request, response and accounting contracts.
+func PrepareBillingRequest(c *gin.Context, info *relaycommon.RelayInfo, defaultOutput bool) error {
+	if info == nil || (!service.BillingProtectionEnabled() && !service.DurableWalletBillingEnabled()) {
+		return nil
 	}
-	if !constant.CountToken || info == nil || info.RelayFormat != types.RelayFormatOpenAI {
-		return 0, errors.New("protected billing requires token counting and an OpenAI text request")
+	admission := *info
+	if admission.ChannelMeta == nil {
+		admission.InitChannelMeta(c)
 	}
-	if info.TokenGroup == "auto" {
-		return 0, errors.New("protected billing requires a fixed group")
+	model := admission.GetUpstreamModelName()
+	if model == "" {
+		model = info.GetOriginModelName()
 	}
-	r, ok := info.Request.(*dto.GeneralOpenAIRequest)
-	if !ok || len(r.Messages) == 0 {
-		return 0, errors.New("protected billing requires chat messages")
+	policy := operation_setting.GetBillingReservePolicy()
+	if info.RelayFormat == types.RelayFormatOpenAIRealtime {
+		return fmt.Errorf("Realtime has no bounded per-turn reservation and is unavailable with durable billing")
 	}
-	if strings.Contains(r.Model, "search-preview") || strings.Contains(info.GetBillingModelName(), "search-preview") {
-		return 0, errors.New("protected billing does not admit models with implicit search fees")
-	}
-	if r.N != nil && *r.N != 1 {
-		return 0, errors.New("protected billing requires n=1")
-	}
-	limit := uint(0)
-	if r.MaxTokens != nil {
-		limit = *r.MaxTokens
-	}
-	if r.MaxCompletionTokens != nil {
-		if limit != 0 && limit != *r.MaxCompletionTokens {
-			return 0, errors.New("conflicting output token limits")
-		}
-		limit = *r.MaxCompletionTokens
-	}
-	if limit == 0 || limit > maxTokensLimit {
-		return 0, errors.New("protected billing requires an explicit bounded output token limit")
-	}
-	body, err := json.Marshal(r)
-	if err != nil {
-		return 0, err
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(body, &fields); err != nil {
-		return 0, err
-	}
-	allowed := map[string]bool{"model": true, "messages": true, "stream": true, "stream_options": true, "max_tokens": true, "max_completion_tokens": true, "n": true, "temperature": true, "top_p": true, "stop": true, "frequency_penalty": true, "presence_penalty": true, "seed": true, "user": true, "tools": true, "tool_choice": true, "parallel_tool_calls": true, "provider": true}
-	for key := range fields {
-		if !allowed[key] {
-			return 0, errors.New("protected billing does not admit optional provider, tool or multimodal fields")
-		}
-	}
-	var messages []map[string]json.RawMessage
-	if err := json.Unmarshal(fields["messages"], &messages); err != nil {
-		return 0, err
-	}
-	for _, tool := range r.Tools {
-		if tool.Type != "function" {
-			return 0, errors.New("protected billing does not admit tools with separate usage charges")
-		}
-	}
-	for _, message := range messages {
-		for key := range message {
-			if key != "role" && key != "content" && key != "name" && key != "tool_call_id" && key != "tool_calls" {
-				return 0, errors.New("protected billing requires plain text messages")
+	profile, approved := operation_setting.ResolveReserveProfile(policy, admission.GetChannelID(), model)
+	hidden := ""
+	tier := ""
+	var cap **uint
+	switch r := info.Request.(type) {
+	case *dto.GeneralOpenAIRequest:
+		if len(r.ServiceTier) > 0 {
+			if err := common.Unmarshal(r.ServiceTier, &tier); err != nil {
+				return fmt.Errorf("invalid service_tier")
 			}
 		}
-		var content string
-		if err := json.Unmarshal(message["content"], &content); err != nil {
-			return 0, errors.New("protected billing requires plain text message content")
+		if r.MaxTokens == nil && r.MaxCompletionTokens == nil {
+			cap = &r.MaxCompletionTokens
+		}
+	case *dto.OpenAIResponsesRequest:
+		tier = r.ServiceTier
+		cap = &r.MaxOutputTokens
+		if r.PreviousResponseID != "" {
+			hidden = "previous_response_id"
+		}
+		if len(r.Conversation) > 0 && string(r.Conversation) != "null" {
+			hidden = "conversation"
+		}
+		if len(r.Prompt) > 0 && string(r.Prompt) != "null" {
+			hidden = "prompt reference"
+		}
+		var input any
+		if err := common.Unmarshal(r.Input, &input); err != nil {
+			return fmt.Errorf("invalid Responses input: %w", err)
+		}
+		if reference := responsesHiddenInput(input); reference != "" {
+			hidden = reference
+		}
+	case *dto.OpenAIResponsesCompactionRequest:
+		tier = r.ServiceTier
+		if r.PreviousResponseID != "" {
+			hidden = "compact previous_response_id"
+		}
+		if !approved || profile.ModelOutputMax <= 0 {
+			return fmt.Errorf("compact billing requires an approved model_output_max because the protocol has no output-limit field")
+		}
+		if profile.ModelOutputMax > maxTokensLimit {
+			return fmt.Errorf("compact model_output_max exceeds the billing token limit")
+		}
+		info.BillingOutputLimit = int(profile.ModelOutputMax)
+		var input any
+		if err := common.Unmarshal(r.Input, &input); err != nil {
+			return fmt.Errorf("invalid compact input: %w", err)
+		}
+		if reference := responsesHiddenInput(input); reference != "" {
+			hidden = reference
+		}
+	case *dto.ClaudeRequest:
+		tier = r.ServiceTier
+		cap = &r.MaxTokens
+		if len(r.McpServers) > 0 && string(r.McpServers) != "null" && string(r.McpServers) != "[]" {
+			return fmt.Errorf("billing cannot bound Claude server-side MCP tool charges")
+		}
+		if len(r.Container) > 0 && string(r.Container) != "null" {
+			hidden = "Claude container state"
+		}
+	case *dto.AudioRequest:
+		if info.RelayMode == relayconstant.RelayModeAudioSpeech {
+			var limit uint
+			if len(r.MaxNewTokens) > 0 {
+				if err := common.Unmarshal(r.MaxNewTokens, &limit); err != nil || limit == 0 || limit > maxTokensLimit {
+					return fmt.Errorf("audio max_new_tokens is invalid")
+				}
+			} else if approved && profile.ModelOutputMax > 0 && profile.ModelOutputMax <= maxTokensLimit {
+				limit = uint(profile.ModelOutputMax)
+			} else {
+				return fmt.Errorf("audio speech billing requires a bounded max_new_tokens or an approved model_output_max")
+			}
+			info.BillingOutputLimit = int(limit)
+			if len(r.RefAudio) > 0 && string(r.RefAudio) != "null" {
+				hidden = "audio ref_audio"
+			}
+		}
+	case *dto.GeminiChatRequest:
+		cap = &r.GenerationConfig.MaxOutputTokens
+		if r.CachedContent != "" {
+			hidden = "Gemini cachedContent"
+		}
+		for _, content := range r.Contents {
+			for _, part := range content.Parts {
+				if part.FileData != nil {
+					hidden = "Gemini fileData"
+				}
+			}
+		}
+		for i := range r.Requests {
+			child := *info
+			child.Request = &r.Requests[i]
+			if len(r.Requests[i].Requests) > 0 {
+				return fmt.Errorf("nested Gemini batches are not supported")
+			}
+			if err := PrepareBillingRequest(c, &child, defaultOutput); err != nil {
+				return err
+			}
 		}
 	}
-	if info.ChannelMeta != nil && (len(info.ChannelMeta.ParamOverride) != 0 || len(info.ChannelMeta.HeadersOverride) != 0) {
-		return 0, errors.New("protected billing does not admit channel parameter or header overrides")
+	// Inspect the effective outbound tier after the channel's existing field
+	// filtering. A standard tariff cannot silently price a different service.
+	if !defaultOutput && tier != "" && tier != "auto" && tier != "default" {
+		return fmt.Errorf("billing has no verified service_tier tariff for %q", tier)
 	}
-	return int(limit), nil
+	if strings.HasPrefix(hidden, "unsupported ") {
+		return fmt.Errorf("billing cannot meter %s", hidden)
+	}
+	if hidden != "" && (policy.Mode != operation_setting.ReserveModeEnforce || !approved || profile.HiddenTotalMax <= 0) {
+		return fmt.Errorf("billing cannot estimate %s without an enforced approved hidden-input reserve profile", hidden)
+	}
+	// A configured server ceiling is imposed on the actual outbound request,
+	// never merely assumed by the estimator. No arbitrary default is invented.
+	if defaultOutput && cap != nil && *cap == nil && approved && profile.ModelOutputMax > 0 && profile.ModelOutputMax <= maxTokensLimit {
+		limit := uint(profile.ModelOutputMax)
+		*cap = &limit
+	}
+	return nil
 }
 
-// Native Responses admission is limited to bounded, self-contained text SSE.
-// Keep the Chat contract above and the reservation arithmetic below unchanged.
-func protectedResponsesTextLimit(info *relaycommon.RelayInfo) (int, error) {
-	if !constant.CountToken {
-		return 0, errors.New("protected billing requires token counting")
-	}
-	if info.TokenGroup == "auto" {
-		return 0, errors.New("protected billing requires a fixed group")
-	}
-	r, ok := info.Request.(*dto.OpenAIResponsesRequest)
-	if !ok || r == nil {
-		return 0, errors.New("protected billing requires a native Responses request")
-	}
-	if strings.Contains(r.Model, "search-preview") || strings.Contains(info.GetBillingModelName(), "search-preview") {
-		return 0, errors.New("protected billing does not admit models with implicit search fees")
-	}
-	// Bypass MarshalJSON field filtering so an unsupported supplied field cannot
-	// disappear before the protection allowlist checks it.
-	type responsesFields dto.OpenAIResponsesRequest
-	body, err := common.Marshal((*responsesFields)(r))
-	if err != nil {
-		return 0, err
-	}
-	if _, err := validateProtectedResponsesText(body); err != nil {
-		return 0, err
-	}
-	if info.ChannelMeta != nil && (len(info.ChannelMeta.ParamOverride) != 0 || len(info.ChannelMeta.HeadersOverride) != 0) {
-		return 0, errors.New("protected billing does not admit channel parameter or header overrides")
-	}
-	return int(*r.MaxOutputTokens), nil
-}
-
-func validateProtectedResponsesText(body []byte) (*dto.OpenAIResponsesRequest, error) {
-	var fields map[string]common.RawMessage
-	if err := common.Unmarshal(body, &fields); err != nil {
-		return nil, err
-	}
-	for key := range fields {
-		switch key {
-		case "model", "input", "instructions", "max_output_tokens", "stream", "tools", "tool_choice", "parallel_tool_calls", "stream_options", "provider", "include", "metadata", "user":
+// Inspect structural references, never words in user text or tool arguments.
+func responsesHiddenInput(input any) string {
+	switch value := input.(type) {
+	case []any:
+		for _, item := range value {
+			if reason := responsesHiddenInput(item); reason != "" {
+				return reason
+			}
+		}
+	case map[string]any:
+		kind, _ := value["type"].(string)
+		switch kind {
+		case "", "message", "input_text", "output_text", "text", "input_image", "input_file", "function_call", "function_call_output", "reasoning", "compaction", "item_reference":
 		default:
-			return nil, errors.New("protected billing does not admit optional provider, tool or reference fields")
+			return "unsupported Responses input type " + kind
 		}
-	}
-	var r dto.OpenAIResponsesRequest
-	if err := common.Unmarshal(body, &r); err != nil {
-		return nil, err
-	}
-	if len(r.Tools) > 0 {
-		var tools []map[string]common.RawMessage
-		if err := common.Unmarshal(r.Tools, &tools); err != nil {
-			return nil, errors.New("protected billing requires function tools")
+		if kind == "item_reference" {
+			return "Responses item_reference"
 		}
-		for _, tool := range tools {
-			var kind string
-			if err := common.Unmarshal(tool["type"], &kind); err != nil || kind != "function" {
-				return nil, errors.New("protected billing does not admit tools with separate usage charges")
+		for _, key := range []string{"encrypted_content", "file_id"} {
+			if raw, present := value[key]; present && raw != nil && raw != "" {
+				return "Responses " + key
 			}
 		}
-	}
-	if r.Stream == nil || !*r.Stream {
-		return nil, errors.New("protected billing requires Responses SSE")
-	}
-	if r.MaxOutputTokens == nil || *r.MaxOutputTokens == 0 || *r.MaxOutputTokens > maxTokensLimit {
-		return nil, errors.New("protected billing requires an explicit bounded output token limit")
-	}
-	if instructions, present := fields["instructions"]; present && common.GetJsonType(instructions) != "string" {
-		return nil, errors.New("protected billing requires plain text instructions")
-	}
-	if common.GetJsonType(r.Input) == "string" {
-		var text string
-		if err := common.Unmarshal(r.Input, &text); err != nil || strings.TrimSpace(text) == "" {
-			return nil, errors.New("protected billing requires nonempty text input")
-		}
-		return &r, nil
-	}
-	var messages []map[string]common.RawMessage
-	if err := common.Unmarshal(r.Input, &messages); err != nil || len(messages) == 0 {
-		return nil, errors.New("protected billing requires self-contained text input")
-	}
-	for _, message := range messages {
-		for key := range message {
-			if key != "type" && key != "role" && key != "content" && key != "id" {
-				return nil, errors.New("protected billing does not admit input references or tool calls")
-			}
-		}
-		var role, kind string
-		if err := common.Unmarshal(message["role"], &role); err != nil || (role != "user" && role != "assistant" && role != "system" && role != "developer") {
-			return nil, errors.New("protected billing requires plain text messages")
-		}
-		if raw, present := message["type"]; present {
-			if err := common.Unmarshal(raw, &kind); err != nil || kind != "message" {
-				return nil, errors.New("protected billing does not admit input references or tool calls")
-			}
-		}
-		content := message["content"]
-		if common.GetJsonType(content) == "string" {
-			continue
-		}
-		var parts []map[string]common.RawMessage
-		if err := common.Unmarshal(content, &parts); err != nil || len(parts) == 0 {
-			return nil, errors.New("protected billing requires plain text message content")
-		}
-		for _, part := range parts {
-			var partType, text string
-			if len(part) != 2 || common.Unmarshal(part["type"], &partType) != nil || partType != "input_text" || common.GetJsonType(part["text"]) != "string" || common.Unmarshal(part["text"], &text) != nil {
-				return nil, errors.New("protected billing does not admit multimodal input or references")
-			}
+		if reason := responsesHiddenInput(value["content"]); reason != "" {
+			return reason
 		}
 	}
-	return &r, nil
-}
-
-func protectTextReservation(info *relaycommon.RelayInfo, price *hosttypes.PriceData, promptTokens, outputTokens int) error {
-	if promptTokens <= 0 || outputTokens <= 0 || len(price.OtherRatios()) != 0 {
-		return errors.New("protected billing cannot establish a text budget")
-	}
-	if !price.UsePrice && !price.FreeModel {
-		for _, ratio := range []float64{price.ModelRatio, price.CompletionRatio, price.GroupRatioInfo.GroupRatio, price.CacheRatio, price.CacheCreationRatio, price.CacheCreation5mRatio, price.CacheCreation1hRatio} {
-			if math.IsNaN(ratio) || math.IsInf(ratio, 0) || ratio < 0 {
-				return errors.New("invalid protected billing ratio")
-			}
-		}
-		// Cover the most expensive supported input category rather than assuming
-		// every input token is uncached. The existing input multiplier remains.
-		inputRatio := max(1.0, price.CacheRatio, price.CacheCreationRatio, price.CacheCreation5mRatio, price.CacheCreation1hRatio)
-		budget := (float64(promptTokens)*inputRatio + float64(outputTokens)*price.CompletionRatio) * price.ModelRatio * price.GroupRatioInfo.GroupRatio
-		if math.IsNaN(budget) || math.IsInf(budget, 0) || budget < 0 {
-			return errors.New("invalid protected text budget")
-		}
-		quota, err := common.QuotaFromFloatStrict(math.Ceil(budget))
-		if err != nil {
-			return err
-		}
-		price.QuotaToPreConsume = max(price.QuotaToPreConsume, quota)
-	}
-	info.ProtectedTextBudget = true
-	return nil
-}
-
-func billingProtectionEnabled() bool { return os.Getenv("CLEARAPI_BILLING_PROTECTION") == "true" }
-
-// ValidateProtectedTextChannel runs for every selected attempt, after channel
-// metadata is initialized. Raw passthrough and conversion cannot bypass the
-// quantities validated before reservation.
-func ValidateProtectedTextChannel(info *relaycommon.RelayInfo) error {
-	if !billingProtectionEnabled() {
-		return nil
-	}
-	if info == nil || !info.ProtectedTextBudget || info.ChannelMeta == nil {
-		return errors.New("protected text budget is missing")
-	}
-	if info.ChannelType != constant.ChannelTypeOpenAI || len(info.ParamOverride) != 0 || len(info.HeadersOverride) != 0 || info.UseRuntimeHeadersOverride || info.ChannelSetting.PassThroughBodyEnabled || info.ChannelSetting.SystemPrompt != "" || model_setting.GetGlobalSettings().PassThroughRequestEnabled {
-		return errors.New("protected billing requires a direct OpenAI channel without overrides, passthrough or injected prompts")
-	}
-	if info.TieredBillingSnapshot != nil {
-		if !info.ProtectedTieredBudget {
-			return errors.New("protected expression budget is missing")
-		}
-		return service.ValidateProtectedTieredSnapshot(info)
-	}
-	return nil
-}
-
-func ValidateProtectedTextBody(info *relaycommon.RelayInfo, body []byte) error {
-	if !billingProtectionEnabled() {
-		return nil
-	}
-	if info != nil && info.RelayFormat == types.RelayFormatOpenAIResponses {
-		originalLimit, err := protectedTextLimit(info)
-		if err != nil {
-			return err
-		}
-		outbound, err := validateProtectedResponsesText(body)
-		if err != nil {
-			return err
-		}
-		original := info.Request.(*dto.OpenAIResponsesRequest)
-		effective := *info
-		effective.Request = outbound
-		limit, err := protectedTextLimit(&effective)
-		if err != nil {
-			return err
-		}
-		var originalInput, outboundInput, originalInstructions, outboundInstructions any
-		if err := common.Unmarshal(original.Input, &originalInput); err != nil {
-			return err
-		}
-		if err := common.Unmarshal(outbound.Input, &outboundInput); err != nil {
-			return err
-		}
-		if len(original.Instructions) > 0 {
-			if err := common.Unmarshal(original.Instructions, &originalInstructions); err != nil {
-				return err
-			}
-		}
-		if len(outbound.Instructions) > 0 {
-			if err := common.Unmarshal(outbound.Instructions, &outboundInstructions); err != nil {
-				return err
-			}
-		}
-		if limit != originalLimit || !reflect.DeepEqual(originalInput, outboundInput) || !reflect.DeepEqual(originalInstructions, outboundInstructions) || !reflect.DeepEqual(original.Tools, outbound.Tools) || !reflect.DeepEqual(original.ToolChoice, outbound.ToolChoice) || !reflect.DeepEqual(original.ParallelToolCalls, outbound.ParallelToolCalls) || !reflect.DeepEqual(original.StreamOptions, outbound.StreamOptions) || !reflect.DeepEqual(original.Include, outbound.Include) || !reflect.DeepEqual(original.Metadata, outbound.Metadata) || !reflect.DeepEqual(original.User, outbound.User) || !reflect.DeepEqual(original.Provider, outbound.Provider) {
-			return errors.New("outbound text or output budget changed after reservation")
-		}
-		return nil
-	}
-	var outbound dto.GeneralOpenAIRequest
-	decoder := json.NewDecoder(bytes.NewReader(body))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&outbound); err != nil {
-		return errors.New("protected billing cannot verify the outbound request")
-	}
-	originalLimit, err := protectedTextLimit(info)
-	if err != nil {
-		return err
-	}
-	effective := *info
-	effective.Request = &outbound
-	limit, err := protectedTextLimit(&effective)
-	if err != nil {
-		return err
-	}
-	original := info.Request.(*dto.GeneralOpenAIRequest)
-	if limit != originalLimit || !reflect.DeepEqual(outbound.Messages, original.Messages) || !reflect.DeepEqual(outbound.Tools, original.Tools) || !reflect.DeepEqual(outbound.ToolChoice, original.ToolChoice) || !reflect.DeepEqual(outbound.Provider, original.Provider) || !reflect.DeepEqual(outbound.ParallelTooCalls, original.ParallelTooCalls) {
-		return errors.New("outbound text or output budget changed after reservation")
-	}
-	return nil
+	return ""
 }

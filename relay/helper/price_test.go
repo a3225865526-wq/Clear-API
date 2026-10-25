@@ -789,6 +789,11 @@ func TestOutboundTextBudgetCoversParameterOverrides(t *testing.T) {
 	require.NoError(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"synthetic prompt"}],"max_tokens":200,"n":2}`)))
 	assert.GreaterOrEqual(t, reservation.held, 400)
 	require.ErrorContains(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"fixture"}]}`)), "bounded output limit")
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	info.ChannelMeta = &relaycommon.ChannelMeta{}
+	info.ChannelSetting.PassThroughBodyEnabled = true
+	require.NoError(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"fixture"}],"max_tokens":200,"response_format":{"type":"json_object"}}`)))
+	require.ErrorContains(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"fixture"}],"max_tokens":200,"unpriced_tokens":1000}`)), "unpriced_tokens")
 }
 
 func TestPaidGeminiBatchBudgetIncludesEveryRequest(t *testing.T) {

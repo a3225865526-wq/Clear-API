@@ -1,7 +1,6 @@
 package service_test
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http/httptest"
@@ -13,12 +12,15 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	relayapi "github.com/QuantumNous/new-api/relay"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -185,7 +187,7 @@ func TestProtectedBillingDatabase(t *testing.T) {
 	assert.Equal(t, "needs_review", row.State)
 	// Public billing session uses the same atomic path, without wallet fallback.
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	info := &relaycommon.RelayInfo{UserId: u.Id, TokenId: token.Id, RequestId: "session", ProtectedTextBudget: true, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
+	info := &relaycommon.RelayInfo{UserId: u.Id, TokenId: token.Id, RequestId: "session", UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
 	session, apiErr := service.NewBillingSession(ctx, info, 400)
 	require.Nil(t, apiErr)
 	balance(9000)
@@ -194,6 +196,11 @@ func TestProtectedBillingDatabase(t *testing.T) {
 	session.Refund(ctx)
 	balance(9250)
 	assert.Equal(t, 150, session.ChargedQuota())
+	info.IsPlayground = true
+	_, apiErr = service.NewBillingSession(ctx, info, 1)
+	require.NotNil(t, apiErr)
+	assert.Equal(t, 400, apiErr.StatusCode)
+	info.IsPlayground = false
 	info.RequestId = "refund-session"
 	session, apiErr = service.NewBillingSession(ctx, info, 250)
 	require.Nil(t, apiErr)
@@ -219,7 +226,7 @@ func TestProtectedBillingDatabase(t *testing.T) {
 			key := model.Token{UserId: user.Id, Key: "synthetic-" + tc.name, RemainQuota: 10000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
 			require.NoError(t, db.Create(&key).Error)
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-			info := &relaycommon.RelayInfo{UserId: user.Id, TokenId: key.Id, RequestId: tc.name, ProtectedTextBudget: true, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
+			info := &relaycommon.RelayInfo{UserId: user.Id, TokenId: key.Id, RequestId: tc.name, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
 			session, apiErr := service.NewBillingSession(ctx, info, tc.reserved)
 			require.Nil(t, apiErr)
 			meter := dto.ParseCodexMetering([]byte(`{"input_tokens":100,"output_tokens":20,"total_tokens":120,"input_tokens_details":{"cached_tokens":30},"output_tokens_details":{"reasoning_tokens":7}}`))
@@ -299,139 +306,178 @@ func TestProtectedBillingDatabase(t *testing.T) {
 	common.BatchUpdateEnabled = false
 }
 
-func TestProtectedTextBudget(t *testing.T) {
+// One protocol matrix shares the real wallet lifecycle. Providers are represented
+// by deterministic protocol usage fixtures; no remote provider is contacted.
+func TestProtocolBillingCompatibility(t *testing.T) {
+	oldMain, oldLog := common.MainDatabaseType(), common.LogDatabaseType()
+	t.Cleanup(func() { common.SetDatabaseTypes(oldMain, oldLog) })
+	db := newHardeningDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Channel{}))
+	require.NoError(t, model.MigrateBillingCompletionReceipts(db))
 	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
-	oldCount := constant.CountToken
-	constant.CountToken = true
-	t.Cleanup(func() { constant.CountToken = oldCount })
-	saved := map[string]string{}
-	require.NoError(t, config.GlobalConfig.SaveToDB(func(k, v string) error { saved[k] = v; return nil }))
-	t.Cleanup(func() { require.NoError(t, config.GlobalConfig.LoadFromDB(saved)) })
-	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{"ModelRatio": `{"protected-test":1}`, "CompletionRatio": `{"protected-test":2}`, "group_ratio_setting.group_ratio": `{"default":1}`}))
-	oldRatios, oldCompletion := ratio_setting.ModelRatio2JSONString(), ratio_setting.CompletionRatio2JSONString()
+	t.Setenv("CLEARAPI_BILLING_OUTBOX", "true")
+	oldRedis, oldBatch, oldCount := common.RedisEnabled, common.BatchUpdateEnabled, constant.CountToken
+	common.RedisEnabled, common.BatchUpdateEnabled, constant.CountToken = false, false, true
 	t.Cleanup(func() {
-		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatios))
-		require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(oldCompletion))
+		common.RedisEnabled, common.BatchUpdateEnabled, constant.CountToken = oldRedis, oldBatch, oldCount
 	})
-	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"protected-test":1}`))
-	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"protected-test":2}`))
+	protectedEncoderInit.Do(service.InitTokenEncoders)
+	previous := config.GlobalConfig.ExportAllConfigs()
+	oldRatio, oldCompletion := ratio_setting.ModelRatio2JSONString(), ratio_setting.CompletionRatio2JSONString()
 	oldCache, oldCreate := ratio_setting.CacheRatio2JSONString(), ratio_setting.CreateCacheRatio2JSONString()
 	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(previous))
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatio))
+		require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(oldCompletion))
 		require.NoError(t, ratio_setting.UpdateCacheRatioByJSONString(oldCache))
 		require.NoError(t, ratio_setting.UpdateCreateCacheRatioByJSONString(oldCreate))
 	})
-	require.NoError(t, ratio_setting.UpdateCacheRatioByJSONString(`{"protected-test":0.25}`))
-	require.NoError(t, ratio_setting.UpdateCreateCacheRatioByJSONString(`{"protected-test":0.5}`))
-	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"protocol-fixture":1}`))
+	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"protocol-fixture":2}`))
+	require.NoError(t, ratio_setting.UpdateCacheRatioByJSONString(`{"protocol-fixture":0.25}`))
+	require.NoError(t, ratio_setting.UpdateCreateCacheRatioByJSONString(`{"protocol-fixture":0.5}`))
+	profile := coldProfile(100)
+	profile["model_context_max"], profile["model_output_max"] = 16384, 1024
+	setPolicy(t, operation_setting.ReserveModeOff, profilesJSON(t, map[string]map[string]any{"model::protocol-fixture": profile}))
+	openAIUsage := &dto.Usage{PromptTokens: 1000, CompletionTokens: 20, TotalTokens: 1020, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 200}}
 	for _, tc := range []struct {
-		body string
-		ok   bool
+		name, path, body string
+		format           types.RelayFormat
+		mode             int
+		request          dto.Request
+		usage            *dto.BillingUsage
 	}{
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100}`, true},
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":100}`, true},
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"provider":{"order":["openai"]}}`, true},
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"tools":[{"type":"function","function":{"name":"lookup","parameters":{"type":"object"}}}],"tool_choice":"auto","parallel_tool_calls":true}`, true},
-		{`{"model":"protected-test","messages":[{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"role":"tool","tool_call_id":"call_1","content":"done"}],"max_tokens":100}`, true},
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}]}`, false},
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"n":2}`, false},
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"max_completion_tokens":200}`, false},
-		{`{"model":"protected-test","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"synthetic"}}]}],"max_tokens":100}`, false},
-		{`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":100,"tools":[{"type":"web_search"}]}`, false},
-		{`{"model":"protected-test-search-preview","messages":[{"role":"user","content":"hello"}],"max_tokens":100}`, false},
-	} {
-		t.Run(fmt.Sprintf("case-%d", len(tc.body)), func(t *testing.T) {
-			var request dto.GeneralOpenAIRequest
-			require.NoError(t, json.Unmarshal([]byte(tc.body), &request))
-			info := &relaycommon.RelayInfo{Request: &request, RelayFormat: types.RelayFormatOpenAI, OriginModelName: "protected-test", UserGroup: "default", UsingGroup: "default"}
-			price, err := helper.ModelPriceHelper(ctx, info, 10, &types.TokenCountMeta{})
-			if !tc.ok {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, 210, price.QuotaToPreConsume)
-			assert.True(t, info.ProtectedTextBudget)
-			require.NoError(t, helper.ValidateProtectedTextBody(info, []byte(tc.body)))
-			require.Error(t, helper.ValidateProtectedTextBody(info, []byte(`{"model":"protected-test","messages":[{"role":"user","content":"hello"}],"max_tokens":200}`)))
-			info.ChannelMeta = &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI}
-			require.NoError(t, helper.ValidateProtectedTextChannel(info))
-			info.ParamOverride = map[string]any{"max_tokens": 200}
-			require.Error(t, helper.ValidateProtectedTextChannel(info))
-		})
-	}
-}
-
-func TestProtectedResponsesTextBudget(t *testing.T) {
-	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
-	oldCount := constant.CountToken
-	constant.CountToken = true
-	t.Cleanup(func() { constant.CountToken = oldCount })
-	oldRatio, oldCompletion := ratio_setting.ModelRatio2JSONString(), ratio_setting.CompletionRatio2JSONString()
-	t.Cleanup(func() {
-		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(oldRatio))
-		require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(oldCompletion))
-	})
-	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"protected-responses-test":1}`))
-	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"protected-responses-test":2}`))
-	for _, tc := range []struct {
-		name, input, extra string
-		limit              uint
-		ok                 bool
-	}{
-		{name: "text", input: `"hello"`, limit: 100, ok: true},
-		{name: "instructions", input: `"hello"`, extra: `,"instructions":"be concise"`, limit: 100, ok: true},
-		{name: "text messages", input: `[{"role":"user","content":[{"type":"input_text","text":"hello"}]}]`, limit: 100, ok: true},
-		{name: "string messages", input: `[{"type":"message","role":"user","content":"hello"}]`, limit: 100, ok: true},
-		{name: "null text type", input: `[{"role":"user","content":[{"type":"input_text","text":"hello"},{"type":null,"text":"unknown"}]}]`, limit: 100},
-		{name: "metered built-in tool", input: `"hello"`, extra: `,"tools":[{"type":"web_search"}]`, limit: 100},
-		{name: "function tools", input: `"hello"`, extra: `,"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"tool_choice":"auto","parallel_tool_calls":true`, limit: 100, ok: true},
-		{name: "provider routing", input: `"hello"`, extra: `,"provider":{"order":["openai"]}`, limit: 100, ok: true},
-		{name: "message item reference", input: `[{"type":"message","id":"msg_1","role":"user","content":"hello"}]`, limit: 100, ok: true},
-		{name: "tool call", input: `[{"type":"function_call","call_id":"call","name":"lookup","arguments":"{}"}]`, limit: 100},
-		{name: "image", input: `[{"role":"user","content":[{"type":"input_image","image_url":"synthetic"}]}]`, limit: 100},
-		{name: "file", input: `[{"role":"user","content":[{"type":"input_file","file_id":"synthetic"}]}]`, limit: 100},
-		{name: "item reference", input: `[{"type":"item_reference","id":"synthetic"}]`, limit: 100},
-		{name: "message reference", input: `[{"role":"user","content":"hello","id":"synthetic"}]`, limit: 100, ok: true},
-		{name: "previous response", input: `"hello"`, extra: `,"previous_response_id":"synthetic"`, limit: 100},
-		{name: "conversation", input: `"hello"`, extra: `,"conversation":"synthetic"`, limit: 100},
-		{name: "prompt reference", input: `"hello"`, extra: `,"prompt":{"id":"synthetic"}`, limit: 100},
-		{name: "filtered optional field", input: `"hello"`, extra: `,"thinking_budget":1`, limit: 100},
-		{name: "instructions reference", input: `"hello"`, extra: `,"instructions":{"id":"synthetic"}`, limit: 100},
-		{name: "null instructions", input: `"hello"`, extra: `,"instructions":null`, limit: 100},
-		{name: "missing budget", input: `"hello"`},
-		{name: "over budget", input: `"hello"`, limit: 1 << 31},
-		{name: "wrapped budget", input: `"hello"`, limit: ^uint(0)},
-		{name: "empty input", input: `[]`, limit: 100},
+		{"chat-json", "/v1/chat/completions", `{"model":"protocol-fixture","messages":[{"role":"assistant","content":null,"tool_calls":[{"id":"a","type":"function","function":{"name":"lookup","arguments":"{}"}}]},{"role":"tool","tool_call_id":"a","content":"result"}],"max_tokens":1024,"max_completion_tokens":512,"n":2,"response_format":{"type":"json_object"},"metadata":{"case":"fixture"}}`, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
+		{"chat-sse", "/v1/chat/completions", `{"model":"protocol-fixture","stream":true,"messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1024,"reasoning_effort":"high"}`, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
+		{"completions", "/v1/completions", `{"model":"protocol-fixture","prompt":"hello","max_tokens":1024}`, types.RelayFormatOpenAI, relayconstant.RelayModeCompletions, &dto.GeneralOpenAIRequest{}, dto.NewOpenAIChatBillingUsage(openAIUsage)},
+		{"responses-json", "/v1/responses", `{"model":"protocol-fixture","input":[{"type":"function_call","call_id":"a","name":"lookup","arguments":"{\"key\":\"argument-fixture\"}"},{"type":"function_call_output","call_id":"a","output":"result-fixture"},{"role":"assistant","content":[{"type":"output_text","text":"assistant-fixture","annotations":[]}]}],"max_output_tokens":1024,"reasoning":{"effort":"high"},"text":{"format":{"type":"json_object"}},"store":false,"temperature":0,"top_p":1,"metadata":{"tag":"fixture"}}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
+		{"responses-sse", "/v1/responses", `{"model":"protocol-fixture","stream":true,"input":"hello encrypted_content item_reference","max_output_tokens":1024,"tools":[{"type":"function","name":"lookup","parameters":{"type":"object"}}],"include":["reasoning.encrypted_content"]}`, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, &dto.OpenAIResponsesRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
+		{"claude-json", "/v1/messages", `{"model":"protocol-fixture","system":"system-fixture","max_tokens":1024,"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"a","name":"lookup","input":{"key":"argument-fixture"}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"a","content":"result-fixture"}]}],"metadata":{"user_id":"fixture"},"thinking":{"type":"enabled","budget_tokens":100}}`, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, &dto.ClaudeRequest{}, dto.NewClaudeMessagesBillingUsage(&dto.ClaudeUsage{InputTokens: 800, CacheReadInputTokens: 200, OutputTokens: 20})},
+		{"claude-sse", "/v1/messages", `{"model":"protocol-fixture","stream":true,"max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}`, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions, &dto.ClaudeRequest{}, dto.NewClaudeMessagesBillingUsage(&dto.ClaudeUsage{InputTokens: 800, CacheReadInputTokens: 200, OutputTokens: 20})},
+		{"gemini-json", "/v1beta/models/protocol-fixture:generateContent", `{"systemInstruction":{"parts":[{"text":"system-fixture"}]},"contents":[{"role":"model","parts":[{"functionCall":{"name":"lookup","args":{"key":"argument-fixture"}}}]},{"role":"user","parts":[{"functionResponse":{"name":"lookup","response":{"result":"result-fixture"}}}]}],"generationConfig":{"maxOutputTokens":1024},"tools":[{"functionDeclarations":[{"name":"lookup","parameters":{"type":"OBJECT"}}]}]}`, types.RelayFormatGemini, relayconstant.RelayModeGemini, &dto.GeminiChatRequest{}, dto.NewGeminiChatBillingUsage(&dto.GeminiUsageMetadata{PromptTokenCount: 1000, CachedContentTokenCount: 200, CandidatesTokenCount: 20, TotalTokenCount: 1020})},
+		{"gemini-sse", "/v1beta/models/protocol-fixture:streamGenerateContent?alt=sse", `{"contents":[{"role":"user","parts":[{"text":"hello"}]}],"generationConfig":{"maxOutputTokens":1024}}`, types.RelayFormatGemini, relayconstant.RelayModeGemini, &dto.GeminiChatRequest{}, dto.NewGeminiChatBillingUsage(&dto.GeminiUsageMetadata{PromptTokenCount: 1000, CachedContentTokenCount: 200, CandidatesTokenCount: 20, TotalTokenCount: 1020})},
+		{"embedding", "/v1/embeddings", `{"model":"protocol-fixture","input":"hello"}`, types.RelayFormatEmbedding, relayconstant.RelayModeEmbeddings, &dto.EmbeddingRequest{}, nil},
+		{"rerank", "/v1/rerank", `{"model":"protocol-fixture","query":"hello","documents":["document"]}`, types.RelayFormatRerank, relayconstant.RelayModeRerank, &dto.RerankRequest{}, nil},
+		{"moderation", "/v1/moderations", `{"model":"protocol-fixture","input":"hello"}`, types.RelayFormatOpenAI, relayconstant.RelayModeModerations, &dto.GeneralOpenAIRequest{}, nil},
+		{"audio-speech", "/v1/audio/speech", `{"model":"protocol-fixture","input":"hello","instructions":"speak calmly","voice":"fixture","response_format":"pcm"}`, types.RelayFormatOpenAIAudio, relayconstant.RelayModeAudioSpeech, &dto.AudioRequest{}, nil},
+		{"compact-json", "/v1/responses/compact", `{"model":"protocol-fixture","input":[{"role":"user","content":"hello"}],"instructions":"summarize"}`, types.RelayFormatOpenAIResponsesCompaction, relayconstant.RelayModeResponsesCompact, &dto.OpenAIResponsesCompactionRequest{}, dto.NewOpenAIResponsesBillingUsage(openAIUsage)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			body := []byte(fmt.Sprintf(`{"model":"protected-responses-test","stream":true,"input":%s,"max_output_tokens":%d%s}`, tc.input, tc.limit, tc.extra))
-			var request dto.OpenAIResponsesRequest
-			require.NoError(t, common.Unmarshal(body, &request))
-			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-			info := &relaycommon.RelayInfo{Request: &request, RelayFormat: types.RelayFormatOpenAIResponses, OriginModelName: request.Model, UserGroup: "default", UsingGroup: "default"}
-			price, err := helper.ModelPriceHelper(ctx, info, 10, request.GetTokenCountMeta())
-			if !tc.ok {
-				require.Error(t, err)
-				assert.False(t, info.ProtectedTextBudget)
-				return
+			require.NoError(t, common.Unmarshal([]byte(tc.body), tc.request))
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", tc.path, nil)
+			common.SetContextKey(c, constant.ContextKeyOriginalModel, "protocol-fixture")
+			u := createHardeningUser(t, db, fmt.Sprintf("pc%x", time.Now().UnixNano()), 100000)
+			info := &relaycommon.RelayInfo{Request: tc.request, RequestId: fmt.Sprintf("protocol-%d", h2FlowCounter.Add(1)), UserId: u.UserID, TokenId: u.TokenID, OriginModelName: "protocol-fixture", UserGroup: "default", UsingGroup: "default", RelayMode: tc.mode, RelayFormat: tc.format, RequestURLPath: c.Request.URL.Path, ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI, UpstreamModelName: "protocol-fixture"}}
+			info.UserSetting.BillingPreference = "wallet_only"
+			require.NoError(t, helper.PrepareBillingRequest(c, info, true))
+			meta := tc.request.GetTokenCountMeta()
+			if tc.name == "responses-json" || tc.name == "gemini-json" || tc.name == "claude-json" {
+				assert.Contains(t, meta.CombineText, "argument-fixture")
+				assert.Contains(t, meta.CombineText, "result-fixture")
 			}
+			require.Nil(t, relayapi.PrepareRequestBilling(c, info))
+			body, err := common.Marshal(tc.request)
 			require.NoError(t, err)
-			assert.GreaterOrEqual(t, price.QuotaToPreConsume, 210)
-			assert.True(t, info.ProtectedTextBudget)
-			require.NoError(t, helper.ValidateProtectedTextBody(info, body))
-			for _, outbound := range []string{
-				`{"model":"protected-responses-test","stream":true,"input":"changed","max_output_tokens":100}`,
-				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":101}`,
-				`{"model":"protected-responses-test","stream":true,"input":"hello","instructions":"changed","max_output_tokens":100}`,
-				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":100,"unknown_budget":1}`,
-				`{"model":"protected-responses-test","stream":true,"input":"hello","max_output_tokens":100,"tools":[{"type":"function","name":"changed"}],"tool_choice":"auto","parallel_tool_calls":true}`,
-			} {
-				require.Error(t, helper.ValidateProtectedTextBody(info, []byte(outbound)))
+			require.NoError(t, helper.PrepareOutboundTextBudget(c, info, body))
+			reserved := info.Billing.GetPreConsumedQuota()
+			expected := 890
+			usage := &dto.Usage{BillingUsage: tc.usage}
+			if tc.usage == nil {
+				expected = info.GetEstimatePromptTokens()
+				usage = &dto.Usage{PromptTokens: expected, TotalTokens: expected}
 			}
-			stream := false
-			request.Stream = &stream
-			_, err = helper.ModelPriceHelper(ctx, info, 10, request.GetTokenCountMeta())
-			require.Error(t, err, "non-streaming Responses admission remains closed")
+			if tc.name == "audio-speech" {
+				expected += 20
+				usage.CompletionTokens, usage.TotalTokens = 20, expected
+				usage.PromptTokensDetails.TextTokens = usage.PromptTokens
+				usage.CompletionTokenDetails.AudioTokens = 20
+				service.PostAudioConsumeQuota(c, info, usage, "")
+			} else {
+				service.PostTextConsumeQuota(c, info, usage, nil)
+			}
+			require.GreaterOrEqual(t, reserved, expected)
+			assert.Equal(t, expected, reservationOf(t, info.RequestId).Applied)
+			require.NoError(t, info.Billing.Settle(expected))
+			info.Billing.Refund(c)
+			assert.Equal(t, walletState{100000 - expected, 100000 - expected}, walletOf(t, u))
+			require.NoError(t, model.RecoverBillingCompletionLogs(100))
+			require.NoError(t, model.RecoverBillingCompletionLogs(100))
+			var logs int64
+			require.NoError(t, db.Model(&model.Log{}).Where("request_id = ?", info.RequestId).Count(&logs).Error)
+			assert.EqualValues(t, 1, logs)
+			// A conversion/override can grow the budget, but must reserve the
+			// increase before dispatch. An unaffordable increase never sends.
+			info.RequestId += "-raise"
+			info.Billing = nil
+			require.Nil(t, service.PreConsumeBilling(c, 10, info))
+			require.NoError(t, helper.PrepareOutboundTextBudget(c, info, body))
+			assert.GreaterOrEqual(t, info.Billing.GetPreConsumedQuota(), 10)
+			require.Error(t, info.Billing.Reserve(200000))
+			assert.False(t, c.GetBool("upstream_attempted"))
+			info.Billing.Refund(c)
+			assert.Equal(t, walletState{100000 - expected, 100000 - expected}, walletOf(t, u))
+			// The same public failure path releases a pre-dispatch reservation.
+			info.RequestId += "-fail"
+			info.Billing = nil
+			require.Nil(t, service.PreConsumeBilling(c, reserved, info))
+			apiErr := types.NewError(fmt.Errorf("fixture failed before dispatch"), types.ErrorCodeInvalidRequest)
+			relayapi.RefundFailedRequestBilling(c, info, apiErr)
+			relayapi.RefundFailedRequestBilling(c, info, apiErr)
+			assert.Equal(t, walletState{100000 - expected, 100000 - expected}, walletOf(t, u))
 		})
 	}
+	// Legacy ratio retries do not yet create a session when the first group is
+	// free. Preserve that real accounting boundary rather than admitting a
+	// later paid attempt with no reservation.
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{"group_ratio_setting.group_ratio": `{"default":0}`}))
+	operation_setting.GetQuotaSetting().EnableFreeModelPreConsume = false
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	limit := uint(100)
+	info := &relaycommon.RelayInfo{Request: &dto.GeneralOpenAIRequest{Model: "protocol-fixture", Messages: []dto.Message{{Role: "user", Content: "hello"}}, MaxTokens: &limit}, OriginModelName: "protocol-fixture", TokenGroup: "auto", UserGroup: "default", UsingGroup: "default", RelayMode: relayconstant.RelayModeChatCompletions, RelayFormat: types.RelayFormatOpenAI}
+	apiErr := relayapi.PrepareRequestBilling(c, info)
+	require.NotNil(t, apiErr)
+	assert.Contains(t, apiErr.Error(), "free-to-paid")
+	assert.Nil(t, info.Billing)
+}
+
+func TestProtocolBillingUnmeasuredInputs(t *testing.T) {
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	setPolicy(t, operation_setting.ReserveModeOff, "{}")
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+	for _, tc := range []struct {
+		name, body, reason string
+		request            dto.Request
+	}{
+		{"previous response", `{"input":"hello","previous_response_id":"resp_1"}`, "previous_response_id", &dto.OpenAIResponsesRequest{}},
+		{"encrypted history", `{"input":[{"type":"reasoning","encrypted_content":"opaque"}]}`, "encrypted_content", &dto.OpenAIResponsesRequest{}},
+		{"item reference", `{"input":[{"type":"item_reference","id":"msg_1"}]}`, "item_reference", &dto.OpenAIResponsesRequest{}},
+		{"cached context", `{"cachedContent":"cachedContents/fixture"}`, "cachedContent", &dto.GeminiChatRequest{}},
+		{"MCP", `{"mcp_servers":[{"type":"url","url":"https://fixture.invalid"}]}`, "MCP", &dto.ClaudeRequest{}},
+		{"compact budget", `{"input":"hello"}`, "model_output_max", &dto.OpenAIResponsesCompactionRequest{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, common.Unmarshal([]byte(tc.body), tc.request))
+			info := &relaycommon.RelayInfo{Request: tc.request, OriginModelName: "protocol-fixture"}
+			require.ErrorContains(t, helper.PrepareBillingRequest(c, info, true), tc.reason)
+			assert.Nil(t, info.Billing)
+			assert.False(t, c.GetBool("upstream_attempted"))
+		})
+	}
+	profile := coldProfile(100)
+	profile["model_context_max"], profile["model_output_max"] = 16384, 1024
+	setPolicy(t, operation_setting.ReserveModeEnforce, profilesJSON(t, map[string]map[string]any{"model::protocol-fixture": profile}))
+	r := &dto.OpenAIResponsesRequest{Model: "protocol-fixture", Input: []byte(`"hello"`), PreviousResponseID: "resp_1"}
+	info := &relaycommon.RelayInfo{Request: r, OriginModelName: r.Model}
+	require.NoError(t, helper.PrepareBillingRequest(c, info, true))
+	require.NotNil(t, r.MaxOutputTokens)
+	assert.EqualValues(t, 1024, *r.MaxOutputTokens)
+	// Outbound validation cannot silently assume a cap that is absent on wire.
+	r.MaxOutputTokens = nil
+	require.NoError(t, helper.PrepareBillingRequest(c, info, false))
+	assert.Nil(t, r.MaxOutputTokens)
+	r.ServiceTier = "priority"
+	require.ErrorContains(t, helper.PrepareBillingRequest(c, info, false), "service_tier")
 }

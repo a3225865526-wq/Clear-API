@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -18,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
+	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	hostreasoning "github.com/QuantumNous/new-api/setting/reasoning"
@@ -74,14 +76,6 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) hostty
 }
 
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (hosttypes.PriceData, error) {
-	protectedOutput := 0
-	if billingProtectionEnabled() {
-		var err error
-		protectedOutput, err = protectedTextLimit(info)
-		if err != nil {
-			return hosttypes.PriceData{}, err
-		}
-	}
 	if info != nil {
 		if matched := resolveBillingModelName(info.GetOriginModelName()); matched != "" && matched != info.OriginModelName {
 			info.BillingModelName = matched
@@ -91,38 +85,13 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 	modelPrice, usePrice := ratio_setting.GetModelPrice(billingModelName, false)
 
 	groupRatioInfo := HandleGroupRatio(c, info)
+	if math.IsNaN(groupRatioInfo.GroupRatio) || math.IsInf(groupRatioInfo.GroupRatio, 0) || groupRatioInfo.GroupRatio < 0 {
+		return hosttypes.PriceData{}, fmt.Errorf("invalid billing group ratio")
+	}
 
 	// Check if this model uses tiered_expr billing
 	if billing_setting.GetBillingMode(billingModelName) == billing_setting.BillingModeTieredExpr {
-		price, err := modelPriceHelperTiered(c, info, billingModelName, promptTokens, meta, groupRatioInfo)
-		if err != nil || !billingProtectionEnabled() {
-			return price, err
-		}
-		// Read middleware's first-channel metadata on a copy. Populating the
-		// real RelayInfo here would make the controller treat it as a retry.
-		admission := *info
-		if admission.ChannelMeta == nil {
-			admission.InitChannelMeta(c)
-		}
-		if err := service.ValidateProtectedTieredSnapshot(&admission); err != nil {
-			return hosttypes.PriceData{}, err
-		}
-		estimate, err := service.EstimateDispatchReservation(&admission, promptTokens, float64(protectedOutput), 1, 0)
-		if err != nil {
-			return hosttypes.PriceData{}, err
-		}
-		price.QuotaToPreConsume = max(price.QuotaToPreConsume, estimate.RequiredQuota)
-		if price.QuotaToPreConsume > estimate.CapQuota {
-			return hosttypes.PriceData{}, fmt.Errorf("protected expression reservation exceeds authorization cap")
-		}
-		info.PriceData = price
-		info.ProtectedTextBudget = true
-		info.ProtectedTieredBudget = true
-		admission.ProtectedTextBudget, admission.ProtectedTieredBudget = true, true
-		if err := ValidateProtectedTextChannel(&admission); err != nil {
-			return hosttypes.PriceData{}, err
-		}
-		return price, nil
+		return modelPriceHelperTiered(c, info, billingModelName, promptTokens, meta, groupRatioInfo)
 	}
 
 	var preConsumedQuota int
@@ -163,6 +132,11 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		imageRatio, _ = ratio_setting.GetImageRatio(billingModelName)
 		audioRatio = ratio_setting.GetAudioRatio(billingModelName)
 		audioCompletionRatio = ratio_setting.GetAudioCompletionRatio(billingModelName)
+		for _, ratio := range []float64{modelRatio, completionRatio, cacheRatio, cacheCreationRatio5m, cacheCreationRatio1h, imageRatio, audioRatio, audioCompletionRatio} {
+			if math.IsNaN(ratio) || math.IsInf(ratio, 0) || ratio < 0 {
+				return hosttypes.PriceData{}, fmt.Errorf("invalid billing price ratio")
+			}
+		}
 		ratio := modelRatio * groupRatioInfo.GroupRatio
 		output, err := requestOutputBudget(info, meta)
 		if err != nil && ratio != 0 {
@@ -253,11 +227,6 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		priceData.QuotaToPreConsume = quota
 	}
 
-	if billingProtectionEnabled() {
-		if err := protectTextReservation(info, &priceData, promptTokens, protectedOutput); err != nil {
-			return hosttypes.PriceData{}, err
-		}
-	}
 	toolQuota, err := requestToolBudget(info)
 	if err != nil {
 		return hosttypes.PriceData{}, err
@@ -527,6 +496,16 @@ func requestOutputBudget(info *relaycommon.RelayInfo, meta *types.TokenCountMeta
 		}
 	case *dto.ClaudeRequest, *dto.OpenAIResponsesRequest:
 		generation = true
+	case *dto.OpenAIResponsesCompactionRequest:
+		generation = service.BillingProtectionEnabled() || service.DurableWalletBillingEnabled()
+		copyMeta := *meta
+		copyMeta.MaxTokens = info.BillingOutputLimit
+		meta = &copyMeta
+	case *dto.AudioRequest:
+		generation = info.RelayMode == relayconstant.RelayModeAudioSpeech && (service.BillingProtectionEnabled() || service.DurableWalletBillingEnabled())
+		copyMeta := *meta
+		copyMeta.MaxTokens = info.BillingOutputLimit
+		meta = &copyMeta
 	case *dto.GeminiChatRequest:
 		generation = !strings.Contains(info.RequestURLPath, ":embedContent") && !strings.Contains(info.RequestURLPath, ":batchEmbedContents")
 		if !generation {
@@ -680,7 +659,7 @@ func RequiresOutboundTextBudget(info *relaycommon.RelayInfo) bool {
 	if info != nil && (strings.Contains(info.RequestURLPath, ":embedContent") || strings.Contains(info.RequestURLPath, ":batchEmbedContents")) {
 		return false
 	}
-	return info != nil && info.Request != nil && !info.IsChannelTest && !info.PriceData.FreeModel && (info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions || info.RelayMode == relayconstant.RelayModeResponses || info.RelayFormat == types.RelayFormatClaude || info.RelayFormat == types.RelayFormatGemini)
+	return info != nil && info.Request != nil && !info.IsChannelTest && !info.PriceData.FreeModel && (info.RelayMode == relayconstant.RelayModeChatCompletions || info.RelayMode == relayconstant.RelayModeCompletions || info.RelayMode == relayconstant.RelayModeResponses || info.RelayMode == relayconstant.RelayModeResponsesCompact || info.RelayMode == relayconstant.RelayModeAudioSpeech || info.RelayFormat == types.RelayFormatClaude || info.RelayFormat == types.RelayFormatGemini)
 }
 
 // PrepareOutboundTextBudget repeats reservation after conversion, injected
@@ -702,11 +681,33 @@ func PrepareOutboundTextBudget(c *gin.Context, info *relaycommon.RelayInfo, body
 		copyInfo.Request = &dto.GeminiChatRequest{}
 	case types.RelayFormatOpenAIResponses:
 		copyInfo.Request = &dto.OpenAIResponsesRequest{}
+	case types.RelayFormatOpenAIResponsesCompaction:
+		copyInfo.Request = &dto.OpenAIResponsesCompactionRequest{}
+	case types.RelayFormatOpenAIAudio:
+		copyInfo.Request = &dto.AudioRequest{}
 	default:
 		return fmt.Errorf("cannot verify outbound generation budget for this provider")
 	}
 	if err := common.Unmarshal(body, copyInfo.Request); err != nil {
 		return fmt.Errorf("cannot verify outbound request budget")
+	}
+	if (service.BillingProtectionEnabled() || service.DurableWalletBillingEnabled()) && (info.ChannelSetting.PassThroughBodyEnabled || model_setting.GetGlobalSettings().PassThroughRequestEnabled) {
+		var fields map[string]common.RawMessage
+		if err := common.Unmarshal(body, &fields); err != nil {
+			return err
+		}
+		// Passthrough skips DTO serialization. Derive the supported fields from
+		// the protocol DTO so an unparsed cost multiplier cannot reach upstream.
+		for _, field := range reflect.VisibleFields(reflect.TypeOf(copyInfo.Request).Elem()) {
+			name, _, _ := strings.Cut(field.Tag.Get("json"), ",")
+			delete(fields, name)
+		}
+		for field := range fields {
+			return fmt.Errorf("billing cannot meter unrecognized passthrough field %q", field)
+		}
+	}
+	if err := PrepareBillingRequest(c, &copyInfo, false); err != nil {
+		return err
 	}
 	meta := copyInfo.Request.GetTokenCountMeta()
 	output, err := requestOutputBudget(&copyInfo, meta)

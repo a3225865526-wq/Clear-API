@@ -1,3 +1,59 @@
+## 2026-10-25 — 全协议计费兼容修复：独立候选，未部署生产
+
+- 基线 `377551526aaea9f64ff085ada3714c6ff8a7abee`；独立工作区 `D:/Codex/worktrees/clearapi-protocol-billing-20261025/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-protocol-billing-compat-20261025`。修复 SHA 以本条所在提交为准。原工作区 HEAD、未提交代码、发布脚本和事故证据未修改。
+- **PG03 商业上线继续暂缓；D 生图不部署。** 本轮没有生产连接、配置切换、部署/重启或额外收费请求。此前 Responses 400 的真实字段仍无历史证据，不能宣称生产事故已验收解决。
+
+### 实际协议入口与验收矩阵
+
+状态“通过”仅指下列已执行的自动化/隔离范围，不代表真实厂商验证，也不代表该协议的全部扩展能力。
+
+| 协议/入口 | 真实代码入口 | 请求兼容、预算与 usage | 本轮验证/边界 |
+| --- | --- | --- | --- |
+| Chat Completions JSON/SSE — `/v1/chat/completions` | `router/relay-router.go` → `controller.Relay` → `relay/compatible_handler.go` | 原生 Chat DTO；函数工具/工具返回、可选字段、多个输出；公共输入/输出预算及文本/缓存结算 | 隔离账务 JSON/SSE 两场景通过；OpenAI JSON/SSE/转换用量测试通过 |
+| Legacy Completions — `/v1/completions` | 同上，`RelayModeCompletions` | 保留 prompt 格式；公共输出预算及文本结算 | 隔离账务通过；不再要求 chat messages |
+| Responses JSON/SSE — `POST /v1/responses` | `router/task-plugin-protocol-router.go` 内置回退 → `relay/responses_handler.go`、`responses_request.go` | 原生 Responses DTO；reasoning/text/store/采样、函数调用/返回、assistant output_text；原生/转换用量归一化与缓存结算 | 隔离账务 JSON/SSE、适配器终态/缺失/部分 usage 测试通过；真实失败请求字段仍未知 |
+| Claude Messages JSON/SSE — `/v1/messages` | `router/relay-router.go` → `relay/claude_handler.go` → `relay/channel/claude/` | 原生 Claude DTO；system、thinking、tool_use/tool_result；Anthropic 缓存读取/创建独立输入语义保留 | 隔离账务 JSON/SSE、原生事件/中断/工具与缓存语义测试通过 |
+| Gemini JSON/SSE — `/v1beta/models/*path`、`/v1/models/*path` | `router/relay-router.go` → `relay/gemini_handler.go` → `relay/channel/gemini/` | generateContent/streamGenerateContent/alt=sse；系统指令、工具、调用/返回/签名进入计量；Gemini 缓存/思考用量保留 | 隔离账务 JSON/SSE、流式及转换用量测试通过；batch 公共预算回归通过 |
+| Responses WebSocket — `GET /v1/responses` | `controller/responses_websocket.go` → `relay/responses_websocket.go` | response.create/cancel、flat/wrapped、连接复用、stream_id；每次发送均复用公共预算复核；终态交给 ResponsesUsageAccumulator 与同一 BillingSession | 套接字/帧/流标识、预算补预扣及拒绝、终态用量组件测试通过；未运行完整收费 WebSocket E2E |
+| duplex | 同一 WebSocket 的读写并行与 stream_id 归属机制 | 未找到单独 duplex 模式的路由、开关或另一套计量实现；当前请求 worker 串行处理请求 | 不将 stream_id 测试冒充独立 duplex 或多请求并发验收；该独立能力未证实 |
+| Compact JSON — `/v1/responses/compact` | `relay/responses_handler.go` → `relay/channel/openai/relay_responses_compact.go` | 保留 Compact 专用 DTO/响应；协议无输出上限字段，使用已批准 model_output_max 作为服务端模型预算；input/output/cache usage 送公共结算 | 隔离账务及真实解析函数的合成 JSON/cache fixture 通过；缺少模型上限明确拒绝 |
+| Realtime WebSocket — `/v1/realtime` | `controller.Relay` → `relay/websocket.go` → Realtime adaptor | 存在代理与 RealtimeUsage 结算代码；缺少可靠的每轮预留接口 | 原生产就要求 `CLEARAPI_ENABLE_REALTIME=false`；durable billing 下明确拒绝，未标通过 |
+| Embeddings — `/v1/embeddings`、Gemini embeddings 路径 | `relay/embedding_handler.go`、`relay/gemini_handler.go` | 原生输入/embedding DTO；输入计量、公共预扣与文本结算；不套用生成输出上限 | OpenAI embeddings 隔离账务通过；Gemini embedding 预算豁免已有回归通过 |
+| Rerank — `/v1/rerank` | `relay/rerank_handler.go` | query/documents 计量，保留原生响应及公共结算 | 隔离账务通过；没有新增生成 token 限制 |
+| Moderations — `/v1/moderations` | `relay/compatible_handler.go` 的 moderation 分支 | 保留 input 格式；输入计量与公共结算 | 隔离账务通过；不再被 messages 白名单阻断 |
+| Audio speech、transcriptions、translations | `relay/audio_handler.go` → `relay/channel/openai/audio.go` 等适配器 | 音频输入/输出细节仍走 PostAudioConsumeQuota；speech 输出预算来自显式 max_new_tokens 或已批准模型上限；multipart 转写沿用音频时长输入计量 | speech 隔离账务、PCM 时长估算、SSE 终态和 STT JSON usage 解析通过；未将时长估算记为真实上游 usage；未新增所有供应商音频/异常流端到端验收 |
+| Images — `/v1/images/generations`、`/v1/images/edits`、legacy `/v1/edits` | host protocol router → task plugin，未认领模型回退 `relay/image_handler.go` | 沿用数量校验、图像预算、实际 payload 数量/usage 与任务结算；不使用文本字段白名单 | 现有 OpenAI JSON/SSE、数量/错误/分片及 multipart 转换测试通过；不是 D 生图上线验收 |
+| Tasks/Video/Midjourney、插件 native routes | `router/task-router.go`、`video-router.go`、`task-plugin-protocol-router.go`、`registerMjRouterGroup`、`plugin-router.go` | 沿用宿主任务预扣/持久化屏障/完成结算；Responses 可被插件按声明认领 sync/stream/background，不能等同内置 Go Responses 的所有模式 | 宿主协议路由回归通过；未修改 JS/runtime/插件合约，未重复各厂商任务完整 E2E，未声明全部插件厂商通过 |
+
+Playground `/pg/chat/completions` 路由存在，走 `controller.Playground` 的会话身份；其 Token-less 持久化账务未实现，保护模式返回明确 400，不记为通过。
+
+明确未实现：Claude `/messages/count_tokens` 路由注释禁用；Gemini `:countTokens` 返回未注册路由；文件 CRUD、fine-tunes、images/variations 等注册到 RelayNotImplemented。模型列举路由存在，但不是生成/收费协议。
+
+### 计费核心与门禁取舍
+
+- 复用现有 `dto.Request/TokenCountMeta`、`Usage/BillingUsage`、`TokenObservation` 和 request ID/预留记录。协议 DTO 保持独立；没有新建平行计费系统。
+- 删除 `protectedTextLimit`、`protectedResponsesTextLimit`、`validateProtectedResponsesText` 及重复出站正文白名单，移除纯文本、SSE-only、direct OpenAI-only、固定 Luna/渠道/分组/精确表达式门禁。历史 Luna 价表只留测试 fixture，实际价格配置不变。
+- 保留价格配置、非负有限倍率、安全金额转换、用户/Token 状态与原子余额检查、数量/输出上限、发送前最终预算、授权 profile/cap、真实 usage/cache/tool 结算、不确定用量保留、幂等完成/退款、outbox 与恢复。模型/数据库迁移/SQL、认证与发布门禁未更改。
+- Protected wallet 现在复用已有 `RaiseBillingReservationWithAuth`，在转换/重试增价时原子补足预留；余额不足或授权 cap 不足时发送前拒绝。不存在“把预算截小后继续发送”。
+- Responses 工具参数/返回、assistant output_text/推理摘要进入输入计量；Gemini system/tools/functionCall/functionResponse/签名补入输入计量；Claude legacy max_tokens_to_sample 补入输出元数据；音频 instructions 计入输入。
+- 正常 DTO 已支持的可选字段沿用序列化与隐私过滤，不全局透传未知 JSON。启用原始 passthrough 时，从协议 DTO 自动推导可识别顶层字段，未解析字段明确指出名字并拒绝，避免额外费用字段绕过预算。
+- 输出上限未提供时，只在已有批准模型上限的情况下写入真实出站 DTO；不虚构全局默认。Compact/音频无标准限额字段的预算依赖已批准模型能力上限；缺少来源明确报错。
+
+仍有限制：引用/加密历史、Gemini cachedContent/fileData 等需要 enforce 状态的已批准隐藏输入预算；未实现的 Responses item 类型明确拒绝。priority/flex 等非默认 service_tier、Claude 服务端 MCP、无法预算的独立收费工具尚不宣称兼容。包含 img/ai 等隐藏模态的表达式 profile 沿用现有域限制。保护模式的订阅与 Playground 缺少持久化实现，返回具体 400；Realtime 保持禁用。原有 legacy ratio 的初始免费 auto 分组不能保证随后付费重试创建预留，因此保留这一个明确限制；已存在 expression snapshot 的分组切换仍复用原有计费路径和回归。
+
+### 实际验证与证据
+
+- Go 1.25.1 Linux 隔离容器；本地协议测试网络为 none。数据库使用本轮独占 internal network、无宿主端口、新建 tmpfs 数据库，未使用已有业务数据库。
+- 核心定向回归：112 个顶层测试通过（`verification-core.jsonl`）；覆盖正常/重试/中断/未知用量、缓存、WebSocket 及公共计费。后续会话错误说明改动由最终三库用例覆盖。
+- 最终协议适配器：72 个顶层测试通过（`release-adapters.jsonl`）；含 Compact、PCM/STT/SSE 音频用量 fixture。`cd relaykit && GOWORK=off go build ./...` 通过；DTO/转换 106 个顶层测试通过（`verification-relaykit.jsonl`）。
+- 共享会话准入及补预留行为改变，因此运行了定向真实三库回归：SQLite **3.50.4**、MySQL **8.4.11**、PostgreSQL **17.6**，每库 4 个顶层测试通过，含 **14 个协议场景**的预扣/缓存结算/outbox 去重/退款/余额与 Token 一致性、补预扣及余额不足拒绝。没有重跑历史完整数据库/E2E/迁移矩阵。
+- 实际命令、测试结果和日志 SHA256 见 `evidence/protocol-billing-20261025/summary.json`；三库最终日志为 `release-sqlite.jsonl`、`release-mysql.jsonl`、`release-postgres.jsonl`。初轮 fixture 缺少计费状态/ChannelMeta/StreamingTimeout 和旧字段引用导致的失败日志保留，修正后定向回归通过，未用删除安全断言绕过。
+- `gofmt` 与 `git diff --check` 已执行。没有前端变更；未执行缺少 `web/dist` 的完整根应用构建，未运行正式 CI/RC、生产备份/部署或真实厂商调用。
+
+**部署条件：尚未满足正式部署条件。** 这是可审查的独立修复候选；仍须按实际发布流程完成正式构建/CI/RC和发布前配置核对，并维持上述不支持能力边界。本轮自动化通过不代表旧客户真实请求已恢复，不请求额外收费调用，也不执行生产授权步骤。完成后停止，等待下一步指令。
+
+---
+
 ## 2026-10-25 — 本地验收调整：渠道状态隐藏调度说明
 
 - 按用户截图移除每日调度说明卡（频率、暂停说明、上次/下次调度时间），仅改 channel-status 页面及聚焦回归；后台调度、API、数据库与历史记录保持。
