@@ -1,3 +1,14 @@
+## 2026-10-25 — 公告/普通渠道与动态监测软件正式发布；真实监测费用激活尚未完成
+
+- **实际运行应用 `1aef1aec0e6337992f382836aaeea62c07eb41fd`**，生产 OCI config `sha256:3c2f84e2b4a162313676320f4aa640114136993dc03fbb20c159c505b9d7a47f`，engine `sha256:61614562f14aeb12bfd060e766510a1c727802fe92eea588afe6c652484b9c08`；Gateway `3c1e4ab2ae3c4680bde376d9893492ed79b5174a8b9362ff86887064ae474f2c`。源码、正式构建、归档 `996d0af25b4113070b0c83f6436425d2ca7dabac346e41f0044c0b323709919d`、生产二进制及 JS/CSS 精确对应；正式 DryRun 后实际执行本地一键部署，health PASS / rollback false。
+- **真实备份 `20261025T061238Z`**，完成 manifest `e5c64bf7ba3d36c5d1ec4fa1863b17d13607f765218ce60d1943e3e3201a862c`；密文 `clearapi-backup-20261025T061238Z.tar.gz.gpg`，12420860 bytes，SHA256 `eb3c0416dd2bf902d527672f04b5f2cd5796b9484816848a8c359c0983c042e2` 重新校验一致，身份绑定 dc685cbe 前驱。未绕过锁/备份/运行身份校验，没有重跑无关 30 项 E2E。
+- 公告缓存刷新和普通渠道新增缓存修复已进入生产；公告9+监测8共17项联合回归及 Go/前端生产构建通过；旧公告、价格 hash 与发布前相同。生产未试发公告、改渠道或财务数据，没有用页面 200 代替功能验收。
+- **动态监测 PARTIAL，真实收费任务未执行，未激活。** 软件配置满足时可执行，三库与 HTTP 完整软件链使用明确合成 provider 通过；已经移除固定501/固定未就绪/禁用触发并复用现有调度。当前 Channel1 缺可核实供应商收费/硬上界依据，最多人民币1元授权无法替代价格证明；仅受影响的收费激活暂停，probes=0，未假称线上可用。唯一需补外部条件是供应商计费/限额依据，然后在授权预算内完成真实验收。
+- PG03继续暂缓、D未纳入，PG/Executor/Caddy未重启。A与C商业真实调用/计费仍PARTIAL；无Push/main合并。历史保护分支及工作区原样保留。**本段后的记录提交仅为文档，实际运行应用 SHA 以上为准。**
+- 完整证据：CLEARAPI_DYNAMIC_MONITOR_RELEASE_20261025.md、evidence/monitor-runtime-20261025/ 下 dryrun/deployment-result/post-verification/website-assets JSON。
+
+---
+
 ## 2026-10-25 — 动态监测费用/传输实现完成隔离验证；正式发布准备
 
 - 本轮明确生产部署授权已取代上一轮“候选后停止”。当前独立分支基于74ff807aa95050a3ac2603e67b20b484a7dda34b；生产只读实核仍为dc685cbe338e8f700cae347e2eaac351d984c9c7。候选完整SHA及镜像/备份在实际发布后记录，不能引用旧镜像冒充新构建。

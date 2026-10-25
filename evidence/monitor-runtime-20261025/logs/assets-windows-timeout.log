@@ -1,0 +1,16 @@
+fetch http://127.0.0.1:18087/
+fetch https://www.clear999.com/
+fetch http://127.0.0.1:18087/static/js/vendor-ui-primitives.5564bb5e9e.js
+fetch https://www.clear999.com/static/js/vendor-ui-primitives.5564bb5e9e.js
+fetch http://127.0.0.1:18087/static/js/vendor-tanstack.e331468f06.js
+fetch https://www.clear999.com/static/js/vendor-tanstack.e331468f06.js
+Traceback (most recent call last):
+  File "D:\Codex\worktrees\clearapi-announcement-monitor-fix-20261025\clearapi-controlled-launch-20261020\.local-tests\monitor-runtime-20261025\assets_verify.py", line 14, in <module>
+    left,right=fetch(local,path),fetch(public,path)
+                                 ^^^^^^^^^^^^^^^^^^
+  File "D:\Codex\worktrees\clearapi-announcement-monitor-fix-20261025\clearapi-controlled-launch-20261020\.local-tests\monitor-runtime-20261025\assets_verify.py", line 6, in fetch
+    if p.returncode:raise RuntimeError(base+path+' '+p.stderr.decode(errors='replace'))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: https://www.clear999.com/static/js/vendor-tanstack.e331468f06.js curl: (28) Operation timed out after 45008 milliseconds with 31667 bytes received
+
+

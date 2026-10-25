@@ -1,0 +1,86 @@
+{
+  "checks_from": "VPS native curl; local Windows resource download had a timeout",
+  "origin_public_candidate_assets": {
+    "origin": {
+      "/": {
+        "sha256": "e5fa880131fb941e8423fb0de9b65b08c4acd775183eea8883f595c1ccd4253e",
+        "bytes": 1426
+      },
+      "/static/js/vendor-ui-primitives.5564bb5e9e.js": {
+        "sha256": "356da346fc3eb102ca07ad8a3f56cf340d9f145383c7d9fd59f32cb1a404e040",
+        "bytes": 322376
+      },
+      "/static/js/vendor-tanstack.e331468f06.js": {
+        "sha256": "81730bb1caff0f35f709125613c6dc831c0b3d820df90f351ce1a02275d232ba",
+        "bytes": 178389
+      },
+      "/static/js/lib-react.91bc21a6cf.js": {
+        "sha256": "8cc40254295877b830502e0c0f15af6a7270b0934b56817d3c75e1ee88c3b17a",
+        "bytes": 189032
+      },
+      "/static/js/59486.358f4047ce.js": {
+        "sha256": "a930b9ffc401d619a3b56ed9a9b0fd593b281af0dc3a032f858f83e565c85f4f",
+        "bytes": 714528
+      },
+      "/static/js/index.09e7c63968.js": {
+        "sha256": "908be0e3f48012ded04db65f53083b02e064008cc659d2136d0734759f05d659",
+        "bytes": 5431954
+      },
+      "/static/css/index.d36ff0d4f8.css": {
+        "sha256": "033015d328dbb786d0b4b7cbf8bc8a9532ba913e2d75aebae4c4f7420ecd33bb",
+        "bytes": 434853
+      }
+    },
+    "public": {
+      "/": {
+        "sha256": "e5fa880131fb941e8423fb0de9b65b08c4acd775183eea8883f595c1ccd4253e",
+        "bytes": 1426
+      },
+      "/static/js/vendor-ui-primitives.5564bb5e9e.js": {
+        "sha256": "356da346fc3eb102ca07ad8a3f56cf340d9f145383c7d9fd59f32cb1a404e040",
+        "bytes": 322376
+      },
+      "/static/js/vendor-tanstack.e331468f06.js": {
+        "sha256": "81730bb1caff0f35f709125613c6dc831c0b3d820df90f351ce1a02275d232ba",
+        "bytes": 178389
+      },
+      "/static/js/lib-react.91bc21a6cf.js": {
+        "sha256": "8cc40254295877b830502e0c0f15af6a7270b0934b56817d3c75e1ee88c3b17a",
+        "bytes": 189032
+      },
+      "/static/js/59486.358f4047ce.js": {
+        "sha256": "a930b9ffc401d619a3b56ed9a9b0fd593b281af0dc3a032f858f83e565c85f4f",
+        "bytes": 714528
+      },
+      "/static/js/index.09e7c63968.js": {
+        "sha256": "908be0e3f48012ded04db65f53083b02e064008cc659d2136d0734759f05d659",
+        "bytes": 5431954
+      },
+      "/static/css/index.d36ff0d4f8.css": {
+        "sha256": "033015d328dbb786d0b4b7cbf8bc8a9532ba913e2d75aebae4c4f7420ecd33bb",
+        "bytes": 434853
+      }
+    }
+  },
+  "html_sha256": "e5fa880131fb941e8423fb0de9b65b08c4acd775183eea8883f595c1ccd4253e",
+  "status_success": true,
+  "password_login_and_registration": {
+    "passkey_login": false,
+    "password_login_enabled": true,
+    "password_login_encryption_enabled": false,
+    "password_register_enabled": true,
+    "register_enabled": true,
+    "wechat_login": false
+  },
+  "pages_http_200": {
+    "/login": 1426,
+    "/register": 1426,
+    "/system-settings/content/announcements": 1426,
+    "/channel-status": 1426
+  },
+  "ordinary_api_without_key_http": 401,
+  "monitor_contract_UI_in_bundle": true,
+  "announcement_status_cache_keys_in_bundle": true,
+  "production_announcement_write_performed": false,
+  "production_authenticated_login_and_paid_relay": "NOT_EXECUTED"
+}
