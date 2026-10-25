@@ -53,6 +53,8 @@ func SetApiRouter(router *gin.Engine) {
 	monitorAdmin.PUT("/policy", controller.SaveConsoleMonitorPolicyAdmin)
 	monitorAdmin.PUT("/:id/switch/:action", controller.SwitchConsoleMonitorAdmin)
 	monitorAdmin.POST("/:id/probe", controller.TriggerConsoleMonitorAdmin)
+	monitorAdmin.GET("/:id/cost-contract", controller.GetConsoleMonitorCostContract)
+	monitorAdmin.PUT("/:id/cost-contract", controller.SaveConsoleMonitorCostContract)
 	monitorAdmin.GET("/:id/history", controller.ConsoleMonitorHistoryAdmin)
 	monitorAdmin.POST("/attempts/:id/recover", controller.RecoverConsoleMonitorAttempt)
 	apiRouter.GET("/guide", middleware.UserAuth(), controller.GetUsageGuide)

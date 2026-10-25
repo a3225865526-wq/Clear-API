@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -26,8 +27,151 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Synthetic evidence is constructed only in _test.go. No exported setter,
-// registry, env var or database field can install this in runtime execution.
+type configuredConsoleAdapter struct{ db *gorm.DB }
+
+func (a configuredConsoleAdapter) Authorize(ctx context.Context, m model.ConsoleMonitor) error {
+	return AuthorizeConsoleProbeCost(ctx, a.db, m)
+}
+func (a configuredConsoleAdapter) Probe(ctx context.Context, m model.ConsoleMonitor, id int64) (ConsoleProbeOutcome, error) {
+	return ProbeConsoleChannel(ctx, a.db, m, id)
+}
+
+// These are HTTP/DB contract tests against an explicitly synthetic provider.
+// They are not evidence of a real vendor call or its pricing/limit contract.
+func TestConsoleProbeConfiguredExecutionMatrix(t *testing.T) {
+	for _, engine := range []struct {
+		name    string
+		dialect gorm.Dialector
+		kind    common.DatabaseType
+	}{
+		{"sqlite", sqlite.Open(":memory:"), common.DatabaseTypeSQLite},
+		{"mysql", mysql.Open(os.Getenv("MONITOR_RUNTIME_MYSQL_DSN")), common.DatabaseTypeMySQL},
+		{"postgres", postgres.New(postgres.Config{DSN: os.Getenv("MONITOR_RUNTIME_POSTGRES_DSN"), PreferSimpleProtocol: true}), common.DatabaseTypePostgreSQL},
+	} {
+		t.Run(engine.name, func(t *testing.T) {
+			if engine.name != "sqlite" && os.Getenv("MONITOR_RUNTIME_"+strings.ToUpper(engine.name)+"_DSN") == "" {
+				t.Skip("dedicated database not configured")
+			}
+			db, err := gorm.Open(engine.dialect, &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+			require.NoError(t, err)
+			sqlDB, err := db.DB()
+			require.NoError(t, err)
+			defer sqlDB.Close()
+			sqlDB.SetMaxOpenConns(1)
+			old := common.MainDatabaseType()
+			common.SetMainDatabaseType(engine.kind)
+			defer common.SetMainDatabaseType(old)
+			require.False(t, db.Migrator().HasTable(&model.ConsoleMonitor{}))
+			require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}, &model.Option{}))
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			var calls atomic.Int64
+			var mode atomic.Value
+			mode.Store("normal")
+			started, release := make(chan struct{}, 1), make(chan struct{})
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				n := calls.Add(1)
+				assert.Equal(t, "Bearer synthetic-only", r.Header.Get("Authorization"))
+				assert.Contains(t, r.Header.Get("X-Client-Request-Id"), "clearapi-monitor-")
+				body, err := io.ReadAll(r.Body)
+				assert.NoError(t, err)
+				assert.Equal(t, consoleProbePayload, string(body))
+				switch mode.Load().(string) {
+				case "hold":
+					started <- struct{}{}
+					<-release
+				case "timeout":
+					<-r.Context().Done()
+					return
+				case "missing-usage":
+					_, _ = io.WriteString(w, `{"id":"resp-test","status":"completed","model":"gpt-6-luna"}`)
+					return
+				case "incomplete":
+					_, _ = io.WriteString(w, `{"id":"resp-incomplete","status":"incomplete","model":"gpt-6-luna","usage":{"input_tokens":4,"output_tokens":2}}`)
+					return
+				}
+				_, _ = fmt.Fprintf(w, `{"id":"resp-%d","status":"completed","model":"gpt-6-luna","usage":{"input_tokens":4,"output_tokens":2}}`, n)
+			}))
+			defer srv.Close()
+			channel := model.Channel{Id: 1, Name: "synthetic only", Key: "synthetic-only", Type: 1, Models: "gpt-6-luna", Status: common.ChannelStatusEnabled, BaseURL: &srv.URL}
+			require.NoError(t, db.Create(&channel).Error)
+			m := consoleProbeCostTarget()
+			m.DisplayName = "synthetic"
+			m.IntervalSeconds = 60
+			m.TimeoutSeconds = 1
+			m.StaleSeconds = 900
+			m.DailyRequests = 10
+			m.RequestCostMicros = 100
+			ctx := context.Background()
+			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &m))
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, m.ID, true))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "published", true))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "enabled", true))
+			require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 10, DailyCostMicros: 200, RetentionDays: 90}))
+			contract := ConsoleProbeCostContract{Source: "synthetic test only, not a vendor quote", ValidFrom: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour), InputTokenLimit: 64, InputMicros: 1, OutputMicros: 2, FixedFeeMicros: 4, HardCeilingMicros: 100}
+			require.NoError(t, SaveConsoleProbeCostContract(ctx, db, m, contract))
+			require.NoError(t, db.Model(&channel).Update("key", "rotated-only").Error)
+			require.ErrorIs(t, AuthorizeConsoleProbeCost(ctx, db, m), ErrMonitorCostUnverified)
+			require.Zero(t, calls.Load())
+			require.NoError(t, db.Model(&channel).Update("key", "synthetic-only").Error)
+			expired := contract
+			expired.ExpiresAt = time.Now().Add(-time.Minute)
+			require.ErrorIs(t, SaveConsoleProbeCostContract(ctx, db, m, expired), ErrMonitorCostUnverified)
+			e := ConsoleProbeExecutor{DB: db, Adapters: map[string]ConsoleProbeAdapter{"channel": configuredConsoleAdapter{db}}}
+			result, err := e.RunWithResult(ctx, m.ID)
+			require.NoError(t, err)
+			require.Equal(t, "normal", result.Status, "%+v", result)
+			require.NotNil(t, result.MeteredCostMicros)
+			assert.EqualValues(t, 12, *result.MeteredCostMicros)
+			var attempt model.ConsoleMonitorAttempt
+			require.NoError(t, db.First(&attempt, result.AttemptID).Error)
+			assert.Equal(t, "resp-1", result.UpstreamResponseID)
+			assert.EqualValues(t, 100, attempt.ReservedCostMicros)
+			for i := range 2 {
+				require.NoError(t, db.Model(&model.ConsoleMonitorAttempt{}).Where("monitor_id = ?", m.ID).Update("started_at", time.Now().Add(-time.Hour).Unix()).Error)
+				_, err = e.RunWithResult(ctx, m.ID)
+				if i == 0 {
+					require.NoError(t, err)
+				} else {
+					require.ErrorIs(t, err, model.ErrMonitorBudget)
+				}
+			}
+			assert.EqualValues(t, 2, calls.Load(), "budget prevents a third HTTP request")
+			for _, scenario := range []string{"incomplete", "concurrent", "missing-usage", "timeout"} {
+				t.Run(scenario, func(t *testing.T) {
+					require.NoError(t, db.Where("id > 0").Delete(&model.ConsoleMonitorAttempt{}).Error)
+					before := calls.Load()
+					if scenario == "incomplete" {
+						mode.Store(scenario)
+						result, err := e.RunWithResult(ctx, m.ID)
+						require.NoError(t, err)
+						assert.Equal(t, "degraded", result.Status)
+						assert.Equal(t, "probe_incomplete", result.ErrorCode)
+					} else if scenario == "concurrent" {
+						mode.Store("hold")
+						done := make(chan error, 1)
+						go func() { _, err := e.RunWithResult(ctx, m.ID); done <- err }()
+						<-started
+						_, err := e.RunWithResult(ctx, m.ID)
+						require.ErrorIs(t, err, model.ErrMonitorBudget)
+						close(release)
+						require.NoError(t, <-done)
+					} else {
+						mode.Store(scenario)
+						result, err := e.RunWithResult(ctx, m.ID)
+						require.ErrorIs(t, err, ErrMonitorLeaseUnresolved)
+						assert.Equal(t, "unknown", result.Status)
+						_, err = e.RunWithResult(ctx, m.ID)
+						require.ErrorIs(t, err, model.ErrMonitorBudget)
+					}
+					assert.Equal(t, before+1, calls.Load())
+				})
+			}
+		})
+	}
+}
+
+// This private transport fixture is not installed as a production contract.
 func syntheticConsoleProbeCostPolicy(now time.Time) consoleProbeCostPolicy {
 	p := consoleProbeProductionCostPolicy()
 	p.HardCeilingMicros = 200

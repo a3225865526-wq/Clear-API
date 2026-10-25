@@ -1,5 +1,6 @@
 {
   "translation": {
+    "Monitoring requires an upstream cost contract and an enabled budget policy.": "Giám sát cần hợp đồng chi phí nhà cung cấp và chính sách ngân sách được bật.",
     "Channel monitoring": "Giám sát kênh",
     "Monitoring targets": "Đối tượng giám sát",
     "Global monitoring policy (read only)": "Chính sách giám sát toàn cục (chỉ đọc)",

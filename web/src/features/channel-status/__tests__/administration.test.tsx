@@ -176,7 +176,7 @@ describe('monitor administration', () => {
     renderAdmin()
     await screen.findByText('Configured target · model-a')
     expect(screen.getByRole('status')).toHaveTextContent(
-      'do not start detection'
+      'upstream cost contract'
     )
     await userEvent.click(screen.getByRole('button', { name: 'Publish' }))
     expect(put).not.toHaveBeenCalled()
@@ -197,6 +197,44 @@ describe('monitor administration', () => {
     expect(
       screen.queryByRole('button', { name: 'Add' })
     ).not.toBeInTheDocument()
+  })
+  it('confirms a probe and displays a returned cost denial instead of claiming health', async () => {
+    const original = vi.mocked(api.get).getMockImplementation()
+    if (!original) throw new Error('missing API fixture')
+    vi.mocked(api.get).mockImplementation(async (...args) => {
+      const response = (await original(...args)) as {
+        data: {
+          data: { monitors?: Array<{ enabled: boolean; published: boolean }> }
+        }
+      }
+      const item = response.data.data.monitors?.[0]
+      if (item) {
+        item.enabled = true
+        item.published = true
+      }
+      return response
+    })
+    const post = vi.spyOn(api, 'post').mockResolvedValue({
+      data: {
+        success: true,
+        data: { status: 'error', error_code: 'MONITOR_COST_EXCEEDED' },
+      },
+    })
+    renderAdmin()
+    await screen.findByText('Configured target · model-a')
+    await userEvent.click(screen.getByRole('button', { name: 'Test' }))
+    expect(post).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/api/console/monitor-admin/1/probe',
+        { confirm: true },
+        { headers: { 'X-ClearAPI-Monitor': '1' } }
+      )
+    )
+    expect(await screen.findByText(/MONITOR_COST_EXCEEDED/)).toHaveTextContent(
+      'error'
+    )
   })
   it('validates an edited monitor before sending it', async () => {
     const put = vi.spyOn(api, 'put')

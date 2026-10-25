@@ -1,0 +1,74 @@
+{
+  "utc": "2026-10-25T06:00:21.646718+00:00",
+  "gateway": {
+    "id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+    "image": "sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020",
+    "revision": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+    "started": "2026-10-24T15:18:11.692823281Z"
+  },
+  "services": {
+    "/clearapi-new-api-1": {
+      "id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+      "started": "2026-10-24T15:18:11.692823281Z",
+      "image": "sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020"
+    },
+    "/clearapi-postgres-1": {
+      "id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+      "started": "2026-10-20T00:46:43.870944528Z",
+      "image": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+    },
+    "/clearapi-pool-executor-1": {
+      "id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+      "started": "2026-10-20T00:46:43.85551099Z",
+      "image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58"
+    },
+    "/clearapi-edge-caddy": {
+      "id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+      "started": "2026-10-24T03:31:58.532588899Z",
+      "image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772"
+    }
+  },
+  "flags": {
+    "CLEARAPI_POOL_ENABLED": "false",
+    "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+    "CLEARAPI_CLOSED_LAUNCH": "false"
+  },
+  "database": {
+    "admin": [
+      {
+        "id": 1,
+        "role": 100,
+        "status": 1,
+        "username": "admin"
+      }
+    ],
+    "pricing_hashes": [
+      {
+        "key": "CompletionRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "ModelPrice",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "ModelRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "billing_setting.billing_expr",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "billing_setting.billing_mode",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "CacheRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      }
+    ],
+    "announcement_hash": "70c1d2a7a57c7a84147bd7e123eca0f6",
+    "transaction_read_only": "on"
+  }
+}

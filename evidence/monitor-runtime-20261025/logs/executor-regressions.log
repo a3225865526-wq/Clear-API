@@ -1,0 +1,20 @@
+=== RUN   TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled
+--- PASS: TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled (0.12s)
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/stop_unconfirmed
+[ERR] 2026/10/25 - 05:55:03 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_failed
+[ERR] 2026/10/25 - 05:55:04 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_canceled
+[ERR] 2026/10/25 - 05:55:04 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_timed_out
+[ERR] 2026/10/25 - 05:55:04 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+--- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled (0.58s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/stop_unconfirmed (0.16s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_failed (0.15s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_canceled (0.14s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_timed_out (0.14s)
+=== RUN   TestConsoleMonitorSchedulerRespectsPauseAndPublication
+--- PASS: TestConsoleMonitorSchedulerRespectsPauseAndPublication (0.11s)
+PASS
+ok  	github.com/QuantumNous/new-api/service	0.886s

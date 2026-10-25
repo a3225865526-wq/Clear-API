@@ -1,5 +1,6 @@
 {
   "translation": {
+    "Monitoring requires an upstream cost contract and an enabled budget policy.": "Monitoring requires an upstream cost contract and an enabled budget policy.",
     "Channel monitoring": "Channel monitoring",
     "Monitoring targets": "Monitoring targets",
     "Global monitoring policy (read only)": "Global monitoring policy (read only)",

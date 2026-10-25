@@ -28,17 +28,21 @@ type ConsoleProbeLeaseReconciler interface {
 var ErrMonitorProbePanic = errors.New("MONITOR_PROBE_PANIC")
 
 type ConsoleProbeOutcome struct {
-	Status           string
-	ErrorCode        string
-	SourceChannelID  int
-	CleanupStartedAt int64
+	Status             string
+	ErrorCode          string
+	SourceChannelID    int
+	CleanupStartedAt   int64
+	MeteredCostMicros  *int64
+	UpstreamResponseID string
 }
 
 type ConsoleProbeResult struct {
-	AttemptID int64  `json:"attempt_id"`
-	ProbeID   int64  `json:"probe_id"`
-	Status    string `json:"status"`
-	ErrorCode string `json:"error_code"`
+	AttemptID          int64  `json:"attempt_id"`
+	ProbeID            int64  `json:"probe_id"`
+	Status             string `json:"status"`
+	ErrorCode          string `json:"error_code"`
+	MeteredCostMicros  *int64 `json:"metered_cost_micros,omitempty"`
+	UpstreamResponseID string `json:"upstream_response_id,omitempty"`
 }
 
 type ConsoleProbeExecutor struct {
@@ -115,7 +119,7 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	start := time.Now()
 	outcome := ConsoleProbeOutcome{Status: "unknown", ErrorCode: "authorization_denied"}
 	if costGated || isConsoleProbeCostScope(m) {
-		_, err = consoleProbeProductionCostPolicy().WorstCaseCost(m, consoleProbePayload, time.Now())
+		err = AuthorizeConsoleProbeCost(probeCtx, e.DB, m)
 	} else if !costGated {
 		err = runConsoleAuthorizeSafely(probeCtx, adapter, m)
 	}
@@ -124,6 +128,9 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	}
 	if err == nil && probeCtx.Err() != nil {
 		err = probeCtx.Err()
+	}
+	if err == nil && costGated && (outcome.MeteredCostMicros == nil || *outcome.MeteredCostMicros < 0 || *outcome.MeteredCostMicros > attempt.ReservedCostMicros || outcome.UpstreamResponseID == "" || len(outcome.UpstreamResponseID) > 128) {
+		err = errors.Join(ErrMonitorMetering, ErrMonitorLeaseUnresolved)
 	}
 	if err != nil {
 		outcome.Status = "error"
@@ -135,7 +142,7 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	}
 	// Never persist arbitrary provider or adapter error strings.
 	switch outcome.ErrorCode {
-	case "", "probe_failed", "probe_timeout", "authorization_denied", "invalid_result", "MONITOR_COST_UNVERIFIED", "MONITOR_COST_EXCEEDED":
+	case "", "probe_failed", "probe_timeout", "probe_incomplete", "authorization_denied", "invalid_result", "MONITOR_COST_UNVERIFIED", "MONITOR_COST_EXCEEDED", "MONITOR_METERING_FAILED":
 	default:
 		outcome.ErrorCode = "probe_failed"
 	}
@@ -180,7 +187,11 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 			if updated.RowsAffected != 1 {
 				return model.ErrMonitorDenied
 			}
-			probe := model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: "unknown", ErrorCode: "probe_failed", LatencyMS: &latency, SourceKind: m.TargetKind}
+			code := outcome.ErrorCode
+			if code == "" {
+				code = "probe_failed"
+			}
+			probe := model.ConsoleProbe{MonitorID: id, CheckedAt: now, Status: "unknown", ErrorCode: code, LatencyMS: &latency, SourceKind: m.TargetKind}
 			if err := tx.Create(&probe).Error; err != nil {
 				return err
 			}
@@ -205,6 +216,8 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 			return err
 		}
 		result.ProbeID, result.Status, result.ErrorCode = probe.ID, probe.Status, probe.ErrorCode
+		result.MeteredCostMicros = outcome.MeteredCostMicros
+		result.UpstreamResponseID = outcome.UpstreamResponseID
 		return nil
 	})
 	if err != nil {
@@ -219,6 +232,8 @@ func consoleProbeFailureCode(err, contextErr error) string {
 		return "MONITOR_COST_UNVERIFIED"
 	case errors.Is(err, ErrMonitorCostExceeded):
 		return "MONITOR_COST_EXCEEDED"
+	case errors.Is(err, ErrMonitorMetering):
+		return "MONITOR_METERING_FAILED"
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(contextErr, context.DeadlineExceeded):
 		return "probe_timeout"
 	default:

@@ -247,6 +247,14 @@ func SaveConsoleMonitorPolicy(ctx context.Context, db *gorm.DB, p ConsoleMonitor
 	})
 }
 
+// LockConsoleMonitorPolicy serializes configuration with admission on every
+// supported database, using the same dialect-aware lock as reservations.
+func LockConsoleMonitorPolicy(tx *gorm.DB) (*ConsoleMonitorPolicy, error) {
+	var policy ConsoleMonitorPolicy
+	err := lockForUpdate(tx).First(&policy, 1).Error
+	return &policy, err
+}
+
 func SetConsoleMonitorSwitch(ctx context.Context, db *gorm.DB, id int, action string, value bool) error {
 	if !ConsoleMonitoringReady(db) {
 		return ErrMonitorNotReady

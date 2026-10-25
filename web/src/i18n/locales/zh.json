@@ -1,5 +1,6 @@
 {
   "translation": {
+    "Monitoring requires an upstream cost contract and an enabled budget policy.": "监测需要配置上游费用合同并启用预算策略。",
     "Channel monitoring": "渠道监测",
     "Monitoring targets": "监测目标",
     "Global monitoring policy (read only)": "全局监测策略（只读）",

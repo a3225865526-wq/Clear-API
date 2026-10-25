@@ -1,5 +1,6 @@
 {
   "translation": {
+    "Monitoring requires an upstream cost contract and an enabled budget policy.": "Для мониторинга нужны договор о расходах провайдера и включённая бюджетная политика.",
     "Channel monitoring": "Мониторинг каналов",
     "Monitoring targets": "Объекты мониторинга",
     "Global monitoring policy (read only)": "Общая политика мониторинга (только чтение)",

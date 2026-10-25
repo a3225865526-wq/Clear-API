@@ -8,6 +8,7 @@ import (
 	"os"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
@@ -78,9 +79,9 @@ func TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch(t *testing.T) {
 	assert.Zero(t, calls.Load(), "a recorded cost denial must never contact an upstream")
 	m.Allowlisted, m.Published, m.Enabled = true, true, true
 	adapter := channelConsoleProbeAdapter{}
-	require.ErrorIs(t, adapter.Authorize(ctx, m), model.ErrMonitorIntegration)
+	require.ErrorIs(t, adapter.Authorize(ctx, m), service.ErrMonitorCostUnverified)
 	_, err := adapter.Probe(ctx, m, attempt.ID)
-	require.ErrorIs(t, err, model.ErrMonitorIntegration)
+	require.ErrorIs(t, err, service.ErrMonitorCostUnverified)
 	assert.Zero(t, calls.Load())
 	m.Published = false
 	require.ErrorIs(t, adapter.Authorize(ctx, m), model.ErrMonitorPaused)
@@ -88,6 +89,62 @@ func TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch(t *testing.T) {
 	require.NoError(t, db.First(&saved, 1).Error)
 	assert.Equal(t, channel.Status, saved.Status)
 	assert.Equal(t, channel.Key, saved.Key)
+}
+
+// Full host HTTP path with a synthetic provider, not a supplier acceptance test.
+func TestConsoleMonitorConfiguredHTTPFlow(t *testing.T) {
+	db := modelManagementDB(t, "sqlite", "")
+	require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+	var calls atomic.Int64
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		assert.Equal(t, "Bearer fixture-only", r.Header.Get("Authorization"))
+		assert.Equal(t, "/v1/responses", r.URL.Path)
+		_, _ = w.Write([]byte(`{"id":"resp-http","status":"completed","model":"gpt-6-luna","usage":{"input_tokens":4,"output_tokens":2}}`))
+	}))
+	defer upstream.Close()
+	channel := model.Channel{Id: 1, Name: "isolated", Key: "fixture-only", Status: common.ChannelStatusEnabled, Models: consoleProbeModel, BaseURL: &upstream.URL}
+	require.NoError(t, db.Create(&channel).Error)
+	m := model.ConsoleMonitor{ChannelID: 1, TargetKind: "channel", TargetRef: "1", Model: consoleProbeModel, Protocol: consoleProbeProtocol, DisplayName: "isolated", IntervalSeconds: 60, TimeoutSeconds: 1, StaleSeconds: 900, DailyRequests: 2, RequestCostMicros: 100}
+	ctx := context.Background()
+	require.NoError(t, model.SaveConsoleMonitor(ctx, db, &m))
+	require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, m.ID, true))
+	require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "published", true))
+	router := gin.New()
+	router.PUT("/monitors/:id/cost-contract", ConsoleMonitorWriteGuard, SaveConsoleMonitorCostContract)
+	router.PUT("/policy", ConsoleMonitorWriteGuard, SaveConsoleMonitorPolicyAdmin)
+	router.PUT("/monitors/:id/:action", ConsoleMonitorWriteGuard, SwitchConsoleMonitorAdmin)
+	router.POST("/monitors/:id/probe", ConsoleMonitorWriteGuard, TriggerConsoleMonitorAdmin)
+	router.GET("/monitors", ListConsoleMonitorAdmin)
+	router.GET("/monitoring", GetConsoleMonitoring)
+	request := func(method, path string, body any) *httptest.ResponseRecorder {
+		raw, err := common.Marshal(body)
+		require.NoError(t, err)
+		req := httptest.NewRequest(method, path, bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-ClearAPI-Monitor", "1")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, req)
+		require.Equal(t, 200, response.Code, response.Body.String())
+		return response
+	}
+	contract := service.ConsoleProbeCostContract{Source: "synthetic HTTP fixture, not supplier evidence", ValidFrom: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour), InputTokenLimit: 64, InputMicros: 1, OutputMicros: 2, FixedFeeMicros: 4, HardCeilingMicros: 100}
+	request(http.MethodPut, "/monitors/1/cost-contract", gin.H{"confirm": true, "contract": contract})
+	request(http.MethodPut, "/policy", gin.H{"confirm": true, "policy": model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 2, DailyCostMicros: 200, RetentionDays: 90}})
+	request(http.MethodPut, "/monitors/1/enabled", gin.H{"confirm": true, "value": true})
+	assert.Contains(t, request(http.MethodGet, "/monitors", nil).Body.String(), `"real_probe_ready":true`)
+	response := request(http.MethodPost, "/monitors/1/probe", gin.H{"confirm": true})
+	assert.Contains(t, response.Body.String(), `"status":"normal"`)
+	assert.Contains(t, response.Body.String(), `"upstream_response_id":"resp-http"`)
+	var public struct{ Data model.ConsoleMonitorData }
+	require.NoError(t, common.Unmarshal(request(http.MethodGet, "/monitoring", nil).Body.Bytes(), &public))
+	require.Len(t, public.Data.Channels, 1)
+	require.Len(t, public.Data.Channels[0].Models, 1)
+	assert.Equal(t, "normal", public.Data.Channels[0].Models[0].Status)
+	assert.EqualValues(t, 1, calls.Load())
+	assert.True(t, (consoleMonitorHandler{}).Enabled())
+	require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, MaxConcurrent: 1, RetentionDays: 90}))
+	assert.False(t, (consoleMonitorHandler{}).Enabled())
 }
 
 func TestManualChannelStatusSynchronizesCacheAndRouting(t *testing.T) {

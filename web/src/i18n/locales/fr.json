@@ -1,5 +1,6 @@
 {
   "translation": {
+    "Monitoring requires an upstream cost contract and an enabled budget policy.": "La surveillance exige un contrat de coût amont et une politique budgétaire active.",
     "Channel monitoring": "Surveillance des canaux",
     "Monitoring targets": "Cibles de surveillance",
     "Global monitoring policy (read only)": "Politique globale de surveillance (lecture seule)",

@@ -1,5 +1,6 @@
 {
   "translation": {
+    "Monitoring requires an upstream cost contract and an enabled budget policy.": "監視には上流の費用契約と有効な予算ポリシーが必要です。",
     "Channel monitoring": "チャネル監視",
     "Monitoring targets": "監視対象",
     "Global monitoring policy (read only)": "全体の監視ポリシー（読み取り専用）",

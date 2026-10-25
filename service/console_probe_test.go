@@ -730,7 +730,7 @@ func TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution(t *te
 	assert.True(t, saved.Published)
 	assert.False(t, saved.Enabled)
 	response = request(http.MethodPut, fmt.Sprintf("%s/%d/switch/enabled", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{"value": true, "confirm": true})
-	assert.Equal(t, http.StatusNotImplemented, response.Code)
+	assert.Equal(t, http.StatusForbidden, response.Code, "the fixture uses unsupported openai_chat")
 	response = request(http.MethodPost, fmt.Sprintf("%s/%d/probe", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{})
 	assert.Equal(t, http.StatusBadRequest, response.Code)
 	response = request(http.MethodPost, fmt.Sprintf("%s/%d/probe", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{"confirm": true})

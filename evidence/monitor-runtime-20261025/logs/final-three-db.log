@@ -1,0 +1,94 @@
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite/concurrent
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite/missing-usage
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite/timeout
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/mysql
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/mysql/concurrent
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/mysql/missing-usage
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/mysql/timeout
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/postgres
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/postgres/concurrent
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/postgres/missing-usage
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/postgres/timeout
+--- PASS: TestConsoleProbeConfiguredExecutionMatrix (3.72s)
+    --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite (1.03s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite/concurrent (0.01s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite/missing-usage (0.00s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite/timeout (1.00s)
+    --- PASS: TestConsoleProbeConfiguredExecutionMatrix/mysql (1.41s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/mysql/concurrent (0.04s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/mysql/missing-usage (0.04s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/mysql/timeout (1.05s)
+    --- PASS: TestConsoleProbeConfiguredExecutionMatrix/postgres (1.29s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/postgres/concurrent (0.03s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/postgres/missing-usage (0.02s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/postgres/timeout (1.03s)
+=== RUN   TestConsoleProbeWorstCaseCost
+=== RUN   TestConsoleProbeWorstCaseCost/below
+=== RUN   TestConsoleProbeWorstCaseCost/equal
+=== RUN   TestConsoleProbeWorstCaseCost/exceed
+=== RUN   TestConsoleProbeWorstCaseCost/missing
+=== RUN   TestConsoleProbeWorstCaseCost/production
+=== RUN   TestConsoleProbeWorstCaseCost/expired
+=== RUN   TestConsoleProbeWorstCaseCost/future
+=== RUN   TestConsoleProbeWorstCaseCost/version
+=== RUN   TestConsoleProbeWorstCaseCost/policy-version
+=== RUN   TestConsoleProbeWorstCaseCost/input-limit
+=== RUN   TestConsoleProbeWorstCaseCost/output-limit
+=== RUN   TestConsoleProbeWorstCaseCost/unknown-model
+=== RUN   TestConsoleProbeWorstCaseCost/channel
+=== RUN   TestConsoleProbeWorstCaseCost/protocol
+=== RUN   TestConsoleProbeWorstCaseCost/payload
+=== RUN   TestConsoleProbeWorstCaseCost/overflow-multiply
+=== RUN   TestConsoleProbeWorstCaseCost/overflow-add
+=== RUN   TestConsoleProbeWorstCaseCost/negative
+=== RUN   TestConsoleProbeWorstCaseCost/source-missing
+--- PASS: TestConsoleProbeWorstCaseCost (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/below (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/equal (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/exceed (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/missing (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/production (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/expired (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/future (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/version (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/policy-version (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/input-limit (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/output-limit (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/unknown-model (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/channel (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/protocol (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/payload (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/overflow-multiply (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/overflow-add (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/negative (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/source-missing (0.00s)
+=== RUN   TestConsoleProbeLocalTransport
+=== RUN   TestConsoleProbeLocalTransport/success
+=== RUN   TestConsoleProbeLocalTransport/http-error-no-retry
+=== RUN   TestConsoleProbeLocalTransport/redirect
+=== RUN   TestConsoleProbeLocalTransport/response-limit
+=== RUN   TestConsoleProbeLocalTransport/unverified-no-request
+=== RUN   TestConsoleProbeLocalTransport/non-local-rejected
+=== RUN   TestConsoleProbeLocalTransport/connection-failure-no-retry
+=== RUN   TestConsoleProbeLocalTransport/canceled-before-dispatch
+=== RUN   TestConsoleProbeLocalTransport/timeout
+=== RUN   TestConsoleProbeLocalTransport/cancellation
+--- PASS: TestConsoleProbeLocalTransport (0.11s)
+    --- PASS: TestConsoleProbeLocalTransport/success (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/http-error-no-retry (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/redirect (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/response-limit (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/unverified-no-request (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/non-local-rejected (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/connection-failure-no-retry (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/canceled-before-dispatch (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/timeout (0.10s)
+    --- PASS: TestConsoleProbeLocalTransport/cancellation (0.00s)
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated
+--- PASS: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution (0.42s)
+    --- PASS: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated (0.17s)
+PASS
+ok  	github.com/QuantumNous/new-api/service	4.334s

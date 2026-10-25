@@ -22,6 +22,31 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(consoleMonitorHandler{})
+}
+
+// Reuse the host task lease and admission ledger. A paused policy schedules
+// nothing and enabling monitoring never enables ordinary channel auto-tests.
+type consoleMonitorHandler struct{}
+
+func (consoleMonitorHandler) Type() string            { return model.SystemTaskTypeConsoleMonitor }
+func (consoleMonitorHandler) Interval() time.Duration { return time.Minute }
+func (consoleMonitorHandler) NewPayload() any         { return nil }
+func (consoleMonitorHandler) Enabled() bool {
+	if !model.ConsoleMonitoringReady(model.DB) {
+		return false
+	}
+	var policy model.ConsoleMonitorPolicy
+	return model.DB.First(&policy, 1).Error == nil && policy.Enabled
+}
+func (consoleMonitorHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	executor := service.ConsoleProbeExecutor{DB: model.DB, Adapters: map[string]service.ConsoleProbeAdapter{"channel": channelConsoleProbeAdapter{}}}
+	err := executor.RunScheduled(ctx)
+	status := model.SystemTaskStatusSucceeded
+	if err != nil {
+		status = model.SystemTaskStatusFailed
+	}
+	finishSystemTaskHandler(task, runnerID, status, nil, err)
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and
