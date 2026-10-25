@@ -1,3 +1,16 @@
+## 2026-10-25 — 公告与普通渠道缓存修复候选；动态监测仍受成本证明阻塞，未部署
+
+- **生产未变：** 当前仍 `dc685cbe338e8f700cae347e2eaac351d984c9c7`，Gateway CID aaf0638277ab，启动于2026-10-24T15:18:11.692823281Z。本轮生产仅只读；用户提供的admin账号已确认role100/status1，具备公告管理所需角色。没有生产数据库写入、服务重启或发布。
+- **独立候选：** 工作区 `D:/Codex/worktrees/clearapi-announcement-monitor-fix-20261025/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-announcement-monitor-fix-20261025`；功能提交 `0c5a06fd93ade4e710ca215a64e5ec025b4b4854`，含祖先8230b601的公告修复。最终干净HEAD及同HEAD DryRun/本地镜像回执保存在 `D:/Codex/backups/clearapi-fix-closeout-20261025/final-candidate-receipt.json`（同工作区.local-tests/closeout-20261025有副本），不把功能提交或早期隔离标签冒称最终构建身份。
+- **成果双重保全：** 原公告工作区a9fe76f3和渠道激活工作区3124d8a1的全部29+5项修改/未跟踪文件已备份并保存为独立保护分支8230b601/c3dd1a2c；原工作区、index与HEAD不变，没有clean/reset/stash。历史发布/恢复/审计证据及日志保留。
+- **B隔离PASS、未上线：** 6行hook修复原样纳入；当前9项回归、typecheck/lint/格式PASS。真实浏览器完成旧缓存→新增草稿→保存→发布→保存→同页即时通知→普通viewer读取新旧两条→管理员仅删除新增测试公告。2020旧公告fixture仍保留，生产旧公告未操作。实际JS主包已检出两个status key及notice失效调用。
+- **普通渠道缓存隔离PASS、未上线：** 实际HTTP复现新增渠道已入库且ability启用却503，根因为AddChannel事务后漏InitChannelCache；补1行。SQLite3.50.4/MySQL8.4.11/PG17.6的新增→禁用→启用、DB/ability/内存路由一致性通过；候选HTTP禁用503且上游无新增调用，启用立即恢复。
+- **动态监测PARTIAL/BLOCKED：** 原未提交channel adapter和trigger接入现有执行器，保留Root/来源/header/confirm边界；预留要求allowlisted+published+enabled+非archived。先失败回归复现未发布/无白名单仍执行，三库修复后通过。主线console_probe/cost/transport字节未动，旧分支覆盖会丢失新成本保护，因此未整文件合并。实际目标缺供应商硬费用上限及传输合同证明，依旧无真实发送/无scheduler激活，启用/Test保持关闭。接上线不等于监测已可用。
+- **A新增隔离计费闭环：** 统一价格GET/PATCH后普通relay实际记账2820/4200/4200 quota，余额及令牌合计11220，改价即时生效、首笔历史日志不变；usage来自合成上游。这补充网关内部结算证据，不代表真实供应商账单或生产商业价格已验收。
+- **保留边界：** C五家真实调用/真实计费仍未验证；E复用有效证据、无工具修改、不重复30项E2E；D三个提交与专属前端未纳入；PG03继续暂缓商业。无Push/main合并，远端新CI未执行，不能冒称通过。
+- 完整验证、未完成事项和最终回执定位：[CLEARAPI_ANNOUNCEMENT_MONITOR_CANDIDATE_20261025.md](CLEARAPI_ANNOUNCEMENT_MONITOR_CANDIDATE_20261025.md)。本轮形成候选和正式DryRun后停止，等待下一步明确授权；不得自动进入生产部署。
+
+---
 ## 2026-10-25 10:56 Asia/Shanghai — A/B/C/E重新审计：版本一致；公告缓存与独立监测遗漏已证实
 
 - **本节替代下方历史“全面PASS”结论，历史记录保留：** 生产仍为 `dc685cbe338e8f700cae347e2eaac351d984c9c7`；Gateway CID `aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0`，engine digest `sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020`，OCI config `sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728`。本轮重新比对实际二进制、5JS+1CSS、构建记录、接收归档和备份，未发现工具工作区替代应用或旧前端产物；用户浏览器自身缓存仍UNKNOWN。

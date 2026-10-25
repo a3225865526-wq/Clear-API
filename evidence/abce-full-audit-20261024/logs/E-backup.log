@@ -1,0 +1,8 @@
+test_lock_contention_never_publishes_a_backup (__main__.BackupIdentityTest.test_lock_contention_never_publishes_a_backup)
+A skipped run must be a failure, never a silent success. ... ok
+test_full_encrypted_backup_offsite_and_legacy_restore_reader (__main__.BackupIdentityTest.test_full_encrypted_backup_offsite_and_legacy_restore_reader) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 1.596s
+
+OK

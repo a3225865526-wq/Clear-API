@@ -1,0 +1,146 @@
+=== RUN   TestConsoleProbeWorstCaseCost
+=== RUN   TestConsoleProbeWorstCaseCost/below
+=== RUN   TestConsoleProbeWorstCaseCost/equal
+=== RUN   TestConsoleProbeWorstCaseCost/exceed
+=== RUN   TestConsoleProbeWorstCaseCost/missing
+=== RUN   TestConsoleProbeWorstCaseCost/production
+=== RUN   TestConsoleProbeWorstCaseCost/expired
+=== RUN   TestConsoleProbeWorstCaseCost/future
+=== RUN   TestConsoleProbeWorstCaseCost/version
+=== RUN   TestConsoleProbeWorstCaseCost/policy-version
+=== RUN   TestConsoleProbeWorstCaseCost/input-limit
+=== RUN   TestConsoleProbeWorstCaseCost/output-limit
+=== RUN   TestConsoleProbeWorstCaseCost/unknown-model
+=== RUN   TestConsoleProbeWorstCaseCost/channel
+=== RUN   TestConsoleProbeWorstCaseCost/protocol
+=== RUN   TestConsoleProbeWorstCaseCost/payload
+=== RUN   TestConsoleProbeWorstCaseCost/overflow-multiply
+=== RUN   TestConsoleProbeWorstCaseCost/overflow-add
+=== RUN   TestConsoleProbeWorstCaseCost/negative
+=== RUN   TestConsoleProbeWorstCaseCost/source-missing
+--- PASS: TestConsoleProbeWorstCaseCost (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/below (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/equal (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/exceed (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/missing (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/production (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/expired (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/future (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/version (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/policy-version (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/input-limit (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/output-limit (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/unknown-model (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/channel (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/protocol (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/payload (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/overflow-multiply (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/overflow-add (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/negative (0.00s)
+    --- PASS: TestConsoleProbeWorstCaseCost/source-missing (0.00s)
+=== RUN   TestConsoleProbeLocalTransport
+=== RUN   TestConsoleProbeLocalTransport/success
+=== RUN   TestConsoleProbeLocalTransport/http-error-no-retry
+=== RUN   TestConsoleProbeLocalTransport/redirect
+=== RUN   TestConsoleProbeLocalTransport/response-limit
+=== RUN   TestConsoleProbeLocalTransport/unverified-no-request
+=== RUN   TestConsoleProbeLocalTransport/non-local-rejected
+=== RUN   TestConsoleProbeLocalTransport/connection-failure-no-retry
+=== RUN   TestConsoleProbeLocalTransport/canceled-before-dispatch
+=== RUN   TestConsoleProbeLocalTransport/timeout
+=== RUN   TestConsoleProbeLocalTransport/cancellation
+--- PASS: TestConsoleProbeLocalTransport (0.11s)
+    --- PASS: TestConsoleProbeLocalTransport/success (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/http-error-no-retry (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/redirect (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/response-limit (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/unverified-no-request (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/non-local-rejected (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/connection-failure-no-retry (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/canceled-before-dispatch (0.00s)
+    --- PASS: TestConsoleProbeLocalTransport/timeout (0.10s)
+    --- PASS: TestConsoleProbeLocalTransport/cancellation (0.00s)
+=== RUN   TestConsoleProbeCostDenialPrecedesDeadline
+=== RUN   TestConsoleProbeCostDenialPrecedesDeadline/unverified
+=== RUN   TestConsoleProbeCostDenialPrecedesDeadline/exceeded
+=== RUN   TestConsoleProbeCostDenialPrecedesDeadline/wrapped-unverified
+=== RUN   TestConsoleProbeCostDenialPrecedesDeadline/wrapped-exceeded
+=== RUN   TestConsoleProbeCostDenialPrecedesDeadline/timeout
+--- PASS: TestConsoleProbeCostDenialPrecedesDeadline (0.00s)
+    --- PASS: TestConsoleProbeCostDenialPrecedesDeadline/unverified (0.00s)
+    --- PASS: TestConsoleProbeCostDenialPrecedesDeadline/exceeded (0.00s)
+    --- PASS: TestConsoleProbeCostDenialPrecedesDeadline/wrapped-unverified (0.00s)
+    --- PASS: TestConsoleProbeCostDenialPrecedesDeadline/wrapped-exceeded (0.00s)
+    --- PASS: TestConsoleProbeCostDenialPrecedesDeadline/timeout (0.00s)
+=== RUN   TestConsoleProbeCostExecutorMatrix
+=== RUN   TestConsoleProbeCostExecutorMatrix/sqlite
+    console_probe_cost_test.go:324: database version: 3.50.4
+=== RUN   TestConsoleProbeCostExecutorMatrix/postgres
+    console_probe_cost_test.go:324: database version: PostgreSQL 17.6 (Debian 17.6-2.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+=== RUN   TestConsoleProbeCostExecutorMatrix/mysql
+    console_probe_cost_test.go:324: database version: 8.4.11
+--- PASS: TestConsoleProbeCostExecutorMatrix (0.70s)
+    --- PASS: TestConsoleProbeCostExecutorMatrix/sqlite (0.01s)
+    --- PASS: TestConsoleProbeCostExecutorMatrix/postgres (0.24s)
+    --- PASS: TestConsoleProbeCostExecutorMatrix/mysql (0.45s)
+=== RUN   TestConsoleMonitorControlMatrix
+=== RUN   TestConsoleMonitorControlMatrix/sqlite
+=== RUN   TestConsoleMonitorControlMatrix/postgres
+=== RUN   TestConsoleMonitorControlMatrix/mysql
+--- PASS: TestConsoleMonitorControlMatrix (2.35s)
+    --- PASS: TestConsoleMonitorControlMatrix/sqlite (0.02s)
+    --- PASS: TestConsoleMonitorControlMatrix/postgres (0.95s)
+    --- PASS: TestConsoleMonitorControlMatrix/mysql (1.38s)
+=== RUN   TestConsoleMonitorPoolContractDenialAndLeaseCleanup
+--- PASS: TestConsoleMonitorPoolContractDenialAndLeaseCleanup (0.00s)
+=== RUN   TestConsoleMonitorLeaseFailuresRetainCapacityAndCleanupStartsAfterProbe
+--- PASS: TestConsoleMonitorLeaseFailuresRetainCapacityAndCleanupStartsAfterProbe (0.00s)
+=== RUN   TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled
+--- PASS: TestConsoleMonitorExecutorRetainsUnresolvedAttemptUntilReconciled (0.16s)
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/stop_unconfirmed
+[ERR] 2026/10/25 - 03:13:29 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_failed
+[ERR] 2026/10/25 - 03:13:29 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_canceled
+[ERR] 2026/10/25 - 03:13:30 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+=== RUN   TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_timed_out
+[ERR] 2026/10/25 - 03:13:30 | SYSTEM | monitor probe panic: monitor_id=1 attempt_id=1; cleanup unconfirmed 
+--- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled (0.58s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/stop_unconfirmed (0.16s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_failed (0.14s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_canceled (0.14s)
+    --- PASS: TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled/confirmation_timed_out (0.14s)
+=== RUN   TestConsoleMonitorReconciliationIsSingleClaimAndRecoveryKeepsLease
+--- PASS: TestConsoleMonitorReconciliationIsSingleClaimAndRecoveryKeepsLease (0.12s)
+=== RUN   TestConsoleMonitorSchedulerRespectsPauseAndPublication
+--- PASS: TestConsoleMonitorSchedulerRespectsPauseAndPublication (0.12s)
+=== RUN   TestConsoleMonitorRetentionPrunesFinishedHistoryButKeepsUnresolvedAttempts
+--- PASS: TestConsoleMonitorRetentionPrunesFinishedHistoryButKeepsUnresolvedAttempts (0.12s)
+=== RUN   TestConsoleMonitorAdmissionRejectsOutstandingExpiredAndBackoffAttempts
+--- PASS: TestConsoleMonitorAdmissionRejectsOutstandingExpiredAndBackoffAttempts (0.11s)
+=== RUN   TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors
+=== RUN   TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/selected_member
+=== RUN   TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/missing_source
+=== RUN   TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/disabled_source
+=== RUN   TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/timeout
+=== RUN   TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/secret_upstream_error
+--- PASS: TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors (0.57s)
+    --- PASS: TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/selected_member (0.13s)
+    --- PASS: TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/missing_source (0.12s)
+    --- PASS: TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/disabled_source (0.11s)
+    --- PASS: TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/timeout (0.11s)
+    --- PASS: TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors/secret_upstream_error (0.12s)
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution
+    console_probe_test.go:735: 
+        	Error Trace:	/work/service/console_probe_test.go:735
+        	Error:      	Not equal: 
+        	            	expected: 501
+        	            	actual  : 400
+        	Test:       	TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated
+--- FAIL: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution (0.45s)
+    --- PASS: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated (0.20s)
+FAIL
+FAIL	github.com/QuantumNous/new-api/service	5.456s
+FAIL

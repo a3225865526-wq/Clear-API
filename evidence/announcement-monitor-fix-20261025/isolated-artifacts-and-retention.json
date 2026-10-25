@@ -1,0 +1,68 @@
+{
+  "html_sha256": "962089af1727124994efd93c9637077e9a7fe81ab50512319eac285ad855f61f",
+  "assets": {
+    "/static/js/vendor-ui-primitives.5564bb5e9e.js": {
+      "bytes": 322376,
+      "sha256": "356da346fc3eb102ca07ad8a3f56cf340d9f145383c7d9fd59f32cb1a404e040"
+    },
+    "/static/js/vendor-tanstack.e331468f06.js": {
+      "bytes": 178389,
+      "sha256": "81730bb1caff0f35f709125613c6dc831c0b3d820df90f351ce1a02275d232ba"
+    },
+    "/static/js/lib-react.91bc21a6cf.js": {
+      "bytes": 189032,
+      "sha256": "8cc40254295877b830502e0c0f15af6a7270b0934b56817d3c75e1ee88c3b17a"
+    },
+    "/static/js/59486.358f4047ce.js": {
+      "bytes": 714528,
+      "sha256": "a930b9ffc401d619a3b56ed9a9b0fd593b281af0dc3a032f858f83e565c85f4f"
+    },
+    "/static/js/index.848fcb2e07.js": {
+      "bytes": 5430770,
+      "sha256": "58950d0fff7fab7b2ba3498de3e175e096e7acb16b63d0ca64d8276977f0ff40",
+      "status_key_set_contains_fix": true,
+      "status_key_set_snippet": "new Set([\"HeaderNavModules\",\"SidebarModulesAdmin\",\"Notice\",\"console_setting.announcements\",\"console_setting.announcements_enabled\",\"LogConsumeEnabled\",\"QuotaPerUnit\",\"USDExchangeRate\",\"Displ",
+      "notice_invalidation_count": 1,
+      "notice_invalidation_snippets": [
+        ".invalidateQueries({queryKey:[\"system-options\"]}),\"Notice\"===n.key&&e.invalidateQueries({queryKey:[\"notice\"]}),d.has(n.key)){e.invalidateQueries({qu"
+      ]
+    },
+    "/static/css/index.d36ff0d4f8.css": {
+      "bytes": 434853,
+      "sha256": "033015d328dbb786d0b4b7cbf8bc8a9532ba913e2d75aebae4c4f7420ecd33bb"
+    }
+  },
+  "binary_sha256": "841e904f60d5fd7f9b9e263ffc51e2f878030c8a4b1d9747a2a978dbdb4bfe27",
+  "isolated_state": {
+    "users": [
+      {
+        "id": 1,
+        "role": 100,
+        "username": "auditroot"
+      },
+      {
+        "id": 2,
+        "role": 1,
+        "username": "viewer"
+      }
+    ],
+    "announcements": [
+      {
+        "id": 1,
+        "type": "default",
+        "status": "published",
+        "content": "Preserved historical announcement — isolated fixture",
+        "publishDate": "2020-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "type": "default",
+        "extra": "",
+        "status": "published",
+        "content": "Closeout announcement — isolated test only",
+        "publishDate": "2026-10-25T03:23:48.834Z"
+      }
+    ]
+  },
+  "ordinary_option_http": 403
+}

@@ -1,0 +1,6 @@
+=== RUN   TestUpdateChannelRejectsStatusField
+--- PASS: TestUpdateChannelRejectsStatusField (0.00s)
+=== RUN   TestChannelStatusValidation
+--- PASS: TestChannelStatusValidation (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/controller	0.068s

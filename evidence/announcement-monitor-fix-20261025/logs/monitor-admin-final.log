@@ -1,0 +1,6 @@
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated
+--- PASS: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution (0.63s)
+    --- PASS: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated (0.28s)
+PASS
+ok  	github.com/QuantumNous/new-api/service	0.694s

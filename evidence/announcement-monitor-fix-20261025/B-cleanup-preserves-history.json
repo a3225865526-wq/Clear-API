@@ -1,0 +1,13 @@
+{
+  "synthetic_fixture_only": true,
+  "new_test_announcement_removed_by_admin_UI": true,
+  "remaining_old_fixture": [
+    {
+      "id": 1,
+      "content": "Preserved historical announcement — isolated fixture",
+      "publishDate": "2020-01-01T00:00:00Z",
+      "type": "default",
+      "status": "published"
+    }
+  ]
+}

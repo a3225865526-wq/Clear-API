@@ -1,0 +1,16 @@
+=== RUN   TestGetAnnouncementsOnlyReturnsPublishedRecords
+--- PASS: TestGetAnnouncementsOnlyReturnsPublishedRecords (0.00s)
+=== RUN   TestGetAnnouncementsHidesUnknownStatus
+--- PASS: TestGetAnnouncementsHidesUnknownStatus (0.00s)
+=== RUN   TestValidateConsoleSettingsAnnouncementStatus
+=== RUN   TestValidateConsoleSettingsAnnouncementStatus/accepts_the_three_release_states
+=== RUN   TestValidateConsoleSettingsAnnouncementStatus/accepts_records_without_a_status
+=== RUN   TestValidateConsoleSettingsAnnouncementStatus/rejects_an_unknown_status
+=== RUN   TestValidateConsoleSettingsAnnouncementStatus/rejects_a_non-string_status
+--- PASS: TestValidateConsoleSettingsAnnouncementStatus (0.00s)
+    --- PASS: TestValidateConsoleSettingsAnnouncementStatus/accepts_the_three_release_states (0.00s)
+    --- PASS: TestValidateConsoleSettingsAnnouncementStatus/accepts_records_without_a_status (0.00s)
+    --- PASS: TestValidateConsoleSettingsAnnouncementStatus/rejects_an_unknown_status (0.00s)
+    --- PASS: TestValidateConsoleSettingsAnnouncementStatus/rejects_a_non-string_status (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/setting/console_setting	0.012s

@@ -1,0 +1,24 @@
+=== RUN   TestTryTieredSettleUsesFrozenRequestInput
+--- PASS: TestTryTieredSettleUsesFrozenRequestInput (0.00s)
+=== RUN   TestTryTieredSettle_PreConsumeMatchesPostConsume
+--- PASS: TestTryTieredSettle_PreConsumeMatchesPostConsume (0.00s)
+=== RUN   TestTryTieredSettle_CacheTokensAffectSettlement
+--- PASS: TestTryTieredSettle_CacheTokensAffectSettlement (0.00s)
+=== RUN   TestTryTieredSettle_GroupRatioScaling
+--- PASS: TestTryTieredSettle_GroupRatioScaling (0.00s)
+=== RUN   TestBuildTieredTokenParams_GPT_WithCache
+--- PASS: TestBuildTieredTokenParams_GPT_WithCache (0.00s)
+=== RUN   TestSamePriceCacheReadsRemainInInput
+=== RUN   TestSamePriceCacheReadsRemainInInput/openai
+=== RUN   TestSamePriceCacheReadsRemainInInput/anthropic
+=== RUN   TestSamePriceCacheReadsRemainInInput/anthropic_mixed_cache_TTLs
+--- PASS: TestSamePriceCacheReadsRemainInInput (0.00s)
+    --- PASS: TestSamePriceCacheReadsRemainInInput/openai (0.00s)
+    --- PASS: TestSamePriceCacheReadsRemainInInput/anthropic (0.00s)
+    --- PASS: TestSamePriceCacheReadsRemainInInput/anthropic_mixed_cache_TTLs (0.00s)
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution
+=== RUN   TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated
+--- PASS: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution (0.57s)
+    --- PASS: TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution/allowlist_management_keeps_execution_and_accounting_isolated (0.24s)
+PASS
+ok  	github.com/QuantumNous/new-api/service	0.646s

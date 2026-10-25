@@ -1,0 +1,705 @@
+=== RUN   TestModelPricingConversionDatabaseMatrix
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite
+[SYS] 2026/10/24 - 16:11:41 | SQL_DSN not set, using SQLite as database 
+    model_management_test.go:121: database version: 3.50.4
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/frontend_contract/audio_pricing_ignores_text_cache_discounts
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-defaults
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-4-32k
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-free-cache
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/claude-3-7-sonnet-20250219
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-image-default
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-image-free
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/deepseek-chat
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-4o-custom
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gemini-2.5-pro-custom
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/vendor/claude-sonnet-4
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-custom
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/deepseek-reasoner
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-5.6-sol
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-5.5
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-6-astra
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-free
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-fixed
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-4o-2024-05-13
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-image-2
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/qwen-image-3.0-pro
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/wan2.7-image-pro
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/video-summarizer
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/sora-transcript-helper
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/gpt-realtime
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/conversion-audio
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/unrecognized-model/none
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/none
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/standard
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/vendor/claude-sonnet-4-6-high/claude_ttl
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/custom-CLAUDE-alias/claude_ttl
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/deepseek-reasoner/standard
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/custom-cache/standard
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/same_price_cache_reads_preserve_overlapping_categories
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/same_price_cache_reads_preserve_overlapping_categories/CreateCacheRatio
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/same_price_cache_reads_preserve_overlapping_categories/ImageRatio
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:41 | SYSTEM | relay error: parameters.n must be an integer between 1 and 128 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:41 | SYSTEM | relay error: invalid image parameters: json: cannot unmarshal number -1 into Go struct field ImageBillingParameters.n of type uint 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:41 | SYSTEM | relay error: invalid image parameters: json: cannot unmarshal number 0.5 into Go struct field ImageBillingParameters.n of type uint 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:41 | SYSTEM | relay error: parameters.n must be an integer between 1 and 128 
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/gemini-2.5-flash
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/gemini-2.5-flash-zero
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-audio
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-free-audio
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-audio-cache
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-text-cache
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/gemini-2.5-flash-overlap
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/catalog-image-prefix-opaque
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/opaque-catalog-image-suffix
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/before-catalog-image-middle-after
+=== RUN   TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/opaque-catalog-video
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres
+    model_management_test.go:121: isolated database: newapi_audit_1792858301507309152 (postgres)
+[SYS] 2026/10/24 - 16:11:41 | using PostgreSQL as database 
+    model_management_test.go:121: database version: PostgreSQL 17.6 (Debian 17.6-2.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/frontend_contract/audio_pricing_ignores_text_cache_discounts
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-defaults
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-4-32k
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-free-cache
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/claude-3-7-sonnet-20250219
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-image-default
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-image-free
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/deepseek-chat
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-4o-custom
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gemini-2.5-pro-custom
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/vendor/claude-sonnet-4
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-custom
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/deepseek-reasoner
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-5.6-sol
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-5.5
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-6-astra
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-free
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-fixed
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-4o-2024-05-13
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-image-2
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/qwen-image-3.0-pro
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/wan2.7-image-pro
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/video-summarizer
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/sora-transcript-helper
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/gpt-realtime
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/conversion-audio
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/unrecognized-model/none
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/none
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/standard
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/vendor/claude-sonnet-4-6-high/claude_ttl
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/custom-CLAUDE-alias/claude_ttl
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/deepseek-reasoner/standard
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/custom-cache/standard
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/same_price_cache_reads_preserve_overlapping_categories
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/same_price_cache_reads_preserve_overlapping_categories/CreateCacheRatio
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/same_price_cache_reads_preserve_overlapping_categories/ImageRatio
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:42 | SYSTEM | relay error: parameters.n must be an integer between 1 and 128 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:42 | SYSTEM | relay error: invalid image parameters: json: cannot unmarshal number -1 into Go struct field ImageBillingParameters.n of type uint 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:42 | SYSTEM | relay error: invalid image parameters: json: cannot unmarshal number 0.5 into Go struct field ImageBillingParameters.n of type uint 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[ERR] 2026/10/24 - 16:11:42 | SYSTEM | relay error: parameters.n must be an integer between 1 and 128 
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/gemini-2.5-flash
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/gemini-2.5-flash-zero
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-audio
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-free-audio
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-audio-cache
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-text-cache
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/gemini-2.5-flash-overlap
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/catalog-image-prefix-opaque
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/opaque-catalog-image-suffix
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/before-catalog-image-middle-after
+=== RUN   TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/opaque-catalog-video
+--- PASS: TestModelPricingConversionDatabaseMatrix (0.94s)
+    --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite (0.40s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/frontend_contract/audio_pricing_ignores_text_cache_discounts (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-defaults (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-4-32k (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-free-cache (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/claude-3-7-sonnet-20250219 (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-image-default (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-image-free (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/deepseek-chat (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-4o-custom (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gemini-2.5-pro-custom (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/vendor/claude-sonnet-4 (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-custom (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/deepseek-reasoner (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-5.6-sol (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-5.5 (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-6-astra (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-free (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-fixed (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-4o-2024-05-13 (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-image-2 (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/qwen-image-3.0-pro (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/wan2.7-image-pro (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/video-summarizer (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/sora-transcript-helper (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/gpt-realtime (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/conversion-audio (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names (0.02s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/unrecognized-model/none (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/none (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/standard (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/vendor/claude-sonnet-4-6-high/claude_ttl (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/custom-CLAUDE-alias/claude_ttl (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/deepseek-reasoner/standard (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/cache_writes_follow_configured_prices_and_claude_names/custom-cache/standard (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/same_price_cache_reads_preserve_overlapping_categories (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/same_price_cache_reads_preserve_overlapping_categories/CreateCacheRatio (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/same_price_cache_reads_preserve_overlapping_categories/ImageRatio (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments (0.02s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/gemini-2.5-flash (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/gemini-2.5-flash-zero (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-audio (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-free-audio (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-audio-cache (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/media-text-cache (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/media_prices_and_request_adjustments/gemini-2.5-flash-overlap (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/catalog-image-prefix-opaque (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/opaque-catalog-image-suffix (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/before-catalog-image-middle-after (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/sqlite/endpoint_metadata/opaque-catalog-video (0.00s)
+    --- PASS: TestModelPricingConversionDatabaseMatrix/postgres (0.54s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/frontend_contract/audio_pricing_ignores_text_cache_discounts (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-defaults (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-4-32k (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-free-cache (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/claude-3-7-sonnet-20250219 (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-image-default (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-image-free (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/deepseek-chat (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-4o-custom (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gemini-2.5-pro-custom (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/vendor/claude-sonnet-4 (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-custom (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/deepseek-reasoner (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-5.6-sol (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-5.5 (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-6-astra (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-free (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-fixed (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-4o-2024-05-13 (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-image-2 (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/qwen-image-3.0-pro (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/wan2.7-image-pro (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/video-summarizer (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/sora-transcript-helper (0.01s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/gpt-realtime (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/conversion-audio (0.02s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names (0.02s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/unrecognized-model/none (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/none (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/gpt-5.6-terra/standard (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/vendor/claude-sonnet-4-6-high/claude_ttl (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/custom-CLAUDE-alias/claude_ttl (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/deepseek-reasoner/standard (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/cache_writes_follow_configured_prices_and_claude_names/custom-cache/standard (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/same_price_cache_reads_preserve_overlapping_categories (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/same_price_cache_reads_preserve_overlapping_categories/CreateCacheRatio (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/same_price_cache_reads_preserve_overlapping_categories/ImageRatio (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments (0.03s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/gemini-2.5-flash (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/gemini-2.5-flash-zero (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-audio (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-free-audio (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-audio-cache (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/media-text-cache (0.00s)
+            --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/media_prices_and_request_adjustments/gemini-2.5-flash-overlap (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/catalog-image-prefix-opaque (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/opaque-catalog-image-suffix (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/before-catalog-image-middle-after (0.00s)
+        --- PASS: TestModelPricingConversionDatabaseMatrix/postgres/endpoint_metadata/opaque-catalog-video (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/controller	1.001s

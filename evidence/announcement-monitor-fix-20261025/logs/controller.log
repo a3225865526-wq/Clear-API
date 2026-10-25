@@ -1,0 +1,35 @@
+=== RUN   TestAnnouncementOptionsRejectOrdinaryUsers
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /api/option/              --> github.com/QuantumNous/new-api/controller.GetOptions (2 handlers)
+[GIN-debug] PUT    /api/option/              --> github.com/QuantumNous/new-api/controller.UpdateOption (2 handlers)
+--- PASS: TestAnnouncementOptionsRejectOrdinaryUsers (0.01s)
+=== RUN   TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch
+[SYS] 2026/10/25 - 03:12:53 | SQL_DSN not set, using SQLite as database 
+    console_monitor_probe_test.go:20: database version: 3.50.4
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] POST   /monitors/:id/probe       --> github.com/QuantumNous/new-api/controller.TriggerConsoleMonitorAdmin (2 handlers)
+[ERR] 2026/10/25 - 03:12:53 | SYSTEM | audit actor role unavailable (request_id=202610250312537576686358268d9d6LtCkXZlp, actor_role=0) 
+--- PASS: TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch (0.13s)
+=== RUN   TestManualChannelStatusSynchronizesCacheAndRouting
+[SYS] 2026/10/25 - 03:12:53 | SQL_DSN not set, using SQLite as database 
+    console_monitor_probe_test.go:93: database version: 3.50.4
+[SYS] 2026/10/25 - 03:12:53 | channels synced from database 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[SYS] 2026/10/25 - 03:12:53 | channels synced from database 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[SYS] 2026/10/25 - 03:12:53 | channels synced from database 
+--- PASS: TestManualChannelStatusSynchronizesCacheAndRouting (0.12s)
+PASS
+ok  	github.com/QuantumNous/new-api/controller	0.322s

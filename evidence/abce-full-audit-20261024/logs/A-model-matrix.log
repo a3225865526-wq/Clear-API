@@ -1,0 +1,75 @@
+=== RUN   TestModelPricingCleanupAcrossDialects
+=== RUN   TestModelPricingCleanupAcrossDialects/sqlite
+
+2026/10/24 16:11:25 [32m/workspace/model/model_pricing_cleanup_dialect_test.go:60 [33mSLOW SQL >= 200ms
+[0m[31;1m[342.113ms] [33m[rows:0][35m CREATE TABLE `options` (`key` text,`value` text,PRIMARY KEY (`key`))[0m
+
+2026/10/24 16:11:25 [32m/workspace/model/model_pricing_cleanup_dialect_test.go:102 [33mSLOW SQL >= 200ms
+[0m[31;1m[215.548ms] [33m[rows:1][35m INSERT INTO `abilities` (`group`,`model`,`channel_id`,`enabled`,`priority`,`weight`,`tag`) VALUES ("default","dialect-model",801,true,0,0,NULL)[0m
+
+2026/10/24 16:11:25 [31;1m/workspace/model/pricing.go:202 [35;1mSQL logic error: no such table: models (1)
+[0m[33m[0.163ms] [34;1m[rows:0][0m SELECT * FROM `models` WHERE `models`.`deleted_at` IS NULL
+
+2026/10/24 16:11:25 [31;1m/workspace/model/pricing.go:211 [35;1mSQL logic error: no such table: vendors (1)
+[0m[33m[0.052ms] [34;1m[rows:0][0m SELECT * FROM `vendors` WHERE `vendors`.`deleted_at` IS NULL
+
+2026/10/24 16:11:25 [31;1m/workspace/model/pricing.go:202 [35;1mSQL logic error: no such table: models (1)
+[0m[33m[0.039ms] [34;1m[rows:0][0m SELECT * FROM `models` WHERE `models`.`deleted_at` IS NULL
+
+2026/10/24 16:11:25 [31;1m/workspace/model/pricing.go:211 [35;1mSQL logic error: no such table: vendors (1)
+[0m[33m[0.022ms] [34;1m[rows:0][0m SELECT * FROM `vendors` WHERE `vendors`.`deleted_at` IS NULL
+=== RUN   TestModelPricingCleanupAcrossDialects/mysql
+
+2026/10/24 16:11:27 [32m/workspace/model/model_pricing_cleanup_dialect_test.go:60 [33mSLOW SQL >= 200ms
+[0m[31;1m[1603.465ms] [33m[rows:0][35m CREATE TABLE `abilities` (`group` varchar(64),`model` varchar(255),`channel_id` bigint,`enabled` boolean,`priority` bigint DEFAULT 0,`weight` bigint unsigned DEFAULT 0,`tag` varchar(191),PRIMARY KEY (`group`,`model`,`channel_id`),INDEX `idx_abilities_channel_id` (`channel_id`),INDEX `idx_abilities_priority` (`priority`),INDEX `idx_abilities_weight` (`weight`),INDEX `idx_abilities_tag` (`tag`))[0m
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:202 [35;1mError 1146 (42S02): Table 'audit_matrix.models' doesn't exist
+[0m[33m[0.801ms] [34;1m[rows:0][0m SELECT * FROM `models` WHERE `models`.`deleted_at` IS NULL
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:211 [35;1mError 1146 (42S02): Table 'audit_matrix.vendors' doesn't exist
+[0m[33m[0.496ms] [34;1m[rows:0][0m SELECT * FROM `vendors` WHERE `vendors`.`deleted_at` IS NULL
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:202 [35;1mError 1146 (42S02): Table 'audit_matrix.models' doesn't exist
+[0m[33m[0.443ms] [34;1m[rows:0][0m SELECT * FROM `models` WHERE `models`.`deleted_at` IS NULL
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:211 [35;1mError 1146 (42S02): Table 'audit_matrix.vendors' doesn't exist
+[0m[33m[0.330ms] [34;1m[rows:0][0m SELECT * FROM `vendors` WHERE `vendors`.`deleted_at` IS NULL
+=== RUN   TestModelPricingCleanupAcrossDialects/postgres
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:202 [35;1mERROR: relation "models" does not exist (SQLSTATE 42P01)
+[0m[33m[0.981ms] [34;1m[rows:0][0m SELECT * FROM "models" WHERE "models"."deleted_at" IS NULL
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:211 [35;1mERROR: relation "vendors" does not exist (SQLSTATE 42P01)
+[0m[33m[0.433ms] [34;1m[rows:0][0m SELECT * FROM "vendors" WHERE "vendors"."deleted_at" IS NULL
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:202 [35;1mERROR: relation "models" does not exist (SQLSTATE 42P01)
+[0m[33m[0.167ms] [34;1m[rows:0][0m SELECT * FROM "models" WHERE "models"."deleted_at" IS NULL
+
+2026/10/24 16:11:28 [31;1m/workspace/model/pricing.go:211 [35;1mERROR: relation "vendors" does not exist (SQLSTATE 42P01)
+[0m[33m[0.132ms] [34;1m[rows:0][0m SELECT * FROM "vendors" WHERE "vendors"."deleted_at" IS NULL
+--- PASS: TestModelPricingCleanupAcrossDialects (3.36s)
+    --- PASS: TestModelPricingCleanupAcrossDialects/sqlite (0.81s)
+    --- PASS: TestModelPricingCleanupAcrossDialects/mysql (2.29s)
+    --- PASS: TestModelPricingCleanupAcrossDialects/postgres (0.27s)
+=== RUN   TestModelPricingCleanupReportDescribesStoredRecordsOnly
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+--- PASS: TestModelPricingCleanupReportDescribesStoredRecordsOnly (0.01s)
+=== RUN   TestApplyModelPricingCleanupEmptiesStoredPricesInsteadOfRestoringDefaults
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+--- PASS: TestApplyModelPricingCleanupEmptiesStoredPricesInsteadOfRestoringDefaults (0.01s)
+=== RUN   TestClearedModelPricingStaysClearedAfterReload
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+--- PASS: TestClearedModelPricingStaysClearedAfterReload (0.01s)
+=== RUN   TestApplyModelPricingCleanupDoesNotMaterializeDefaultsForOtherModels
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+--- PASS: TestApplyModelPricingCleanupDoesNotMaterializeDefaultsForOtherModels (0.01s)
+=== RUN   TestApplyModelPricingCleanupRejectsUnreviewedState
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+[SYS] 2026/10/24 - 16:11:28 | channels synced from database 
+--- PASS: TestApplyModelPricingCleanupRejectsUnreviewedState (0.01s)
+PASS
+ok  	github.com/QuantumNous/new-api/model	3.478s

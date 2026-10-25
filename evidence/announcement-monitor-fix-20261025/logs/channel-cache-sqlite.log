@@ -1,0 +1,12 @@
+=== RUN   TestManualChannelStatusSynchronizesCacheAndRouting
+=== RUN   TestManualChannelStatusSynchronizesCacheAndRouting/sqlite
+[SYS] 2026/10/25 - 03:20:07 | SQL_DSN not set, using SQLite as database 
+    console_monitor_probe_test.go:99: database version: 3.50.4
+[SYS] 2026/10/25 - 03:20:07 | channels synced from database 
+[SYS] 2026/10/25 - 03:20:07 | channels synced from database 
+[SYS] 2026/10/25 - 03:20:07 | channels synced from database 
+[SYS] 2026/10/25 - 03:20:07 | channels synced from database 
+--- PASS: TestManualChannelStatusSynchronizesCacheAndRouting (0.10s)
+    --- PASS: TestManualChannelStatusSynchronizesCacheAndRouting/sqlite (0.10s)
+PASS
+ok  	github.com/QuantumNous/new-api/controller	0.166s

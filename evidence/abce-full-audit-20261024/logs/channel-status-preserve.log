@@ -1,0 +1,4 @@
+=== RUN   TestSaveStatusStateFromSingleKeySnapshotPreservesUnownedColumns
+--- PASS: TestSaveStatusStateFromSingleKeySnapshotPreservesUnownedColumns (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/model	0.035s

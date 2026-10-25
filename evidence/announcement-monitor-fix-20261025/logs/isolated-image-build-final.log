@@ -1,0 +1,118 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.70kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/golang:1.26.1-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039
+#4 DONE 0.1s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 224B done
+#5 DONE 0.0s
+
+#6 [stage-2  1/11] FROM docker.io/library/debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a
+#6 resolve docker.io/library/debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a 0.0s done
+#6 DONE 0.0s
+
+#7 [builder 1/8] FROM docker.io/oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6
+#7 resolve docker.io/oven/bun:1.4.0@sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6 0.0s done
+#7 DONE 0.0s
+
+#8 [builder2 1/8] FROM docker.io/library/golang:1.26.1-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039
+#8 resolve docker.io/library/golang:1.26.1-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039 0.0s done
+#8 DONE 0.0s
+
+#9 [internal] load build context
+#9 transferring context: 410.30kB 0.2s done
+#9 DONE 0.2s
+
+#10 [builder 2/8] WORKDIR /build/web
+#10 CACHED
+
+#11 [builder 3/8] COPY web/package.json web/bun.lock ./
+#11 CACHED
+
+#12 [builder 5/8] COPY ./web ./
+#12 CACHED
+
+#13 [builder 6/8] COPY ./docs/clearapi /build/docs/clearapi
+#13 CACHED
+
+#14 [builder 7/8] COPY ./VERSION /build/VERSION
+#14 CACHED
+
+#15 [builder 4/8] RUN bun install --frozen-lockfile
+#15 CACHED
+
+#16 [builder2 3/8] ADD go.mod go.sum ./
+#16 CACHED
+
+#17 [builder2 2/8] WORKDIR /build
+#17 CACHED
+
+#18 [builder2 4/8] ADD relaykit/go.mod ./relaykit/go.mod
+#18 CACHED
+
+#19 [builder 8/8] RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat /build/VERSION) bun run build
+#19 CACHED
+
+#20 [builder2 5/8] RUN go mod download
+#20 CACHED
+
+#21 [builder2 6/8] COPY . .
+#21 DONE 0.8s
+
+#22 [builder2 7/8] COPY --from=builder /build/web/dist ./web/dist
+#22 DONE 0.3s
+
+#23 [builder2 8/8] RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api     && go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o production-bootstrap ./cmd/production-bootstrap     && go build -ldflags "-s -w" -o finance-migrate ./cmd/finance-migrate     && go build -ldflags "-s -w" -o billing-migrate ./cmd/billing-migrate     && go build -ldflags "-s -w" -o legacy-store-retire ./cmd/legacy-store-retire
+#23 DONE 34.6s
+
+#24 [stage-2  2/11] RUN apt-get update     && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget     && rm -rf /var/lib/apt/lists/*     && update-ca-certificates
+#24 CACHED
+
+#25 [stage-2  3/11] COPY --from=builder2 /build/new-api /
+#25 DONE 0.2s
+
+#26 [stage-2  4/11] COPY --from=builder2 /build/production-bootstrap /
+#26 DONE 0.1s
+
+#27 [stage-2  5/11] COPY --from=builder2 /build/finance-migrate /
+#27 DONE 0.1s
+
+#28 [stage-2  6/11] COPY --from=builder2 /build/billing-migrate /
+#28 DONE 0.1s
+
+#29 [stage-2  7/11] COPY --from=builder2 /build/legacy-store-retire /
+#29 DONE 0.1s
+
+#30 [stage-2  8/11] COPY scripts/production-entrypoint.sh /entrypoint-secure.sh
+#30 DONE 0.0s
+
+#31 [stage-2  9/11] RUN chmod 0755 /entrypoint-secure.sh
+#31 DONE 0.2s
+
+#32 [stage-2 10/11] COPY LICENSE THIRD-PARTY-LICENSES.md /licenses/
+#32 DONE 0.0s
+
+#33 [stage-2 11/11] WORKDIR /data
+#33 DONE 0.0s
+
+#34 exporting to image
+#34 exporting layers
+#34 exporting layers 4.0s done
+#34 exporting manifest sha256:0cca707cbebce5c7ea41a9c75a459330f67bde47bcf7410d6a5de46ed2e48bf3 0.0s done
+#34 exporting config sha256:f922fa1c71be04349cab010d371159d600e6de61fb2419bf43d04c6f25343aa8 done
+#34 exporting attestation manifest sha256:e3168e5d279732dd0ba8a5e06ddc5a7768ab85efb5f21b27f5db654de0eca187 0.0s done
+#34 exporting manifest list sha256:af104bba777e9e4f2f43c91325fe1008ab87b98cd0089f525960cd9b364a84b9 done
+#34 naming to docker.io/library/clearapi-closeout:isolated-20261025 done
+#34 unpacking to docker.io/library/clearapi-closeout:isolated-20261025
+#34 unpacking to docker.io/library/clearapi-closeout:isolated-20261025 1.0s done
+#34 DONE 5.2s

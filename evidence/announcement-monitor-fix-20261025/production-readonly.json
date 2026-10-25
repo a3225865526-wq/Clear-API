@@ -1,0 +1,52 @@
+{
+  "utc": "2026-10-25T03:11:41.013444+00:00",
+  "gateway": {
+    "id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+    "image": "sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020",
+    "revision": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+    "started": "2026-10-24T15:18:11.692823281Z"
+  },
+  "flags": {
+    "CLEARAPI_POOL_ENABLED": "false",
+    "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+    "CLEARAPI_CLOSED_LAUNCH": "false"
+  },
+  "database": {
+    "admin": [
+      {
+        "id": 1,
+        "role": 100,
+        "status": 1,
+        "username": "admin"
+      }
+    ],
+    "pricing_hashes": [
+      {
+        "key": "CompletionRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "ModelPrice",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "ModelRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "billing_setting.billing_expr",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "billing_setting.billing_mode",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      },
+      {
+        "key": "CacheRatio",
+        "md5": "99914b932bd37a50b983c5e7c90ae93b"
+      }
+    ],
+    "announcement_hash": "70c1d2a7a57c7a84147bd7e123eca0f6",
+    "transaction_read_only": "on"
+  }
+}
