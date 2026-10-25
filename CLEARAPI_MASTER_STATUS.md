@@ -1,3 +1,11 @@
+## 2026-10-25 — 本地验收调整：渠道状态隐藏调度说明
+
+- 按用户截图移除每日调度说明卡（频率、暂停说明、上次/下次调度时间），仅改 channel-status 页面及聚焦回归；后台调度、API、数据库与历史记录保持。
+- 新增回归先失败，修复后该交互文件 6 项通过；typecheck、两文件 lint/格式、Docker 构建及实际浏览器通过。本地原地址 `http://localhost:13100/channel-status` 已更新，沿用原隔离数据。
+- 尚未部署生产；继续等待用户验收。专项报告新增本次调整，截图 `evidence/notice-history-20261025/schedule-hidden.png`；新候选 SHA 记录于最终交付和外部 candidate-receipt.json，取代原 5fe7cbf 候选。
+
+---
+
 ## 2026-10-25 — 公告位置/持久化已读 + 每日监测历史：隔离候选完成，未部署生产
 
 - 独立工作区 `D:/Codex/worktrees/clearapi-notice-history-fix/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-notice-history-fix-20261025`，基于 879eff62（包含已部署 1aef1aec）。原 a032 工作区 152 项现有文件、动态线 72d26b26、运行适配 3124d8a1 的 5 项修改和正式源码 879eff62 原样保留，未 reset/clean/覆盖。保护 manifest/patch 在 D:/Codex/backups/clearapi-notice-history-20261025/。

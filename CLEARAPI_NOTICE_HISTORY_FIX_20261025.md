@@ -1,5 +1,15 @@
 # 公告展示控制与每日渠道历史联合修复候选（2026-10-25）
 
+## 用户本地验收补记：隐藏调度说明卡
+
+按截图移除渠道状态页的每日调度频率、暂停说明和上次/下次调度时间。仅删除前端展示与不再使用的日期格式化代码，不改变后台调度、历史查询或任何数据库字段。修改文件为 `web/src/features/channel-status/index.tsx` 及其 `__tests__/interaction.test.tsx`；回归 fixture 仍返回 schedule，断言页面不展示它且保留渠道/刷新/周期筛选。
+
+验证：新用例先失败；`node node_modules/vitest/vitest.mjs run src/features/channel-status/__tests__/interaction.test.tsx` 6 项 PASS；`bun run typecheck` PASS；两文件 oxlint 0 error/0 warning；实际 Dockerfile 构建并更新原本地预览地址，浏览器确认说明卡已消失。没有后端/数据库改动，不重复三库或历史部署 E2E；未部署生产。此补记取代下方历史截图中的调度说明展示，后台功能及此前验证继续保留。新本地验证镜像为 `clearapi-notice-history:preview-no-schedule`（SOURCE_COMMIT 空，仅供隔离预览），回执见 `evidence/notice-history-20261025/schedule-hidden.json`。
+
+![隐藏调度说明后的渠道状态](D:/Codex/worktrees/clearapi-notice-history-fix/clearapi-controlled-launch-20261020/evidence/notice-history-20261025/schedule-hidden.png)
+
+---
+
 本轮完成源码修复、隔离验证及本地候选准备；**未部署生产，未修改生产公告、已读记录、渠道配置或费用策略，真实供应商收费请求为 0**。PG03 继续暂缓，D 线生图未纳入。最终候选是包含本报告的本地分支 `codex/clearapi-notice-history-fix-20261025` 的提交；完整 SHA 在最终交付及外部 candidate-receipt.json 记录，避免在提交正文中伪造自引用 SHA。
 
 ## 实际基线与成果保护

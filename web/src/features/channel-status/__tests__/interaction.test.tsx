@@ -108,6 +108,39 @@ async function renderPage() {
 }
 
 describe('channel monitoring interaction', () => {
+  it('keeps channel status controls while hiding scheduler metadata returned by the API', async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          ...fixture,
+          schedule: {
+            timezone: 'Asia/Shanghai',
+            interval_seconds: 86400,
+            execution_enabled: false,
+            last_run_at: 1790812800,
+            next_run_at: 1790899200,
+            task_status: 'succeeded',
+          },
+        },
+      },
+    })
+    await renderPage()
+    expect(
+      await screen.findByRole('button', { name: 'View First channel details' })
+    ).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeVisible()
+    expect(screen.getByRole('tab', { name: '7 days' })).toBeVisible()
+    expect(
+      screen.queryByText(/Daily monitoring schedule/)
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByText(/Monitoring execution paused/)
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText(/Last scheduler run/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Next scheduler run/)).not.toBeInTheDocument()
+  })
+
   it('stops automatic requests when the page is unmounted', async () => {
     const view = await renderPage()
     await screen.findByRole('button', { name: 'View First channel details' })

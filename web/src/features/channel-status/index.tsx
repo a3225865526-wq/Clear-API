@@ -28,7 +28,6 @@ import { LoadingState } from '@/components/loading-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { toIntlLocale } from '@/i18n/languages'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { aggregateMonitorStatus, getMonitoring } from './api'
@@ -40,10 +39,7 @@ const MonitorAdmin = lazy(() =>
 )
 
 export function ChannelStatusPage() {
-  const { t, i18n } = useTranslation()
-  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
-  const time = (value: number) =>
-    new Date(value * 1000).toLocaleString(locale, { timeZone: 'Asia/Shanghai' })
+  const { t } = useTranslation()
   const userId = useAuthStore((state) => state.auth.user?.id)
   const isRoot = useAuthStore((state) => state.auth.user?.role === 100)
   const [manage, setManage] = useState(false)
@@ -135,34 +131,6 @@ export function ChannelStatusPage() {
                 : t('monitor.autoRefresh', { seconds })}
             </span>
           </div>
-          {data?.schedule && (
-            <div className='space-y-1 rounded-xl border p-4 text-sm'>
-              <p>
-                {t('Daily monitoring schedule')} ·{' '}
-                {t('Every 24 hours after the previous task finishes')} ·
-                Asia/Shanghai
-              </p>
-              <p>
-                {t(
-                  data.schedule.execution_enabled
-                    ? 'Monitoring execution enabled'
-                    : 'Monitoring execution paused; daily observations still record skipped targets'
-                )}
-              </p>
-              <p>
-                {t('Last scheduler run')}:{' '}
-                {data.schedule.last_run_at
-                  ? time(data.schedule.last_run_at)
-                  : t('monitor.notChecked')}
-              </p>
-              <p>
-                {t('Next scheduler run')}:{' '}
-                {data.schedule.next_run_at
-                  ? time(data.schedule.next_run_at)
-                  : t('Running')}
-              </p>
-            </div>
-          )}
           {query.isPending && <LoadingState />}
           {query.isError && (
             <ErrorState

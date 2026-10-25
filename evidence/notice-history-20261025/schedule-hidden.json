@@ -1,0 +1,15 @@
+{
+  "utc": "2026-10-25T07:41:28.432742+00:00",
+  "scope": "Remove only scheduler summary card from channel status page",
+  "previous_candidate": "5fe7cbf66d3064cd961864508b588d735f9499e1",
+  "preview_url": "http://localhost:13100/channel-status",
+  "image": "sha256:f9c374ac114f319d1cd2e2e79664dfec8c1ecdda818227d7c6e4323f122c4cb8",
+  "source_commit_label": "",
+  "regression_tests": "6 PASS; added case failed before removal",
+  "typecheck": "PASS",
+  "lint": "0 errors, 0 warnings (2 changed TS/TSX files)",
+  "browser": "Actual page retains cards/refresh/history and contains no scheduler summary",
+  "backend_or_schema_changes": false,
+  "production_modified": false,
+  "deploy_authorization": "Awaiting user review; no production deployment"
+}
