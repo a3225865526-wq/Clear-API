@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -156,7 +157,24 @@ func SaveConsoleMonitorPolicyAdmin(c *gin.Context) {
 	c.JSON(200, gin.H{"success": true})
 }
 
-func TriggerConsoleMonitorAdmin(c *gin.Context) { monitorAdminError(c, model.ErrMonitorIntegration) }
+func TriggerConsoleMonitorAdmin(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	var input struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err != nil || id <= 0 || c.ShouldBindJSON(&input) != nil || !input.Confirm {
+		monitorAdminError(c, model.ErrMonitorInvalid)
+		return
+	}
+	executor := service.ConsoleProbeExecutor{DB: model.DB, Adapters: map[string]service.ConsoleProbeAdapter{"channel": channelConsoleProbeAdapter{}}}
+	result, err := executor.RunWithResult(c.Request.Context(), id)
+	if err != nil {
+		monitorAdminError(c, err)
+		return
+	}
+	recordManageAudit(c, "monitor.probe", map[string]any{"monitor_id": id, "attempt_id": result.AttemptID, "probe_id": result.ProbeID})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+}
 
 func ConsoleMonitorHistoryAdmin(c *gin.Context) {
 	if !model.ConsoleMonitoringReady(model.DB) {

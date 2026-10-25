@@ -305,7 +305,7 @@ func ReserveConsoleMonitorAttempt(ctx context.Context, db *gorm.DB, id int, now 
 		if err := tx.First(&m, id).Error; err != nil {
 			return err
 		}
-		if !m.Enabled || m.Archived {
+		if !m.Allowlisted || !m.Published || !m.Enabled || m.Archived {
 			return ErrMonitorPaused
 		}
 		if err := ValidateMonitorTarget(tx, &m); err != nil {

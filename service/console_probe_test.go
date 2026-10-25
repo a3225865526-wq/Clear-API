@@ -218,6 +218,14 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			require.ErrorIs(t, executor.Run(ctx, m.ID), model.ErrMonitorPaused)
 			assert.Zero(t, mock.calls)
 			require.NoError(t, db.Model(&model.ConsoleMonitorPolicy{}).Where("id = 1").Updates(map[string]any{"enabled": true, "max_concurrent": 1, "daily_requests": 2, "daily_cost_micros": 20}).Error)
+			for _, gate := range []string{"allowlisted", "published", "enabled"} {
+				require.NoError(t, db.Model(&model.ConsoleMonitor{}).Where("id = ?", m.ID).Update(gate, false).Error)
+				result, err := executor.RunWithResult(ctx, m.ID)
+				require.ErrorIs(t, err, model.ErrMonitorPaused, gate)
+				assert.Zero(t, result.AttemptID)
+				assert.Zero(t, mock.calls)
+				require.NoError(t, db.Model(&model.ConsoleMonitor{}).Where("id = ?", m.ID).Update(gate, true).Error)
+			}
 			require.NoError(t, executor.Run(ctx, m.ID))
 			assert.Equal(t, 1, mock.calls)
 			require.ErrorIs(t, executor.Run(ctx, m.ID), model.ErrMonitorBudget)
@@ -227,6 +235,8 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			assert.Equal(t, "normal", probe.Status)
 			assert.Equal(t, 1, probe.SourceChannelID)
 			// A different model has its own records; failed probes preserve channels.
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, second.ID, true))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, second.ID, "published", true))
 			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, second.ID, "enabled", true))
 			mock.failure = true
 			require.NoError(t, executor.Run(ctx, second.ID))
@@ -234,6 +244,8 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			probe = model.ConsoleProbe{}
 			require.NoError(t, db.Where("monitor_id = ?", second.ID).First(&probe).Error)
 			assert.Equal(t, "error", probe.Status)
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, third.ID, true))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, third.ID, "published", true))
 			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, third.ID, "enabled", true))
 			require.ErrorIs(t, executor.Run(ctx, third.ID), model.ErrMonitorBudget)
 			assert.Equal(t, 2, mock.calls)
@@ -472,6 +484,8 @@ func TestConsoleMonitorProbePanicRetainsCapacityUntilReconciled(t *testing.T) {
 			second := m
 			second.ID, second.Model = 0, "model-b"
 			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &second))
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, second.ID, true))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, second.ID, "published", true))
 			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, second.ID, "enabled", true))
 			require.ErrorIs(t, e.Run(ctx, second.ID), model.ErrMonitorBudget)
 			assert.Equal(t, 1, adapter.calls, "another monitor cannot start a probe while the panic holds capacity")
@@ -542,19 +556,23 @@ func TestConsoleMonitorReconciliationIsSingleClaimAndRecoveryKeepsLease(t *testi
 	assert.Zero(t, saved.FinishedAt)
 }
 
-func TestConsoleMonitorSchedulerRespectsPauseAndAdmissionWithoutPublication(t *testing.T) {
+func TestConsoleMonitorSchedulerRespectsPauseAndPublication(t *testing.T) {
 	db, m := consoleMonitorFixture(t)
 	mock := &monitorMockAdapter{}
 	e := service.ConsoleProbeExecutor{DB: db, Adapters: map[string]service.ConsoleProbeAdapter{"channel": mock}}
 	require.ErrorIs(t, e.RunScheduled(context.Background()), model.ErrMonitorPaused)
 	require.NoError(t, model.SetConsoleMonitorSwitch(context.Background(), db, m.ID, "enabled", true))
 	require.NoError(t, model.SaveConsoleMonitorPolicy(context.Background(), db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 2, DailyCostMicros: 20, RetentionDays: 90}))
+	require.NoError(t, model.SetConsoleMonitorSwitch(context.Background(), db, m.ID, "published", false))
+	require.NoError(t, e.RunScheduled(context.Background()))
+	assert.Zero(t, mock.calls, "unpublished targets cannot execute")
+	require.NoError(t, model.SetConsoleMonitorSwitch(context.Background(), db, m.ID, "published", true))
 	require.NoError(t, e.RunScheduled(context.Background()))
 	require.NoError(t, e.RunScheduled(context.Background()))
 	assert.Equal(t, 1, mock.calls, "repeated scheduler passes cannot bypass per-target intervals")
 	var saved model.ConsoleMonitor
 	require.NoError(t, db.First(&saved, m.ID).Error)
-	assert.False(t, saved.Published, "execution never changes publication")
+	assert.True(t, saved.Published, "execution never changes publication")
 }
 
 func TestConsoleMonitorRetentionPrunesFinishedHistoryButKeepsUnresolvedAttempts(t *testing.T) {
@@ -591,6 +609,8 @@ func consoleMonitorFixture(t *testing.T) (*gorm.DB, model.ConsoleMonitor) {
 	require.NoError(t, db.Create(&model.Channel{Id: 2, Status: common.ChannelStatusManuallyDisabled, Key: "fixture-secret", Models: "gpt-6.1-sol", Name: "Disabled"}).Error)
 	m := model.ConsoleMonitor{ChannelID: 1, TargetKind: "channel", TargetRef: "1", Model: "gpt-6-luna", Protocol: "openai_chat", DisplayName: "Approved", IntervalSeconds: 60, TimeoutSeconds: 1, StaleSeconds: 900, DailyRequests: 2, RequestCostMicros: 10}
 	require.NoError(t, model.SaveConsoleMonitor(context.Background(), db, &m))
+	require.NoError(t, model.SetConsoleMonitorAllowlisted(context.Background(), db, m.ID, true))
+	require.NoError(t, model.SetConsoleMonitorSwitch(context.Background(), db, m.ID, "published", true))
 	return db, m
 }
 
@@ -632,6 +652,8 @@ func TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors(t *testing
 			require.NoError(t, db.Create(&model.Ability{ChannelId: 1, Group: "fixture-group", Model: m.Model, Enabled: true}).Error)
 			m.ID, m.ChannelID, m.TargetKind, m.TargetRef = 0, 0, "group_route", "fixture-group"
 			require.NoError(t, model.SaveConsoleMonitor(context.Background(), db, &m))
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(context.Background(), db, m.ID, true))
+			require.NoError(t, model.SetConsoleMonitorSwitch(context.Background(), db, m.ID, "published", true))
 			require.NoError(t, model.SetConsoleMonitorSwitch(context.Background(), db, m.ID, "enabled", true))
 			require.NoError(t, model.SaveConsoleMonitorPolicy(context.Background(), db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 2, DailyCostMicros: 20, RetentionDays: 90}))
 			adapter := &monitorMockAdapter{probe: func(context.Context, model.ConsoleMonitor) (service.ConsoleProbeOutcome, error) {
@@ -710,7 +732,10 @@ func TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution(t *te
 	response = request(http.MethodPut, fmt.Sprintf("%s/%d/switch/enabled", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{"value": true, "confirm": true})
 	assert.Equal(t, http.StatusNotImplemented, response.Code)
 	response = request(http.MethodPost, fmt.Sprintf("%s/%d/probe", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{})
-	assert.Equal(t, http.StatusNotImplemented, response.Code)
+	assert.Equal(t, http.StatusBadRequest, response.Code)
+	response = request(http.MethodPost, fmt.Sprintf("%s/%d/probe", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{"confirm": true})
+	assert.Equal(t, http.StatusForbidden, response.Code)
+	assert.Contains(t, response.Body.String(), "MONITOR_TARGET_DENIED", "the fixture uses the unsupported openai_chat transport")
 	var recoverable model.ConsoleMonitorAttempt
 	require.NoError(t, db.Create(&model.ConsoleMonitorAttempt{MonitorID: m.ID, StartedAt: time.Now().Unix(), CleanupState: "cleanup_reconciling", ReservedCostMicros: 10}).Error)
 	require.NoError(t, db.Last(&recoverable).Error)
