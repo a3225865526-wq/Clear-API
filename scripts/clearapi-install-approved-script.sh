@@ -8,7 +8,7 @@ TARGET=/opt/clearapi/bin/production-deploy.sh
 LOCK=/run/lock/clearapi-production-deploy.lock
 EXPECTED_SHA=e7404a8e4094224f007272d5571c3b649d152590b8968c3296822a0e3de8d5c5
 EXPECTED_IDENTITY_SHA=9e64059039b6de48d6e88bce6a3cfb587f4835d9b4234f0cc0693343e1e4fa95
-EXPECTED_LIST_SHA=5e87f373771d4317c08a2f16d27d90fd3d5d6d71b11fdda28b5a02c74aa4df73
+EXPECTED_LIST_SHA=47885f601dbaffabd3ecc0057d314c0680dc70b582c39703bd3bfc66666da9f8
 # Approval is pinned to bytes, not to an arbitrary caller-provided checksum.
 # The supplied release commit is recorded provenance, not a Git signature check.
 EXPECTED_COMMIT=${2:-}
