@@ -25,16 +25,57 @@ import {
 } from '../lib/content'
 
 describe('bundled Clear API documentation', () => {
-  it('loads the approved quickstart content in Chinese by default', () => {
+  it('loads Chinese setup with placeholder credentials and a bounded first request', () => {
     const quickstart = documentationChapters.find(
       (chapter) => chapter.id === 'quickstart'
     )
 
+    expect(quickstart?.content.zh).toContain('https://api.example.com/v1')
     expect(quickstart?.content.zh).toContain(
-      'Base URL: https://www.clear999.com'
+      "Read-Host 'API Key' -AsSecureString"
     )
+    expect(quickstart?.content.zh).toContain('"max_tokens":128')
+    expect(quickstart?.content.zh).toContain('YOUR_MODEL_ID')
     expect(quickstart?.content.zh).toContain('/v1/chat/completions')
     expect(getDocumentationTitle(quickstart?.content.zh ?? '')).toBe('快速开始')
+  })
+
+  it('resolves all bundled article links and heading fragments in both languages', () => {
+    for (const chapter of documentationChapters) {
+      for (const language of ['zh', 'en'] as const) {
+        for (const match of chapter.content[language].matchAll(
+          /\]\(([^)]+\.md(?:#[^)]*)?|\.\.\/(?:zh|en)\/)\)/g
+        )) {
+          const resolved = resolveDocumentationLink(
+            match[1],
+            chapter.id,
+            language
+          )
+          expect(resolved, `${chapter.id}: ${match[1]}`).toBeDefined()
+          const url = new URL(resolved ?? '', 'https://documentation.invalid')
+          if (!url.hash) continue
+          const targetId = url.pathname.split('/')[3] || 'overview'
+          const target = documentationChapters.find(
+            (item) => item.id === targetId
+          )
+          const targetLanguage = url.searchParams.get('lang') as 'zh' | 'en'
+          const headings = [
+            ...(target?.content[targetLanguage] ?? '').matchAll(
+              /^#{1,6}\s+(.+)$/gm
+            ),
+          ].map((heading) =>
+            heading[1]
+              .toLowerCase()
+              .trim()
+              .replaceAll(/[^\p{L}\p{N}\s-]/gu, '')
+              .replaceAll(/\s+/g, '-')
+          )
+          expect(headings, match[1]).toContain(
+            decodeURIComponent(url.hash.slice(1))
+          )
+        }
+      }
+    }
   })
 
   it('keeps English quickstart and client guides available from source Markdown', () => {

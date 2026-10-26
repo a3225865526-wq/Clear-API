@@ -10,4 +10,4 @@
 | Codex CLI | A route is not client support | Not verified | Not verified | Do not advertise |
 | Claude Code | A route is not client support | Not verified | Not verified | Do not advertise |
 
-The known business record is `88token / Channel 1 / gpt-6-luna / default` with a successful plain-text Chat Completions call. This does not verify every account, model, protocol, or client.
+A historical plain-text Chat Completions success record exists. It does not verify every account, model, protocol, or client. This guide update did not connect to a live upstream or verify production availability.

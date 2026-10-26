@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -66,6 +66,7 @@ export function ModelPricingPanel(props: {
   const query = useModelPricing([props.modelName], Boolean(props.modelName))
   const save = useSaveModelPricing()
   const [entry, setEntry] = useState<ModelPricingEntry | null>(null)
+  const [dirty, setDirty] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
   const [upstreamOpen, setUpstreamOpen] = useState(false)
   const editor = useRef<ModelPricingEditorPanelHandle>(null)
@@ -84,10 +85,21 @@ export function ModelPricingPanel(props: {
     const loaded = query.data?.entries.find(
       (item) => item.model_name === props.modelName
     )
-    if (loaded && (!entry || entry.model_name !== props.modelName)) {
+    // Keep the draft's version while editing so a concurrent update still
+    // conflicts, but let pristine editors follow the shared pricing query.
+    if (loaded && (!entry || entry.model_name !== props.modelName || !dirty)) {
       setEntry(loaded)
     }
-  }, [query.data, entry, props.modelName])
+  }, [query.data, entry, props.modelName, dirty])
+
+  const onDirtyChange = props.onDirtyChange
+  const handleDirtyChange = useCallback(
+    (value: boolean) => {
+      setDirty(value)
+      onDirtyChange?.(value)
+    },
+    [onDirtyChange]
+  )
 
   const persist = async (reset = false) => {
     if (!entry) return
@@ -167,7 +179,7 @@ export function ModelPricingPanel(props: {
         editData={editData}
         usageSchema={entry.usage_schema}
         pluginVariants={entry.plugin_variants}
-        onDirtyChange={props.onDirtyChange}
+        onDirtyChange={handleDirtyChange}
         onSave={() => persist()}
         isSaving={save.isPending}
         className='rounded-none border-0'

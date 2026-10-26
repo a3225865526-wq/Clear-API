@@ -8060,6 +8060,8 @@
     "Clearing...": "消去中…",
     "Failed to clean up model pricing": "モデル料金の整理に失敗しました",
     "Failed to load model pricing records": "モデル料金の読み込みに失敗しました",
+    "Copy support QQ group": "サポートQQグループ番号をコピー",
+    "Support QQ group": "サポートQQグループ",
     "Generate price table from expression": "式から料金表を生成",
     "Generated prices applied to the draft. Save model pricing to activate them.": "生成した料金を下書きに適用しました。モデル料金を保存すると有効になります。",
     "Model pricing cleanup": "モデル料金の整理",

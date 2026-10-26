@@ -8060,6 +8060,8 @@
     "Clearing...": "Effacement…",
     "Failed to clean up model pricing": "Échec du nettoyage des tarifs",
     "Failed to load model pricing records": "Impossible de charger les tarifs des modèles",
+    "Copy support QQ group": "Copier le numéro du groupe QQ du support",
+    "Support QQ group": "Groupe QQ du support",
     "Generate price table from expression": "Générer les tarifs depuis l’expression",
     "Generated prices applied to the draft. Save model pricing to activate them.": "Tarifs générés appliqués au brouillon. Enregistrez les tarifs du modèle pour les activer.",
     "Model pricing cleanup": "Nettoyage des tarifs des modèles",

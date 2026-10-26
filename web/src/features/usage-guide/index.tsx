@@ -62,6 +62,12 @@ export function UsageGuidePage() {
     <SectionPageLayout>
       <SectionPageLayout.Title>{t('console.guide')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
+        <Button
+          variant='outline'
+          render={<Link to='/docs/clearapi' search={{ lang: 'zh' }} />}
+        >
+          {t('footer.columns.docs.links.quickStart')}
+        </Button>
         {query.isPending && <LoadingState />}
         {query.isError && <ErrorState onRetry={() => void query.refetch()} />}
         {query.data && (

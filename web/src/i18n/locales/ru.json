@@ -8060,6 +8060,8 @@
     "Clearing...": "Очистка…",
     "Failed to clean up model pricing": "Не удалось очистить цены моделей",
     "Failed to load model pricing records": "Не удалось загрузить цены моделей",
+    "Copy support QQ group": "Копировать номер группы поддержки QQ",
+    "Support QQ group": "Группа поддержки QQ",
     "Generate price table from expression": "Создать таблицу цен из выражения",
     "Generated prices applied to the draft. Save model pricing to activate them.": "Созданные цены применены к черновику. Сохраните цены модели, чтобы активировать их.",
     "Model pricing cleanup": "Очистка цен моделей",

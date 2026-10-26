@@ -72,6 +72,7 @@ type ModelRatioFormProps = {
   onReset: () => void
   isSaving: boolean
   isResetting: boolean
+  onEditorDirtyChange?: (dirty: boolean) => void
   variant?: 'default' | 'unset'
 }
 
@@ -175,6 +176,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
   onReset,
   isSaving,
   isResetting,
+  onEditorDirtyChange,
   variant = 'default',
 }: ModelRatioFormProps) {
   const { t } = useTranslation()
@@ -307,6 +309,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
           <div className='flex min-h-0 flex-1 flex-col gap-6'>
             <ModelRatioVisualEditor
               ref={visualEditorRef}
+              onDirtyChange={onEditorDirtyChange}
               savedModelPrice={savedValues.ModelPrice}
               savedModelRatio={savedValues.ModelRatio}
               savedCacheRatio={savedValues.CacheRatio}

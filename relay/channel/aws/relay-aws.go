@@ -228,47 +228,9 @@ func getAwsModelID(requestModel string) string {
 	return requestModel
 }
 
-func prepareAwsBudget(c *gin.Context, info *relaycommon.RelayInfo, body []byte, nova bool) *types.NewAPIError {
-	if helper.RequiresOutboundTextBudget(info) {
-		copyInfo := *info
-		copyInfo.FinalRequestRelayFormat = types.RelayFormatClaude
-		if nova {
-			var request NovaRequest
-			if err := common.Unmarshal(body, &request); err != nil || request.InferenceConfig == nil || request.InferenceConfig.MaxTokens <= 0 {
-				return types.NewError(errors.New("cannot verify Nova output budget"), types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
-			}
-			messages := make([]map[string]any, 0, len(request.Messages))
-			for _, message := range request.Messages {
-				var text strings.Builder
-				for _, content := range message.Content {
-					text.WriteString(content.Text)
-				}
-				messages = append(messages, map[string]any{"role": message.Role, "content": text.String()})
-			}
-			var err error
-			body, err = common.Marshal(map[string]any{"messages": messages, "max_tokens": request.InferenceConfig.MaxTokens})
-			if err != nil {
-				return types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
-			}
-		}
-		// The SDK sends the original body; its limit must already be on wire.
-		var wire dto.ClaudeRequest
-		if err := common.Unmarshal(body, &wire); err != nil || wire.MaxTokens == nil || *wire.MaxTokens == 0 {
-			return types.NewError(errors.New("cannot verify AWS output budget"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
-		}
-		if _, err := helper.PrepareOutboundTextBudget(c, &copyInfo, body); err != nil {
-			return types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
-		}
-	}
+func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types.NewAPIError, *dto.Usage) {
 	if c.Request.Context().Err() == nil {
 		c.Set("upstream_attempted", true)
-	}
-	return nil
-}
-
-func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types.NewAPIError, *dto.Usage) {
-	if err := prepareAwsBudget(c, info, a.AwsReq.(*bedrockruntime.InvokeModelInput).Body, false); err != nil {
-		return err, nil
 	}
 
 	requestContext := c.Request.Context()
@@ -304,8 +266,8 @@ func awsHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types
 }
 
 func awsStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types.NewAPIError, *dto.Usage) {
-	if err := prepareAwsBudget(c, info, a.AwsReq.(*bedrockruntime.InvokeModelWithResponseStreamInput).Body, false); err != nil {
-		return err, nil
+	if c.Request.Context().Err() == nil {
+		c.Set("upstream_attempted", true)
 	}
 	requestContext := c.Request.Context()
 	ctx, cancel := newAwsInvokeContext(requestContext)
@@ -367,8 +329,8 @@ streamLoop:
 
 // Nova模型处理函数
 func handleNovaRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor) (*types.NewAPIError, *dto.Usage) {
-	if err := prepareAwsBudget(c, info, a.AwsReq.(*bedrockruntime.InvokeModelInput).Body, true); err != nil {
-		return err, nil
+	if c.Request.Context().Err() == nil {
+		c.Set("upstream_attempted", true)
 	}
 
 	requestContext := c.Request.Context()

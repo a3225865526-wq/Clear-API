@@ -8060,6 +8060,8 @@
     "Clearing...": "清空中…",
     "Failed to clean up model pricing": "清理模型定價失敗",
     "Failed to load model pricing records": "載入模型定價紀錄失敗",
+    "Copy support QQ group": "複製客服 QQ 群號",
+    "Support QQ group": "QQ群",
     "Generate price table from expression": "從運算式產生價格表",
     "Generated prices applied to the draft. Save model pricing to activate them.": "產生的價格已套用至草稿。儲存模型定價後生效。",
     "Model pricing cleanup": "模型定價清理",

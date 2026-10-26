@@ -118,14 +118,28 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		if info.ChannelMeta != nil {
 			detail.ChannelId = info.ChannelId
 		}
+		// A reservation is an estimate, not a maximum charge. Reuse the atomic
+		// wallet/token debit for measured usage above it. If balances cannot
+		// cover the debit, the completion retains the target for review.
+		var reserveErr error
+		if actualQuota > s.preConsumedQuota {
+			reserveErr = model.RaiseBillingReservation(info.RequestId, actualQuota)
+			if reserveErr == nil {
+				s.preConsumedQuota, s.tokenConsumed, s.chargedQuota = actualQuota, actualQuota, actualQuota
+				s.syncRelayInfo()
+			}
+		}
 		if err := model.RequestBillingCompletion(info.RequestId, actualQuota, false, detail); err != nil {
-			return err
+			return errors.Join(reserveErr, err)
 		}
 		charged, err := model.ApplyBillingCompletion(s.relayInfo.RequestId)
 		if err == nil {
 			s.chargedQuota, s.settled, s.fundingSettled = charged, true, true
 		}
-		return err
+		if err != nil {
+			return errors.Join(reserveErr, err)
+		}
+		return nil
 	}
 	delta := actualQuota - s.preConsumedQuota
 	if delta == 0 {

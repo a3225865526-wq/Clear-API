@@ -741,12 +741,13 @@ func TestResponsesWSOutboundBillingBudget(t *testing.T) {
 		payload, apiErr := buildResponsesWSCreatePayload(c, info, request, nil, streamID)
 		require.Nil(t, apiErr)
 		assert.Contains(t, string(payload), "tool result")
-		assert.GreaterOrEqual(t, billing.preConsumed, 400)
+		assert.Equal(t, 10, billing.preConsumed)
 	}
 	billing.reject = true
 	payload, apiErr := buildResponsesWSCreatePayload(c, info, request, nil, "")
-	require.NotNil(t, apiErr)
-	assert.Nil(t, payload)
+	require.Nil(t, apiErr)
+	assert.NotEmpty(t, payload)
+	assert.Equal(t, 10, billing.preConsumed)
 	assert.False(t, c.GetBool("upstream_attempted"))
 }
 

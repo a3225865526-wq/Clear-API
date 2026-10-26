@@ -183,31 +183,24 @@ export function RatioSettingsCard({
   const [upstreamPricingOpen, setUpstreamPricingOpen] = useState(false)
   const [cleanupOpen, setCleanupOpen] = useState(false)
   const [hasGeneratedDraft, setHasGeneratedDraft] = useState(false)
+  const [editorDirty, setEditorDirty] = useState(false)
 
   const pricingQuery = useModelPricing()
   const savePricing = useSaveModelPricing()
   const [pricingBaseline, setPricingBaseline] =
     useState<ModelPricingConfig | null>(null)
-  useEffect(() => {
-    if (!pricingBaseline && pricingQuery.data) {
-      setPricingBaseline(pricingQuery.data)
-    }
-  }, [pricingBaseline, pricingQuery.data])
   const modelDefaults = useMemo(
-    () =>
-      pricingBaseline
-        ? {
-            ...initialModelDefaults,
-            ...pricingBaseline.options,
-            BillingMode:
-              pricingBaseline.options['billing_setting.billing_mode'],
-            BillingExpr:
-              pricingBaseline.options['billing_setting.billing_expr'],
-            PluginBillingExpr:
-              pricingBaseline.options['billing_setting.plugin_billing_expr'],
-          }
-        : initialModelDefaults,
-    [initialModelDefaults, pricingBaseline]
+    () => ({
+      ...pricingOptions(pricingBaseline?.options ?? {}),
+      ExposeRatioEnabled: initialModelDefaults.ExposeRatioEnabled,
+      BillingMode:
+        pricingBaseline?.options['billing_setting.billing_mode'] ?? '{}',
+      BillingExpr:
+        pricingBaseline?.options['billing_setting.billing_expr'] ?? '{}',
+      PluginBillingExpr:
+        pricingBaseline?.options['billing_setting.plugin_billing_expr'] ?? '{}',
+    }),
+    [initialModelDefaults.ExposeRatioEnabled, pricingBaseline]
   )
   const resetMutation = useMutation({
     mutationFn: async () => {
@@ -301,6 +294,15 @@ export function RatioSettingsCard({
       ),
     },
   })
+
+  const modelDirty = modelForm.formState.isDirty
+  useEffect(() => {
+    // The embedded visual editor owns a draft before it reaches modelForm.
+    // Preserve both drafts and their optimistic-concurrency baseline.
+    if (pricingQuery.data && !modelDirty && !editorDirty) {
+      setPricingBaseline(pricingQuery.data)
+    }
+  }, [pricingQuery.data, modelDirty, editorDirty])
 
   useEffect(() => {
     modelNormalizedDefaults.current = {
@@ -584,6 +586,7 @@ export function RatioSettingsCard({
             onReset={handleResetRatios}
             isSaving={updateOption.isPending || savePricing.isPending}
             isResetting={resetMutation.isPending}
+            onEditorDirtyChange={setEditorDirty}
             variant={tab === 'unset-models' ? 'unset' : 'default'}
           />
         </>

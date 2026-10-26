@@ -8135,7 +8135,9 @@
     "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.": "Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.",
     "Announcement published. Click \"Save Settings\" to apply.": "Announcement published. Click \"Save Settings\" to apply.",
     "Announcement withdrawn. Click \"Save Settings\" to apply.": "Announcement withdrawn. Click \"Save Settings\" to apply.",
-    "Failed to load model pricing records": "Failed to load model pricing records"
+    "Failed to load model pricing records": "Failed to load model pricing records",
+    "Copy support QQ group": "Copy support QQ group",
+    "Support QQ group": "Support QQ group"
   },
   "CNY per USD": "CNY per USD",
   "Cache read price": "Cache read price",

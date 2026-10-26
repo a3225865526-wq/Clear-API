@@ -1,3 +1,47 @@
+## 2026-10-26 Asia/Shanghai — A/B/C 统一集成候选，正式本地部署待执行
+
+- 基线由本轮固定 SSH 身份下正式 preflight 实查：`86451cd20e9e0b3b3205afab44ebc3c422218502`，Gateway healthy=true；独立工作区 `D:/Codex/worktrees/clearapi-abc-release-20261026/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-abc-release-20261026`。本条所在提交为集成应用提交；原工作区及 A 工作区未提交总控、其他工作成果均未修改。
+- 原始提交：A `5681fe8ccf5b7d5f2d5aef3f16f0b526b17af4d1`；B `a6dfd057c61d51bcbf099c95c39a287e2f0a92df`；C `ffd750770609361c544f70d959fd80230e9cb436`。按提交差异集成，未用旧工作区覆盖；B 旧基线为 `517158135`。冲突仅七份 locale 文件，按脚本合入两个 QQ 群键，执行 i18n:sync 后剔除无关排序/同步改动；自动比较确认原翻译全部保留。
+- 帮助中心存在 `/data/usage-guide/published.json` revision 44，会整份覆盖镜像静态 pages。未改生产编辑数据或存储机制；现有 UsageGuidePage 复用 Button/Link 和既有翻译键增加 `/docs/clearapi?lang=zh` 总览入口；补充已有 access 测试覆盖有编辑稿时入口仍可见。静态文章的 paths/source 与线上稿完全兼容，线上编辑文章保留原内容，新总览与各指南走既有独立文档路由。地址说明与 API Key 页面 server_address/当前源站回退一致；充值说明与现有 wallet Legacy/商城/线下入口一致。
+- 实际验证：Docker golang:1.25.1、network none、复用缓存运行 `go test ./relay/helper ./service ./relay ./relay/channel/aws -run "^Test(Basic|ProtectedBillingDatabase|BillingPreservesOptionalOutputLimits|ModelPriceHelperTieredInputPreConsumeMultiplier|OutboundTextBudgetCoversParameterOverrides|ResponsesWSOutboundBillingBudget)" -count=1 -timeout=3m` 通过；aws 包仅编译、无匹配测试。前端 `bun run test` 针对 synchronization、save-errors、pricing-sync、documentation/content、shop/catalog、usage-guide 8 文件 42 测试通过；最终入口改动后 access 2/2 通过；`bun run typecheck`、改动 11 文件 oxlint/oxfmt、`bun run build` 和 `git diff --check HEAD` 通过。
+- 范围核验：所有 Go 文件与 A 逐字一致，B/C 未改实际单价、分组倍率或计费公式；model/setting/数据库/schema/依赖/Dockerfile/relaykit 无变更。已部署 helper/state/runtime identity/backup identity/backup 五项资产与候选源码 SHA256 一致。复用 A 已通过 SQLite 3.50.4、MySQL 8.4.11、PostgreSQL 17.6 账务验证，不重复完整协议或三库矩阵。Docker Engine Linux/Buildx linux/amd64 可用。
+- 边界与未解决：取消公共最大输出预留后仍有超余额而无法足额补扣的欠费敞口，未解决；GPT-6.1-Sol `stream closed before response.completed` 未确认修复。本轮不调用收费上游、不修改生产价格/余额/渠道/支付数据、不 Push/合并 main；PG03 继续暂缓商业，D 生图不部署。
+- 正式 DryRun、构建、部署及生产回读结果另据真实执行追加；本条不提前宣称部署成功。完整日志与生产只读投影保存 `D:/Codex/backups/clearapi-abc-release-20261026/`。
+
+---
+## 2026-10-26 Asia/Shanghai — 全面精简历史请求门禁：独立本地候选，未发布
+
+- **生产与源码身份：** 本轮 10:34 上海时间通过只读 SSH 实核运行容器及镜像 OCI revision 为 `86451cd20e9e0b3b3205afab44ebc3c422218502`，容器 `e18ead979e93…` running，镜像 `sha256:80a23bb4238e9d8c716bcfcdf15e9a389e4aefd550c05c41d907b08077f3ada7`。远端 main 仍为 `a032815cb6244a7ee5e812de82f8300c02554e99`，不能当作当前生产版本。独立工作区 `D:/Codex/worktrees/clearapi-historical-gates-20261026/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-historical-gates-20261026` 从实际生产 Commit 创建，继承 `382d52108`、`517158135`、`86451cd20` 已有修复。其他工作区及其未提交成果保持原样；未引入其他支线的未发布改动。
+- **历史对照：** 对照 Protected Billing 引入前 `bff96adb73dda5dcf168216da6aaa4623aacdd68` 的输入估算预扣/正常协议转发，以及 `94a8cafad` 的窄文本保护、`793fd7476` 的公共输出/工具预算、`6af33fbca` 的 reservation hardening，再核对本轮生产继承的后续精简。复用既有 DTO、适配器、BillingSession、原子补预留、完成意图、outbox 和退款路径，没有另建 Billing 系统。
+
+| 机制及位置 | 分类 | 本轮处置 |
+| --- | --- | --- |
+| Protected Billing 的 Chat/Responses 文本、字段、渠道、覆盖参数、固定分组、`n=1` 白名单 | 不必要的兼容性限制 | 生产基线已由后续修复删除；核对后保持删除，不恢复模型/协议白名单 |
+| 普通 namespace/custom/扩展工具类型整体拒绝 | 不必要的兼容性限制 | 生产基线 `86451cd20` 已删除，继续沿用声明与实际调用分离 |
+| `price.go` 按最大输出、最昂贵缓存类别及表达式所有分支全额预留 | 不必要的兼容性限制 | 删除；恢复可配置输入估算基础预扣，表达式按当前输入估算分支执行，真实 usage 再结算 |
+| 未给 `max_*` 一概拒绝、强写网关 4096 输出额度、依赖模型批准上限 | 不必要的兼容性限制 | 删除；保留客户端原始可选参数，Claude 等协议自身已有默认值仍由原适配器处理 |
+| Responses 的 previous_response_id/conversation/prompt、encrypted_content/file_id/item_reference；Claude container；Gemini cachedContent/fileData 的 approved profile 前置 | 不必要的兼容性限制 | 删除；转发原协议引用，按上游实际输入/cache usage 结算 |
+| Compact / speech 因协议无输出上限或缺 model_output_max 被拒绝 | 不必要的兼容性限制 | 删除；沿用原 Compact/Audio 适配器和 usage/既有估算路径，不声称每个厂商都返回精确用量 |
+| 出站 profile/quarantine、授权 cap、隐藏用量 domain/表达式变量限制 | 不必要的兼容性限制 | 从真实请求分发路径移除；旧设置/计算工具及历史授权数据保留，但不再阻断普通请求 |
+| 收到真实 usage 后仅因超过 hidden profile 而保留更高预扣、不按实际退款 | 不必要的兼容性限制 | 删除；正常最终 usage 按冻结价格计算实际应收 |
+| HTTP 要求 GetBody 重放回调；AWS SDK body 重建为 Claude DTO 再估预算 | 重复检查 | 删除此准入条件和 AWS 二次预算转换；保留原 SDK 序列化及 dispatch 标记 |
+| 入站后再按 token 全量重估、改写 wire body、补最大预算；hardening 快照 schema 前置 | 重复检查 | 删除；出站只保留可绕过入站的数量边界和独立收费工具检查，原文转发 |
+| API Key/用户权限、Key 模型/分组范围、有效价格、用户/Key 余额 | 必要的权限与计费约束 | 保留；没有关闭认证或价格校验 |
+| 计费数量范围、非有限/负数价格、溢出防护、请求体大小和配置的限流/并发策略 | 必要的权限与计费约束 | 保留；透传成本字段改为数量范围校验，不因字段存在就拒绝 |
+| 基础预扣、真实 usage/cache 结算、差额退款、完成意图/outbox/恢复及幂等 | 必要的权限与计费约束 | 保留；实际费用高于基础预扣时复用 `RaiseBillingReservation` 原子补扣，不再仅因超预扣进入人工核对 |
+| 余额不足或补扣存储失败，未知/中断用量 | 必要的权限与计费约束 | 保留未结清目标/已有预留及核对记录，不制造负余额、不把失败补扣当作已收款；已分发且缺最终用量的流保留至少已有预留及已观察费用 |
+| 搜索调用预算；code_interpreter/file_search/image_generation、Gemini hosted code/url context、Claude server MCP 的缺失计量路径 | 必要的权限与计费约束 | 保留具体收费能力限制；不将无法可靠计费的独立收费功能免费放行 |
+| durable Realtime、Playground 无 Key、订阅无持久化完成路径；旧 ratio 免费→收费自动分组重试缺预留 | 必要的权限与计费约束 | 保留现有具体实现缺口限制，不能描述为这些路径已恢复完整持久化计费 |
+| Redis/batch 与直接持久化钱包冲突、缺 reservation/outbox schema；PG03 权限及现有停用状态 | 必要的权限与计费约束 | 保留；未改数据库结构、生产配置、渠道、PG03、任务插件或发布安全机制 |
+
+- **实际协议效果：** Chat、Completions、原生 Responses JSON/SSE、Claude、Gemini、Compact、Audio 不再依赖公共输出额度和隐藏输入批准 profile；Embeddings/Rerank/Moderations 沿用原路径；Images/Tasks 保留原数量和任务账务路径。本次没有新增未实现路由或供应商协议，没有修改任何 SSE 响应处理器，也没有新增等效白名单或模型特例。
+- **流式事故取证：** 当前容器自 2026-10-26 07:36 上海时间启动，限定读取的 595 行 stdout/stderr 中，该错误、response.completed、计费拒绝、context canceled/deadline exceeded 均为 0；持久日志挂载目录仅发现部署日志（89 行），也无对应记录。没有事故 Request ID 和上游原始 SSE，故**尚不能证明新增计费逻辑截断 SSE，也不声称此事故已修复**。确定可删除的预算阻断发生在发出上游请求之前；本轮未凭猜测改流式协议。
+- **必要验证：** Docker `golang:1.25.1` / `go1.25.1 linux/amd64`，缓存复用，非数据库测试 network none。最终聚焦命令 `go test -json ./relay/helper ./service ./relay ./relay/channel/aws -run '^Test(Basic|ProtectedBillingDatabase|ProtocolBilling|Billing(OutputAllowanceTransport|PreservesOptionalOutputLimits)|OutboundTextBudgetCoversParameterOverrides|ModelPriceHelperTieredInputPreConsumeMultiplier|ModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice|ResponsesWSOutboundBillingBudget)' -count=1 -timeout=3m` 通过（11 个主测试，计入子测试共 73 项）。涵盖普通协议/引用、可选 max 保留、无 GetBody 的实际本地 HTTP 转发、收费工具、超预扣补扣、预扣与结算余额不足、存储故障回滚、退款与重复完成/outbox 单次日志。
+- **精简三库验证：** SQLite **3.50.4**、MySQL **8.4.11**、PostgreSQL **17.6 (Debian 17.6-2.pgdg13+1)** 真实实例。MySQL/PostgreSQL 为本轮新建临时容器、独立测试网络、tmpfs、无生产数据，分别设置 `TEST_BILLING_DIALECT` 和临时 `TEST_BILLING_DSN` 后执行 `go test -json ./service -run '^Test(BasicBillingSettlement|ProtocolBillingCompatibility|ProtectedBillingDatabase)$' -count=1 -timeout=3m`，各 3 个主测试/31 个含子测试项通过。现有迁移 fixture 两次运行通过；生产 schema/SQL/驱动/模型无改动，未重跑完整历史迁移/数据库矩阵。精确命令、临时 DSN 和证据 SHA 见 `validation/historical-gates-20261026/validation.json`。
+- **终态及适配器：** `go test -json ./service -run '^Test(InterruptedStream|CompletedStreamEstimate|R7ZeroChunkClosure|R7CompletedProxySettlement)' -count=1 -timeout=3m` 通过（6 个主测试/8 个含子测试项）；OpenAI 原生 Responses、Chat↔Responses SSE 顺序/终态/usage 与 AWS 现有定向适配器回归通过，controller 编译通过。初次旧预算预期失败的两个 helper 测试已按基础输入预扣改正并在最终聚焦命令通过；原始失败日志保留，不称首次全通过。修改 Go 文件已 gofmt，`git diff --check` 通过。未改 relaykit，无需重复其独立构建。
+- **证据与风险：** 检查摘要位于 `validation/historical-gates-20261026/`，原始完整运行日志在 `D:/AI/API/evidence/historical-gates-20261026/`。基础预扣不保证最终成本全额覆盖：若结算前余额被耗尽，将保留实际欠款目标供核对；补预留与完成意图之间的进程崩溃仍可能留下 active 预留需核对，沿用已有持久化恢复边界。上游缺失最终 usage 的费用仍不能凭空恢复；Audio 等缺 usage 仍使用原估算，不冒充厂商实测。真实上游未请求，流式事故根因未定。
+- **交付结论：** 修改和必要定向验证完成，可进入本地部署预检；本轮未执行部署 DryRun、完整镜像构建或真实厂商验收，不等于允许生产发布。本节与代码在独立本地提交中交付，最终完整 Commit 见交付回执。没有 Push、合并、生产部署、真实收费请求，原工作区成果未清理或覆盖。
+
 ## 2026-10-26 Asia/Shanghai — 删除普通工具声明整体拒绝门禁（独立本地提交，未部署）
 
 - **基线与范围：** 以用户指定的生产 Commit `517158135021d4800ee84b333ccb593cedb2c76f` 建立独立分支 `codex/remove-tool-budget-gate`，工作区 `D:/Codex/worktrees/remove-tool-budget-gate/clearapi-controlled-launch-20261020`。本节所在提交是修复 Commit；保留原工作区未提交内容。未连接生产读取请求日志，Request ID `202610251709081606250048268d9d64WeB7Pqk` 仅作为用户提供的事故关联信息，不声称已重放该请求。

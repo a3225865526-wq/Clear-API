@@ -272,10 +272,7 @@ func TestProtectedBillingDatabase(t *testing.T) {
 			if tc.unknown {
 				want = tc.reserved
 			}
-			if tc.actual > tc.reserved {
-				require.Error(t, settlementErr)
-				want = tc.reserved
-			} else if tc.fail {
+			if tc.fail {
 				require.Error(t, settlementErr)
 				require.NoError(t, db.Callback().Update().Remove("codex-fail"))
 				require.NoError(t, model.RecoverBillingCompletions(100))
@@ -294,11 +291,7 @@ func TestProtectedBillingDatabase(t *testing.T) {
 			assert.Equal(t, want, afterKey.UsedQuota)
 			var reservation model.BillingReservation
 			require.NoError(t, db.Where("request_id = ?", tc.name).First(&reservation).Error)
-			if tc.actual > tc.reserved {
-				assert.Equal(t, "needs_review", reservation.State)
-			} else {
-				assert.Equal(t, "settled", reservation.State)
-			}
+			assert.Equal(t, "settled", reservation.State)
 			if tc.unknown {
 				var marker model.BillingReviewMarker
 				require.NoError(t, db.Where("reservation_id = ?", reservation.ID).First(&marker).Error)
@@ -344,9 +337,7 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"protocol-fixture":2}`))
 	require.NoError(t, ratio_setting.UpdateCacheRatioByJSONString(`{"protocol-fixture":0.25}`))
 	require.NoError(t, ratio_setting.UpdateCreateCacheRatioByJSONString(`{"protocol-fixture":0.5}`))
-	profile := coldProfile(100)
-	profile["model_context_max"], profile["model_output_max"] = 16384, 1024
-	setPolicy(t, operation_setting.ReserveModeOff, profilesJSON(t, map[string]map[string]any{"model::protocol-fixture": profile}))
+	setPolicy(t, operation_setting.ReserveModeEnforce, "{}")
 	openAIUsage := &dto.Usage{PromptTokens: 1000, CompletionTokens: 20, TotalTokens: 1020, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 200}}
 	for _, tc := range []struct {
 		name, path, body string
@@ -410,7 +401,9 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			} else {
 				service.PostTextConsumeQuota(c, info, usage, nil)
 			}
-			require.GreaterOrEqual(t, reserved, expected)
+			if tc.usage != nil {
+				assert.Less(t, reserved, expected, "measured usage above the basic estimate must settle normally")
+			}
 			assert.Equal(t, expected, reservationOf(t, info.RequestId).Applied)
 			require.NoError(t, info.Billing.Settle(expected))
 			info.Billing.Refund(c)
@@ -457,7 +450,7 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 	assert.Nil(t, info.Billing)
 }
 
-func TestProtocolBillingUnmeasuredInputs(t *testing.T) {
+func TestProtocolBillingReferencesDoNotRequireAdmission(t *testing.T) {
 	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
 	setPolicy(t, operation_setting.ReserveModeOff, "{}")
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -476,7 +469,11 @@ func TestProtocolBillingUnmeasuredInputs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			require.NoError(t, common.Unmarshal([]byte(tc.body), tc.request))
 			info := &relaycommon.RelayInfo{Request: tc.request, OriginModelName: "protocol-fixture"}
-			require.ErrorContains(t, helper.PrepareBillingRequest(c, info, true), tc.reason)
+			if tc.name == "MCP" {
+				require.ErrorContains(t, helper.PrepareBillingRequest(c, info, true), tc.reason)
+			} else {
+				require.NoError(t, helper.PrepareBillingRequest(c, info, true))
+			}
 			assert.Nil(t, info.Billing)
 			assert.False(t, c.GetBool("upstream_attempted"))
 		})
@@ -487,8 +484,7 @@ func TestProtocolBillingUnmeasuredInputs(t *testing.T) {
 	r := &dto.OpenAIResponsesRequest{Model: "protocol-fixture", Input: []byte(`"hello"`), PreviousResponseID: "resp_1"}
 	info := &relaycommon.RelayInfo{Request: r, OriginModelName: r.Model}
 	require.NoError(t, helper.PrepareBillingRequest(c, info, true))
-	require.NotNil(t, r.MaxOutputTokens)
-	assert.EqualValues(t, 1024, *r.MaxOutputTokens)
+	assert.Nil(t, r.MaxOutputTokens)
 	// Outbound validation cannot silently assume a cap that is absent on wire.
 	r.MaxOutputTokens = nil
 	require.NoError(t, helper.PrepareBillingRequest(c, info, false))
@@ -560,6 +556,7 @@ func TestBillingOutputAllowanceTransport(t *testing.T) {
 			info.ChannelSetting.PassThroughBodyEnabled = true
 			req, err := http.NewRequest("POST", upstream.URL, bytes.NewBufferString(tc.body))
 			require.NoError(t, err)
+			req.GetBody = nil // A replay callback is not a protocol admission condition.
 			response, err := channel.DoRequest(c, req, info)
 			if tc.wantErr != "" {
 				require.ErrorContains(t, err, tc.wantErr)
@@ -572,9 +569,9 @@ func TestBillingOutputAllowanceTransport(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, response.Body.Close())
 			<-seen
-			assert.Positive(t, gjson.GetBytes(received, tc.field).Int())
+			assert.False(t, gjson.GetBytes(received, tc.field).Exists())
+			assert.JSONEq(t, tc.body, string(received))
 			assert.True(t, gjson.GetBytes(received, "extension").Bool())
-			assert.GreaterOrEqual(t, reservation.held, int(gjson.GetBytes(received, tc.field).Int()))
 			assert.Equal(t, int64(len(received)), receivedLength)
 			if tools := gjson.Get(tc.body, "tools"); tools.Exists() {
 				assert.JSONEq(t, tools.Raw, gjson.GetBytes(received, "tools").Raw)
@@ -583,7 +580,11 @@ func TestBillingOutputAllowanceTransport(t *testing.T) {
 				toolQuota := 2 * operation_setting.GetToolPriceForModel(dto.BuildInToolWebSearch, "fixture") / 1000 * common.QuotaPerUnit
 				assert.GreaterOrEqual(t, float64(reservation.held), float64(gjson.GetBytes(received, tc.field).Int())+toolQuota)
 			}
-			// Rejection happens before HTTP dispatch, with no synthetic usage.
+			if tc.name != "paid-search" {
+				assert.Zero(t, reservation.held)
+				return
+			}
+			// Paid independent tool fees still require a real reservation.
 			reservation.available = 1
 			req, err = http.NewRequest("POST", upstream.URL, bytes.NewBufferString(tc.body))
 			require.NoError(t, err)

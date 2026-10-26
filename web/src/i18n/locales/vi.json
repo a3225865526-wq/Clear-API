@@ -8060,6 +8060,8 @@
     "Clearing...": "Đang xóa…",
     "Failed to clean up model pricing": "Không thể dọn dẹp giá mô hình",
     "Failed to load model pricing records": "Không thể tải bản ghi giá mô hình",
+    "Copy support QQ group": "Sao chép số nhóm QQ hỗ trợ",
+    "Support QQ group": "Nhóm QQ hỗ trợ",
     "Generate price table from expression": "Tạo bảng giá từ biểu thức",
     "Generated prices applied to the draft. Save model pricing to activate them.": "Giá đã tạo được áp dụng vào bản nháp. Lưu giá mô hình để kích hoạt.",
     "Model pricing cleanup": "Dọn dẹp giá mô hình",

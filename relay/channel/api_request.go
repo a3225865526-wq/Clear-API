@@ -547,15 +547,8 @@ func keepUpstreamRedirectResponse(_ *http.Request, _ []*http.Request) error {
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	req = req.WithContext(c.Request.Context())
 	if helper.RequiresOutboundTextBudget(info) {
-		if req.GetBody == nil || req.Body == nil {
-			return nil, types.NewError(errors.New("outbound request budget cannot be verified"), types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
-		}
-		body, err := req.GetBody()
-		if err != nil {
-			return nil, err
-		}
-		data, err := io.ReadAll(io.LimitReader(body, int64(max(1, common2.GetEnvOrDefault("MAX_REQUEST_BODY_MB", 128)))<<20))
-		_ = body.Close()
+		data, err := io.ReadAll(io.LimitReader(req.Body, int64(max(1, common2.GetEnvOrDefault("MAX_REQUEST_BODY_MB", 128)))<<20))
+		_ = req.Body.Close()
 		if err != nil {
 			return nil, err
 		}
