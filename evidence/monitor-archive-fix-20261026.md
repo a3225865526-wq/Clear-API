@@ -1,3 +1,13 @@
+## 2026-10-27 获授权后的真实生产执行结果：迁移成功，应用发布失败并停止
+
+- 用户明确授权显式监测迁移及正式部署。候选为 `63169051225da0fc9b09ea99b6e8f3e1cf573d25`；工具及完整证据在 `D:/AI/API/evidence/monitor-release-20261027/`，本节取代下文“尚未授权/未修改生产数据库”的当前状态，历史调查和本地测试记录保留。
+- 使用既有部署锁和 helper 备份方法，生成并验证新备份 `20261026T232914Z` 后，现有显式 `monitor-init` 迁移成功，`deleted_at` 字段/索引已存在。工具 SHA256 `5d69cce4567a3836dfdc1be60cbeb5c7d1ccba6d9b6a980581f38e5b838e30e1`；迁移前后目录、probe 历史及策略摘要一致，目录 2、未完成 attempt 0、预算策略关闭。没有发布 catalog、创建合同、启用监测、真实探测或删除目录。
+- Windows 正式脚本实际执行两次，均串行、同一干净候选、未跳过 preflight。第一次 Debian 下载 tzdata HTTP 502；在查明原因并确认现网/迁移状态后只重试一次，第二次 wget HTTP 502。两次 apt exit 100 / 脚本 exit 1，均停在本地 Linux 镜像构建，未上传归档、切换或重启生产服务，无候选镜像 config ID/归档 SHA。已停止，不再自动重试或回滚数据库。
+- 最终 helper preflight healthy=true；现网仍为 `fb695711c19106209ddbe7de73cb273a0cd67b20`，规范 OCI config ID `sha256:b7bb8edcc21a898bc4a098fe998bbde7de0929d5aedcb9ecde0ad23eb44bea8c`。本地和公网状态 API PASS，PG03 运行/Compose 均 false。直接从 Windows 访问主页返回 HTTP 403；浏览器工具因无法可靠识别 Windows 当前浏览器 URL 被安全检查终止，未完成页面或新功能生产验收，不能声称生产 E2E 通过。
+- 总控顶部记载备份、镜像、容器、迁移和失败证据。当前真实状态为“生产监测迁移完成，应用变更未上线”；没有价格/余额/账务/退款/凭据/DNS/防护修改，D 生图未部署。需要先解决构建下载及主页访问/浏览器验收阻塞，后续部署仍须完整前置和新备份。
+
+---
+
 ## 2026-10-27 发布准备回执（正式部署尚未授权）
 
 - 应用已提交：`1f0d26934a0a9ff540938616c5cc497b68bdf530`；真实 `scripts/deploy-local.ps1 -DryRun` exit 0，`DRY_RUN_NO_PRODUCTION_WRITES`，范围 backend、amd64/new-api，27 个差异文件，正式部署需要新备份。写入总控及本记录后补做最终提交的只读 DryRun，最终候选身份及实测结果保存在 `D:/AI/API/evidence/monitor-release-preflight-20261027/final-dry-run.json` 与对应退出码中。

@@ -1,3 +1,17 @@
+## 2026-10-27 Asia/Shanghai — 显式监测迁移成功；正式部署因本地镜像构建失败停止，应用未上线
+
+- **用户授权与实际候选：** 用户明确授权“显式监测迁移，本次授权正式部署”。工作区仍为 `D:/Codex/worktrees/clearapi-monitor-archive-fix/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-monitor-archive-fix-20261026`；正式脚本两次串行调用均使用干净候选 `63169051225da0fc9b09ea99b6e8f3e1cf573d25`，应用源码提交为 `1f0d26934a0a9ff540938616c5cc497b68bdf530`。本节之后另提交纯状态记录，不能将记录提交当成已部署版本；未推送或触发 GitHub 部署。
+- **迁移已真实执行成功：** 从上述候选源码单独本地编译 Linux/amd64 `cmd/monitor-init`，工具 SHA256 `5d69cce4567a3836dfdc1be60cbeb5c7d1ccba6d9b6a980581f38e5b838e30e1`，上传和容器内二次校验一致。固定 SSH pinned key、已安装 helper 哈希及生产身份通过；使用既有 `deploy_lock()` 取得生产部署锁，实际 CLI DryRun 通过后调用既有 `backup()`。全程未绕过现有 preflight/锁/备份门禁。
+- **迁移前新备份：** `20261026T232914Z`，manifest SHA256 `93d98e443f24834f2426593a49c0377079b9dc594afe59716ecf7eb52641f0b1`，密文 SHA256 `297064a899692c2b4f536d799be9d795d66d69cbfd58f494c66903550fd6a038`、12,436,567 bytes；helper 已核验完整性、运行容器/OCI commit/config ID 和当前 release manifest 身份绑定。未下载或提交备份、DSN 或凭据。
+- **迁移范围与结果：** 在生产 PostgreSQL 17.6 上执行现有 `monitor-init -dialect postgres -database <实际数据库> -migrate -apply -confirm-database <同一数据库> -approve-monitor-migration`，未提供 catalog/发布授权，未创建合同、预算或探测请求。`2026-10-26T23:30:05Z` 确认 `console_monitors.deleted_at` 及 `idx_console_monitors_deleted_at` 存在。迁移前后目录数均 2，目录（剔除新增列）、probe 历史、策略原始行的摘要完全一致；策略 enabled=false，未完成 attempt=0。旧 Gateway 容器和 commit 未变，迁移后 health PASS；迁移工具临时文件成功清理。生产数据库已发生本项获授权的结构迁移，不能再声称“生产数据库未修改”。
+- **正式部署失败的真实阶段：** 实际调用未带 DryRun/Fixture/TestTarget 的 `scripts/deploy-local.ps1`。首次在 Docker runtime 阶段从 `deb.debian.org` 下载 `tzdata` 返回 HTTP 502，apt exit 100、脚本 exit 1；没有完成镜像构建。确认脚本已退出、候选镜像不存在、现网健康且迁移状态明确后，对同一提交仅串行重试一次；第二次下载 `wget` 返回 HTTP 502，同样 apt exit 100、脚本 exit 1。两次未并发、未改 Dockerfile/镜像源、未跳过门禁；现已停止，不再自动重试。
+- **没有发生应用切换：** 两次均停在 `local Linux image build`，未发送镜像归档、未进入 VPS receive/apply、未替换或重启任何生产服务、未生成候选镜像 config ID/归档 SHA。没有生产回滚或数据库恢复操作。监测迁移已完成并保留，与旧程序兼容；本次监测模型/协议及删除功能应用代码尚未上线。
+- **失败后生产证据：** 最终真实 helper preflight 返回 healthy=true，commit=`fb695711c19106209ddbe7de73cb273a0cd67b20`，image_ref=`clearapi-local:fb695711c19106209ddbe7de73cb273a0cd67b20`，规范 OCI config ID=`sha256:b7bb8edcc21a898bc4a098fe998bbde7de0929d5aedcb9ecde0ad23eb44bea8c`，容器=`bc81f815a080847077eef70b9d49b6283559d3ebacad28617b2188c5dc83e598`。本地/公网 `/api/status` 检查通过，运行身份 PASS，锁已释放；PG03 在运行环境和有效 Compose 中均 false。未改价格、余额、账务、退款、凭据、DNS、Cloudflare 或防护配置；未调用真实上游；D 生图未部署。
+- **不能冒充的验收：** Windows Python 直接 HTTPS GET `https://www.clear999.com` 实际返回 HTTP 403，主页验收未通过；不据此猜测服务端或防护根因，不改防护也不绕过。Computer Use 两次浏览器连接超时，原生窗口恢复后因“无法可靠识别 Windows 当前浏览器 URL 以执行策略”被工具安全检查终止，本轮已停止浏览器操作。未完成浏览器页面/新功能生产验收，未执行真实删除或付费探测，不把既有本地合成测试当生产 E2E。
+- **测试与停止点：** 应用源码及测试没有变化，沿用已记录的定向测试与三库迁移通过证据，未重复完整 CI/E2E。真实输出在 `D:/AI/API/evidence/monitor-release-20261027/`：`monitor-migration.log` / `.exit.txt`、两次 `deploy-local*.stdout.json` / `.stderr.txt` / `.exit.txt`、`build-failure*.log`、`final-production-preflight.json`、`final-after-build-failure/readonly-safety-projection.json`。剩余阻塞为本地构建下载 HTTP 502、主页客户端 HTTP 403 与浏览器验收未完成。后续恢复发布须重新核对干净候选/身份并生成切换前新备份，不能拿迁移前备份替代正式部署备份；本轮到此停止。
+
+---
+
 ## 2026-10-27 Asia/Shanghai — Windows 本地发布预检通过；等待正式部署及监测迁移授权
 
 - **实际工作区及提交：** `D:/Codex/worktrees/clearapi-monitor-archive-fix/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-monitor-archive-fix-20261026`。应用变更提交 `1f0d26934a0a9ff540938616c5cc497b68bdf530`；本节为其后的状态记录提交，最终候选完整 HEAD 及只读 DryRun 回执保存在下述外部证据目录。原有其他工作树未清理或覆盖。未推送、未触发 GitHub Actions/RC/部署。
