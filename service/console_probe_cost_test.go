@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -172,8 +174,12 @@ func TestConsoleProbeConfiguredExecutionMatrix(t *testing.T) {
 }
 
 // This private transport fixture is not installed as a production contract.
+const consoleProbePayload = `{"input":"monitor probe","max_output_tokens":16,"model":"gpt-6-luna","store":false,"stream":false}`
+
 func syntheticConsoleProbeCostPolicy(now time.Time) consoleProbeCostPolicy {
 	p := consoleProbeProductionCostPolicy()
+	p.ChannelID, p.Model, p.Protocol = 1, "gpt-6-luna", "openai_responses"
+	p.payload, p.contentType, p.keyHeader = consoleProbePayload, "application/json", "Authorization"
 	p.HardCeilingMicros = 200
 	p.PricingSource = "synthetic-test-only"
 	p.proof = &consoleProbeCostProof{Version: p.Version, Payload: consoleProbePayload,
@@ -184,6 +190,190 @@ func syntheticConsoleProbeCostPolicy(now time.Time) consoleProbeCostPolicy {
 
 func consoleProbeCostTarget() model.ConsoleMonitor {
 	return model.ConsoleMonitor{ChannelID: 1, TargetKind: "channel", TargetRef: "1", Model: "gpt-6-luna", Protocol: "openai_responses"}
+}
+
+func TestConsoleProbeArbitraryModelsAndNativeProtocols(t *testing.T) {
+	for _, tc := range []struct {
+		protocol, path, contentType, response, responseType, successPath string
+		poll                                                             bool
+	}{
+		{"openai_chat", "/v1/chat/completions", "", `{"id":"chat-receipt","model":"any-provider-model","usage":{"prompt_tokens":4,"completion_tokens":2}}`, "application/json", "", false},
+		{"openai_responses", "/v1/responses", "", `{"id":"response-receipt","model":"any-provider-model","status":"completed","usage":{"input_tokens":4,"output_tokens":2}}`, "application/json", "", false},
+		{"anthropic", "/v1/messages", "", `{"id":"claude-receipt","model":"any-provider-model","usage":{"input_tokens":4,"output_tokens":2,"cache_read_input_tokens":3,"cache_creation_input_tokens":2}}`, "application/json", "", false},
+		{"gemini", "/v1beta/models/any-provider-model:generateContent", "", `{"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":2,"thoughtsTokenCount":3}}`, "application/json", "", false},
+		{"image-generation", "/v1/images/generations", "application/json", `{"data":[{"url":"https://example.invalid/synthetic.png"}]}`, "application/json", "data.0.url", false},
+		{"audio-speech", "/v1/audio/speech", "application/json", "RIFF-synthetic-WAVE", "audio/wav", "", false},
+		{"audio-transcription", "/v1/audio/transcriptions", "multipart/form-data; boundary=probe", `{"text":"synthetic transcript"}`, "application/json", "text", false},
+		{"video-generation", "/v1/videos", "application/json", `{"id":"synthetic-job","status":"queued"}`, "application/json", "", true},
+		{"custom-protocol", "/vendor/native", "application/json", `{"ok":true}`, "application/json", "ok", false},
+		{"native-html", "/vendor/native", "application/json", "<html>not an API response</html>", "text/html", "", false},
+		{"video-failed", "/v1/videos", "application/json", `{"id":"synthetic-job","status":"queued"}`, "application/json", "", true},
+	} {
+		t.Run(tc.protocol, func(t *testing.T) {
+			db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+			require.NoError(t, err)
+			connection, err := db.DB()
+			require.NoError(t, err)
+			connection.SetMaxOpenConns(1)
+			t.Cleanup(func() { require.NoError(t, connection.Close()) })
+			previous := common.MainDatabaseType()
+			common.SetMainDatabaseType(common.DatabaseTypeSQLite)
+			t.Cleanup(func() { common.SetMainDatabaseType(previous) })
+			require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Option{}))
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			var calls atomic.Int64
+			sample := `{"model":"any-provider-model","input":"monitor probe"}`
+			if tc.protocol == "image-generation" {
+				sample = `{"model":"any-provider-model","prompt":"monitor probe","n":1,"size":"1024x1024"}`
+			}
+			if tc.protocol == "audio-speech" {
+				sample = `{"model":"any-provider-model","input":"monitor probe","voice":"alloy","response_format":"wav"}`
+			}
+			if tc.poll {
+				sample = `{"model":"any-provider-model","prompt":"monitor probe","seconds":"4","size":"720x1280"}`
+			}
+			// Valid one-second mono PCM fixture; no speech or supplier media processing
+			// is claimed by these synthetic HTTP contract tests.
+			wav := make([]byte, 44+16000)
+			copy(wav, "RIFF")
+			binary.LittleEndian.PutUint32(wav[4:8], uint32(len(wav)-8))
+			copy(wav[8:], "WAVEfmt ")
+			binary.LittleEndian.PutUint32(wav[16:20], 16)
+			binary.LittleEndian.PutUint16(wav[20:22], 1)
+			binary.LittleEndian.PutUint16(wav[22:24], 1)
+			binary.LittleEndian.PutUint32(wav[24:28], 8000)
+			binary.LittleEndian.PutUint32(wav[28:32], 16000)
+			binary.LittleEndian.PutUint16(wav[32:34], 2)
+			binary.LittleEndian.PutUint16(wav[34:36], 16)
+			copy(wav[36:], "data")
+			binary.LittleEndian.PutUint32(wav[40:44], 16000)
+			if tc.protocol == "audio-transcription" {
+				sample = "--probe\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nany-provider-model\r\n--probe\r\nContent-Disposition: form-data; name=\"file\"; filename=\"sample.wav\"\r\nContent-Type: audio/wav\r\n\r\n" + string(wav) + "\r\n--probe--\r\n"
+			}
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				if r.Method == http.MethodGet {
+					assert.Equal(t, "/v1/videos/synthetic-job", r.URL.Path)
+					w.Header().Set("Content-Type", "application/json")
+					if tc.protocol == "video-failed" {
+						_, _ = w.Write([]byte(`{"id":"synthetic-job","status":"failed"}`))
+					} else {
+						_, _ = w.Write([]byte(`{"id":"synthetic-job","status":"completed"}`))
+					}
+					return
+				}
+				assert.Equal(t, tc.path, r.URL.Path)
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+				if tc.contentType != "" {
+					assert.Equal(t, sample, string(body))
+				} else if tc.protocol != "gemini" {
+					assert.Contains(t, string(body), "any-provider-model")
+				}
+				if tc.protocol == "anthropic" {
+					assert.Equal(t, "synthetic-only", r.Header.Get("X-Api-Key"))
+				} else if tc.protocol == "gemini" {
+					assert.Equal(t, "synthetic-only", r.Header.Get("X-Goog-Api-Key"))
+				} else if tc.protocol == "custom-protocol" {
+					assert.Equal(t, "synthetic-only", r.Header.Get("Api-Key"))
+					assert.Empty(t, r.Header.Get("anthropic-version"))
+				} else {
+					assert.Equal(t, "Bearer synthetic-only", r.Header.Get("Authorization"))
+				}
+				w.Header().Set("Content-Type", tc.responseType)
+				if tc.protocol == "audio-speech" {
+					_, _ = w.Write(wav)
+				} else {
+					_, _ = w.Write([]byte(tc.response))
+				}
+			}))
+			defer upstream.Close()
+			// Neither the old channel ID nor a channel model list authorizes probes.
+			require.NoError(t, db.Create(&model.Channel{Id: 7, Name: "arbitrary fixture", Key: "synthetic-only", Status: common.ChannelStatusEnabled, Models: "unrelated-listed-model", BaseURL: &upstream.URL}).Error)
+			m := model.ConsoleMonitor{ChannelID: 7, TargetKind: "channel", TargetRef: "7", Model: "any-provider-model", Protocol: tc.protocol, DisplayName: tc.protocol, IntervalSeconds: 60, TimeoutSeconds: 1, StaleSeconds: 900, DailyRequests: 2, RequestCostMicros: 100}
+			ctx := context.Background()
+			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &m))
+			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, m.ID, true))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "published", true))
+			contract := ConsoleProbeCostContract{Source: "synthetic fixture, no supplier evidence", ValidFrom: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour), InputTokenLimit: 64, InputMicros: 1, OutputMicros: 2, FixedFeeMicros: 4, HardCeilingMicros: 100}
+			if tc.contentType != "" {
+				contract.BillingUnit = "request"
+				contract.InputMicros, contract.OutputMicros = 0, 0
+				contract.NativeRequest = &ConsoleProbeNativeRequest{Path: tc.path, ContentType: tc.contentType, ResponseContentType: tc.responseType, SuccessPath: tc.successPath, BodyBase64: base64.StdEncoding.EncodeToString([]byte(sample))}
+				if tc.protocol == "custom-protocol" {
+					contract.NativeRequest.KeyHeader = "Api-Key"
+				}
+				if tc.poll {
+					contract.NativeRequest.Poll = &ConsoleProbeNativePoll{Path: "/v1/videos/{id}", IDPath: "id", StatusPath: "status", CompletedStates: []string{"completed"}, FailedStates: []string{"failed"}}
+				}
+			}
+			if tc.protocol == "image-generation" {
+				bad := contract
+				request := *contract.NativeRequest
+				bad.NativeRequest = &request
+				bad.NativeRequest.BodyBase64 = base64.StdEncoding.EncodeToString([]byte(`{"model":"any-provider-model","n":18446744073709551615}`))
+				require.ErrorIs(t, SaveConsoleProbeCostContract(ctx, db, m, bad), model.ErrMonitorInvalid)
+				bad.NativeRequest.BodyBase64 = base64.StdEncoding.EncodeToString([]byte(`{"model":"wrong-target","n":1}`))
+				require.ErrorIs(t, SaveConsoleProbeCostContract(ctx, db, m, bad), model.ErrMonitorInvalid)
+				assert.Zero(t, calls.Load())
+			}
+			require.NoError(t, SaveConsoleProbeCostContract(ctx, db, m, contract))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "enabled", true))
+			require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, Enabled: true, MaxConcurrent: 1, DailyRequests: 2, DailyCostMicros: 200, RetentionDays: 90}))
+			executor := ConsoleProbeExecutor{DB: db, Adapters: map[string]ConsoleProbeAdapter{"channel": configuredConsoleAdapter{db}}}
+			result, err := executor.RunWithResult(ctx, m.ID)
+			if tc.protocol == "native-html" {
+				require.ErrorIs(t, err, ErrMonitorLeaseUnresolved)
+				assert.Equal(t, "unknown", result.Status)
+				var attempt model.ConsoleMonitorAttempt
+				require.NoError(t, db.First(&attempt, result.AttemptID).Error)
+				assert.Zero(t, attempt.FinishedAt)
+				assert.EqualValues(t, 100, attempt.ReservedCostMicros)
+				before := calls.Load()
+				_, err = executor.RunWithResult(ctx, m.ID)
+				require.ErrorIs(t, err, model.ErrMonitorBudget)
+				assert.Equal(t, before, calls.Load(), "unresolved media cannot be retried or refunded automatically")
+				return
+			}
+			if tc.protocol == "video-failed" {
+				require.NoError(t, err)
+				assert.Equal(t, "error", result.Status)
+				assert.Nil(t, result.MeteredCostMicros)
+				var attempt model.ConsoleMonitorAttempt
+				require.NoError(t, db.First(&attempt, result.AttemptID).Error)
+				assert.Positive(t, attempt.FinishedAt)
+				assert.EqualValues(t, 100, attempt.ReservedCostMicros, "terminal failures never refund an unknown supplier charge")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "normal", result.Status)
+			require.NotNil(t, result.MeteredCostMicros)
+			if tc.contentType != "" {
+				assert.EqualValues(t, 4, *result.MeteredCostMicros)
+			} else {
+				expected := int64(12)
+				if tc.protocol == "anthropic" {
+					expected = 17
+				}
+				if tc.protocol == "gemini" {
+					expected = 18
+				}
+				assert.Equal(t, expected, *result.MeteredCostMicros)
+			}
+			if tc.poll {
+				assert.EqualValues(t, 2, calls.Load())
+				assert.Equal(t, "synthetic-job", result.UpstreamResponseID)
+			} else {
+				assert.EqualValues(t, 1, calls.Load())
+			}
+			// Any post-approval model change invalidates the supplier binding,
+			// rather than silently probing the old model or reusing its price.
+			m.Model = "changed-after-approval"
+			require.ErrorIs(t, AuthorizeConsoleProbeCost(ctx, db, m), ErrMonitorCostUnverified)
+			m.Model, m.Protocol = "any-provider-model", "changed-protocol"
+			require.ErrorIs(t, AuthorizeConsoleProbeCost(ctx, db, m), ErrMonitorCostUnverified)
+		})
+	}
 }
 
 func TestConsoleProbeWorstCaseCost(t *testing.T) {

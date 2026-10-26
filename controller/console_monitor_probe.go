@@ -5,25 +5,19 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
-	"slices"
-)
-
-const (
-	consoleProbeModel    = "gpt-6-luna"
-	consoleProbeProtocol = "openai_responses"
 )
 
 type channelConsoleProbeAdapter struct{}
 
 func (channelConsoleProbeAdapter) Authorize(ctx context.Context, m model.ConsoleMonitor) error {
-	if m.TargetKind != "channel" || m.Protocol != consoleProbeProtocol || m.ChannelID != 1 || m.Model != consoleProbeModel {
-		return model.ErrMonitorDenied
+	if m.TargetKind != "channel" {
+		return model.ErrMonitorIntegration
 	}
 	if !m.Allowlisted || !m.Published || !m.Enabled || m.Archived {
 		return model.ErrMonitorPaused
 	}
 	channel, err := model.GetChannelById(m.ChannelID, true)
-	if err != nil || channel.Status != common.ChannelStatusEnabled || channel.PoolChannelBound() || !slices.Contains(channel.GetModels(), m.Model) {
+	if err != nil || channel.Status != common.ChannelStatusEnabled || channel.PoolChannelBound() {
 		return model.ErrMonitorDenied
 	}
 	return service.AuthorizeConsoleProbeCost(ctx, model.DB, m)

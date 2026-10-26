@@ -19,6 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted.',
+  'An unfinished monitoring attempt must be resolved before this operation.',
+  'Monitoring must be allowlisted, published, enabled, and not archived before a probe can run.',
+  'The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.',
   'Probe interval (seconds)',
   'Probe timeout (seconds)',
   'Result validity (seconds)',

@@ -1,5 +1,11 @@
 {
   "translation": {
+    "An unfinished monitoring attempt must be resolved before this operation.": "Phải xử lý lần kiểm tra giám sát chưa hoàn tất trước thao tác này.",
+    "Delete archived monitoring entry \"{{name}}\" (ID {{id}})? The upstream channel and historical records will be retained.": "Xóa mục giám sát đã lưu trữ “{{name}}” (ID {{id}})? Kênh thượng nguồn và lịch sử sẽ được giữ lại.",
+    "Delete monitoring entry": "Xóa mục giám sát",
+    "Monitoring must be allowlisted, published, enabled, and not archived before a probe can run.": "Để chạy kiểm tra, mục giám sát phải được cho phép, công bố, bật và chưa lưu trữ.",
+    "Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted.": "Chỉ có thể xóa mục giám sát đã lưu trữ, đã tắt, chưa công bố và không có kiểm tra chưa hoàn tất.",
+    "The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.": "Hợp đồng chi phí giám sát thượng nguồn bị thiếu, hết hạn, không hợp lệ hoặc không khớp cấu hình kênh.",
     "{{count}} announcements deleted. Click \"Save Settings\" to apply.": "Đã xóa {{count}} thông báo. Nhấn «Lưu cài đặt» để áp dụng.",
     "Both locations": "Cả hai vị trí",
     "Budget, concurrency or minimum interval limit reached": "Đã đạt giới hạn ngân sách, đồng thời hoặc khoảng cách tối thiểu",

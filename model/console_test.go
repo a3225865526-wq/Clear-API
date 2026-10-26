@@ -71,7 +71,7 @@ func TestConsoleDatabaseMatrix(t *testing.T) {
 			require.False(t, empty.Ready)
 			require.Empty(t, empty.Channels)
 			// Representative pre-feature tables exist before opt-in monitor migration.
-			require.NoError(t, db.AutoMigrate(&User{}, &Token{}, &Log{}, &Model{}, &Vendor{}))
+			require.NoError(t, db.AutoMigrate(&User{}, &Token{}, &Log{}, &Model{}, &Vendor{}, &Channel{}))
 			require.NoError(t, db.Create(&User{Id: 1, Username: "console-user", AffCode: "fixture-one", Quota: 123, UsedQuota: 9, RequestCount: 2}).Error)
 			require.NoError(t, db.Create(&User{Id: 2, Username: "other-user", AffCode: "fixture-two", Quota: 456}).Error)
 			require.NoError(t, db.Create(&Token{UserId: 1, Key: "fixture-not-a-real-key", Status: 1, ExpiredTime: -1, UnlimitedQuota: true}).Error)

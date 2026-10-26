@@ -30,7 +30,11 @@ func ConsoleMonitorWriteGuard(c *gin.Context) {
 
 func monitorAdminError(c *gin.Context, err error) {
 	status, code := http.StatusInternalServerError, "MONITOR_INTERNAL"
+	message := ""
 	switch {
+	case errors.Is(err, model.ErrMonitorDeleteState):
+		status, code = http.StatusConflict, "MONITOR_DELETE_REQUIRES_ARCHIVE"
+		message = "Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted."
 	case errors.Is(err, model.ErrMonitorInvalid):
 		status, code = 400, "MONITOR_INVALID"
 	case errors.Is(err, model.ErrMonitorDenied):
@@ -41,18 +45,24 @@ func monitorAdminError(c *gin.Context, err error) {
 		status, code = 409, "MONITOR_BUDGET_OR_CONCURRENCY"
 	case errors.Is(err, model.ErrMonitorPaused):
 		status, code = 409, "MONITOR_PAUSED"
+		message = "Monitoring must be allowlisted, published, enabled, and not archived before a probe can run."
 	case errors.Is(err, model.ErrMonitorIntegration):
 		status, code = 501, "MONITOR_INTEGRATION_PENDING"
 	case errors.Is(err, model.ErrMonitorLease):
 		status, code = 409, "MONITOR_LEASE_UNRESOLVED"
+		message = "An unfinished monitoring attempt must be resolved before this operation."
 	case errors.Is(err, service.ErrMonitorLeaseUnresolved):
 		status, code = 409, "MONITOR_LEASE_UNRESOLVED"
 	case errors.Is(err, service.ErrMonitorCostUnverified):
 		status, code = 409, "MONITOR_COST_UNVERIFIED"
+		message = "The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration."
 	case errors.Is(err, service.ErrMonitorCostExceeded):
 		status, code = 409, "MONITOR_COST_EXCEEDED"
 	}
-	c.JSON(status, gin.H{"success": false, "code": code, "message": code})
+	if message == "" {
+		message = code
+	}
+	c.JSON(status, gin.H{"success": false, "code": code, "message": message})
 }
 
 // Discovery never serializes Channel, credentials, endpoints or pool identities.
@@ -124,6 +134,23 @@ func SaveConsoleMonitorAdmin(c *gin.Context) {
 	}
 	recordManageAudit(c, "monitor.configuration", map[string]any{"monitor_id": m.ID, "target_kind": m.TargetKind})
 	c.JSON(200, gin.H{"success": true, "data": gin.H{"id": m.ID}})
+}
+
+func DeleteConsoleMonitorAdmin(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	var input struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err != nil || id <= 0 || c.ShouldBindJSON(&input) != nil || !input.Confirm {
+		monitorAdminError(c, model.ErrMonitorInvalid)
+		return
+	}
+	if err := model.DeleteArchivedConsoleMonitor(c.Request.Context(), model.DB, id); err != nil {
+		monitorAdminError(c, err)
+		return
+	}
+	recordManageAudit(c, "monitor.delete", map[string]any{"monitor_id": id})
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 func SwitchConsoleMonitorAdmin(c *gin.Context) {

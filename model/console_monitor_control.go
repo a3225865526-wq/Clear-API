@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +22,7 @@ var (
 	ErrMonitorBudget      = errors.New("MONITOR_BUDGET_OR_CONCURRENCY")
 	ErrMonitorIntegration = errors.New("MONITOR_INTEGRATION_PENDING")
 	ErrMonitorLease       = errors.New("MONITOR_LEASE_UNRESOLVED")
+	ErrMonitorDeleteState = errors.New("MONITOR_DELETE_REQUIRES_ARCHIVE")
 )
 
 // The policy row serializes admissions across processes. No site option enables
@@ -83,7 +83,7 @@ func MigrateConsoleMonitoringDB(db *gorm.DB) error {
 }
 
 func ConsoleMonitoringReady(db *gorm.DB) bool {
-	if db == nil || !db.Migrator().HasTable(&ConsoleMonitor{}) || !db.Migrator().HasTable(&ConsoleProbe{}) || !db.Migrator().HasTable(&ConsoleMonitorPolicy{}) || !db.Migrator().HasTable(&ConsoleMonitorAttempt{}) || !db.Migrator().HasColumn(&ConsoleMonitorPolicy{}, "schema_version") || !db.Migrator().HasColumn(&ConsoleProbe{}, "task_id") {
+	if db == nil || !db.Migrator().HasTable(&ConsoleMonitor{}) || !db.Migrator().HasColumn(&ConsoleMonitor{}, "deleted_at") || !db.Migrator().HasTable(&ConsoleProbe{}) || !db.Migrator().HasTable(&ConsoleMonitorPolicy{}) || !db.Migrator().HasTable(&ConsoleMonitorAttempt{}) || !db.Migrator().HasColumn(&ConsoleMonitorPolicy{}, "schema_version") || !db.Migrator().HasColumn(&ConsoleProbe{}, "task_id") {
 		return false
 	}
 	var policy ConsoleMonitorPolicy
@@ -96,7 +96,7 @@ func ValidateMonitorTarget(db *gorm.DB, m *ConsoleMonitor) error {
 	if m == nil || strings.TrimSpace(m.Model) == "" || len(m.Model) > 255 || strings.ContainsRune(m.Model, '\x00') || strings.ContainsRune(m.TargetRef, '\x00') || strings.TrimSpace(m.DisplayName) == "" || len(m.DisplayName) > 255 || len(m.Platform) > 255 {
 		return ErrMonitorInvalid
 	}
-	if m.Protocol != "openai_chat" && m.Protocol != "openai_responses" {
+	if strings.TrimSpace(m.Protocol) == "" || len(m.Protocol) > 32 || strings.ContainsRune(m.Protocol, '\x00') {
 		return ErrMonitorInvalid
 	}
 	if m.IntervalSeconds < 60 || m.IntervalSeconds > 86400 || m.TimeoutSeconds < 1 || m.TimeoutSeconds > 120 || m.StaleSeconds < m.IntervalSeconds || m.StaleSeconds > 604800 || m.DailyRequests < 0 || m.DailyRequests > 1440 || m.RequestCostMicros < 0 || m.RequestCostMicros > 1000000000 {
@@ -113,7 +113,7 @@ func ValidateMonitorTarget(db *gorm.DB, m *ConsoleMonitor) error {
 			return ErrMonitorDenied
 		}
 		// Never publish or probe a disabled or pool-backed channel through this path.
-		if c.Status != common.ChannelStatusEnabled || c.PoolChannelBound() || !slices.Contains(c.GetModels(), m.Model) {
+		if c.Status != common.ChannelStatusEnabled || c.PoolChannelBound() {
 			return ErrMonitorDenied
 		}
 	case "group_route":
@@ -291,6 +291,49 @@ func SetConsoleMonitorSwitch(ctx context.Context, db *gorm.DB, id int, action st
 			updates["enabled"] = false
 		}
 		return tx.Model(&m).Updates(updates).Error
+	})
+}
+
+// DeleteArchivedConsoleMonitor removes a directory entry, never its channel or
+// history. The policy lock serializes deletion with state changes and admission.
+func DeleteArchivedConsoleMonitor(ctx context.Context, db *gorm.DB, id int) error {
+	if !ConsoleMonitoringReady(db) {
+		return ErrMonitorNotReady
+	}
+	if id <= 0 {
+		return ErrMonitorInvalid
+	}
+	return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := LockConsoleMonitorPolicy(tx); err != nil {
+			return err
+		}
+		var m ConsoleMonitor
+		err := tx.Unscoped().First(&m, id).Error
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if m.DeletedAt.Valid {
+			return nil
+		}
+		if !m.Archived || m.Enabled || m.Published {
+			return ErrMonitorDeleteState
+		}
+		var active int64
+		if err := tx.Model(&ConsoleMonitorAttempt{}).Where("monitor_id = ? AND finished_at = 0", id).Count(&active).Error; err != nil {
+			return err
+		}
+		if active != 0 {
+			return ErrMonitorLease
+		}
+		// Release only the catalog uniqueness key so a later target can be
+		// registered with a new ID; the tombstone retains its name and target.
+		if err := tx.Model(&m).Update("identity", nil).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&m).Error
 	})
 }
 

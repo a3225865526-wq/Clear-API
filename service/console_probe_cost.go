@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
 
@@ -23,7 +22,7 @@ var (
 	ErrMonitorMetering       = errors.New("MONITOR_METERING_FAILED")
 )
 
-const consoleProbeCostVersion = "monitor-responses-v1"
+const consoleProbeCostVersion = "monitor-native-v2"
 
 // The execution snapshot uses an explicit upstream contract, never retail prices
 // or RequestCostMicros as a substitute for the supplier's charging boundary.
@@ -39,6 +38,11 @@ type consoleProbeCostPolicy struct {
 	proof             *consoleProbeCostProof
 	endpoint          string
 	key               string
+	payload           string
+	contentType       string
+	keyHeader         string
+	native            *ConsoleProbeNativeRequest
+	fixedRequest      bool
 }
 
 // ConsoleProbeCostContract is an operator-attested upstream charging contract.
@@ -46,16 +50,18 @@ type consoleProbeCostPolicy struct {
 // including hidden tokens; the fixed fee includes all non-token charges. No
 // default or inferred price is provided. Saving it never enables a monitor.
 type ConsoleProbeCostContract struct {
-	Source            string    `json:"source"`
-	ValidFrom         time.Time `json:"valid_from"`
-	ExpiresAt         time.Time `json:"expires_at"`
-	InputTokenLimit   int64     `json:"input_token_limit"`
-	InputMicros       int64     `json:"input_micros"`
-	OutputMicros      int64     `json:"output_micros"`
-	FixedFeeMicros    int64     `json:"fixed_fee_micros"`
-	HardCeilingMicros int64     `json:"hard_ceiling_micros"`
-	Endpoint          string    `json:"endpoint"`
-	CredentialBinding string    `json:"credential_binding"`
+	NativeRequest     *ConsoleProbeNativeRequest `json:"native_request,omitempty"`
+	BillingUnit       string                     `json:"billing_unit,omitempty"` // "request" attests an exact all-inclusive per-request charge
+	Source            string                     `json:"source"`
+	ValidFrom         time.Time                  `json:"valid_from"`
+	ExpiresAt         time.Time                  `json:"expires_at"`
+	InputTokenLimit   int64                      `json:"input_token_limit"`
+	InputMicros       int64                      `json:"input_micros"`
+	OutputMicros      int64                      `json:"output_micros"`
+	FixedFeeMicros    int64                      `json:"fixed_fee_micros"`
+	HardCeilingMicros int64                      `json:"hard_ceiling_micros"`
+	Endpoint          string                     `json:"endpoint"`
+	CredentialBinding string                     `json:"credential_binding"`
 }
 
 func LoadConsoleProbeCostContract(ctx context.Context, db *gorm.DB, m model.ConsoleMonitor) (ConsoleProbeCostContract, error) {
@@ -74,19 +80,36 @@ func consoleProbeContractPolicy(ctx context.Context, db *gorm.DB, m model.Consol
 	p := consoleProbeProductionCostPolicy()
 	var channel model.Channel
 	err := db.WithContext(ctx).First(&channel, m.ChannelID).Error
-	if err != nil || channel.Status != common.ChannelStatusEnabled || channel.PoolChannelBound() || !slices.Contains(channel.GetModels(), m.Model) || channel.ModelMapping != nil && *channel.ModelMapping != "" {
+	if err != nil || channel.Status != common.ChannelStatusEnabled || channel.PoolChannelBound() {
 		return p, model.ErrMonitorDenied
 	}
-	endpoint := strings.TrimRight(channel.GetBaseURL(), "/") + "/v1/responses"
-	binding := fmt.Sprintf("%x", sha256.Sum256([]byte(endpoint+"\x00"+channel.Key)))
+	path, payload, contentType, keyHeader, err := consoleProbeRequest(m, contract.NativeRequest)
+	if err != nil {
+		return p, ErrMonitorCostUnverified
+	}
+	endpoint := strings.TrimRight(channel.GetBaseURL(), "/") + path
+	requestProfile, err := common.Marshal(contract.NativeRequest)
+	if err != nil {
+		return p, err
+	}
+	binding := fmt.Sprintf("%x", sha256.Sum256([]byte(endpoint+"\x00"+channel.Key+"\x00"+m.Model+"\x00"+m.Protocol+"\x00"+payload+"\x00"+string(requestProfile))))
 	u, parseErr := url.Parse(endpoint)
-	if parseErr != nil || u.User != nil || u.RawQuery != "" || u.Fragment != "" || contract.Endpoint != endpoint || contract.CredentialBinding != binding {
+	if parseErr != nil || u.User != nil || u.Fragment != "" || contract.Endpoint != endpoint || contract.CredentialBinding != binding {
+		return p, ErrMonitorCostUnverified
+	}
+	p.ChannelID, p.Model, p.Protocol = m.ChannelID, m.Model, m.Protocol
+	p.payload, p.contentType, p.keyHeader, p.native = payload, contentType, keyHeader, contract.NativeRequest
+	p.fixedRequest = contract.BillingUnit == "request"
+	if contract.NativeRequest != nil && !p.fixedRequest {
+		return p, ErrMonitorCostUnverified
+	}
+	if p.fixedRequest && (contract.InputMicros != 0 || contract.OutputMicros != 0 || contract.FixedFeeMicros <= 0) {
 		return p, ErrMonitorCostUnverified
 	}
 	p.InputTokenLimit, p.HardCeilingMicros, p.PricingSource = contract.InputTokenLimit, contract.HardCeilingMicros, contract.Source
 	p.endpoint, p.key = endpoint, channel.Key
-	p.proof = &consoleProbeCostProof{Version: p.Version, Payload: consoleProbePayload, InputTokens: contract.InputTokenLimit, InputMicros: contract.InputMicros, OutputMicros: contract.OutputMicros, FixedFeeMicros: contract.FixedFeeMicros, ValidFrom: contract.ValidFrom, ExpiresAt: contract.ExpiresAt}
-	cost, err := p.WorstCaseCost(m, consoleProbePayload, time.Now())
+	p.proof = &consoleProbeCostProof{Version: p.Version, Payload: payload, InputTokens: contract.InputTokenLimit, InputMicros: contract.InputMicros, OutputMicros: contract.OutputMicros, FixedFeeMicros: contract.FixedFeeMicros, ValidFrom: contract.ValidFrom, ExpiresAt: contract.ExpiresAt}
+	cost, err := p.WorstCaseCost(m, payload, time.Now())
 	if err != nil {
 		return p, err
 	}
@@ -106,7 +129,7 @@ func AuthorizeConsoleProbeCost(ctx context.Context, db *gorm.DB, m model.Console
 }
 
 func SaveConsoleProbeCostContract(ctx context.Context, db *gorm.DB, m model.ConsoleMonitor, contract ConsoleProbeCostContract) error {
-	if len(contract.Source) == 0 || len(contract.Source) > 1024 || contract.InputTokenLimit < 1 || contract.InputTokenLimit > 4096 {
+	if len(contract.Source) == 0 || len(contract.Source) > 1024 || contract.InputTokenLimit < 0 || (contract.BillingUnit != "request" && contract.InputTokenLimit == 0) || contract.InputTokenLimit > 4096 || (contract.BillingUnit != "" && contract.BillingUnit != "request") {
 		return model.ErrMonitorInvalid
 	}
 	var channel model.Channel
@@ -114,8 +137,16 @@ func SaveConsoleProbeCostContract(ctx context.Context, db *gorm.DB, m model.Cons
 	if err != nil {
 		return err
 	}
-	contract.Endpoint = strings.TrimRight(channel.GetBaseURL(), "/") + "/v1/responses"
-	contract.CredentialBinding = fmt.Sprintf("%x", sha256.Sum256([]byte(contract.Endpoint+"\x00"+channel.Key)))
+	path, payload, _, _, err := consoleProbeRequest(m, contract.NativeRequest)
+	if err != nil {
+		return err
+	}
+	contract.Endpoint = strings.TrimRight(channel.GetBaseURL(), "/") + path
+	requestProfile, err := common.Marshal(contract.NativeRequest)
+	if err != nil {
+		return err
+	}
+	contract.CredentialBinding = fmt.Sprintf("%x", sha256.Sum256([]byte(contract.Endpoint+"\x00"+channel.Key+"\x00"+m.Model+"\x00"+m.Protocol+"\x00"+payload+"\x00"+string(requestProfile))))
 	if _, err := consoleProbeContractPolicy(ctx, db, m, contract); err != nil {
 		return err
 	}
@@ -152,11 +183,8 @@ type consoleProbeCostProof struct {
 	ExpiresAt      time.Time
 }
 
-const consoleProbePayload = `{"model":"gpt-6-luna","input":"monitor probe","stream":false,"max_output_tokens":16,"store":false}`
-
 func consoleProbeProductionCostPolicy() consoleProbeCostPolicy {
 	return consoleProbeCostPolicy{
-		ChannelID: 1, Model: "gpt-6-luna", Protocol: "openai_responses",
 		InputTokenLimit: 64, OutputTokenLimit: 16,
 		Version: consoleProbeCostVersion,
 		// Ceiling/source/proof intentionally absent: no verified provider evidence.
@@ -167,18 +195,19 @@ func consoleProbeProductionCostPolicy() consoleProbeCostPolicy {
 // discounts. Invalid/incomplete evidence and arithmetic overflow fail closed.
 func (p consoleProbeCostPolicy) WorstCaseCost(m model.ConsoleMonitor, payload string, now time.Time) (int64, error) {
 	proof := p.proof
-	if m.TargetKind != "channel" || m.TargetRef != "1" || m.ChannelID != 1 || m.Model != "gpt-6-luna" || m.Protocol != "openai_responses" ||
+	if m.TargetKind != "channel" || m.ChannelID <= 0 || m.Model == "" || m.Protocol == "" ||
 		p.ChannelID != m.ChannelID || p.Model != m.Model || p.Protocol != m.Protocol ||
 		p.Version != consoleProbeCostVersion || p.PricingSource == "" || p.HardCeilingMicros <= 0 ||
-		p.InputTokenLimit <= 0 || p.OutputTokenLimit != 16 || payload != consoleProbePayload || proof == nil {
+		(p.InputTokenLimit < 0 || !p.fixedRequest && p.InputTokenLimit == 0) || p.OutputTokenLimit != 16 || payload != p.payload || proof == nil {
 		return 0, ErrMonitorCostUnverified
 	}
-	if proof.Version != p.Version || proof.Payload != payload || proof.InputTokens <= 0 || proof.InputTokens > p.InputTokenLimit ||
-		proof.InputMicros <= 0 || proof.OutputMicros <= 0 || proof.FixedFeeMicros < 0 ||
+	if proof.Version != p.Version || proof.Payload != payload || (proof.InputTokens < 0 || !p.fixedRequest && proof.InputTokens == 0) || proof.InputTokens > p.InputTokenLimit ||
+		proof.InputMicros < 0 || proof.OutputMicros < 0 || proof.FixedFeeMicros < 0 ||
+		(!p.fixedRequest && (proof.InputMicros == 0 || proof.OutputMicros == 0)) ||
 		proof.ValidFrom.IsZero() || now.Before(proof.ValidFrom) || !now.Before(proof.ExpiresAt) {
 		return 0, ErrMonitorCostUnverified
 	}
-	if p.InputTokenLimit > math.MaxInt64/proof.InputMicros || p.OutputTokenLimit > math.MaxInt64/proof.OutputMicros {
+	if (proof.InputMicros > 0 && p.InputTokenLimit > math.MaxInt64/proof.InputMicros) || (proof.OutputMicros > 0 && p.OutputTokenLimit > math.MaxInt64/proof.OutputMicros) {
 		return 0, ErrMonitorCostUnverified
 	}
 	input := p.InputTokenLimit * proof.InputMicros

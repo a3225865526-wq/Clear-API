@@ -28,12 +28,13 @@ type ConsoleProbeLeaseReconciler interface {
 var ErrMonitorProbePanic = errors.New("MONITOR_PROBE_PANIC")
 
 type ConsoleProbeOutcome struct {
-	Status             string
-	ErrorCode          string
-	SourceChannelID    int
-	CleanupStartedAt   int64
-	MeteredCostMicros  *int64
-	UpstreamResponseID string
+	completionConfirmed bool
+	Status              string
+	ErrorCode           string
+	SourceChannelID     int
+	CleanupStartedAt    int64
+	MeteredCostMicros   *int64
+	UpstreamResponseID  string
 }
 
 type ConsoleProbeResult struct {
@@ -122,7 +123,7 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	if err := e.DB.WithContext(ctx).First(&configured, id).Error; err != nil {
 		return result, err
 	}
-	// Only the approved dedicated-channel Responses boundary is affected.
+	// Every channel probe uses the same cost boundary, regardless of model/protocol.
 	// No real adapter is required or registered to record a cost denial.
 	costGated := isConsoleProbeCostScope(configured)
 	if costGated && (!configured.Allowlisted || !configured.Published || !configured.Enabled || configured.Archived) {
@@ -158,7 +159,8 @@ func (e *ConsoleProbeExecutor) RunWithResult(ctx context.Context, id int) (resul
 	if err == nil && probeCtx.Err() != nil {
 		err = probeCtx.Err()
 	}
-	if err == nil && costGated && (outcome.MeteredCostMicros == nil || *outcome.MeteredCostMicros < 0 || *outcome.MeteredCostMicros > attempt.ReservedCostMicros || outcome.UpstreamResponseID == "" || len(outcome.UpstreamResponseID) > 128) {
+	confirmedFailure := outcome.Status == "error" && outcome.completionConfirmed
+	if err == nil && costGated && !confirmedFailure && (outcome.MeteredCostMicros == nil || *outcome.MeteredCostMicros < 0 || *outcome.MeteredCostMicros > attempt.ReservedCostMicros || outcome.UpstreamResponseID == "" && !outcome.completionConfirmed || len(outcome.UpstreamResponseID) > 128) {
 		err = errors.Join(ErrMonitorMetering, ErrMonitorLeaseUnresolved)
 	}
 	if err != nil {
@@ -276,7 +278,7 @@ func consoleProbeFailureCode(err, contextErr error) string {
 }
 
 func isConsoleProbeCostScope(m model.ConsoleMonitor) bool {
-	return m.TargetKind == "channel" && m.ChannelID == 1 && m.TargetRef == "1" && m.Model == "gpt-6-luna" && m.Protocol == "openai_responses"
+	return m.TargetKind == "channel"
 }
 
 func runConsoleProbeSafely(ctx context.Context, adapter ConsoleProbeAdapter, m model.ConsoleMonitor, attemptID int64) (outcome ConsoleProbeOutcome, err error) {

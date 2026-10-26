@@ -1,3 +1,27 @@
+## 2026-10-27 Asia/Shanghai — 监测模型/协议名单已取消；媒体原生 HTTP 探测本地验证通过（未部署）
+
+- 用户补充明确要求所有模型、所有协议，并确认包括图片、音频和视频。本条取代下文 A 的“保留 Luna/Responses 特定条件”本地方案；历史调查及 B 原记录保留。
+- 当前同一工作树/分支 `codex/clearapi-monitor-archive-fix-20261026`，HEAD 仍为 `fb695711c19106209ddbe7de73cb273a0cd67b20`，已有归档删除修改完整保留，修改未提交/推送。已删除渠道1/Luna/Responses及渠道 models 目录名单限制；模型/协议可自由填写，只保留必要输入校验。
+- 原费用/权限保护保留：Root 权限、白名单资格、发布/启用/归档状态、启用且非池渠道、费用证据、预算、并发及未完成任务。PG03 没有开启，D 生图没有部署；没有生产数据库写入、部署、重启或付费供应商调用。
+- 请求不再固定 Luna：内置 Chat/Responses/Claude/Gemini 样本，其他媒体或自定义原生 HTTP 协议通过已有费用合同 API 的 `native_request` 配置对应 JSON/二进制/multipart 样本、鉴权头、响应条件及异步完成查询。没有协议名称名单，也不把提交成功当作任务完成；没有自动保证所有厂商私有签名、映射或非 HTTP 传输均已实现。
+- v2 费用合同绑定 endpoint、凭据、目标模型/协议、实际样本及原生请求定义；变更后需重新审核合同。文本标准化计入 Claude 缓存和 Gemini 思考用量。媒体固定样本总费用必须有供应商证据，不能伪造通用费率；未知结果保留预算和租约，已确认终止的失败保留预算、不制造实际费用。
+- 实际验证：service 监测/费用的18个顶层测试PASS；最新原生协议及保护11个用例PASS；controller监测定向测试PASS；前端12/12 PASS；typecheck、涉及文件lint（0错误/警告）、format、gofmt、JSON及diff检查通过。未重跑完整CI/E2E或生产构建；没有新增schema/SQL/driver，本轮复用B三库删除迁移证据，原可选三库子项跳过不冒充重新通过。
+- 完整配置字段、文件、命令及限制已追加在 `D:/Codex/worktrees/clearapi-monitor-archive-fix/clearapi-controlled-launch-20261020/evidence/monitor-archive-fix-20261026.md` 顶部；本轮合成测试日志 `D:/AI/API/evidence/monitor-all-protocols-20261026/`。当前生产配置本轮未复采，不将旧快照作为新现状。生产使用仍需单独授权监测schema迁移、有效费用合同/媒体样本配置及既有Windows→SSH helper部署。本轮完成并停止。
+
+---
+
+## 2026-10-26 Asia/Shanghai — 监测启用根因已确认；归档监测目录软删除本地通过（未部署）
+
+- **实际工作区核实与保全：** 初始目录 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-non-pg03-rc-20261022`，HEAD `f30b247383ee5a18f370d1ad65b30204d32c8833`，存在多项既有修改。其监测实现早于指定生产源码；未重置、覆盖或清理。以 `fb695711c19106209ddbe7de73cb273a0cd67b20` 建立本轮工作树 `D:/Codex/worktrees/clearapi-monitor-archive-fix/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-monitor-archive-fix-20261026`；本轮修改未提交、未推送。
+- **A 真实根因：** 现场只读确认运行镜像 tag 为 `fb695711...`，监测 ID=2 的启用 PUT 多次返回403。该目标为渠道1 / `gpt-6.1-sol` / `openai_chat`，而执行器只支持渠道1 / `gpt-6-luna` / `openai_responses`，在合同读取前即拒绝。另有独立配置缺项：allowlisted=false，费用合同不存在，全局预算关闭且请求/金额预算为0。页面费用合同提示是固定说明，不能冒充首个拒绝原因。生产日志无响应体，旧JSON只能据源码映射，未重放生产PUT。
+- **A 本地结果与阻塞：** 返回明确 `MONITOR_TARGET_UNSUPPORTED` 并说明支持范围，保留原拒绝语义及费用保护；前端显示实际原因，补齐七语言。支持的合成目标启用/探测闭环、无效目标/合同拒绝及权限定向测试通过。当前生产 Chat/Sol 目标仍不能启用，不伪造成功；若改用已有支持的目标，仍需单独授权恢复/创建目标、白名单/发布、真实供应商费用合同及预算策略。合同和策略暂无后台编辑表单，使用现有Root费用合同/策略API；本轮未调用配置写接口。
+- **B 用户已澄清：** 删除的是已归档监测目录，保留真实上游渠道和历史数据。新增归档条目的删除按钮及名称/ID确认框，复用 `ConfirmDialog`。后端复用Root权限、来源/JSON请求校验和监测策略锁，仅允许已归档、停用、未发布、无未完成attempt的目录；重复删除幂等，失败事务回滚。复用GORM软删除，仅增加目录 `deleted_at` 并释放identity，保留原ID/名称/目标、probe/attempt及所有业务和财务历史；不调用真实渠道删除API。现场也未发现监测目录外键。
+- **必要验证：** A三个controller定向测试及service实际路由权限/状态测试PASS；B删除/迁移定向三库全部PASS（SQLite3.50.4 / MySQL8.4.11 / PostgreSQL17.6），覆盖fresh和上一版schema升级各两次、唯一性、状态/未完成探测阻断、并发重复删除、失败回滚及独立日志库/用户额度/钱包/退款/计费记录保留。前端11/11 PASS，typecheck、涉及文件lint（0错误/警告）、format、gofmt和diff检查通过。额外既有读模型测试补齐原缺失Channel表夹具后SQLite PASS，其MySQL/PG子项跳过，不等同于B的三库验证。未重跑完整CI、完整数据库矩阵、E2E或生产构建。
+- **发布前置条件：** B包含显式监测schema增量，后续必须另行授权 `MigrateConsoleMonitoringDB` / `cmd/monitor-init` 迁移，再按既有Windows本地构建→SSH helper受控部署。未迁移时保持未初始化，不通过访问页面隐式写数据库。本轮未迁移生产、未部署或重启、未删除真实渠道、未修改生产配置/价格/余额/账务/退款/凭据、未新增收费上游调用；PG03继续关闭，D生图不部署。
+- **记录与证据：** 完整文件、命令、结果与限制见 `D:/Codex/worktrees/clearapi-monitor-archive-fix/clearapi-controlled-launch-20261020/evidence/monitor-archive-fix-20261026.md`；原始只读投影和测试日志在 `D:/AI/API/evidence/monitor-archive-fix-20261026/`。本条同步追加至本轮工作树总控和初始实际目录总控，旧正文完整保留。完成本轮工作并停止，等待后续指示。
+
+---
+
 ## 2026-10-26 Asia/Shanghai — 撤销自定义协议准入门禁：本地代码完成，等待部署授权
 
 - **身份与范围：** 本轮固定 SSH 身份只读 preflight 实查生产为 `6d43530398f218ffbebecda2a44c7bd8fe5fed80`，Gateway `7a47ead735236fb0b72105956f6a3432974d52ce61226b9218ffafeae346e434` healthy，规范 OCI config `sha256:e18187013221ca9b3a747ab08a97827ff784308f42696fc8c3b1dba5de91b149`。从此生产提交建立新 worktree `D:/Codex/worktrees/clearapi-native-gates-20261026/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-native-gates-20261026`；原工作区和其他支线成果未覆盖、清理或重置。最终 SHA 为包含本节与代码的本地提交，见交付回执；未 Push、合并 main 或部署。

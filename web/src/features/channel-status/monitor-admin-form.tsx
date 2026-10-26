@@ -101,20 +101,6 @@ export function MonitorAdminForm(props: {
   const groupNames = [
     ...new Set(props.targets.groups.map((item) => item.group)),
   ]
-  let models: string[] = []
-  if (target.startsWith('channel:')) {
-    models =
-      props.targets.channels
-        .find((item) => item.id === Number(target.slice(8)))
-        ?.models.split(',')
-        .map((item) => item.trim())
-        .filter(Boolean) ?? []
-  }
-  if (target.startsWith('group_route:')) {
-    models = props.targets.groups
-      .filter((item) => item.group === target.slice(12))
-      .map((item) => item.model)
-  }
   return (
     <form onSubmit={form.handleSubmit((values) => save.mutate(values))}>
       <fieldset disabled={save.isPending} className='grid gap-4 sm:grid-cols-2'>
@@ -165,47 +151,24 @@ export function MonitorAdminForm(props: {
               </Select>
             </div>
             <div className='space-y-2'>
-              <Label id='monitor-model-label'>{t('Model')}</Label>
-              <Select
+              <Label htmlFor='monitor-model'>{t('Model')}</Label>
+              <Input
+                id='monitor-model'
                 value={model}
-                onValueChange={(value) => setModel(value ?? '')}
-              >
-                <SelectTrigger
-                  aria-labelledby='monitor-model-label'
-                  className='w-full'
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {models.map((name) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                maxLength={255}
+                onChange={(event) => setModel(event.target.value)}
+              />
             </div>
             <div className='space-y-2'>
-              <Label id='monitor-protocol-label'>
+              <Label htmlFor='monitor-protocol'>
                 {t('Monitoring protocol')}
               </Label>
-              <Select
+              <Input
+                id='monitor-protocol'
                 value={protocol}
-                onValueChange={(value) => setProtocol(value ?? 'openai_chat')}
-              >
-                <SelectTrigger
-                  aria-labelledby='monitor-protocol-label'
-                  className='w-full'
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value='openai_chat'>OpenAI Chat</SelectItem>
-                  <SelectItem value='openai_responses'>
-                    OpenAI Responses
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                maxLength={32}
+                onChange={(event) => setProtocol(event.target.value)}
+              />
             </div>
           </>
         )}
@@ -254,7 +217,12 @@ export function MonitorAdminForm(props: {
               )}
             </div>
           ))}
-        <Button type='submit' disabled={!model || !target || save.isPending}>
+        <Button
+          type='submit'
+          disabled={
+            !model.trim() || !protocol.trim() || !target || save.isPending
+          }
+        >
           {t(props.monitor ? 'Save' : 'Add')}
         </Button>
         {save.isError && <p role='alert'>{t('Error')}</p>}

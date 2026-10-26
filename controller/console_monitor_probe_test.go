@@ -3,9 +3,11 @@ package controller
 import (
 	"bytes"
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,6 +18,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+)
+
+const (
+	consoleProbeModel    = "gpt-6-luna"
+	consoleProbeProtocol = "openai_responses"
 )
 
 func TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch(t *testing.T) {
@@ -145,6 +153,192 @@ func TestConsoleMonitorConfiguredHTTPFlow(t *testing.T) {
 	assert.True(t, (consoleMonitorHandler{}).Enabled())
 	require.NoError(t, model.SaveConsoleMonitorPolicy(ctx, db, model.ConsoleMonitorPolicy{ID: 1, MaxConcurrent: 1, RetentionDays: 90}))
 	assert.True(t, (consoleMonitorHandler{}).Enabled(), "daily observations continue while paid execution is paused")
+}
+
+func TestConsoleMonitorEnableDenials(t *testing.T) {
+	db := modelManagementDB(t, "sqlite", "")
+	require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+	channel := model.Channel{Id: 1, Key: "fixture-only", Status: common.ChannelStatusEnabled, Models: "gpt-6-luna,gpt-6.1-sol"}
+	require.NoError(t, db.Create(&channel).Error)
+	m := model.ConsoleMonitor{ChannelID: 1, TargetKind: "channel", TargetRef: "1", Model: consoleProbeModel, Protocol: consoleProbeProtocol, DisplayName: "isolated", IntervalSeconds: 60, TimeoutSeconds: 1, StaleSeconds: 900, DailyRequests: 2, RequestCostMicros: 100}
+	require.NoError(t, model.SaveConsoleMonitor(context.Background(), db, &m))
+	router := gin.New()
+	router.PUT("/monitors/:id/:action", ConsoleMonitorWriteGuard, SwitchConsoleMonitorAdmin)
+	for _, tc := range []struct {
+		name, model, protocol, contract, code string
+		allowlisted, published                bool
+		status                                int
+	}{
+		{"reported target", "gpt-6.1-sol", "openai_chat", "", "MONITOR_PAUSED", false, true, 409},
+		{"not allowlisted", consoleProbeModel, consoleProbeProtocol, "", "MONITOR_PAUSED", false, true, 409},
+		{"not published", consoleProbeModel, consoleProbeProtocol, "", "MONITOR_PAUSED", true, false, 409},
+		{"missing contract", consoleProbeModel, consoleProbeProtocol, "", "MONITOR_COST_UNVERIFIED", true, true, 409},
+		{"invalid contract", consoleProbeModel, consoleProbeProtocol, "{", "MONITOR_COST_UNVERIFIED", true, true, 409},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, db.Model(&m).Updates(map[string]any{"model": tc.model, "protocol": tc.protocol, "allowlisted": tc.allowlisted, "published": tc.published}).Error)
+			if tc.contract != "" {
+				require.NoError(t, db.Create(&model.Option{Key: "console_monitor.cost.1", Value: tc.contract}).Error)
+			}
+			req := httptest.NewRequest(http.MethodPut, "/monitors/1/enabled", bytes.NewBufferString(`{"confirm":true,"value":true}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-ClearAPI-Monitor", "1")
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, req)
+			assert.Equal(t, tc.status, response.Code)
+			var body struct{ Code, Message string }
+			require.NoError(t, common.Unmarshal(response.Body.Bytes(), &body))
+			assert.Equal(t, tc.code, body.Code)
+			assert.NotEqual(t, body.Code, body.Message, "the response must explain the actual denial")
+			var saved model.ConsoleMonitor
+			require.NoError(t, db.First(&saved, m.ID).Error)
+			assert.False(t, saved.Enabled)
+		})
+	}
+	var attempts int64
+	require.NoError(t, db.Model(&model.ConsoleMonitorAttempt{}).Count(&attempts).Error)
+	assert.Zero(t, attempts, "enabling never dispatches or reserves a probe")
+}
+
+func TestDeleteArchivedConsoleMonitorDatabaseMatrix(t *testing.T) {
+	for _, dialect := range []struct{ kind, env string }{{"sqlite", ""}, {"mysql", "TEST_MYSQL_DSN"}, {"postgres", "TEST_POSTGRES_DSN"}} {
+		t.Run(dialect.kind, func(t *testing.T) {
+			if dialect.env != "" && os.Getenv(dialect.env) == "" {
+				t.Skip("set " + dialect.env + " to run this database")
+			}
+			db := modelManagementDB(t, dialect.kind, os.Getenv(dialect.env))
+			if dialect.kind == "sqlite" {
+				connection, err := db.DB()
+				require.NoError(t, err)
+				// modelManagementDB reopens the fixture with a plain file path.
+				// Serialize its SQLite writers as in consoleMonitorFixture.
+				connection.SetMaxOpenConns(1)
+			}
+			ctx := context.Background()
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			channel := model.Channel{Id: 1, Name: "preserved upstream", Key: "synthetic-only", Status: common.ChannelStatusEnabled, Models: consoleProbeModel}
+			require.NoError(t, db.Create(&channel).Error)
+			m := model.ConsoleMonitor{ChannelID: 1, TargetKind: "channel", TargetRef: "1", Model: consoleProbeModel, Protocol: consoleProbeProtocol, DisplayName: "Archived directory", IntervalSeconds: 60, TimeoutSeconds: 1, StaleSeconds: 900}
+			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &m))
+			require.NoError(t, model.SetConsoleMonitorSwitch(ctx, db, m.ID, "archived", true))
+			probe := model.ConsoleProbe{MonitorID: m.ID, CheckedAt: 100, Status: "normal", SourceChannelID: 1}
+			require.NoError(t, db.Create(&probe).Error)
+			attempt := model.ConsoleMonitorAttempt{MonitorID: m.ID, StartedAt: 90, FinishedAt: 100, ReservedCostMicros: 7, CleanupState: "released"}
+			require.NoError(t, db.Create(&attempt).Error)
+			// Reconstruct the released schema: the only difference is deleted_at.
+			// Upgrade twice with real directory/history rows and its unique identity.
+			require.NoError(t, db.Migrator().DropColumn(&model.ConsoleMonitor{}, "deleted_at"))
+			require.False(t, model.ConsoleMonitoringReady(db))
+			require.ErrorIs(t, model.DeleteArchivedConsoleMonitor(ctx, db, m.ID), model.ErrMonitorNotReady)
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			require.NoError(t, model.MigrateConsoleMonitoringDB(db))
+			var upgraded model.ConsoleMonitor
+			require.NoError(t, db.First(&upgraded, m.ID).Error)
+			assert.Equal(t, m.DisplayName, upgraded.DisplayName)
+			assert.Equal(t, m.Identity, upgraded.Identity)
+			assert.True(t, upgraded.Archived)
+			duplicate := upgraded
+			duplicate.ID = 0
+			require.Error(t, db.Create(&duplicate).Error, "migration must retain identity uniqueness")
+			for _, tc := range []struct {
+				name                         string
+				archived, enabled, published bool
+			}{
+				{"restored since list read", false, false, false},
+				{"enabled", true, true, false},
+				{"published reference", true, false, true},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					require.NoError(t, db.Model(&m).Updates(map[string]any{"archived": tc.archived, "enabled": tc.enabled, "published": tc.published}).Error)
+					require.ErrorIs(t, model.DeleteArchivedConsoleMonitor(ctx, db, m.ID), model.ErrMonitorDeleteState)
+				})
+			}
+			require.NoError(t, db.Model(&m).Updates(map[string]any{"archived": true, "enabled": false, "published": false}).Error)
+			active := model.ConsoleMonitorAttempt{MonitorID: m.ID, StartedAt: 1, LeaseUntil: 2, CleanupState: "cleanup_pending"}
+			require.NoError(t, db.Create(&active).Error)
+			require.ErrorIs(t, model.DeleteArchivedConsoleMonitor(ctx, db, m.ID), model.ErrMonitorLease, "expired but unfinished probes still protect the entry")
+			require.NoError(t, db.Model(&active).Updates(map[string]any{"finished_at": 3, "cleanup_state": "released"}).Error)
+			injected := errors.New("synthetic delete failure")
+			require.NoError(t, db.Callback().Delete().Before("gorm:delete").Register("test:monitor_delete_failure", func(tx *gorm.DB) {
+				if tx.Statement.Table == "console_monitors" {
+					tx.AddError(injected)
+				}
+			}))
+			err := model.DeleteArchivedConsoleMonitor(ctx, db, m.ID)
+			require.NoError(t, db.Callback().Delete().Remove("test:monitor_delete_failure"))
+			require.ErrorIs(t, err, injected)
+			var retained model.ConsoleMonitor
+			require.NoError(t, db.First(&retained, m.ID).Error)
+			assert.Equal(t, m.Identity, retained.Identity, "identity release must roll back with deletion")
+			assert.False(t, retained.DeletedAt.Valid)
+			// Snapshots cover the actual upstream, user funds and separate log DB.
+			require.NoError(t, db.AutoMigrate(&model.FinanceWallet{}, &model.FinanceCashRefund{}, &model.BillingReservation{}))
+			wallet := model.FinanceWallet{UserID: 1, RemainingQuota: 500}
+			user := model.User{Id: 19, Username: "preserved-user", AffCode: "preserved-user", Quota: 300, UsedQuota: 20}
+			refund := model.FinanceCashRefund{EventKey: "preserved-refund", State: "succeeded", AmountCNY: "2"}
+			reservation := model.BillingReservation{RequestID: "preserved-request", UserID: 1, Reserved: 7, Applied: 7, State: "settled"}
+			require.NoError(t, db.Create(&wallet).Error)
+			require.NoError(t, db.Create(&user).Error)
+			require.NoError(t, db.Create(&refund).Error)
+			require.NoError(t, db.Create(&reservation).Error)
+			logDB, _ := newAuditTestDatabase(t, dialect.kind, os.Getenv(dialect.env))
+			require.NoError(t, logDB.AutoMigrate(&model.Log{}))
+			model.LOG_DB = logDB
+			log := model.Log{ChannelId: 1, RequestId: "preserved-request", PromptTokens: 12, CompletionTokens: 3, Quota: 7}
+			require.NoError(t, logDB.Create(&log).Error)
+			var workers sync.WaitGroup
+			errors := make(chan error, 2)
+			for range 2 {
+				workers.Go(func() { errors <- model.DeleteArchivedConsoleMonitor(ctx, db, m.ID) })
+			}
+			workers.Wait()
+			close(errors)
+			for err := range errors {
+				require.NoError(t, err, "concurrent duplicate deletes are idempotent")
+			}
+			require.ErrorIs(t, db.First(&model.ConsoleMonitor{}, m.ID).Error, gorm.ErrRecordNotFound)
+			require.NoError(t, db.Unscoped().First(&retained, m.ID).Error)
+			assert.True(t, retained.DeletedAt.Valid)
+			assert.Equal(t, m.DisplayName, retained.DisplayName)
+			assert.Nil(t, retained.Identity)
+			var preservedChannel model.Channel
+			require.NoError(t, db.First(&preservedChannel, 1).Error)
+			assert.Equal(t, channel, preservedChannel)
+			var preservedProbe model.ConsoleProbe
+			require.NoError(t, db.First(&preservedProbe, probe.ID).Error)
+			assert.Equal(t, probe, preservedProbe)
+			var preservedAttempt model.ConsoleMonitorAttempt
+			require.NoError(t, db.First(&preservedAttempt, attempt.ID).Error)
+			assert.Equal(t, attempt, preservedAttempt)
+			var preservedWallet model.FinanceWallet
+			require.NoError(t, db.First(&preservedWallet, 1).Error)
+			assert.Equal(t, wallet, preservedWallet)
+			var preservedUser model.User
+			require.NoError(t, db.First(&preservedUser, user.Id).Error)
+			assert.Equal(t, user.Quota, preservedUser.Quota)
+			assert.Equal(t, user.UsedQuota, preservedUser.UsedQuota)
+			var preservedRefund model.FinanceCashRefund
+			require.NoError(t, db.First(&preservedRefund, refund.ID).Error)
+			assert.Equal(t, refund, preservedRefund)
+			var preservedReservation model.BillingReservation
+			require.NoError(t, db.First(&preservedReservation, reservation.ID).Error)
+			assert.Equal(t, reservation, preservedReservation)
+			var preservedLog model.Log
+			require.NoError(t, logDB.First(&preservedLog, log.Id).Error)
+			assert.Equal(t, log, preservedLog)
+			// Re-adding the same target gets a new identity/ID, never old history.
+			m.ID = 0
+			m.Archived, m.Published, m.Enabled = false, false, false
+			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &m))
+			assert.NotEqual(t, retained.ID, m.ID)
+			var history int64
+			require.NoError(t, db.Model(&model.ConsoleProbe{}).Where("monitor_id = ?", m.ID).Count(&history).Error)
+			assert.Zero(t, history)
+			assert.Error(t, model.SetConsoleMonitorSwitch(ctx, db, retained.ID, "archived", false))
+			t.Logf("preserved deleted monitor %d; new target %d", retained.ID, m.ID)
+		})
+	}
 }
 
 func TestManualChannelStatusSynchronizesCacheAndRouting(t *testing.T) {

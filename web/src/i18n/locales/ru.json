@@ -1,5 +1,11 @@
 {
   "translation": {
+    "An unfinished monitoring attempt must be resolved before this operation.": "Перед этой операцией необходимо завершить обработку незавершённой проверки.",
+    "Delete archived monitoring entry \"{{name}}\" (ID {{id}})? The upstream channel and historical records will be retained.": "Удалить архивную запись «{{name}}» (ID {{id}})? Вышестоящий канал и история будут сохранены.",
+    "Delete monitoring entry": "Удалить запись мониторинга",
+    "Monitoring must be allowlisted, published, enabled, and not archived before a probe can run.": "Для проверки мониторинг должен быть в списке разрешённых, опубликован, включён и не архивирован.",
+    "Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted.": "Удалять можно только архивированные, отключённые и неопубликованные записи без незавершённых проверок.",
+    "The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.": "Договор стоимости проверок отсутствует, истёк, недействителен или не соответствует настройкам канала.",
     "{{count}} announcements deleted. Click \"Save Settings\" to apply.": "Удалено объявлений: {{count}}. Нажмите «Сохранить настройки» для применения.",
     "Both locations": "В обоих разделах",
     "Budget, concurrency or minimum interval limit reached": "Достигнут лимит бюджета, параллельности или минимального интервала",

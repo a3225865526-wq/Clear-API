@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import i18next from 'i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -67,6 +67,33 @@ function renderAdmin() {
     </QueryClientProvider>
   )
 }
+
+function renderArchivedAdmin() {
+  client.setQueryData(['monitor-admin-catalog'], {
+    monitors: [
+      {
+        id: 1,
+        display_name: 'Archived target',
+        model: 'model-a',
+        target_kind: 'channel',
+        published: false,
+        enabled: false,
+        archived: true,
+      },
+      {
+        id: 2,
+        display_name: 'Active target',
+        model: 'model-a',
+        target_kind: 'channel',
+        published: true,
+        enabled: true,
+        archived: false,
+      },
+    ],
+  })
+  client.setQueryDefaults(['monitor-admin-catalog'], { staleTime: Infinity })
+  return renderAdmin()
+}
 function renderEditForm(allowlist = false) {
   return render(
     <QueryClientProvider client={client}>
@@ -100,6 +127,111 @@ function renderEditForm(allowlist = false) {
 }
 
 describe('monitor administration', () => {
+  it('accepts model and protocol names outside the previous choices', async () => {
+    renderAdmin()
+    await screen.findByText('Configured target · model-a')
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Model' }),
+      'unlisted-provider-model'
+    )
+    const protocol = screen.getByRole('textbox', {
+      name: 'Monitoring protocol',
+    })
+    await userEvent.clear(protocol)
+    await userEvent.type(protocol, 'video-generation')
+    expect(screen.getByRole('textbox', { name: 'Model' })).toHaveValue(
+      'unlisted-provider-model'
+    )
+    expect(protocol).toHaveValue('video-generation')
+  })
+
+  it('deletes only an archived directory after showing its name and ID', async () => {
+    const remove = vi.spyOn(api, 'delete').mockResolvedValue({
+      data: { success: true },
+    })
+    renderArchivedAdmin()
+    await screen.findByText('Archived target · model-a')
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(remove).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      'Delete archived monitoring entry "Archived target" (ID 1)?'
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(remove).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    const dialog = screen.getByRole('alertdialog')
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete' })
+    )
+    await waitFor(() =>
+      expect(remove).toHaveBeenCalledWith('/api/console/monitor-admin/1', {
+        data: { confirm: true },
+        headers: { 'X-ClearAPI-Monitor': '1' },
+      })
+    )
+    await waitFor(() =>
+      expect(
+        screen.queryByText('Archived target · model-a')
+      ).not.toBeInTheDocument()
+    )
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps the directory and confirmation visible after a failed delete', async () => {
+    vi.spyOn(api, 'delete').mockResolvedValue({
+      data: {
+        success: false,
+        message:
+          'An unfinished monitoring attempt must be resolved before this operation.',
+      },
+    })
+    renderArchivedAdmin()
+    await screen.findByText('Archived target · model-a')
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    await userEvent.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: 'Delete',
+      })
+    )
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'An unfinished monitoring attempt must be resolved before this operation.'
+    )
+    expect(screen.getByText('Archived target · model-a')).toBeInTheDocument()
+    expect(screen.getByRole('alertdialog')).toBeVisible()
+  })
+
+  it('keeps the enable confirmation open and explains a missing cost contract', async () => {
+    client.setQueryData(['monitor-admin-catalog'], {
+      monitors: [
+        {
+          id: 1,
+          display_name: 'Configured target',
+          model: 'model-a',
+          target_kind: 'channel',
+          published: true,
+          enabled: false,
+          archived: false,
+        },
+      ],
+    })
+    client.setQueryDefaults(['monitor-admin-catalog'], { staleTime: Infinity })
+    const message =
+      'The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.'
+    vi.spyOn(api, 'put').mockRejectedValue({
+      response: {
+        status: 409,
+        data: { success: false, code: 'MONITOR_COST_UNVERIFIED', message },
+      },
+    })
+    renderAdmin()
+    await screen.findByText('Configured target · model-a')
+    await userEvent.click(screen.getByRole('button', { name: 'Enable' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    expect(screen.getByRole('alertdialog')).toBeVisible()
+  })
+
   it('saves target timing without sending per-target budget overrides', async () => {
     const put = vi
       .spyOn(api, 'put')

@@ -1,5 +1,11 @@
 {
   "translation": {
+    "An unfinished monitoring attempt must be resolved before this operation.": "执行此操作前，必须先处理未完成的监测探测。",
+    "Delete archived monitoring entry \"{{name}}\" (ID {{id}})? The upstream channel and historical records will be retained.": "删除已归档的监测目录“{{name}}”（ID {{id}}）？上游渠道及历史记录将保留。",
+    "Delete monitoring entry": "删除监测目录",
+    "Monitoring must be allowlisted, published, enabled, and not archived before a probe can run.": "运行探测前，监测必须加入白名单、已发布、已启用且未归档。",
+    "Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted.": "只能删除已归档、已停用、未发布且没有未完成探测的监测目录。",
+    "The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.": "上游监测费用合同缺失、已过期、无效或与渠道配置不匹配。",
     "{{count}} announcements deleted. Click \"Save Settings\" to apply.": "已删除 {{count}} 条公告。点击“保存设置”以应用。",
     "Both locations": "两处显示",
     "Budget, concurrency or minimum interval limit reached": "已达预算、并发或最小间隔限制",

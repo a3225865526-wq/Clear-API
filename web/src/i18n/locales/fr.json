@@ -1,5 +1,11 @@
 {
   "translation": {
+    "An unfinished monitoring attempt must be resolved before this operation.": "Une tentative de surveillance inachevée doit être résolue avant cette opération.",
+    "Delete archived monitoring entry \"{{name}}\" (ID {{id}})? The upstream channel and historical records will be retained.": "Supprimer l’entrée archivée « {{name}} » (ID {{id}}) ? Le canal amont et l’historique seront conservés.",
+    "Delete monitoring entry": "Supprimer l’entrée de surveillance",
+    "Monitoring must be allowlisted, published, enabled, and not archived before a probe can run.": "Pour lancer une sonde, la surveillance doit être autorisée, publiée, activée et non archivée.",
+    "Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted.": "Seules les entrées archivées, désactivées, non publiées et sans sonde en cours peuvent être supprimées.",
+    "The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.": "Le contrat de coût amont est absent, expiré, invalide ou incompatible avec la configuration du canal.",
     "{{count}} announcements deleted. Click \"Save Settings\" to apply.": "{{count}} annonces supprimées. Cliquez sur « Enregistrer les paramètres » pour appliquer.",
     "Both locations": "Les deux",
     "Budget, concurrency or minimum interval limit reached": "Limite de budget, concurrence ou intervalle atteinte",

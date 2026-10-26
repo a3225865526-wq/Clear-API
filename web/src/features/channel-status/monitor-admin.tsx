@@ -11,10 +11,14 @@ import { toIntlLocale } from '@/i18n/languages'
 import { api } from '@/lib/api'
 import { formatCurrencyFromUSD } from '@/lib/currency'
 import { formatNumber, formatTimestamp } from '@/lib/format'
-import { requireServerSuccess } from '@/lib/server-error-message'
+import {
+  getServerErrorMessage,
+  requireServerSuccess,
+} from '@/lib/server-error-message'
 
 import type { Monitor, MonitorTargets } from './lib/monitor-admin-schema'
 import { MonitorAdminForm } from './monitor-admin-form'
+import { MonitorDeleteDialog } from './monitor-delete-dialog'
 
 export function MonitorAdmin(props: { allowlist?: boolean }) {
   const { t, i18n } = useTranslation()
@@ -27,6 +31,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
     : 'monitor-admin-catalog'
   const client = useQueryClient()
   const [edit, setEdit] = useState<Monitor | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Monitor | null>(null)
   const [probeResult, setProbeResult] = useState<{
     status: string
     error_code: string
@@ -182,6 +187,15 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
                   </p>
                 </div>
                 <div className='flex flex-wrap gap-2'>
+                  {!props.allowlist && item.archived && (
+                    <Button
+                      variant='destructive'
+                      disabled={toggle.isPending || probe.isPending}
+                      onClick={() => setDeleteTarget(item)}
+                    >
+                      {t('Delete')}
+                    </Button>
+                  )}
                   <Button
                     disabled={
                       item.archived || toggle.isPending || !item.target_kind
@@ -303,8 +317,18 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
             : toggle.mutate()
         }
       >
-        {(toggle.isError || probe.isError) && <p role='alert'>{t('Error')}</p>}
+        {(toggle.isError || probe.isError) && (
+          <p role='alert'>
+            {getServerErrorMessage(toggle.error || probe.error)}
+          </p>
+        )}
       </ConfirmDialog>
+      {deleteTarget && (
+        <MonitorDeleteDialog
+          monitor={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+        />
+      )}
       {probeResult && (
         <p role='status'>
           {t('Status')}: {probeResult.status} {probeResult.error_code}

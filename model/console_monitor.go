@@ -3,17 +3,20 @@ package model
 import (
 	"context"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // Publication is an explicit operator opt-in. None of the upstream configuration
 // is serialized. These tables are deliberately excluded from startup AutoMigrate.
 type ConsoleMonitor struct {
-	ID          int    `gorm:"primaryKey" json:"id"`
-	ChannelID   int    `gorm:"index" json:"channel_id"`
-	DisplayName string `json:"display_name"`
-	Platform    string `json:"platform"`
-	Model       string `json:"model"`
-	Published   bool   `gorm:"default:false" json:"published"`
+	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
+	ID          int            `gorm:"primaryKey" json:"id"`
+	ChannelID   int            `gorm:"index" json:"channel_id"`
+	DisplayName string         `json:"display_name"`
+	Platform    string         `json:"platform"`
+	Model       string         `json:"model"`
+	Published   bool           `gorm:"default:false" json:"published"`
 	// Nullable identity preserves legacy rows; new targets use a canonical hash.
 	Identity        *string `gorm:"size:64;uniqueIndex" json:"identity"`
 	TargetKind      string  `gorm:"size:32" json:"target_kind"`
@@ -140,7 +143,7 @@ func ConsoleProbeWindow(records []ConsoleProbe, days int, now time.Time) Console
 
 func GetConsoleMonitoring(ctx context.Context, now time.Time) (*ConsoleMonitorData, error) {
 	result := &ConsoleMonitorData{ReadAt: now.Unix(), StaleAfterSeconds: 900, Channels: []ConsoleChannelView{}}
-	if !DB.Migrator().HasTable(&ConsoleMonitor{}) || !DB.Migrator().HasTable(&ConsoleProbe{}) {
+	if !DB.Migrator().HasTable(&ConsoleMonitor{}) || !DB.Migrator().HasTable(&ConsoleProbe{}) || !DB.Migrator().HasColumn(&ConsoleMonitor{}, "deleted_at") {
 		return result, nil
 	}
 	result.Ready = true
@@ -224,7 +227,7 @@ func GetConsoleMonitoring(ctx context.Context, now time.Time) (*ConsoleMonitorDa
 
 // Save only results of an existing scheduled test, without creating extra requests.
 func RecordConsoleProbe(ctx context.Context, channelID int, testModel, status string, milliseconds int64) error {
-	if !DB.Migrator().HasTable(&ConsoleMonitor{}) || !DB.Migrator().HasTable(&ConsoleProbe{}) {
+	if !DB.Migrator().HasTable(&ConsoleMonitor{}) || !DB.Migrator().HasTable(&ConsoleProbe{}) || !DB.Migrator().HasColumn(&ConsoleMonitor{}, "deleted_at") {
 		return nil
 	}
 	var monitors []ConsoleMonitor

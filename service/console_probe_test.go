@@ -42,13 +42,21 @@ func (a *monitorMockAdapter) Authorize(ctx context.Context, m model.ConsoleMonit
 }
 func (a *monitorMockAdapter) Probe(ctx context.Context, m model.ConsoleMonitor, _ int64) (service.ConsoleProbeOutcome, error) {
 	a.calls++
+	var outcome service.ConsoleProbeOutcome
+	var err error
 	if a.probe != nil {
-		return a.probe(ctx, m)
+		outcome, err = a.probe(ctx, m)
+	} else if a.failure {
+		return outcome, context.DeadlineExceeded
+	} else {
+		outcome = service.ConsoleProbeOutcome{Status: "normal", SourceChannelID: m.ChannelID}
 	}
-	if a.failure {
-		return service.ConsoleProbeOutcome{}, context.DeadlineExceeded
+	if err == nil && outcome.MeteredCostMicros == nil {
+		cost := int64(3)
+		outcome.MeteredCostMicros = &cost
+		outcome.UpstreamResponseID = "synthetic-receipt"
 	}
-	return service.ConsoleProbeOutcome{Status: "normal", SourceChannelID: m.ChannelID}, nil
+	return outcome, err
 }
 
 // Legacy schema fixtures deliberately omit all new control-plane fields.
@@ -190,7 +198,8 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			denied = m
 			denied.ID = 0
 			denied.Model = "not-authorized"
-			require.ErrorIs(t, model.SaveConsoleMonitor(ctx, db, &denied), model.ErrMonitorDenied)
+			denied.Protocol = "audio-transcription"
+			require.NoError(t, model.SaveConsoleMonitor(ctx, db, &denied), "models and protocols are not allowlisted")
 			denied = m
 			denied.TargetKind = "account_pool_group"
 			denied.ChannelID = 0
@@ -210,6 +219,10 @@ func TestConsoleMonitorControlMatrix(t *testing.T) {
 			require.NoError(t, model.SetConsoleMonitorAllowlisted(ctx, db, group.ID, true))
 			group.Model = "not-authorized"
 			require.ErrorIs(t, model.ValidateMonitorTarget(db, &group), model.ErrMonitorDenied)
+			require.NoError(t, db.AutoMigrate(&model.Option{}))
+			for _, target := range []model.ConsoleMonitor{m, second, third} {
+				require.NoError(t, service.SaveConsoleProbeCostContract(ctx, db, target, service.ConsoleProbeCostContract{Source: "synthetic per-request fixture", BillingUnit: "request", ValidFrom: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour), FixedFeeMicros: 3, HardCeilingMicros: 10}))
+			}
 			mock := &monitorMockAdapter{}
 			executor := service.ConsoleProbeExecutor{DB: db, Adapters: map[string]service.ConsoleProbeAdapter{"channel": mock}}
 			require.ErrorIs(t, executor.Run(ctx, m.ID), model.ErrMonitorPaused)
@@ -604,13 +617,14 @@ func consoleMonitorFixture(t *testing.T) (*gorm.DB, model.ConsoleMonitor) {
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
 	t.Cleanup(func() { common.SetMainDatabaseType(oldKind) })
 	require.NoError(t, model.MigrateConsoleMonitoringDB(db))
-	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}))
+	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}, &model.Option{}))
 	require.NoError(t, db.Create(&model.Channel{Id: 1, Status: common.ChannelStatusEnabled, Key: "fixture-secret", Models: "gpt-6-luna,model-b", Name: "Allowed"}).Error)
 	require.NoError(t, db.Create(&model.Channel{Id: 2, Status: common.ChannelStatusManuallyDisabled, Key: "fixture-secret", Models: "gpt-6.1-sol", Name: "Disabled"}).Error)
 	m := model.ConsoleMonitor{ChannelID: 1, TargetKind: "channel", TargetRef: "1", Model: "gpt-6-luna", Protocol: "openai_chat", DisplayName: "Approved", IntervalSeconds: 60, TimeoutSeconds: 1, StaleSeconds: 900, DailyRequests: 2, RequestCostMicros: 10}
 	require.NoError(t, model.SaveConsoleMonitor(context.Background(), db, &m))
 	require.NoError(t, model.SetConsoleMonitorAllowlisted(context.Background(), db, m.ID, true))
 	require.NoError(t, model.SetConsoleMonitorSwitch(context.Background(), db, m.ID, "published", true))
+	require.NoError(t, service.SaveConsoleProbeCostContract(context.Background(), db, m, service.ConsoleProbeCostContract{Source: "synthetic fixed-request fixture, not supplier evidence", BillingUnit: "request", ValidFrom: time.Now().Add(-time.Hour), ExpiresAt: time.Now().Add(time.Hour), FixedFeeMicros: 3, HardCeilingMicros: 10}))
 	return db, m
 }
 
@@ -671,6 +685,7 @@ func TestConsoleMonitorExecutorValidatesGroupSourceAndSanitizesErrors(t *testing
 
 func TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution(t *testing.T) {
 	db, m := consoleMonitorFixture(t)
+	require.NoError(t, db.Where(map[string]any{"key": "console_monitor.cost.1"}).Delete(&model.Option{}).Error)
 	previousDB, previousLogDB := model.DB, model.LOG_DB
 	previousRedis, previousMemory := common.RedisEnabled, common.MemoryCacheEnabled
 	model.DB, model.LOG_DB = db, db
@@ -730,12 +745,12 @@ func TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution(t *te
 	assert.True(t, saved.Published)
 	assert.False(t, saved.Enabled)
 	response = request(http.MethodPut, fmt.Sprintf("%s/%d/switch/enabled", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{"value": true, "confirm": true})
-	assert.Equal(t, http.StatusForbidden, response.Code, "the fixture uses unsupported openai_chat")
+	assert.Equal(t, http.StatusConflict, response.Code, "the missing cost contract must block execution")
 	response = request(http.MethodPost, fmt.Sprintf("%s/%d/probe", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{})
 	assert.Equal(t, http.StatusBadRequest, response.Code)
 	response = request(http.MethodPost, fmt.Sprintf("%s/%d/probe", base, m.ID), "fixture-root-pat", "application/json", "1", map[string]any{"confirm": true})
-	assert.Equal(t, http.StatusForbidden, response.Code)
-	assert.Contains(t, response.Body.String(), "MONITOR_TARGET_DENIED", "the fixture uses the unsupported openai_chat transport")
+	assert.Equal(t, http.StatusConflict, response.Code)
+	assert.Contains(t, response.Body.String(), "MONITOR_PAUSED", "a failed enable must leave execution paused")
 	var recoverable model.ConsoleMonitorAttempt
 	require.NoError(t, db.Create(&model.ConsoleMonitorAttempt{MonitorID: m.ID, StartedAt: time.Now().Unix(), CleanupState: "cleanup_reconciling", ReservedCostMicros: 10}).Error)
 	require.NoError(t, db.Last(&recoverable).Error)
@@ -754,6 +769,29 @@ func TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution(t *te
 	require.NoError(t, db.Where("action = ?", "monitor.attempt_recover").First(&audit).Error)
 	assert.Equal(t, "monitor.attempt_recover", audit.Action)
 	assert.NotContains(t, audit.Content, "fixture worker restart")
+
+	t.Run("archived directory deletion requires root and confirmation", func(t *testing.T) {
+		archived := model.ConsoleMonitor{ID: 77, ChannelID: 1, Model: "retained-model", DisplayName: "Archived fixture", Archived: true}
+		require.NoError(t, db.Create(&archived).Error)
+		path := fmt.Sprintf("%s/%d", base, archived.ID)
+		for _, token := range []string{"", "fixture-admin-pat", "fixture-user-pat", "fixture-disabled-pat"} {
+			response := request(http.MethodDelete, path, token, "application/json", "1", map[string]any{"confirm": true})
+			assert.Contains(t, []int{http.StatusUnauthorized, http.StatusForbidden}, response.Code)
+		}
+		assert.Equal(t, http.StatusForbidden, request(http.MethodDelete, path, "fixture-root-pat", "application/json", "", map[string]any{"confirm": true}).Code)
+		assert.Equal(t, http.StatusBadRequest, request(http.MethodDelete, path, "fixture-root-pat", "application/json", "1", map[string]any{"confirm": false}).Code)
+		for range 2 {
+			response := request(http.MethodDelete, path, "fixture-root-pat", "application/json", "1", map[string]any{"confirm": true})
+			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
+		}
+		var tombstone model.ConsoleMonitor
+		require.NoError(t, db.Unscoped().First(&tombstone, archived.ID).Error)
+		assert.True(t, tombstone.DeletedAt.Valid)
+		assert.Equal(t, archived.DisplayName, tombstone.DisplayName)
+		assert.ErrorIs(t, db.First(&model.ConsoleMonitor{}, archived.ID).Error, gorm.ErrRecordNotFound)
+		response := request(http.MethodGet, base, "fixture-root-pat", "application/json", "1", nil)
+		assert.NotContains(t, response.Body.String(), "Archived fixture")
+	})
 
 	t.Run("allowlist management keeps execution and accounting isolated", func(t *testing.T) {
 		base := "/api/console/monitor-targets"
