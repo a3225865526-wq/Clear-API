@@ -546,17 +546,16 @@ func keepUpstreamRedirectResponse(_ *http.Request, _ []*http.Request) error {
 
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	req = req.WithContext(c.Request.Context())
-	if helper.RequiresOutboundTextBudget(info) {
+	if helper.RequiresRelayBillingValidation(info) {
 		data, err := io.ReadAll(io.LimitReader(req.Body, int64(max(1, common2.GetEnvOrDefault("MAX_REQUEST_BODY_MB", 128)))<<20))
 		_ = req.Body.Close()
 		if err != nil {
 			return nil, err
 		}
-		data, err = helper.PrepareOutboundTextBudget(c, info, data)
+		data, err = helper.ValidateOutboundBilling(c, info, data)
 		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithStatusCode(http.StatusBadRequest), types.ErrOptionWithSkipRetry())
 		}
-		_ = req.Body.Close()
 		req.Body = io.NopCloser(bytes.NewReader(data))
 		req.ContentLength = int64(len(data))
 		req.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(data)), nil }

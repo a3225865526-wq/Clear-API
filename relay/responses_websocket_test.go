@@ -15,7 +15,6 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	appdto "github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/i18n"
-	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
@@ -87,12 +86,10 @@ func TestResponsesWSActiveHeartbeatPreservesLongRequest(t *testing.T) {
 	}
 }
 
-func TestResponsesWSIdleClosesAndReleasesAdmission(t *testing.T) {
+func TestResponsesWSIdleCloses(t *testing.T) {
 	t.Setenv("RESPONSES_WS_IDLE_TIMEOUT", "1")
-	t.Setenv("RELAY_CONCURRENCY_USER", "1")
 	router := gin.New()
 	router.Use(func(c *gin.Context) { c.Set("id", 7); c.Set("token_id", 9) })
-	router.Use(middleware.RelayConcurrencyLimit())
 	upgrader := websocket.Upgrader{}
 	done := make(chan struct{})
 	router.GET("/ws", func(c *gin.Context) {
@@ -102,7 +99,7 @@ func TestResponsesWSIdleClosesAndReleasesAdmission(t *testing.T) {
 		}
 		ResponsesWebSocketHelper(c, conn, nil)
 	})
-	// This outer middleware runs after the admission defer releases its slot.
+	// Observe completion after the idle session returns.
 	outer := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		router.ServeHTTP(w, r)
 		if r.URL.Path == "/ws" {
@@ -117,7 +114,7 @@ func TestResponsesWSIdleClosesAndReleasesAdmission(t *testing.T) {
 	defer client.Close()
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequest("GET", "/ok", nil))
-	require.Equal(t, 429, w.Code)
+	require.Equal(t, 204, w.Code)
 	require.NoError(t, client.SetReadDeadline(time.Now().Add(5*time.Second)))
 	_, _, err = client.ReadMessage() // answers pings, still idle
 	require.Error(t, err)

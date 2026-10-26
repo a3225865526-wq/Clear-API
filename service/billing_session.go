@@ -42,34 +42,12 @@ type BillingSession struct {
 	mu               sync.Mutex
 	codexFinalized   bool
 	completionMeter  *dto.CodexMetering
-	dispatchAuth     *model.BillingAuthSnapshot // 发送前冻结的授权快照（hardening）
 }
 
 // Durable reports whether this session settles through the durable wallet
-// reservation ledger. Reservation hardening only admits durable sessions.
+// reservation ledger.
 func (s *BillingSession) Durable() bool {
 	return s.durable
-}
-
-// SetDispatchAuth freezes the dispatch-time authorization estimate. The next
-// Reserve raise persists it in the same transaction; when no raise is needed
-// PersistDispatchAuth writes it before the request is sent.
-func (s *BillingSession) SetDispatchAuth(snapshot *model.BillingAuthSnapshot) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.dispatchAuth = snapshot
-}
-
-// PersistDispatchAuth durably records the frozen authorization facts.
-func (s *BillingSession) PersistDispatchAuth() error {
-	s.mu.Lock()
-	snapshot := s.dispatchAuth
-	s.mu.Unlock()
-	if snapshot == nil {
-		return nil
-	}
-	snapshot.ReservedQuota = s.preConsumedQuota
-	return model.UpsertBillingAuthSnapshot(snapshot)
 }
 
 // SettleUncertain retains the approved charge while durably flagging missing
@@ -303,7 +281,7 @@ func (s *BillingSession) Reserve(targetQuota int) error {
 		if targetQuota <= s.preConsumedQuota {
 			return nil
 		}
-		if err := model.RaiseBillingReservationWithAuth(s.relayInfo.RequestId, targetQuota, s.dispatchAuth); err != nil {
+		if err := model.RaiseBillingReservation(s.relayInfo.RequestId, targetQuota); err != nil {
 			return err
 		}
 		s.preConsumedQuota = targetQuota
@@ -542,23 +520,16 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	if relayInfo == nil {
 		return nil, types.NewError(fmt.Errorf("relayInfo is nil"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
-	if BillingProtectionEnabled() && relayInfo.IsPlayground {
-		return nil, types.NewErrorWithStatusCode(errors.New("durable billing requires an API token; playground session accounting is not supported"), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
-	}
-
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
-		if BillingProtectionEnabled() || DurableWalletBillingEnabled() && !relayInfo.IsPlayground {
-			if err := ValidateBillingProtection(); err != nil {
-				return nil, types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
-			}
+		if DurableWalletBillingEnabled() && !relayInfo.IsPlayground {
 			if err := model.ReserveBillingRequest(relayInfo.RequestId, relayInfo.UserId, relayInfo.TokenId, preConsumedQuota); err != nil {
 				if errors.Is(err, model.ErrBillingReservationQuota) {
-					return nil, types.NewErrorWithStatusCode(errors.New("protected billing reservation exceeds available quota"), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry())
+					return nil, types.NewErrorWithStatusCode(errors.New("billing reservation exceeds available quota"), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry())
 				}
-				return nil, types.NewError(errors.New("protected billing reservation could not be committed"), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+				return nil, types.NewError(errors.New("billing reservation could not be committed"), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 			}
 			session := &BillingSession{relayInfo: relayInfo, funding: &WalletFunding{userId: relayInfo.UserId}, durable: true, preConsumedQuota: preConsumedQuota, tokenConsumed: preConsumedQuota, chargedQuota: preConsumedQuota}
 			c.Set(model.BillingExecutionContextKey, append(c.GetStringSlice(model.BillingExecutionContextKey), relayInfo.RequestId))
@@ -594,9 +565,6 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	}
 
 	trySubscription := func() (*BillingSession, *types.NewAPIError) {
-		if BillingProtectionEnabled() {
-			return nil, types.NewErrorWithStatusCode(errors.New("protected billing has no durable subscription settlement implementation"), types.ErrorCodeInvalidRequest, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
-		}
 		subConsume := int64(preConsumedQuota)
 		if subConsume <= 0 {
 			subConsume = 1

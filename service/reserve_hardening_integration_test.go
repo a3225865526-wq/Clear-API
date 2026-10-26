@@ -20,7 +20,6 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/billing_setting"
 	"github.com/QuantumNous/new-api/setting/config"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
@@ -35,9 +34,11 @@ import (
 
 // ---------------------------------------------------------------------------
 // Full-chain hardening fixtures: ModelPriceHelper -> PreConsumeBilling ->
-// PrepareOutboundTextBudget -> PostTextConsumeQuota against a durable wallet
+// ValidateOutboundBilling -> PostTextConsumeQuota against a durable wallet
 // reservation in an isolated database. No real provider is contacted.
 // ---------------------------------------------------------------------------
+
+const fixtureAExpr = `len <= 272000 ? tier("upstream_1", p*0.02 + cr*0.002 + cc*0.025 + cc1h*0.025 + c*0.10) : tier("upstream_2", p*0.04 + cr*0.04 + cc*0.05 + cc1h*0.05 + c*0.15)`
 
 const (
 	h2ChannelA      = 1
@@ -216,7 +217,7 @@ func startHardeningFlow(t testing.TB, u hardeningUser, channelID int, modelName,
 
 func (f *hardeningFlow) dispatch(t testing.TB) error {
 	t.Helper()
-	_, err := helper.PrepareOutboundTextBudget(f.Ctx, f.Info, []byte(f.OutboundBody))
+	_, err := helper.ValidateOutboundBilling(f.Ctx, f.Info, []byte(f.OutboundBody))
 	return err
 }
 
@@ -247,20 +248,6 @@ func hiddenUsageFixtureB() *dto.Usage {
 	}
 }
 
-func enforceColdPolicy(t *testing.T, extraProfile func(profile map[string]any)) {
-	t.Helper()
-	profileA := coldProfile(4480)
-	profileB := coldProfile(4480)
-	if extraProfile != nil {
-		extraProfile(profileA)
-		extraProfile(profileB)
-	}
-	setPolicy(t, operation_setting.ReserveModeEnforce, profilesJSON(t, map[string]map[string]any{
-		"channel::1::model::gpt-6-luna":  profileA,
-		"channel::2::model::gpt-6.1-sol": profileB,
-	}))
-}
-
 // Basic reservations must not impose profile/model admission on normal usage.
 func TestBasicBillingSettlement(t *testing.T) {
 	db := newHardeningDB(t)
@@ -268,7 +255,7 @@ func TestBasicBillingSettlement(t *testing.T) {
 	oldRedis, oldBatch := common.RedisEnabled, common.BatchUpdateEnabled
 	common.RedisEnabled, common.BatchUpdateEnabled = false, false
 	t.Cleanup(func() { common.RedisEnabled, common.BatchUpdateEnabled = oldRedis, oldBatch })
-	setPolicy(t, operation_setting.ReserveModeEnforce, "{}")
+
 	for _, tc := range []struct {
 		name                                    string
 		balance, tokenBalance, reserved, actual int

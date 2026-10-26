@@ -658,7 +658,7 @@ func buildResponsesWSCreatePayload(c *gin.Context, info *relaycommon.RelayInfo, 
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeReadRequestBodyFailed, types.ErrOptionWithSkipRetry())
 	}
-	jsonData, err = helper.PrepareOutboundTextBudget(c, info, jsonData)
+	jsonData, err = helper.ValidateOutboundBilling(c, info, jsonData)
 	if err != nil {
 		return nil, newResponsesWSInvalidRequestError(err)
 	}

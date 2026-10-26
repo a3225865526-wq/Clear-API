@@ -77,6 +77,9 @@ func GetAndValidAudioRequest(c *gin.Context, relayMode int) (*dto.AudioRequest, 
 			audioRequest.ResponseFormat = "json"
 		}
 	}
+	if err := validateTextQuantities(audioRequest); err != nil {
+		return nil, err
+	}
 	return audioRequest, nil
 }
 

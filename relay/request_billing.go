@@ -26,12 +26,9 @@ import (
 // provide the current request body through BodyStorage or BillingRequestInput;
 // channel retries retain the resulting billing session and pricing snapshot.
 func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.NewAPIError {
-	if err := helper.PrepareBillingRequest(c, info, true); err != nil {
-		return types.NewErrorWithStatusCode(err, types.ErrorCodeModelPriceError, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
-	}
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	meta := &types.TokenCountMeta{TokenType: types.TokenTypeTokenizer}
-	if info.Request != nil && (needSensitiveCheck || constant.CountToken || service.BillingProtectionEnabled() || service.DurableWalletBillingEnabled()) {
+	if info.Request != nil && (needSensitiveCheck || constant.CountToken || service.DurableWalletBillingEnabled()) {
 		meta = info.Request.GetTokenCountMeta()
 	} else {
 		// Avoid building CombineText when only the pricing quantities are needed.
@@ -67,11 +64,10 @@ func PrepareRequestBilling(c *gin.Context, info *relaycommon.RelayInfo) *types.N
 		return types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
 	}
 	if priceData.FreeModel {
-		// Only expression pricing currently creates a session on a free-to-paid
-		// group retry. Do not admit an unreserved legacy-ratio retry by dropping
-		// the old fixed-group text gate.
-		if (service.BillingProtectionEnabled() || service.DurableWalletBillingEnabled()) && info.TokenGroup == "auto" && info.TieredBillingSnapshot == nil {
-			return types.NewErrorWithStatusCode(errors.New("durable billing cannot reserve a free-to-paid automatic group retry without an expression snapshot"), types.ErrorCodeModelPriceError, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
+		// A free base price can still incur metered tool charges or a paid
+		// group retry. Keep one zero reservation for actual settlement.
+		if service.DurableWalletBillingEnabled() && !info.IsPlayground {
+			return service.PreConsumeBilling(c, 0, info)
 		}
 		logger.LogInfo(c, fmt.Sprintf("模型 %s 免费，跳过预扣费", info.OriginModelName))
 		return nil

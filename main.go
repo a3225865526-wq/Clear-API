@@ -189,7 +189,7 @@ func main() {
 		model.InitBatchUpdater()
 	}
 
-	if err := service.StartBillingProtectionWorker(); err != nil {
+	if err := service.StartWalletBillingRecovery(); err != nil {
 		common.FatalLog("billing protection unavailable; explicit migration and direct database accounting required")
 		return
 	}

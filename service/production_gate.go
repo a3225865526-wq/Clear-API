@@ -51,13 +51,13 @@ func ValidateProductionReadiness() error {
 	if strings.TrimSpace(os.Getenv("TRUSTED_PROXIES")) == "" {
 		return errors.New("production trusted proxies must be explicit")
 	}
-	for _, name := range []string{"MAX_UPSTREAM_RESPONSE_MB", "MAX_REQUEST_BODY_MB", "RELAY_CONCURRENCY_GLOBAL", "RELAY_CONCURRENCY_USER", "RELAY_CONCURRENCY_TOKEN", "RELAY_CONCURRENCY_IP"} {
+	for _, name := range []string{"MAX_UPSTREAM_RESPONSE_MB", "MAX_REQUEST_BODY_MB"} {
 		n, err := strconv.Atoi(os.Getenv(name))
 		if err != nil || n < 1 || n > 128 {
 			return errors.New("production resource limit invalid: " + name)
 		}
 	}
-	if err := ValidateBillingProtection(); err != nil {
+	if err := ValidateWalletBillingLedger(); err != nil {
 		return errors.New("production billing schema unavailable")
 	}
 	if !model.BillingReconciliationEnabled() || model.BillingReconciliationReady(model.DB) != nil {

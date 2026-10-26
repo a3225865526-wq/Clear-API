@@ -9,20 +9,19 @@ import (
 	"github.com/QuantumNous/new-api/model"
 )
 
-// Protection is opt-in and never migrates a running database automatically.
-func BillingProtectionEnabled() bool { return os.Getenv("CLEARAPI_BILLING_PROTECTION") == "true" }
+// DurableWalletBillingEnabled selects the existing reservation ledger. The old
+// protection flag remains a deployment alias so outstanding accounting keeps
+// the same completion/recovery path when upgrading.
+func DurableWalletBillingEnabled() bool {
+	return os.Getenv("CLEARAPI_DURABLE_WALLET") == "true" || os.Getenv("CLEARAPI_BILLING_PROTECTION") == "true"
+}
 
-// Both deployment flags use the same durable wallet ledger. Protocol adapters
-// supply billing facts; neither flag imposes a text-only request whitelist.
-// The ledger still requires an explicit schema migration.
-func DurableWalletBillingEnabled() bool { return os.Getenv("CLEARAPI_DURABLE_WALLET") == "true" }
-
-func ValidateBillingProtection() error {
-	if !BillingProtectionEnabled() && !DurableWalletBillingEnabled() {
+func ValidateWalletBillingLedger() error {
+	if !DurableWalletBillingEnabled() {
 		return nil
 	}
 	if common.RedisEnabled || common.BatchUpdateEnabled || os.Getenv("BATCH_UPDATE_ENABLED") == "true" {
-		return errors.New("billing protection requires direct database accounting without Redis or batch updates")
+		return errors.New("wallet ledger requires direct database accounting without Redis or batch updates")
 	}
 	if model.BillingOutboxEnabled() {
 		if err := model.BillingCompletionOutboxReady(model.DB, model.LOG_DB); err != nil {
@@ -32,11 +31,11 @@ func ValidateBillingProtection() error {
 	return model.BillingReservationsReady(model.DB)
 }
 
-func StartBillingProtectionWorker() error {
-	if !BillingProtectionEnabled() && !DurableWalletBillingEnabled() {
+func StartWalletBillingRecovery() error {
+	if !DurableWalletBillingEnabled() {
 		return nil
 	}
-	if err := ValidateBillingProtection(); err != nil {
+	if err := ValidateWalletBillingLedger(); err != nil {
 		return err
 	}
 	go func() {

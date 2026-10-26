@@ -175,7 +175,7 @@ func getImageToken(c *gin.Context, fileMeta *types.FileMeta, model string, strea
 
 func EstimateRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relaycommon.RelayInfo) (int, error) {
 	// 是否统计token
-	if !constant.CountToken && !BillingProtectionEnabled() && !DurableWalletBillingEnabled() {
+	if !constant.CountToken && !DurableWalletBillingEnabled() {
 		return 0, nil
 	}
 	return CountRequestToken(c, meta, info)

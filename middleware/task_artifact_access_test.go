@@ -187,27 +187,3 @@ func TestMidjourneyImageCapabilityIsBoundToOneImage(t *testing.T) {
 		assert.Equal(t, tc.status, r.Code)
 	}
 }
-
-func TestRelayConcurrencyReleasesAdmission(t *testing.T) {
-	t.Setenv("RELAY_CONCURRENCY_USER", "1")
-	admit := RelayConcurrencyLimit()
-	held, release, done := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	router := gin.New()
-	router.Use(func(c *gin.Context) { c.Set("id", 17); c.Set("token_id", 23) })
-	router.Use(admit)
-	router.GET("/hold", func(c *gin.Context) { close(held); <-release; c.Status(204) })
-	router.GET("/ok", func(c *gin.Context) { c.Status(204) })
-	go func() {
-		defer close(done)
-		router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/hold", nil))
-	}()
-	<-held
-	r := httptest.NewRecorder()
-	router.ServeHTTP(r, httptest.NewRequest("GET", "/ok", nil))
-	assert.Equal(t, 429, r.Code)
-	close(release)
-	<-done
-	r = httptest.NewRecorder()
-	router.ServeHTTP(r, httptest.NewRequest("GET", "/ok", nil))
-	assert.Equal(t, 204, r.Code)
-}

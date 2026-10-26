@@ -243,14 +243,13 @@ func ObserveRuntimeIntegrityWithProvider(ctx context.Context, provider RuntimeId
 		InstanceID: identity.InstanceID, BuildIdentity: identity.BuildIdentity,
 		OnlinePaymentEnabled: !operation_setting.DisableOnlinePayments,
 		StoreEnabled:         operation_setting.StoreRechargeEnabled,
-		BillingMode:          operation_setting.ReservationHardeningMode(),
+		BillingMode:          "off", // Retired admission policy; wallet/usage billing remains active.
 		PoolEnabled:          common.OptionMap[PoolMasterOptionKey] == "true",
 	}
 	expected := map[string]string{
-		"DisableOnlinePayments":       strconv.FormatBool(!result.OnlinePaymentEnabled),
-		"StoreRechargeEnabled":        strconv.FormatBool(result.StoreEnabled),
-		"billing_reserve_policy.mode": result.BillingMode,
-		PoolMasterOptionKey:           strconv.FormatBool(result.PoolEnabled),
+		"DisableOnlinePayments": strconv.FormatBool(!result.OnlinePaymentEnabled),
+		"StoreRechargeEnabled":  strconv.FormatBool(result.StoreEnabled),
+		PoolMasterOptionKey:     strconv.FormatBool(result.PoolEnabled),
 	}
 	for key, value := range expected {
 		raw, ok := common.OptionMap[key]
@@ -264,7 +263,7 @@ func ObserveRuntimeIntegrityWithProvider(ctx context.Context, provider RuntimeId
 	var viewStateDigest string
 	err = DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var options []Option
-		if err := tx.Where(commonKeyCol+" IN ?", []string{"DisableOnlinePayments", "StoreRechargeEnabled", "billing_reserve_policy.mode", PoolMasterOptionKey, ReferralOptionKey}).Find(&options).Error; err != nil {
+		if err := tx.Where(commonKeyCol+" IN ?", []string{"DisableOnlinePayments", "StoreRechargeEnabled", PoolMasterOptionKey, ReferralOptionKey}).Find(&options).Error; err != nil {
 			return ErrProbeUnavailable
 		}
 		stored := make(map[string]string, len(options))

@@ -1,3 +1,64 @@
+## 2026-10-26 Asia/Shanghai — 撤销自定义协议准入门禁：本地代码完成，等待部署授权
+
+- **身份与范围：** 本轮固定 SSH 身份只读 preflight 实查生产为 `6d43530398f218ffbebecda2a44c7bd8fe5fed80`，Gateway `7a47ead735236fb0b72105956f6a3432974d52ce61226b9218ffafeae346e434` healthy，规范 OCI config `sha256:e18187013221ca9b3a747ab08a97827ff784308f42696fc8c3b1dba5de91b149`。从此生产提交建立新 worktree `D:/Codex/worktrees/clearapi-native-gates-20261026/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-native-gates-20261026`；原工作区和其他支线成果未覆盖、清理或重置。最终 SHA 为包含本节与代码的本地提交，见交付回执；未 Push、合并 main 或部署。
+- **上游基线：** Git 历史中首个 ClearAPI 网站改动 `637e4ff26` 的父提交为原版 new-api `0aec08fee811ec6136828fda790551b49e410301`（CaIon，2026-09-21）。对照该源码及 `94a8cafad`（Protected Billing）、`793fd7476`（预算）、`6af33fbca`（hardening）、`382d52108` / `517158135` / `86451cd20` / `5681fe8cc` 的后续修复；没有整仓回退或覆盖。原生 `BillingSession`、价格表达式、协议 DTO/适配器和实际工具调用收费均已存在于上游基线。
+
+### 门禁盘点与删除口径
+
+按阻断行为归并，发现 **20 类历史 ClearAPI 自定义门禁**，不是 if、字段或文件计数。前 8 类在生产基线已撤销，本轮确认没有恢复；后 12 类在本轮删除活跃阻断或清除其失效实现、配置、回调与废弃测试。旧持久化审计字段不等于仍然生效的准入规则。
+
+| # | 自定义门禁行为 | 本次结果 |
+| --- | --- | --- |
+| 1 | 仅允许 Chat/Responses 纯文本、SSE 请求 | 生产基线已删除，保持删除 |
+| 2 | 固定渠道、模型、分组、精确价式白名单 | 生产基线已删除，保持删除 |
+| 3 | 顶层字段、provider/工具元数据白名单 | 生产基线已删除，保持原 DTO/渠道配置语义 |
+| 4 | namespace/custom/未知普通工具声明整体拒绝 | 生产基线已删除，不恢复工具类型白名单 |
+| 5 | 缺显式 max 或关闭可选 Token 估算就拒绝 | 生产基线已删除，保留可选参数 |
+| 6 | 网关强写通用 4096 输出额度 | 生产基线已删除，不改写客户端额度 |
+| 7 | 最大输出、最贵缓存及表达式所有分支全额预算 | 生产基线已删除，沿用基础输入估算与实际结算 |
+| 8 | 历史引用、加密内容、cachedContent/fileData 需批准预算 | 生产基线已删除，按原生引用和最终 usage 处理 |
+| 9 | channel/model approved profile 与 quarantine | 删除残留估算器、注册配置、验证与相关测试 |
+| 10 | 自定义 cap、margin、floor、model_output/context_max | 删除相关估算、配置及测试；不增加同义限制 |
+| 11 | 隐藏模态/表达式变量 domain 限制及超 profile 不退款 | 删除残留 domain/anomaly 实现及上界求值测试/语料 |
+| 12 | 出站 hardening 授权快照写入、每请求重复 schema 校验 | 删除无调用用途的服务回调，Reserve 使用现有普通原子接口；schema 只保留启动检查及真实事务错误 |
+| 13 | 搜索必须预声明最大调用次数并另预留最大工具预算 | 删除；原生搜索按实际调用结算 |
+| 14 | File Search、原生 Responses 图像工具一概拒绝 | 删除；复用原生调用计数和已有工具价格，图像按原生完成结果计数 |
+| 15 | Protected Billing 阻止 Playground | 删除；恢复原生会话身份及资金来源路径 |
+| 16 | Protected Billing 阻止订阅资金来源 | 删除；恢复原生订阅预扣/差额/退款，不混入钱包 reservation |
+| 17 | 免费初始组/旧倍率 auto 请求整体拒绝 | 删除；durable 钱包保留零 reservation，支持后续实际工具费或收费组结算，避免旧无 session 回退 |
+| 18 | 额外全局/用户/Key/IP 并发准入层 | 删除中间件、全部路由挂接、部署模板配置和对应废弃断言；原生模型请求限流/SystemPerformanceCheck 保留 |
+| 19 | Responses WebSocket 总开关默认阻断 | 删除；保留每请求认证、原生限流及渠道传输能力选择 |
+| 20 | Runtime/旧发布入口强制失效的 billing_reserve_policy=enforce | 删除配置注册及强制前置；旧 runtime 字段报告 off 仅指已退役准入策略，不代表关闭计费 |
+
+### 保留的原生机制、商业功能与账务依赖
+
+- 保留 API Key、用户权限、模型/分组范围、原生价格未配置拒绝、有限非负价格/倍率、数量与整数溢出边界、余额、实际 usage/cache/tool 计费、消费记录和退款。`ValidateOutboundBilling` 仅检查覆盖/透传后的真实数量和下列未支持能力，不改写正文、不求最大预算、不保存内容指纹。普通扩展字段由原 DTO 和渠道透传/隐私设置处理。
+- **账务存储未删除、回滚或迁移：** reservation、完成意图、outbox、恢复、对账和历史 BillingAuthSnapshot 模型/表及既有记录保持；没有修改其 schema、SQL 写入、数据库驱动或生产数据。`CLEARAPI_BILLING_PROTECTION` 仅作为已部署 ledger 选择开关的兼容别名，与 `CLEARAPI_DURABLE_WALLET` 使用同一账本，不再附加协议准入。启动仍验证直接数据库记账、所需表/唯一约束及 outbox。
+- 钱包请求只走一个 BillingSession；实际大于基础预扣时复用原子补扣，失败保留目标及已收金额；重复完成/退款不会再扣。免费基础价也保留零钱包预留，原生工具的非零实际费用仍结算。订阅与 Playground 恢复原生资金路径，不宣称它们具有 durable 钱包的全部跨进程恢复保证。
+- 模型价格同步、使用指南、注册充值、渠道管理和其他现有商业功能源码保持。生产实际销售价格、倍率和用户余额没有修改。**PG03 继续暂缓商业使用，D 生图不部署。** 恢复原生 Responses 内置图像工具的既有收费路径，不等同于部署 D/PG03 生图功能。
+- **明确未支持的具体能力：** Code Interpreter 独立会话费用、Claude 服务端 MCP 独立费用、Gemini hosted code/URL context 独立费用仍无完整宿主计量/结算；仅限制这些具体能力。Realtime 在 durable 钱包下缺逐轮结算，维持明确未支持及既有生产关闭状态。没有把函数工具、引用或所有协议整体列为风险请求；未增加新门禁。
+- **风险如实保留：** 基础预扣不能保证最终上游费用全部被用户/Key 余额覆盖；删除最大搜索调用预留后同样存在超余额未收足风险，无法承诺零欠费。上游缺最终 usage 时仍有估算/保留预扣与后续核对边界；进程在补预留与完成意图之间崩溃仍可能留下 active 记录。定向测试未发现新增重复扣费或漏掉已支持工具实际费用的路径，不代表所有厂商/流式异常已真实验收。
+
+### 最小只读追踪：5 次 gpt-6.1-sol 调用
+
+- 用户补充的当天 5 笔、30,654 Token 与 Gateway 五条消费日志精确吻合：输入 **30,585**，输出 **69**。UTC 请求窗口 **04:48:25–04:59:09**，上海 **12:48:25–12:59:09**；消费完成时间依次为 **12:48:29、12:48:36、12:48:42、12:48:47、12:59:09**，各笔总 Token 为 **522、6601、523、6601、16407**。
+- 归属链：当前生产 Gateway `/new-api`（观察时 host PID 2117566）→ 普通 Channel 1/type 1 → `https://api.88token.net`；本地 Token 6「test」属于 root 用户 1。Caddy 同窗口 POST `/v1/responses` 200 对应前四笔 OpenCode desktop、第五笔 Codex Desktop UA；UA 只识别客户端自报软件，不证明实际操作者。相关 routechain/monitor attempts/probes/pool auth tasks 为 0，Executor 同窗口日志 0 行；无证据归因为 Executor、后台测试或账号池。
+- **费用原因更正：** 五份冻结消费价式与当前生效配置均为 `tier("base", p * 0 + c * 0)`，mode=tiered_expr。五笔均走正常完成链，reservation 为 settled，reserved/target/applied=0。因此是**显式零销售价**，不是“未配置价格而绕过保护”的证据；上游非零成本与销售价零可以同时成立。零价由谁保存、是否有意未在本轮追查；没有擅自改价。
+- 原生 tiered 模式缺表达式会报错；旧倍率未配置默认拒绝，保留用户显式 AcceptUnsetRatioModel 的原生例外。此次用户该选项为 false，SelfUseModeEnabled=false；本轮补充缺表达式拒绝与显式零价可结算的回归。
+- PG03 关闭仍成立：`CLEARAPI_POOL_ENABLED=false`，routechain/images 未启用，仅普通 Channel 1 活跃。Executor 进程存在不是 PG03 已开放的证据。截至只读采样上海 **17:01:55**，当天仅发现这五条，无后续同模型消费记录；未发现持续未经授权调用证据，未做隔离。上游逐笔 request ID 在本地为空，无法独立逐笔核对上游 ID，保持 **UNKNOWN**；不能据此断言密钥泄露，也不能证明绝无其他程序直连。
+- 证据：`D:/AI/API/evidence/native-gates-20261026/trace-summary.json` 及三个只读投影；使用固定 SSH 身份和 PostgreSQL READ ONLY 事务，未发新上游请求、写生产凭据/数据库或扩展为完整财务审查。历史调用本身不阻断本地恢复工作。
+
+### 实际验证与交付边界
+
+- Docker **Go 1.25.1**、业务测试 **network none**、复用模块/编译缓存、独立 SQLite：聚焦协议/钱包/工具/路由/适配器验证共 **39 个主测试，151 个含子测试项通过**（去重计数）。覆盖 Chat Completions、Responses JSON/SSE 使用量夹具、Claude、Gemini、可选 max、引用、原生搜索/File Search/图像工具收费、免费价与收费工具、订阅/Playground、超预扣补扣/不足、退款、outbox 单次日志、中断用量及本地 Responses WebSocket 复用/原生限流。测试夹具与本地 HTTP/WebSocket 不代表真实厂商请求。
+- 主要实际命令：`go test -json ./service ./relay/helper ./relay -run '^Test(NativeFundingAndMeteredTools|BasicBillingSettlement|ProtocolBilling.*|ProtectedBillingDatabase|ProtectedTieredReplayAndRetention|BillingPreservesOptionalOutputLimits|BillingOutputAllowanceTransport|OutboundTextBudgetCoversParameterOverrides|ResponsesWSIdleCloses|ResponsesWSOutboundBillingBudget|InterruptedStream.*|CompletedStreamEstimate.*|R7ZeroChunkClosure.*|R7CompletedProxySettlement.*)$' -count=1 -timeout=3m`；`go test -json ./controller ./router -run '^Test(RuntimeIntegrityStateAndFailures|ResponsesWebSocketReusesConnectionAndSettlesEachRequest|ResponsesWSRequestRunnerUsesExistingMemoryRateLimit|GetOpenAIVideoRouteRendersJimengTask|HostProtocolRegistryDrivesProtocolRoutesOnce|ClearAPIPublicRelayRoutes)$' -count=1 -timeout=3m`。适配器/工具实际调用及终态回归见 `adapters-and-build.log`；最后改动的 ledger/HTTP 路径 3 个主测试复核见 `final-ledger-transport-tests.jsonl`。
+- 初次出现删门禁后的旧预期、测试 fixture 未完整初始化及未用 import；已修正并仅重跑受影响测试，最终对应主测试均 PASS。原始失败日志保留，未改成“首次全部通过”。视频路由只删除旧并发门禁断言，保留视频内容权限回归；Runtime 测试确认历史 enforce/monitor 值不再阻断退役策略。
+- `TestDryRunZeroWrite` 通过；WSL 两脚本 `bash -n` 通过；`RuntimeGateContractTest` 共8项（7通过、1平台明确 skip），v2 对应商业目录/runtime 合同1项通过。全部改动 Go 文件已 gofmt，`git diff --check` 通过。没有改 relaykit，未重复其构建。未重跑完整历史 E2E 或三库矩阵；本次未改账务持久化结构/迁移。
+- **完整 Gateway 构建未通过：** 实际尝试 `go build -o /tmp/clearapi-native .`，新 worktree 未生成 `web/dist`，模块缓存缺 `github.com/joho/godotenv v1.5.1`，公共依赖下载返回 network EOF；没有伪造 embed 资源或把编译阻塞写成通过。完整镜像构建/前端构建和真实厂商 SSE/工具验收仍待后续预检/商业验收。
+- 本轮已具备**进入 Windows 本地部署预检**的代码交付条件；不等于预检、构建或生产发布已通过。预检须解决完整构建依赖并沿用真实备份/身份机制；PG03 和 D 状态不变。所有原始日志及去重测试清单在 `D:/AI/API/evidence/native-gates-20261026/validation-summary.json`。本轮没有生产部署、重启、真实收费请求、Push、main 合并、价格/余额写入；完成本地提交后停止，等待用户部署授权。
+
+---
+
 ## 2026-10-26 Asia/Shanghai — A/B/C 统一集成候选，正式本地部署待执行
 
 - 基线由本轮固定 SSH 身份下正式 preflight 实查：`86451cd20e9e0b3b3205afab44ebc3c422218502`，Gateway healthy=true；独立工作区 `D:/Codex/worktrees/clearapi-abc-release-20261026/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-abc-release-20261026`。本条所在提交为集成应用提交；原工作区及 A 工作区未提交总控、其他工作成果均未修改。

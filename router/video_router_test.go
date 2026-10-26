@@ -3,13 +3,11 @@ package router
 import (
 	"net/http"
 	"net/http/httptest"
-	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/middleware"
+	"github.com/QuantumNous/new-api/i18n"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +15,7 @@ import (
 )
 
 func TestGetOpenAIVideoRouteRendersJimengTask(t *testing.T) {
+	require.NoError(t, i18n.Init())
 	gin.SetMode(gin.TestMode)
 
 	previousDB := model.DB
@@ -104,9 +103,6 @@ func TestGetOpenAIVideoRouteRendersJimengTask(t *testing.T) {
 	require.NoError(t, database.Create(task).Error)
 
 	engine := gin.New()
-	previousLimiter := relayConcurrencyLimit
-	relayConcurrencyLimit = middleware.RelayConcurrencyLimit()
-	t.Cleanup(func() { relayConcurrencyLimit = previousLimiter })
 	SetVideoRouter(engine)
 	SetTaskPluginProtocolRouter(engine)
 	request := httptest.NewRequest(http.MethodGet, "/v1/videos/task_jimeng_public", nil)
@@ -133,43 +129,6 @@ func TestGetOpenAIVideoRouteRendersJimengTask(t *testing.T) {
 	assert.Equal(t, int64(1710000060), response.CompletedAt)
 	assert.NotContains(t, recorder.Body.String(), "cdn.example")
 	assert.NotContains(t, recorder.Body.String(), "jimeng-private-1")
-
-	for _, slots := range []int{4, 8} {
-		held := make(chan struct{}, slots)
-		release := make(chan struct{})
-		var workers sync.WaitGroup
-		path := "/hold-" + strconv.Itoa(slots)
-		engine.GET(path, func(c *gin.Context) {
-			c.Set("id", 91)
-			if slots == 4 {
-				c.Set("token_id", 1)
-			} else {
-				index, _ := strconv.Atoi(c.Query("index"))
-				c.Set("token_id", 2+index/4)
-			}
-		}, relayConcurrencyLimit, func(c *gin.Context) { held <- struct{}{}; <-release })
-		for index := range slots {
-			workers.Go(func() {
-				engine.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", path+"?index="+strconv.Itoa(index), nil))
-			})
-		}
-		for range slots {
-			<-held
-		}
-		for _, route := range []struct{ method, path string }{
-			{"POST", "/v1/video/generations"}, {"GET", "/v1/video/generations/task"}, {"POST", "/v1/videos/task/remix"},
-			{"POST", "/v1/videos"}, {"GET", "/v1/videos/task"}, {"GET", "/v1/videos/task/content"},
-			{"POST", "/v1/images/generations"}, {"POST", "/v1/images/edits"}, {"POST", "/v1/responses"}, {"GET", "/v1/responses/task"},
-		} {
-			r := httptest.NewRequest(route.method, route.path, nil)
-			r.Header.Set("Authorization", "Bearer sk-jimengfetch")
-			w := httptest.NewRecorder()
-			engine.ServeHTTP(w, r)
-			assert.Equal(t, 429, w.Code, "slots=%d %s %s: %s", slots, route.method, route.path, w.Body.String())
-		}
-		close(release)
-		workers.Wait()
-	}
 
 	for _, testCase := range []struct {
 		name          string

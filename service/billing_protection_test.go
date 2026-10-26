@@ -95,14 +95,14 @@ func TestProtectedBillingDatabase(t *testing.T) {
 	require.NoError(t, db.Create(&u).Error)
 	token := model.Token{UserId: u.Id, Key: "sbp" + suffix, RemainQuota: 10000, Status: common.TokenStatusEnabled, ExpiredTime: -1}
 	require.NoError(t, db.Create(&token).Error)
-	require.Error(t, service.ValidateBillingProtection())
+	require.Error(t, service.ValidateWalletBillingLedger())
 	require.NoError(t, model.MigrateBillingReservations(db))
 	require.NoError(t, model.MigrateBillingReservations(db))
-	require.NoError(t, service.ValidateBillingProtection())
+	require.NoError(t, service.ValidateWalletBillingLedger())
 	require.NoError(t, db.Migrator().DropIndex(&model.BillingReservation{}, "idx_billing_request_id"))
-	require.Error(t, service.ValidateBillingProtection())
+	require.Error(t, service.ValidateWalletBillingLedger())
 	require.NoError(t, model.MigrateBillingReservations(db))
-	require.NoError(t, service.ValidateBillingProtection())
+	require.NoError(t, service.ValidateWalletBillingLedger())
 	var version string
 	query := "select version()"
 	if dialect == "sqlite" {
@@ -205,9 +205,11 @@ func TestProtectedBillingDatabase(t *testing.T) {
 	balance(9250)
 	assert.Equal(t, 150, session.ChargedQuota())
 	info.IsPlayground = true
-	_, apiErr = service.NewBillingSession(ctx, info, 1)
-	require.NotNil(t, apiErr)
-	assert.Equal(t, 400, apiErr.StatusCode)
+	playground, apiErr := service.NewBillingSession(ctx, info, 1)
+	require.Nil(t, apiErr)
+	assert.False(t, playground.Durable(), "Playground retains native session funding")
+	playground.Refund(ctx)
+	balance(9250)
 	info.IsPlayground = false
 	info.RequestId = "refund-session"
 	session, apiErr = service.NewBillingSession(ctx, info, 250)
@@ -300,10 +302,10 @@ func TestProtectedBillingDatabase(t *testing.T) {
 		})
 	}
 	common.RedisEnabled = true
-	require.Error(t, service.ValidateBillingProtection())
+	require.Error(t, service.ValidateWalletBillingLedger())
 	common.RedisEnabled = false
 	common.BatchUpdateEnabled = true
-	require.Error(t, service.ValidateBillingProtection())
+	require.Error(t, service.ValidateWalletBillingLedger())
 	common.BatchUpdateEnabled = false
 }
 
@@ -337,7 +339,7 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"protocol-fixture":2}`))
 	require.NoError(t, ratio_setting.UpdateCacheRatioByJSONString(`{"protocol-fixture":0.25}`))
 	require.NoError(t, ratio_setting.UpdateCreateCacheRatioByJSONString(`{"protocol-fixture":0.5}`))
-	setPolicy(t, operation_setting.ReserveModeEnforce, "{}")
+
 	openAIUsage := &dto.Usage{PromptTokens: 1000, CompletionTokens: 20, TotalTokens: 1020, PromptTokensDetails: dto.InputTokenDetails{CachedTokens: 200}}
 	for _, tc := range []struct {
 		name, path, body string
@@ -371,7 +373,7 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			u := createHardeningUser(t, db, fmt.Sprintf("pc%x", time.Now().UnixNano()), 100000)
 			info := &relaycommon.RelayInfo{Request: tc.request, RequestId: fmt.Sprintf("protocol-%d", h2FlowCounter.Add(1)), UserId: u.UserID, TokenId: u.TokenID, OriginModelName: "protocol-fixture", UserGroup: "default", UsingGroup: "default", RelayMode: tc.mode, RelayFormat: tc.format, RequestURLPath: c.Request.URL.Path, ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI, UpstreamModelName: "protocol-fixture"}}
 			info.UserSetting.BillingPreference = "wallet_only"
-			require.NoError(t, helper.PrepareBillingRequest(c, info, true))
+			require.NoError(t, helper.ValidateBillingCapabilities(info))
 			meta := tc.request.GetTokenCountMeta()
 			if tc.name == "responses-json" || tc.name == "gemini-json" || tc.name == "claude-json" {
 				assert.Contains(t, meta.CombineText, "argument-fixture")
@@ -380,7 +382,7 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			require.Nil(t, relayapi.PrepareRequestBilling(c, info))
 			body, err := common.Marshal(tc.request)
 			require.NoError(t, err)
-			wire, budgetErr := helper.PrepareOutboundTextBudget(c, info, body)
+			wire, budgetErr := helper.ValidateOutboundBilling(c, info, body)
 			require.NoError(t, budgetErr)
 			if tools := gjson.Get(tc.body, "tools"); tools.Exists() {
 				assert.JSONEq(t, tools.Raw, gjson.GetBytes(wire, "tools").Raw)
@@ -418,7 +420,7 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			info.RequestId += "-raise"
 			info.Billing = nil
 			require.Nil(t, service.PreConsumeBilling(c, 10, info))
-			_, budgetErr = helper.PrepareOutboundTextBudget(c, info, body)
+			_, budgetErr = helper.ValidateOutboundBilling(c, info, body)
 			require.NoError(t, budgetErr)
 			assert.GreaterOrEqual(t, info.Billing.GetPreConsumedQuota(), 10)
 			require.Error(t, info.Billing.Reserve(200000))
@@ -435,24 +437,56 @@ func TestProtocolBillingCompatibility(t *testing.T) {
 			assert.Equal(t, walletState{100000 - expected, 100000 - expected}, walletOf(t, u))
 		})
 	}
-	// Legacy ratio retries do not yet create a session when the first group is
-	// free. Preserve that real accounting boundary rather than admitting a
-	// later paid attempt with no reservation.
+	for _, tc := range []struct {
+		name, expression string
+		missing          bool
+	}{
+		{"missing-expression", "", true}, {"explicit-zero", `tier("base", p * 0 + c * 0)`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
+				"billing_setting.billing_mode": `{"sales-fixture":"tiered_expr"}`,
+				"billing_setting.billing_expr": fmt.Sprintf(`{"sales-fixture":%q}`, tc.expression),
+			}))
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+			u := createHardeningUser(t, db, tc.name, 100000)
+			info := &relaycommon.RelayInfo{Request: &dto.OpenAIResponsesRequest{Model: "sales-fixture", Input: []byte(`"hello"`)}, RequestId: tc.name, UserId: u.UserID, TokenId: u.TokenID, OriginModelName: "sales-fixture", UsingGroup: "default", UserGroup: "default", UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
+			apiErr := relayapi.PrepareRequestBilling(c, info)
+			if tc.missing {
+				require.NotNil(t, apiErr)
+				assert.Nil(t, info.Billing)
+				assert.False(t, c.GetBool("upstream_attempted"))
+				return
+			}
+			require.Nil(t, apiErr)
+			require.NotNil(t, info.Billing)
+			require.NoError(t, info.Billing.Settle(0))
+			assert.Equal(t, "settled", reservationOf(t, info.RequestId).State)
+			assert.Equal(t, walletState{100000, 100000}, walletOf(t, u))
+		})
+	}
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{"billing_setting.billing_mode": "{}", "billing_setting.billing_expr": "{}"}))
+	// A free auto group retains one zero reservation for a later paid retry.
 	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{"group_ratio_setting.group_ratio": `{"default":0}`}))
 	operation_setting.GetQuotaSetting().EnableFreeModelPreConsume = false
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	u := createHardeningUser(t, db, "auto-free-paid", 100000)
 	limit := uint(100)
-	info := &relaycommon.RelayInfo{Request: &dto.GeneralOpenAIRequest{Model: "protocol-fixture", Messages: []dto.Message{{Role: "user", Content: "hello"}}, MaxTokens: &limit}, OriginModelName: "protocol-fixture", TokenGroup: "auto", UserGroup: "default", UsingGroup: "default", RelayMode: relayconstant.RelayModeChatCompletions, RelayFormat: types.RelayFormatOpenAI}
+	info := &relaycommon.RelayInfo{Request: &dto.GeneralOpenAIRequest{Model: "protocol-fixture", Messages: []dto.Message{{Role: "user", Content: "hello"}}, MaxTokens: &limit}, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}, RequestId: "auto-free-paid", UserId: u.UserID, TokenId: u.TokenID, OriginModelName: "protocol-fixture", TokenGroup: "auto", UserGroup: "default", UsingGroup: "default", RelayMode: relayconstant.RelayModeChatCompletions, RelayFormat: types.RelayFormatOpenAI}
 	apiErr := relayapi.PrepareRequestBilling(c, info)
-	require.NotNil(t, apiErr)
-	assert.Contains(t, apiErr.Error(), "free-to-paid")
-	assert.Nil(t, info.Billing)
+	require.Nil(t, apiErr)
+	require.NotNil(t, info.Billing)
+	assert.Zero(t, info.Billing.GetPreConsumedQuota())
+	require.NoError(t, info.Billing.Settle(100))
+	require.NoError(t, info.Billing.Settle(100))
+	assert.Equal(t, walletState{99900, 99900}, walletOf(t, u))
 }
 
 func TestProtocolBillingReferencesDoNotRequireAdmission(t *testing.T) {
 	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
-	setPolicy(t, operation_setting.ReserveModeOff, "{}")
+
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
 	for _, tc := range []struct {
@@ -470,31 +504,28 @@ func TestProtocolBillingReferencesDoNotRequireAdmission(t *testing.T) {
 			require.NoError(t, common.Unmarshal([]byte(tc.body), tc.request))
 			info := &relaycommon.RelayInfo{Request: tc.request, OriginModelName: "protocol-fixture"}
 			if tc.name == "MCP" {
-				require.ErrorContains(t, helper.PrepareBillingRequest(c, info, true), tc.reason)
+				require.ErrorContains(t, helper.ValidateBillingCapabilities(info), tc.reason)
 			} else {
-				require.NoError(t, helper.PrepareBillingRequest(c, info, true))
+				require.NoError(t, helper.ValidateBillingCapabilities(info))
 			}
 			assert.Nil(t, info.Billing)
 			assert.False(t, c.GetBool("upstream_attempted"))
 		})
 	}
-	profile := coldProfile(100)
-	profile["model_context_max"], profile["model_output_max"] = 16384, 1024
-	setPolicy(t, operation_setting.ReserveModeEnforce, profilesJSON(t, map[string]map[string]any{"model::protocol-fixture": profile}))
 	r := &dto.OpenAIResponsesRequest{Model: "protocol-fixture", Input: []byte(`"hello"`), PreviousResponseID: "resp_1"}
 	info := &relaycommon.RelayInfo{Request: r, OriginModelName: r.Model}
-	require.NoError(t, helper.PrepareBillingRequest(c, info, true))
+	require.NoError(t, helper.ValidateBillingCapabilities(info))
 	assert.Nil(t, r.MaxOutputTokens)
 	// Outbound validation cannot silently assume a cap that is absent on wire.
 	r.MaxOutputTokens = nil
-	require.NoError(t, helper.PrepareBillingRequest(c, info, false))
+	require.NoError(t, helper.ValidateBillingCapabilities(info))
 	assert.Nil(t, r.MaxOutputTokens)
 	r.ServiceTier = "priority"
-	require.NoError(t, helper.PrepareBillingRequest(c, info, false))
+	require.NoError(t, helper.ValidateBillingCapabilities(info))
 }
 
-// A real HTTP transport must send the normalized allowance and must not send
-// anything if reserving that allowance fails.
+// A real HTTP transport preserves protocol bodies and rejects only concrete
+// unsupported independent charges.
 type allowanceReservation struct{ held, available int }
 
 func (s *allowanceReservation) Settle(int) error         { return nil }
@@ -511,7 +542,7 @@ func (s *allowanceReservation) Reserve(quota int) error {
 
 func TestBillingOutputAllowanceTransport(t *testing.T) {
 	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
-	setPolicy(t, operation_setting.ReserveModeOff, "{}")
+
 	previous := config.GlobalConfig.ExportAllConfigs()
 	t.Cleanup(func() { require.NoError(t, config.GlobalConfig.LoadFromDB(previous)) })
 	operation_setting.SetToolPriceForTest(dto.BuildInToolWebSearch, 10)
@@ -531,10 +562,10 @@ func TestBillingOutputAllowanceTransport(t *testing.T) {
 		{"custom-tool", "/v1/responses", `{"model":"fixture","input":"hello","extension":true,"tools":[{"type":"custom","name":"apply_patch","format":{"type":"text"}}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
 		{"extension-tool", "/v1/responses", `{"model":"fixture","input":"hello","extension":true,"tools":[{"type":"client_extension","name":"local_tool"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
 		{"paid-search", "/v1/responses", `{"model":"fixture","input":"hello","extension":true,"tools":[{"type":"web_search"}],"max_tool_calls":2}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
-		{"unbounded-search", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"web_search"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "bounded call limit"},
+		{"unbounded-search", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"web_search"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
 		{"code-interpreter", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"code_interpreter","container":{"type":"auto"}}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "code_interpreter"},
-		{"file-search", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"file_search","vector_store_ids":["vs_fixture"]}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "file_search"},
-		{"image-generation", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"image_generation"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, "image_generation"},
+		{"file-search", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"file_search","vector_store_ids":["vs_fixture"]}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
+		{"image-generation", "/v1/responses", `{"model":"fixture","input":"hello","tools":[{"type":"image_generation"}]}`, "max_output_tokens", &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var received []byte
@@ -571,29 +602,74 @@ func TestBillingOutputAllowanceTransport(t *testing.T) {
 			<-seen
 			assert.False(t, gjson.GetBytes(received, tc.field).Exists())
 			assert.JSONEq(t, tc.body, string(received))
-			assert.True(t, gjson.GetBytes(received, "extension").Bool())
+			if gjson.Get(tc.body, "extension").Exists() {
+				assert.True(t, gjson.GetBytes(received, "extension").Bool())
+			}
 			assert.Equal(t, int64(len(received)), receivedLength)
+			assert.Zero(t, reservation.held, "native metered tools do not require a maximum-call reservation")
 			if tools := gjson.Get(tc.body, "tools"); tools.Exists() {
 				assert.JSONEq(t, tools.Raw, gjson.GetBytes(received, "tools").Raw)
 			}
-			if tc.name == "paid-search" {
-				toolQuota := 2 * operation_setting.GetToolPriceForModel(dto.BuildInToolWebSearch, "fixture") / 1000 * common.QuotaPerUnit
-				assert.GreaterOrEqual(t, float64(reservation.held), float64(gjson.GetBytes(received, tc.field).Int())+toolQuota)
-			}
-			if tc.name != "paid-search" {
-				assert.Zero(t, reservation.held)
-				return
-			}
-			// Paid independent tool fees still require a real reservation.
-			reservation.available = 1
-			req, err = http.NewRequest("POST", upstream.URL, bytes.NewBufferString(tc.body))
-			require.NoError(t, err)
-			c.Set("upstream_attempted", false)
-			response, err = channel.DoRequest(c, req, info)
-			require.ErrorContains(t, err, "insufficient quota")
-			assert.Nil(t, response)
-			assert.Equal(t, 1, calls)
-			assert.False(t, c.GetBool("upstream_attempted"))
+
 		})
 	}
+}
+
+// Exercise restored native funding and actual tool fees while the deployed
+// ledger alias remains enabled. These are local usage fixtures, not upstream calls.
+func TestNativeFundingAndMeteredTools(t *testing.T) {
+	db := newHardeningDB(t)
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	oldRedis, oldBatch := common.RedisEnabled, common.BatchUpdateEnabled
+	common.RedisEnabled, common.BatchUpdateEnabled = false, false
+	t.Cleanup(func() { common.RedisEnabled, common.BatchUpdateEnabled = oldRedis, oldBatch })
+	previous := config.GlobalConfig.ExportAllConfigs()
+	previousRatio := ratio_setting.ModelRatio2JSONString()
+	t.Cleanup(func() {
+		require.NoError(t, config.GlobalConfig.LoadFromDB(previous))
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(previousRatio))
+	})
+	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{"group_ratio_setting.group_ratio": `{"default":1}`}))
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"native-tools":0}`))
+	protectedEncoderInit.Do(service.InitTokenEncoders)
+	for _, name := range []string{dto.BuildInToolWebSearch, dto.BuildInToolFileSearch, dto.BuildInToolImageGeneration} {
+		t.Run(name, func(t *testing.T) {
+			u := createHardeningUser(t, db, "native-"+name, 1000000)
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/responses", nil)
+			request := &dto.OpenAIResponsesRequest{Model: "native-tools", Input: []byte(`"hello"`), Tools: []byte(fmt.Sprintf(`[{"type":%q}]`, name))}
+			info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{ChannelType: constant.ChannelTypeOpenAI}, RequestId: "native-" + name, Request: request, UserId: u.UserID, TokenId: u.TokenID, OriginModelName: request.Model, UsingGroup: "default", UserGroup: "default", RelayMode: relayconstant.RelayModeResponses, RelayFormat: types.RelayFormatOpenAIResponses, UserSetting: dto.UserSetting{BillingPreference: "wallet_only"}}
+			require.Nil(t, relayapi.PrepareRequestBilling(c, info))
+			require.NotNil(t, info.Billing)
+			assert.Zero(t, info.Billing.GetPreConsumedQuota())
+			info.ResponsesUsageInfo = &relaycommon.ResponsesUsageInfo{BuiltInTools: map[string]*relaycommon.BuildInToolInfo{name: {ToolName: name, CallCount: 2}}}
+			expected := common.QuotaRound(2 * operation_setting.GetToolPriceForModel(name, request.Model) / 1000 * common.QuotaPerUnit)
+			require.Positive(t, expected)
+			service.PostTextConsumeQuota(c, info, &dto.Usage{PromptTokens: 10, TotalTokens: 10}, nil)
+			require.NoError(t, info.Billing.Settle(expected))
+			info.Billing.Refund(c)
+			assert.Equal(t, expected, reservationOf(t, info.RequestId).Applied)
+			assert.Equal(t, walletState{1000000 - expected, 1000000 - expected}, walletOf(t, u))
+		})
+	}
+	t.Run("native-subscription", func(t *testing.T) {
+		require.NoError(t, db.AutoMigrate(&model.SubscriptionPlan{}, &model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{}))
+		u := createHardeningUser(t, db, "native-subscription", 10000)
+		plan := model.SubscriptionPlan{Title: "fixture", QuotaResetPeriod: model.SubscriptionResetNever}
+		require.NoError(t, db.Create(&plan).Error)
+		sub := model.UserSubscription{UserId: u.UserID, PlanId: plan.Id, Status: "active", AmountTotal: 1000, EndTime: time.Now().Unix() + 3600}
+		require.NoError(t, db.Create(&sub).Error)
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		info := &relaycommon.RelayInfo{RequestId: "native-subscription", UserId: u.UserID, TokenId: u.TokenID, TokenKey: "native-subscription-key", UserSetting: dto.UserSetting{BillingPreference: "subscription_only"}}
+		session, apiErr := service.NewBillingSession(c, info, 100)
+		require.Nil(t, apiErr)
+		assert.False(t, session.Durable())
+		assert.Equal(t, service.BillingSourceSubscription, info.BillingSource)
+		require.NoError(t, session.Settle(40))
+		require.NoError(t, session.Settle(40))
+		session.Refund(c)
+		require.NoError(t, db.First(&sub, sub.Id).Error)
+		assert.EqualValues(t, 40, sub.AmountUsed)
+		assert.Equal(t, walletState{10000, 9960}, walletOf(t, u))
+	})
 }
