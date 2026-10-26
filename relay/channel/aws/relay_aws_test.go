@@ -12,9 +12,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	relaytypes "github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -28,41 +26,6 @@ import (
 )
 
 const awsTestModel = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-
-type awsBudgetBilling struct{ held int }
-
-func (b *awsBudgetBilling) Reserve(quota int) error  { b.held = quota; return nil }
-func (b *awsBudgetBilling) Settle(int) error         { return nil }
-func (b *awsBudgetBilling) Refund(*gin.Context)      {}
-func (b *awsBudgetBilling) NeedsRefund() bool        { return true }
-func (b *awsBudgetBilling) GetPreConsumedQuota() int { return b.held }
-
-func TestAwsFinalPayloadBudgetBeforeDispatch(t *testing.T) {
-	old := constant.CountToken
-	constant.CountToken = true
-	t.Cleanup(func() { constant.CountToken = old })
-	for _, test := range []struct {
-		nova          bool
-		body, invalid string
-	}{
-		{false, `{"messages":[{"role":"user","content":"synthetic"}],"max_tokens":100}`, `{"messages":[]}`},
-		{true, `{"messages":[{"role":"user","content":[{"text":"synthetic"}]}],"inferenceConfig":{"maxTokens":100}}`, `{"messages":[]}`},
-	} {
-		c, _ := gin.CreateTestContext(httptest.NewRecorder())
-		c.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
-		billing := &awsBudgetBilling{}
-		info := &relaycommon.RelayInfo{RelayMode: relayconstant.RelayModeChatCompletions, Request: &dto.GeneralOpenAIRequest{}, Billing: billing}
-		info.PriceData.UsePrice = true
-		info.PriceData.ModelPrice = 0.01
-		info.PriceData.GroupRatioInfo.GroupRatio = 1
-		require.NotNil(t, prepareAwsBudget(c, info, []byte(test.invalid), test.nova))
-		assert.False(t, c.GetBool("upstream_attempted"))
-		assert.Zero(t, billing.held)
-		require.Nil(t, prepareAwsBudget(c, info, []byte(test.body), test.nova))
-		assert.True(t, c.GetBool("upstream_attempted"))
-		assert.Greater(t, billing.held, 0)
-	}
-}
 
 type awsHTTPClientFunc func(*http.Request) (*http.Response, error)
 

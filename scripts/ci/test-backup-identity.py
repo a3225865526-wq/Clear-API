@@ -26,7 +26,7 @@ DIGEST = "sha256:" + "2" * 64  # Intentionally different from Docker Image ID.
 REF = "ghcr.io/a3225865526-wq/clearapi@" + DIGEST
 
 FAKE_DOCKER = '''#!/usr/bin/env python3
-import json, os, sys
+import io, json, os, sys, tarfile
 from pathlib import Path
 p = Path(os.environ["TEST_STATE"])
 s = json.loads(p.read_text())
@@ -46,6 +46,13 @@ elif a[:2] == ["image", "inspect"]:
     if a[2] == s["reference"]: print(json.dumps([s["effective_image"]]))
     elif a[2] == s["container"]["Image"]: print(json.dumps([s["image"]]))
     else: sys.exit("unexpected image")
+elif a[:2] == ["save", "-o"] and s.get("archive_config"):
+    raw = s["archive_config"].encode()
+    with tarfile.open(a[2], "w") as bundle:
+        for name, content in [("manifest.json", b'[{"Config":"config.json"}]'), ("config.json", raw)]:
+            entry = tarfile.TarInfo(name)
+            entry.size = len(content)
+            bundle.addfile(entry, io.BytesIO(content))
 elif a[:3] == ["exec", "clearapi-postgres-1", "pg_dump"]:
     print("isolated dump fixture")
     if s.get("pg03_drift"):
@@ -132,6 +139,30 @@ class BackupIdentityTest(unittest.TestCase):
     def test_missing_revision_rejected(self):
         self.state["image"]["Config"]["Labels"] = {}
         self.assertNotEqual(self.tool().returncode, 0)
+
+    def test_archive_capture_keeps_config_and_engine_identity_distinct(self):
+        config = '{"architecture":"amd64","fixture":"local-archive"}'
+        config_id = 'sha256:' + hashlib.sha256(config.encode()).hexdigest()
+        ref = 'clearapi-local:' + REVISION
+        self.state.update(reference=ref, archive_config=config)
+        self.state['image']['RepoDigests'] = []
+        self.current = dict(status='success', candidate_commit=REVISION, image_ref=ref,
+                            new_api_image_id=config_id, archive_sha256='a' * 64,
+                            deployment_method='local-build-ssh-archive-v1')
+        self.write_release()
+        identity = json.loads(self.tool().stdout)
+        self.assertEqual(identity['docker_image_id'], config_id)
+        self.assertEqual(identity['docker_engine_image_id'], IMAGE_ID)
+        self.assertIsNone(identity['ghcr_digest'])
+        self.assertEqual(identity['archive_sha256'], 'a' * 64)
+        for change in ({'status': 'pending'}, {'deployment_method': 'isolated-test-v1'},
+                       {'archive_sha256': ''}, {'new_api_image_id': IMAGE_ID}):
+            with self.subTest(change=change):
+                baseline = self.current.copy()
+                self.current.update(change)
+                self.write_release()
+                self.assertNotEqual(self.tool().returncode, 0)
+                self.current = baseline
 
     def test_missing_override_rejected(self):
         self.override.unlink()
@@ -302,6 +333,7 @@ class BackupIdentityTest(unittest.TestCase):
         source = source.replace("/var/log/clearapi", str(self.root / "log"))
         source = source.replace("/run/lock/clearapi-backup.lock", str(self.root / "backup.lock"))
         source = source.replace(" -C / ", " -C " + str(self.root) + " ")
+        source = source.replace("--archive-root /", "--archive-root " + str(self.root))
         source = source.replace("D675187C7097EF9D8C3BFF966B1439F896043FFD", fingerprint)
         if cleanup_failure:
             source = source.replace('if ! find "$STAGE" -type f -exec shred -u {} +; then rc=1; fi',

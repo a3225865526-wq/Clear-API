@@ -1,0 +1,65 @@
+{
+  "synthetic_only": true,
+  "records": [
+    {
+      "path": "/grok/v1/chat/completions",
+      "model": "grok-3-mini",
+      "stream": false,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/grok/v1/chat/completions",
+      "model": "grok-3-mini",
+      "stream": true,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/deepseek/v1/chat/completions",
+      "model": "deepseek-chat",
+      "stream": false,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/deepseek/v1/chat/completions",
+      "model": "deepseek-chat",
+      "stream": true,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/qwen/compatible-mode/v1/chat/completions",
+      "model": "qwen-plus",
+      "stream": false,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/qwen/compatible-mode/v1/chat/completions",
+      "model": "qwen-plus",
+      "stream": true,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/zhipu/api/paas/v4/chat/completions",
+      "model": "glm-4",
+      "stream": false,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/zhipu/api/paas/v4/chat/completions",
+      "model": "glm-4",
+      "stream": true,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/kimi/v1/chat/completions",
+      "model": "kimi-k2",
+      "stream": false,
+      "authorization_scheme": "Bearer"
+    },
+    {
+      "path": "/kimi/v1/chat/completions",
+      "model": "kimi-k2",
+      "stream": true,
+      "authorization_scheme": "Bearer"
+    }
+  ]
+}

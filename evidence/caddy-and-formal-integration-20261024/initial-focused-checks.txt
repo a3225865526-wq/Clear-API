@@ -1,0 +1,6 @@
+Observed actual command results before focused-results.json:
+1. python3 scripts/ci/test-runtime-boot-recovery.py: 18 tests, OK, exit 0.
+2. python3 scripts/ci/test-production-deploy.py RuntimeIdentityTest InstallerTest: 21 RuntimeIdentityTest cases completed, then unittest loader error: no attribute InstallerTest. Entire command exit 1; not a passing command. Correct class InstallerFaultTest subsequently run alone: 14 tests OK (installer.log).
+3. python3 -m unittest discover -s tests -p test_cutover_prepare.py -v: 2 tests OK, exit 0.
+4. An intermediate WSL runner failed before tests because its earlier /tmp copy no longer existed. Fixed runner creates and tests the copy in one WSL invocation; no suite was executed by that failed runner.
+No 30-scenario E2E rerun; accepted evidence retains its original code identity.

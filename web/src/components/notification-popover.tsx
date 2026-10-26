@@ -60,6 +60,9 @@ interface NotificationPopoverProps {
   onTabChange: (tab: 'notice' | 'announcements') => void
   notice: string
   announcements: AnnouncementItem[]
+  notificationAnnouncements?: AnnouncementItem[]
+  onMarkRead?: () => void
+  markingRead?: boolean
   loading: boolean
   className?: string
 }
@@ -298,6 +301,9 @@ export function NotificationPopover({
   onTabChange,
   notice,
   announcements,
+  notificationAnnouncements = [],
+  onMarkRead,
+  markingRead,
   loading,
   className,
 }: NotificationPopoverProps) {
@@ -353,7 +359,16 @@ export function NotificationPopover({
           </TabsList>
 
           <TabsContent value='notice' className='mt-2'>
-            <NoticeContent notice={notice} loading={loading} t={t} />
+            {notice && (
+              <NoticeContent notice={notice} loading={loading} t={t} />
+            )}
+            {(!notice || notificationAnnouncements.length > 0) && (
+              <AnnouncementsContent
+                announcements={notificationAnnouncements}
+                loading={loading}
+                t={t}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value='announcements' className='mt-2'>
@@ -365,7 +380,17 @@ export function NotificationPopover({
           </TabsContent>
         </Tabs>
 
-        <div className='flex justify-end'>
+        <div className='flex justify-end gap-2'>
+          {onMarkRead && (
+            <Button
+              size='sm'
+              variant='outline'
+              disabled={markingRead || loading}
+              onClick={onMarkRead}
+            >
+              {t('Mark as read')}
+            </Button>
+          )}
           <Button size='sm' onClick={() => onOpenChange(false)}>
             {t('Close')}
           </Button>

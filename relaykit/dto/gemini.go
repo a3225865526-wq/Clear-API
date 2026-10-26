@@ -74,29 +74,42 @@ func (r *GeminiChatRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	}
 
 	var inputTexts []string
-	for _, content := range r.Contents {
+	contents := append([]GeminiChatContent(nil), r.Contents...)
+	if r.SystemInstructions != nil {
+		contents = append(contents, *r.SystemInstructions)
+	}
+	for _, content := range contents {
 		for _, part := range content.Parts {
 			if part.Text != "" {
 				inputTexts = append(inputTexts, part.Text)
 			}
+			if part.FunctionCall != nil || part.FunctionResponse != nil || part.ExecutableCode != nil || part.CodeExecutionResult != nil || len(part.ThoughtSignature) > 0 {
+				copyPart := part
+				copyPart.Text, copyPart.InlineData, copyPart.FileData = "", nil, nil
+				encoded, _ := kitutil.Marshal(copyPart)
+				inputTexts = append(inputTexts, string(encoded))
+			}
 			if source := part.InlineData.ToFileSource(); source != nil {
 				mimeType := part.InlineData.MimeType
-				var fileType types.FileType
-				if strings.HasPrefix(mimeType, "image/") {
+				fileType := types.FileTypeFile
+				switch {
+				case strings.HasPrefix(mimeType, "image/"):
 					fileType = types.FileTypeImage
-				} else if strings.HasPrefix(mimeType, "audio/") {
+				case strings.HasPrefix(mimeType, "audio/"):
 					fileType = types.FileTypeAudio
-				} else if strings.HasPrefix(mimeType, "video/") {
+				case strings.HasPrefix(mimeType, "video/"):
 					fileType = types.FileTypeVideo
-				} else {
-					fileType = types.FileTypeFile
 				}
-				files = append(files, &types.FileMeta{
-					FileType: fileType,
-					Source:   source,
-				})
+				files = append(files, &types.FileMeta{FileType: fileType, Source: source})
 			}
 		}
+	}
+	if len(r.Tools) > 0 {
+		inputTexts = append(inputTexts, string(r.Tools))
+	}
+	if r.ToolConfig != nil {
+		encoded, _ := kitutil.Marshal(r.ToolConfig)
+		inputTexts = append(inputTexts, string(encoded))
 	}
 
 	inputText := strings.Join(inputTexts, "\n")

@@ -1,0 +1,49 @@
+{
+  "en": {
+    "missing": [],
+    "new_keys": 35,
+    "changed_existing_values": []
+  },
+  "zh": {
+    "missing": [],
+    "new_keys": 35,
+    "changed_existing_values": [
+      "Blocked"
+    ]
+  },
+  "zh-TW": {
+    "missing": [],
+    "new_keys": 35,
+    "changed_existing_values": [
+      "Blocked"
+    ]
+  },
+  "fr": {
+    "missing": [],
+    "new_keys": 35,
+    "changed_existing_values": [
+      "Blocked"
+    ]
+  },
+  "ja": {
+    "missing": [],
+    "new_keys": 35,
+    "changed_existing_values": [
+      "Blocked"
+    ]
+  },
+  "ru": {
+    "missing": [],
+    "new_keys": 35,
+    "changed_existing_values": [
+      "Blocked"
+    ]
+  },
+  "vi": {
+    "missing": [],
+    "new_keys": 35,
+    "changed_existing_values": [
+      "Blocked"
+    ]
+  }
+}

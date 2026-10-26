@@ -1,0 +1,6 @@
+=== RUN   TestAddChannelTaskPluginRequiresBindPermission
+--- PASS: TestAddChannelTaskPluginRequiresBindPermission (0.01s)
+=== RUN   TestAddChannelTaskPluginPersistsPluginDefaultBaseURLAndAuditsSource
+--- PASS: TestAddChannelTaskPluginPersistsPluginDefaultBaseURLAndAuditsSource (0.01s)
+PASS
+ok  	github.com/QuantumNous/new-api/controller	0.075s

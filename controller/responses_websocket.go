@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -114,20 +113,7 @@ func newResponsesWSRequestRunner(c *gin.Context) relay.ResponsesWSRequestRunner 
 	}
 }
 
-// ResponsesWebSocketEnabled reports whether the ordinary Responses WebSocket
-// transport accepts connections. The gate is fail closed: deployments must opt
-// in explicitly, so an unconfigured production instance never upgrades this
-// endpoint and therefore never reserves quota, selects a channel, or dispatches
-// upstream for it.
-func ResponsesWebSocketEnabled() bool {
-	return os.Getenv("CLEARAPI_ENABLE_RESPONSES_WEBSOCKET") == "true"
-}
-
 func ResponsesWebSocket(c *gin.Context) {
-	if !ResponsesWebSocketEnabled() {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"message": "Responses WebSocket is not enabled for this deployment", "type": "service_unavailable"}})
-		return
-	}
 	requestID := c.GetString(common.RequestIdKey)
 	runner := newResponsesWSRequestRunner(c)
 	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)

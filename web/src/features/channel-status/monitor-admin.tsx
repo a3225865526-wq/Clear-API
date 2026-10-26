@@ -27,6 +27,10 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
     : 'monitor-admin-catalog'
   const client = useQueryClient()
   const [edit, setEdit] = useState<Monitor | null>(null)
+  const [probeResult, setProbeResult] = useState<{
+    status: string
+    error_code: string
+  } | null>(null)
   const [confirmation, setConfirmation] = useState<{
     id: number
     action: string
@@ -79,6 +83,28 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
       void client.invalidateQueries({ queryKey: ['monitor-admin-catalog'] })
       void client.invalidateQueries({ queryKey: ['monitor-allowlist-catalog'] })
       void client.invalidateQueries({ queryKey: ['console-monitoring'] })
+      void client.invalidateQueries({ queryKey: ['console-monitor-history'] })
+    },
+  })
+  const probe = useMutation({
+    mutationFn: async (id: number) =>
+      requireServerSuccess(
+        (
+          await api.post<{
+            success: boolean
+            data: { status: string; error_code: string }
+          }>(
+            `/api/console/monitor-admin/${id}/probe`,
+            { confirm: true },
+            { headers: { 'X-ClearAPI-Monitor': '1' } }
+          )
+        ).data
+      ).data,
+    onSuccess: (result) => {
+      setConfirmation(null)
+      setProbeResult(result)
+      void client.invalidateQueries({ queryKey: ['console-monitoring'] })
+      void client.invalidateQueries({ queryKey: ['console-monitor-history'] })
     },
   })
   return (
@@ -89,7 +115,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
       <h2 className='font-semibold'>{t('Monitor administration')}</h2>
       <p role='status' className='text-muted-foreground text-sm'>
         {t(
-          'Probe transport integration is pending. Configuration and publication do not start detection.'
+          'Monitoring requires an upstream cost contract and an enabled budget policy.'
         )}
       </p>
       {(catalog.isPending || targets.isPending) && <LoadingState />}
@@ -187,7 +213,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
                     disabled={
                       item.archived ||
                       toggle.isPending ||
-                      (!props.allowlist && !item.enabled) ||
+                      (!props.allowlist && !item.published) ||
                       item.target_kind === 'account_pool_group'
                     }
                     variant='outline'
@@ -195,15 +221,29 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
                       setConfirmation({
                         id: item.id,
                         action: 'enabled',
-                        value: props.allowlist ? !item.enabled : false,
+                        value: !item.enabled,
                       })
                     }
                   >
-                    {props.allowlist
-                      ? t(item.enabled ? 'Disable' : 'Enable')
-                      : t('Pause')}
+                    {t(item.enabled ? 'Disable' : 'Enable')}
                   </Button>
-                  <Button disabled variant='outline'>
+                  <Button
+                    disabled={
+                      props.allowlist ||
+                      item.archived ||
+                      !item.enabled ||
+                      !item.published ||
+                      probe.isPending
+                    }
+                    variant='outline'
+                    onClick={() =>
+                      setConfirmation({
+                        id: item.id,
+                        action: 'probe',
+                        value: true,
+                      })
+                    }
+                  >
                     {t('Test')}
                   </Button>
                   {!props.allowlist && (
@@ -232,7 +272,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
             }}
             title={t('Edit')}
             description={t(
-              'Probe transport integration is pending. Configuration and publication do not start detection.'
+              'Monitoring requires an upstream cost contract and an enabled budget policy.'
             )}
           >
             {edit && (
@@ -254,13 +294,22 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
         }}
         title={t('Confirm')}
         desc={t(
-          'Probe transport integration is pending. Configuration and publication do not start detection.'
+          'Monitoring requires an upstream cost contract and an enabled budget policy.'
         )}
-        isLoading={toggle.isPending}
-        handleConfirm={() => toggle.mutate()}
+        isLoading={toggle.isPending || probe.isPending}
+        handleConfirm={() =>
+          confirmation?.action === 'probe'
+            ? probe.mutate(confirmation.id)
+            : toggle.mutate()
+        }
       >
-        {toggle.isError && <p role='alert'>{t('Error')}</p>}
+        {(toggle.isError || probe.isError) && <p role='alert'>{t('Error')}</p>}
       </ConfirmDialog>
+      {probeResult && (
+        <p role='status'>
+          {t('Status')}: {probeResult.status} {probeResult.error_code}
+        </p>
+      )}
     </section>
   )
 }

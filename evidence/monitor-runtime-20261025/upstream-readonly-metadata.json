@@ -1,0 +1,20 @@
+{
+  "utc": "2026-10-25T04:11:09.398259+00:00",
+  "origin": "https://api.88token.net",
+  "base_path": "",
+  "paid_requests": 0,
+  "metadata": {
+    "/v1/models": {
+      "http": 200,
+      "matching_models": [
+        {
+          "id": "gpt-6-luna",
+          "owned_by": "openai"
+        }
+      ]
+    },
+    "/api/usage/token/": {
+      "http": 404
+    }
+  }
+}

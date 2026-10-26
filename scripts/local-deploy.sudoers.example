@@ -1,0 +1,5 @@
+# Install only after explicit production cutover; validate with visudo -cf.
+# Executable, parent directories, config and activation sentinel must be root-owned
+# and not writable by clearadmin. The helper parses/validates every receive arg.
+# Global --config-path is intentionally absent: test configuration is forbidden.
+clearadmin ALL=(root) NOPASSWD: /opt/clearapi/bin/clearapi-local-deploy.py preflight, /opt/clearapi/bin/clearapi-local-deploy.py receive *

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Read-only Caddy state comparison with append-only local audit output."""
 import argparse
+import hashlib
+import importlib.util
 from datetime import datetime, timezone
 import json
 import os
@@ -152,7 +154,27 @@ def probe(state_path, command=None, observed_at=None):
             raise ProbeError('persistent_edge_snapshot_invalid')
         base['expected'] = dict(persisted_edge, running=False, paused=False,
                                 restart_policy={'Name': 'no', 'MaximumRetryCount': 0})
-    except ProbeError as error:
+        result_path=state_path.parent/'website-restoration-result-39347012653.json'
+        if result_path.exists() or result_path.is_symlink():
+            source=Path(__file__).with_name('local-deploy-state.py')
+            spec=importlib.util.spec_from_file_location('local_state',source)
+            state=importlib.util.module_from_spec(spec);spec.loader.exec_module(state)
+            active=state.load(state_path.parent)
+            result=json.loads(state.read_file(result_path,private=True),object_pairs_hook=unique)
+            identity=hashlib.sha256(json.dumps(active['adoption'],sort_keys=True).encode()).hexdigest()
+            if (result.get('schema')!='clearapi.website-restoration/v1'
+                    or result.get('method')!='existing-running-adoption-v1'
+                    or result.get('status')!='website_restored' or result.get('public_traffic')!='open'
+                    or result.get('adoption_identity_sha256')!=identity
+                    or result.get('authorization')!={'source_commit':active['adoption']['source_commit'],
+                                                   'scope':'existing-gateway-original-caddy-v1'}
+                    or result.get('edge',{}).get('container_id')!=persisted_edge['id']
+                    or result.get('edge',{}).get('image_id')!=persisted_edge['image']):
+                raise ProbeError('invalid_current_instance_restoration_result')
+            base['expected']=persisted_edge
+            base['effective_stage']='website_restored'
+            base['historical_journal_preserved']=True
+    except (ProbeError,OSError,ValueError,KeyError,TypeError) as error:
         errors.append(str(error))
     try:
         base['observed'] = docker_edge(command)

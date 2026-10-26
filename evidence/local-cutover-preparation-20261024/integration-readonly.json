@@ -1,0 +1,41 @@
+{
+  "local_head": "49f23003a054e7b156e9f7c6a25589aa56500adc",
+  "remote_main": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "merge_base": "55ac54415bd3501bb3e6c26a57ea5567a6e07e0b",
+  "ahead_behind": "4\t138",
+  "local_only_commits": [
+    "49f23003a054e7b156e9f7c6a25589aa56500adc fix(deploy): complete isolated Windows deployment acceptance",
+    "d9cd1299f6cb0442ba9d43af1a1ac368c94816c5 feat(deploy): save local SSH deployment tooling",
+    "d021bf6f73a0fdc81bfaaabdeb5554852d794764 test(shop): use published product fixture",
+    "965f629e22c69cd6dcaad37f00f370a46ffe4536 fix(shop): remove duplicate legacy purchase entry"
+  ],
+  "overlapping_paths": [
+    "CLEARAPI_MASTER_STATUS.md",
+    "scripts/backup-identity.py",
+    "web/src/features/shop/__tests__/catalog.test.tsx",
+    "web/src/features/shop/index.tsx"
+  ],
+  "merge_preview_exit": 1,
+  "merge_preview": "74e44ccf374a0da92753b534f0fc3e325b9fc0ba\n100644 85833b09567ed5a54972c23ddd4a775db293eab2 2\tCLEARAPI_MASTER_STATUS.md\n100644 1aa02266b90d92122e33eb5cde925338ed125ae5 3\tCLEARAPI_MASTER_STATUS.md\n100644 3a6dc3020c6801579c5ff9dc9d26db00129f3eb5 1\tscripts/backup-identity.py\n100644 20e12f1a71f12c089c1a6d47e9e2d11866ba651d 2\tscripts/backup-identity.py\n100644 b835abb0b7a39d63b6f7f7315dad8b4e5c8401fb 3\tscripts/backup-identity.py\n\nAuto-merging CLEARAPI_MASTER_STATUS.md\nCONFLICT (add/add): Merge conflict in CLEARAPI_MASTER_STATUS.md\nAuto-merging scripts/backup-identity.py\nCONFLICT (content): Merge conflict in scripts/backup-identity.py\n",
+  "merge_preview_stderr": "",
+  "source_sha256": {
+    "scripts/runtime-identity-refresh.py": {
+      "HEAD": "8c7b8362e819fdf20703eca2df70162afdfc2470a4a28d0ac947fc14923d671e",
+      "production/main": "afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e"
+    },
+    "scripts/backup-identity.py": {
+      "HEAD": "6ef4b2ab8aece259e7ecbe7e4ac150116575b489d93f5bd0ce53976f9c95cdfe",
+      "production/main": "e1e21e0227b8f668bc9945e13e460542d8a07f7e6d3bdf7eaf00546180d7dc0d"
+    },
+    "scripts/runtime-boot-recovery.py": {
+      "production/main": "7c205fa4861ecbfca344f8289472be9ecd6e52abc7008f3ece4ffe3ec012b8c2"
+    },
+    "scripts/production-backup.sh": {
+      "HEAD": "602db56708b6dec4fdd781bed6b111b7c6024bded85345c15f4670f36164aa8c",
+      "production/main": "7edb9ce97eff93992dc15b9c0f7cccf78e28009fc5a5d35ab022e653770c85ac"
+    },
+    "scripts/controlled-traffic-hold.py": {
+      "production/main": "b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90"
+    }
+  }
+}

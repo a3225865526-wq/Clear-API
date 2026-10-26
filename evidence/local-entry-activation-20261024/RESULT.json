@@ -1,0 +1,53 @@
+{
+  "entry_activated": true,
+  "formal_preflight": "PASS",
+  "windows_ssh_sudo_preflight": "PASS",
+  "website": "HTTP200 application shell; API success=true",
+  "service_identity_and_start_times_unchanged": true,
+  "application_deployment_executed": false,
+  "rollback": false,
+  "remaining_blockers": [],
+  "source_approval_commit": "133336060a650be577d618a046f001a124f379aa",
+  "root_receipt": {
+    "exists": true,
+    "uid": 0,
+    "gid": 0,
+    "mode": "0o600",
+    "nlink": 1,
+    "symlink": false,
+    "bytes": 12172,
+    "sha256": "558886f95653bc58683ca848c71192093a1b19463ee49b09feff717c167fa5c1"
+  },
+  "files": {
+    "/opt/clearapi/bin/clearapi-local-deploy.py": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o750",
+      "nlink": 1,
+      "symlink": false,
+      "bytes": 31111,
+      "sha256": "b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f"
+    },
+    "/opt/clearapi/config/local-deploy.json": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "nlink": 1,
+      "symlink": false,
+      "bytes": 388,
+      "sha256": "22833e916fc368b208959d55442f006e5b551e81dc5261be40a92803bb188286"
+    },
+    "/opt/clearapi/config/local-deploy.enabled": {
+      "exists": true,
+      "uid": 0,
+      "gid": 0,
+      "mode": "0o600",
+      "nlink": 1,
+      "symlink": false,
+      "bytes": 33,
+      "sha256": "00d09becb7e5b07482cf917cf361befd457a12e664d193645454e0e6a4904f16"
+    }
+  }
+}

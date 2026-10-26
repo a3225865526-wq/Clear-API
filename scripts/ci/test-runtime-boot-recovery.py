@@ -51,6 +51,7 @@ class BootRecoveryTest(unittest.TestCase):
                             image_digest=DIGEST, new_api_image_id=IMAGE_ID)
         self.write_manifest()
         self.running = True
+        self.ref = REF
         self.container_id = 'd' * 64
         self.started_at = '2026-01-01T00:00:00Z'
         self.calls = []
@@ -63,14 +64,15 @@ class BootRecoveryTest(unittest.TestCase):
         self.calls.append(args)
         self.assertIn(args[0], ('inspect', 'image'))
         if args[0] == 'inspect':
-            data = dict(Id=self.container_id, Image=IMAGE_ID, Ref=REF,
+            data = dict(Id=self.container_id, Image=IMAGE_ID, Ref=self.ref,
                         Running=self.running, Restarting=False,
                         State=dict(Running=self.running, Restarting=False, StartedAt=self.started_at),
-                        Config=dict(Image=REF),
+                        Config=dict(Image=self.ref),
                         Mounts=[dict(Destination='/run/clearapi', Type='bind', RW=False,
                                      Source=str(self.directory))])
         else:
-            data = dict(Id=IMAGE_ID, Digests=[REF], RepoDigests=[REF], Revision=REVISION,
+            digests = [] if self.ref.startswith('clearapi-local:') else [self.ref]
+            data = dict(Id=IMAGE_ID, Digests=digests, RepoDigests=digests, Revision=REVISION,
                         Config={'Labels': {'org.opencontainers.image.revision': REVISION}})
         return [data]
 
@@ -158,6 +160,45 @@ class BootRecoveryTest(unittest.TestCase):
         self.running = False
         self.assertEqual(BOOT.check_image(self.helper, BOOT.approved_identity(self.app), self.directory), 'stopped')
         self.assertFalse(self.directory.exists())
+
+    def test_archive_boot_uses_config_digest_and_preserves_local_runtime_contract(self):
+        self.ref = 'clearapi-local:' + REVISION
+        config_id = 'sha256:' + 'f' * 64  # Containerd index differs from saved config.
+        self.current = dict(status='success', image_ref=self.ref, candidate_commit=REVISION,
+                            new_api_image_id=config_id, archive_sha256='1' * 64,
+                            deployment_method='local-build-ssh-archive-v1')
+        self.write_manifest()
+        self.directory.mkdir(mode=0o750)
+        expected = BOOT.approved_identity(self.app)
+        frozen = (self.app / 'release-manifest.json').read_bytes()
+        with patch.object(self.helper, 'archive_image_id', return_value=config_id), \
+                patch.object(BOOT, 'DIRECTORY', self.directory):
+            self.assertEqual(BOOT.runtime_directory(self.helper, expected), self.directory)
+            self.assertEqual(BOOT.check_image(self.helper, expected, self.directory), 'running')
+            self.assertEqual(self.recover(), 'repaired')
+            self.assertEqual(self.recover(), 'unchanged')
+        identity = json.loads((self.directory / 'runtime-identity.json').read_text())
+        self.assertEqual(identity['docker_image_id'], IMAGE_ID)
+        self.assertNotIn('image_digest', identity)
+        self.assertEqual((self.app / 'release-manifest.json').read_bytes(), frozen)
+        with patch.object(self.helper, 'archive_image_id', return_value=IMAGE_ID), \
+                self.assertRaisesRegex(BOOT.Blocked, 'container image drift'):
+            BOOT.check_image(self.helper, expected, self.directory)
+        for change in ({'status': 'pending'}, {'status': 'failed'}, {'archive_sha256': ''},
+                       {'deployment_method': 'isolated-test-v1'},
+                       {'image_ref': 'clearapi-local:' + 'b' * 40}):
+            with self.subTest(change=change):
+                baseline = self.current.copy()
+                self.current.update(change)
+                self.write_manifest()
+                with self.assertRaises(BOOT.Blocked):
+                    BOOT.approved_identity(self.app)
+                self.current = baseline
+
+    def test_archive_runtime_rejects_tag_revision_mismatch(self):
+        with self.assertRaisesRegex(self.helper.IdentityError, 'REVISION_MISMATCH'):
+            self.helper.observe(BOOT.CONTAINER, 'clearapi-local:' + 'b' * 40,
+                                REVISION, self.directory)
 
     def test_reboot_with_stopped_gateway_preserves_ingress_and_never_starts_it(self):
         hold = self.app / 'controlled-launch-state.json'

@@ -1,0 +1,13 @@
+{
+  "observed_utc": "2026-10-26T02:34:36.084494+00:00",
+  "source": "Read-only SSH docker inspect/image inspect and bounded docker logs; recorded from actual command output",
+  "revision": "86451cd20e9e0b3b3205afab44ebc3c422218502",
+  "container": "e18ead979e93ba274b249cbf170e93dbeadb05bfcfd7fee1a90cd77906448131",
+  "image": "sha256:80a23bb4238e9d8c716bcfcdf15e9a389e4aefd550c05c41d907b08077f3ada7",
+  "running": true,
+  "started_utc": "2026-10-25T23:36:01.907041253Z",
+  "log_lines": 595,
+  "exact_stream_error_matches": 0,
+  "billing_rejection_matches": 0,
+  "limits": "Current container logs only; no failing request ID or raw upstream SSE trace supplied. Absence of a match does not establish the incident cause."
+}

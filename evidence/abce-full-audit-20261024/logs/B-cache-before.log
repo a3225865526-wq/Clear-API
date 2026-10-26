@@ -1,0 +1,157 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/workspace/web[39m
+
+ [31m❯[39m src/features/system-settings/hooks/__tests__/use-update-option.test.tsx [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[33m 15197[2mms[22m[39m
+[31m     [31m×[31m updates the visible 'announcements' after saving 'console_setting.announcements' without a page reload[39m[33m 5149[2mms[22m[39m
+[31m     [31m×[31m updates the visible 'announcements' after saving 'console_setting.announcements_enabled' without a page reload[39m[33m 5023[2mms[22m[39m
+[31m     [31m×[31m updates the visible 'notice' after saving 'Notice' without a page reload[39m[33m 5020[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/features/system-settings/hooks/__tests__/use-update-option.test.tsx[2m > [22mnotification settings cache refresh[2m > [22mupdates the visible 'announcements' after saving 'console_setting.announcements' without a page reload
+[31m[1mError[22m: [2mexpect([22m[31melement[31m[2m).toHaveTextContent()[22m
+
+Expected element to have text content:
+[32m  Published audit announcement[31m
+Received:
+[31m  empty[31m
+
+Ignored nodes: comments, script, style
+[36m<html>[31m
+  [36m<head />[31m
+  [36m<body>[31m
+    [36m<div>[31m
+      [36m<button>[31m
+        [0mSave[0m
+      [36m</button>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"announcements"[31m
+      [36m>[31m
+        [0mempty[0m
+      [36m</output>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"notice"[31m
+      [36m>[31m
+        [0mempty[0m
+      [36m</output>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"loading"[31m
+      [36m>[31m
+        [0mfalse[0m
+      [36m</output>[31m
+    [36m</div>[31m
+  [36m</body>[31m
+[36m</html>[31m...[39m
+[36m [2m❯[22m src/features/system-settings/hooks/__tests__/use-update-option.test.tsx:[2m64:71[22m[39m
+    [90m 62|[39m     if (example.key.endsWith('_enabled')) expect(screen.getByLabelText…
+    [90m 63|[39m     await userEvent.setup().click(screen.getByRole('button', { name: '…
+    [90m 64|[39m     await waitFor(() => expect(screen.getByLabelText(example.output)).…
+    [90m   |[39m                                                                       [31m^[39m
+    [90m 65|[39m     client[33m.[39m[34mclear[39m()
+    [90m 66|[39m   })
+[90m [2m❯[22m runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:[2m47:12[22m[39m
+[90m [2m❯[22m checkCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m124:77[22m[39m
+[90m [2m❯[22m Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m118:16[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/features/system-settings/hooks/__tests__/use-update-option.test.tsx[2m > [22mnotification settings cache refresh[2m > [22mupdates the visible 'announcements' after saving 'console_setting.announcements_enabled' without a page reload
+[31m[1mError[22m: [2mexpect([22m[31melement[31m[2m).toHaveTextContent()[22m
+
+Expected element to have text content:
+[32m  empty[31m
+Received:
+[31m  Previously visible announcement[31m
+
+Ignored nodes: comments, script, style
+[36m<html>[31m
+  [36m<head />[31m
+  [36m<body>[31m
+    [36m<div>[31m
+      [36m<button>[31m
+        [0mSave[0m
+      [36m</button>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"announcements"[31m
+      [36m>[31m
+        [0mPreviously visible announcement[0m
+      [36m</output>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"notice"[31m
+      [36m>[31m
+        [0mempty[0m
+      [36m</output>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"loading"[31m
+      [36m>[31m
+        [0mfalse[0m
+      [36m</output>[31m
+    [36m</div>[31m
+  [36m</body>[31m
+[36m</html>[31m...[39m
+[36m [2m❯[22m src/features/system-settings/hooks/__tests__/use-update-option.test.tsx:[2m64:71[22m[39m
+    [90m 62|[39m     if (example.key.endsWith('_enabled')) expect(screen.getByLabelText…
+    [90m 63|[39m     await userEvent.setup().click(screen.getByRole('button', { name: '…
+    [90m 64|[39m     await waitFor(() => expect(screen.getByLabelText(example.output)).…
+    [90m   |[39m                                                                       [31m^[39m
+    [90m 65|[39m     client[33m.[39m[34mclear[39m()
+    [90m 66|[39m   })
+[90m [2m❯[22m runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:[2m47:12[22m[39m
+[90m [2m❯[22m checkCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m124:77[22m[39m
+[90m [2m❯[22m Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m118:16[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/features/system-settings/hooks/__tests__/use-update-option.test.tsx[2m > [22mnotification settings cache refresh[2m > [22mupdates the visible 'notice' after saving 'Notice' without a page reload
+[31m[1mError[22m: [2mexpect([22m[31melement[31m[2m).toHaveTextContent()[22m
+
+Expected element to have text content:
+[32m  Updated system notice[31m
+Received:
+[31m  empty[31m
+
+Ignored nodes: comments, script, style
+[36m<html>[31m
+  [36m<head />[31m
+  [36m<body>[31m
+    [36m<div>[31m
+      [36m<button>[31m
+        [0mSave[0m
+      [36m</button>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"announcements"[31m
+      [36m>[31m
+        [0mempty[0m
+      [36m</output>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"notice"[31m
+      [36m>[31m
+        [0mempty[0m
+      [36m</output>[31m
+      [36m<output[31m
+        [33maria-label[31m=[32m"loading"[31m
+      [36m>[31m
+        [0mfalse[0m
+      [36m</output>[31m
+    [36m</div>[31m
+  [36m</body>[31m
+[36m</html>[31m...[39m
+[36m [2m❯[22m src/features/system-settings/hooks/__tests__/use-update-option.test.tsx:[2m64:71[22m[39m
+    [90m 62|[39m     if (example.key.endsWith('_enabled')) expect(screen.getByLabelText…
+    [90m 63|[39m     await userEvent.setup().click(screen.getByRole('button', { name: '…
+    [90m 64|[39m     await waitFor(() => expect(screen.getByLabelText(example.output)).…
+    [90m   |[39m                                                                       [31m^[39m
+    [90m 65|[39m     client[33m.[39m[34mclear[39m()
+    [90m 66|[39m   })
+[90m [2m❯[22m runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:[2m47:12[22m[39m
+[90m [2m❯[22m checkCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m124:77[22m[39m
+[90m [2m❯[22m Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m118:16[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[90m (3)[39m
+[2m   Start at [22m 16:07:50
+[2m   Duration [22m 17.08s[2m (transform 428ms, setup 329ms, import 646ms, tests 15.20s, environment 770ms)[22m
+

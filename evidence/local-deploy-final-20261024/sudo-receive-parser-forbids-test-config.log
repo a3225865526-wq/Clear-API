@@ -1,0 +1,3 @@
+usage: clearapi-local-deploy.py [-h] [--config-path CONFIG_PATH]
+                                {preflight,receive} ...
+clearapi-local-deploy.py: error: unrecognized arguments: --config-path /opt/clearapi-test/config/test-config.json

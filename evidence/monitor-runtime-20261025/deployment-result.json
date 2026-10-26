@@ -1,0 +1,13 @@
+{
+  "result": "SUCCESS",
+  "commit": "1aef1aec0e6337992f382836aaeea62c07eb41fd",
+  "archive_sha256": "996d0af25b4113070b0c83f6436425d2ca7dabac346e41f0044c0b323709919d",
+  "image_id": "sha256:3c2f84e2b4a162313676320f4aa640114136993dc03fbb20c159c505b9d7a47f",
+  "updated_service": "new-api",
+  "scope": "backend",
+  "backup_id": "20261025T061238Z",
+  "health": "PASS",
+  "rollback": false,
+  "target_mode": "production",
+  "public_url": "https://www.clear999.com"
+}

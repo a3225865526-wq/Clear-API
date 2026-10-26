@@ -1,0 +1,118 @@
+{
+  "utc": "2026-10-24T14:26:52.293278+00:00",
+  "method": "existing gh identity; explicit GET only; proxy omitted only for child process as previous accepted read path",
+  "results": {
+    "workflows": {
+      "exit": 0,
+      "data": [
+        {
+          "id": 377545312,
+          "path": ".github/workflows/ci.yml",
+          "state": "active"
+        },
+        {
+          "id": 378068457,
+          "path": ".github/workflows/release-candidate.yml",
+          "state": "active"
+        },
+        {
+          "id": 384204592,
+          "path": ".github/workflows/release-pg03-gateway.yml",
+          "state": "active"
+        },
+        {
+          "id": 387553097,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "state": "active"
+        },
+        {
+          "id": 389079463,
+          "path": ".github/workflows/release-state-audit.yml",
+          "state": "active"
+        },
+        {
+          "id": 390820963,
+          "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+          "state": "active"
+        },
+        {
+          "id": 391551026,
+          "path": ".github/workflows/pg03-successor-approval.yml",
+          "state": "active"
+        },
+        {
+          "id": 378101050,
+          "path": ".github/workflows/deploy-production.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 378227091,
+          "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 387486994,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 390042545,
+          "path": ".github/workflows/failed-production-recovery.yml",
+          "state": "disabled_manually"
+        }
+      ]
+    },
+    "variables": {
+      "exit": 0,
+      "data": [
+        {
+          "name": "CLEARAPI_AUTO_PRODUCTION_ENABLED",
+          "value": "false",
+          "created_at": "2026-10-18T21:25:08Z",
+          "updated_at": "2026-10-19T14:16:55Z"
+        },
+        {
+          "name": "CLEARAPI_AUTO_RC_ENABLED",
+          "value": "false",
+          "created_at": "2026-10-16T20:46:46Z",
+          "updated_at": "2026-10-19T15:19:02Z"
+        }
+      ]
+    },
+    "queued": {
+      "exit": 0,
+      "data": {
+        "total_count": 0,
+        "runs": []
+      }
+    },
+    "in_progress": {
+      "exit": 0,
+      "data": {
+        "total_count": 0,
+        "runs": []
+      }
+    },
+    "waiting": {
+      "exit": 0,
+      "data": {
+        "total_count": 0,
+        "runs": []
+      }
+    },
+    "pending": {
+      "exit": 0,
+      "data": {
+        "total_count": 0,
+        "runs": []
+      }
+    },
+    "requested": {
+      "exit": 0,
+      "data": {
+        "total_count": 0,
+        "runs": []
+      }
+    }
+  }
+}

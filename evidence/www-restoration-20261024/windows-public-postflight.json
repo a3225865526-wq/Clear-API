@@ -1,0 +1,41 @@
+{
+  "client": "Windows native curl/8.21.0; default UA; direct; TLS validation enabled; no authentication",
+  "results": [
+    {
+      "url": "https://www.clear999.com/api/status?clearapi_restored=8a081ff2d0",
+      "utc": "2026-10-24T03:33:36.421011+00:00",
+      "exit": 28,
+      "metrics_http_remote_type": "000||",
+      "headers": {},
+      "body_bytes": 0,
+      "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr": "curl: (28) Connection timed out after 15004 milliseconds\r\n",
+      "api_success": false
+    },
+    {
+      "url": "https://www.clear999.com/?clearapi_restored=8a081ff2d0",
+      "utc": "2026-10-24T03:33:49.943311+00:00",
+      "exit": 0,
+      "metrics_http_remote_type": "200|104.21.2.201|text/html; charset=utf-8",
+      "headers": {
+        "date": "Sat, 24 Oct 2026 03:33:41 GMT",
+        "content-type": "text/html; charset=utf-8",
+        "cf-cache-status": "DYNAMIC",
+        "server": "cloudflare",
+        "cf-ray": "a4f5ebe04a443ceb-LAX"
+      },
+      "body_bytes": 1426,
+      "body_sha256": "8112a695f50f65e4c0a5155617c6c39e28ab8e47cec20bbe45613466903d46b0",
+      "stderr": "",
+      "application_shell": true
+    },
+    {
+      "url": "https://www.clear999.com/static/js/vendor-ui-primitives.5564bb5e9e.js",
+      "method": "GET public entry JavaScript; body discarded",
+      "utc": "2026-10-24T03:34:05.008535+00:00",
+      "exit": 28,
+      "http_type_bytes": "200|text/javascript; charset=utf-8|188814",
+      "stderr": "curl: (28) Operation timed out after 15006 milliseconds with 188814 bytes received\n"
+    }
+  ]
+}

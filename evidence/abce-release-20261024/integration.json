@@ -1,0 +1,248 @@
+{
+  "tool_base": "80d3dc5b3a58655f736e4fcd49372971c30014b4",
+  "production_predecessor": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "lines": {
+    "A": {
+      "source": "b140f5a7b73c00f022eae00062b41759b25cec56",
+      "compared_paths": [
+        "controller/model_pricing_config.go",
+        "model/model_pricing_cleanup.go",
+        "model/model_pricing_cleanup_dialect_test.go",
+        "model/model_pricing_cleanup_test.go",
+        "router/api-router.go",
+        "web/src/features/model-pricing/__tests__/cleanup-dialog.test.tsx",
+        "web/src/features/model-pricing/__tests__/upstream-pricing.test.ts",
+        "web/src/features/model-pricing/api.ts",
+        "web/src/features/model-pricing/model-pricing-cleanup-dialog.tsx",
+        "web/src/features/model-pricing/model-pricing-panel.tsx",
+        "web/src/features/model-pricing/upstream-pricing-dialog.tsx",
+        "web/src/features/model-pricing/upstream-pricing.ts",
+        "web/src/features/models/components/models-dialogs.tsx",
+        "web/src/features/models/components/models-primary-buttons.tsx",
+        "web/src/features/models/components/models-provider.tsx",
+        "web/src/features/system-settings/models/model-pricing-sheet.tsx",
+        "web/src/features/system-settings/models/ratio-settings-card.tsx"
+      ],
+      "baseline_differences": {
+        "web/src/features/model-pricing/__tests__/cleanup-dialog.test.tsx": {
+          "review": "assertion wrapping only",
+          "diff": "diff --git a/web/src/features/model-pricing/__tests__/cleanup-dialog.test.tsx b/web/src/features/model-pricing/__tests__/cleanup-dialog.test.tsx\nindex 980a1f1539..07e1826e73 100644\n--- a/web/src/features/model-pricing/__tests__/cleanup-dialog.test.tsx\n+++ b/web/src/features/model-pricing/__tests__/cleanup-dialog.test.tsx\n@@ -127,9 +127,7 @@ it('submits an empty draft for the reviewed selection so nothing is restored', a\n     within(table).getByText('Stored pricing: ModelRatio, CompletionRatio')\n   ).toBeVisible()\n \n-  expect(\n-    screen.getByRole('button', { name: 'Clear 0 models' })\n-  ).toBeDisabled()\n+  expect(screen.getByRole('button', { name: 'Clear 0 models' })).toBeDisabled()\n \n   await user.click(screen.getByRole('checkbox', { name: 'Select gpt-4' }))\n   await user.click(screen.getByRole('button', { name: 'Clear 1 models' }))"
+        },
+        "web/src/features/model-pricing/__tests__/upstream-pricing.test.ts": {
+          "review": "argument wrapping only",
+          "diff": "diff --git a/web/src/features/model-pricing/__tests__/upstream-pricing.test.ts b/web/src/features/model-pricing/__tests__/upstream-pricing.test.ts\nindex cc008659d3..bd85bc0d16 100644\n--- a/web/src/features/model-pricing/__tests__/upstream-pricing.test.ts\n+++ b/web/src/features/model-pricing/__tests__/upstream-pricing.test.ts\n@@ -273,7 +273,10 @@ describe('upstream screenshot pricing', () => {\n     })\n \n     expect(\n-      generatePriceTableFromExpression('usage', 'tier(\"base\", u(\"seconds\") * 1)')\n+      generatePriceTableFromExpression(\n+        'usage',\n+        'tier(\"base\", u(\"seconds\") * 1)'\n+      )\n     ).toBeNull()\n   })\n })"
+        },
+        "web/src/features/system-settings/models/ratio-settings-card.tsx": {
+          "review": "import ordering only",
+          "diff": "diff --git a/web/src/features/system-settings/models/ratio-settings-card.tsx b/web/src/features/system-settings/models/ratio-settings-card.tsx\nindex 684be4eecc..3d1ca4b152 100644\n--- a/web/src/features/system-settings/models/ratio-settings-card.tsx\n+++ b/web/src/features/system-settings/models/ratio-settings-card.tsx\n@@ -35,12 +35,12 @@ import {\n   useSaveModelPricing,\n   type ModelPricingConfig,\n } from '@/features/model-pricing/api'\n+import { ModelPricingCleanupDialog } from '@/features/model-pricing/model-pricing-cleanup-dialog'\n import { pricingOptions } from '@/features/model-pricing/pricing'\n import {\n   applyGeneratedUpstreamPricing,\n   type GeneratedUpstreamPricing,\n } from '@/features/model-pricing/upstream-pricing'\n-import { ModelPricingCleanupDialog } from '@/features/model-pricing/model-pricing-cleanup-dialog'\n import { UpstreamPricingDialog } from '@/features/model-pricing/upstream-pricing-dialog'\n import { handleServerError } from '@/lib/handle-server-error'"
+        }
+      },
+      "finding": "already integrated in production baseline; retain existing implementation"
+    },
+    "B": {
+      "source": "1b04b8bc0e2ad92d42e3bc7e6900a6692a31085f",
+      "compared_paths": [
+        "setting/console_setting/announcements.go",
+        "setting/console_setting/announcements_test.go",
+        "setting/console_setting/validation.go",
+        "web/src/components/data-table/static/static-row-actions.tsx",
+        "web/src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx",
+        "web/src/features/system-settings/content/announcements-section.tsx",
+        "web/src/features/system-settings/content/announcements.ts"
+      ],
+      "baseline_differences": {},
+      "finding": "already integrated in production baseline; retain existing implementation"
+    },
+    "C": {
+      "source": "88e935b934b3eb04f2619a8b6bf94997acea498c",
+      "compared_paths": [
+        "relay/channel/ali/adaptor.go",
+        "relay/channel/ali/gemini_test.go",
+        "relay/channel/deepseek/adaptor.go",
+        "relay/channel/deepseek/adaptor_test.go",
+        "relay/channel/inbound_conversion.go",
+        "relay/channel/inbound_conversion_test.go",
+        "relay/channel/moonshot/adaptor.go",
+        "relay/channel/moonshot/gemini_test.go",
+        "relay/channel/zhipu/adaptor.go",
+        "relay/channel/zhipu/adaptor_test.go",
+        "relay/channel/zhipu/relay-zhipu.go",
+        "relay/channel/zhipu_4v/adaptor.go",
+        "relay/channel/zhipu_4v/gemini_test.go"
+      ],
+      "baseline_differences": {},
+      "finding": "already integrated in production baseline; retain existing implementation"
+    }
+  },
+  "d_excluded": {
+    "9725fe4317bcc7f8a5d19bd00ae9defcc9195277": true,
+    "112f1cad3127d625bf94aaec7b77e7c32b13dab4": true,
+    "f126bd10ddeb27e5435888973fadc25cd7daff3c": true,
+    "dedicated_paths_absent": true
+  },
+  "locale_changes": {
+    "en.json": {
+      "added": [
+        "Failed to load model pricing records"
+      ],
+      "removed": [],
+      "changed": [],
+      "root_preserved": true
+    },
+    "fr.json": {
+      "added": [
+        "Already clear",
+        "Cleanup",
+        "Clear model pricing",
+        "Clear stored pricing",
+        "Clear {{count}} models",
+        "Cleared pricing for {{count}} models",
+        "Clearing...",
+        "Failed to clean up model pricing",
+        "Failed to load model pricing records",
+        "Generate price table from expression",
+        "Generated prices applied to the draft. Save model pricing to activate them.",
+        "Model pricing cleanup",
+        "No model pricing records were found",
+        "No stored pricing",
+        "Pricing changed since this plan was prepared. Reload before clearing.",
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.",
+        "Select all models with pricing to clear",
+        "Select {{model}}",
+        "Stored pricing: {{fields}}",
+        "The built-in upstream price is not written back; the engine resolves it at billing time.",
+        "{{count}} models have stored pricing to clear"
+      ],
+      "removed": [],
+      "changed": [],
+      "root_preserved": true
+    },
+    "ja.json": {
+      "added": [
+        "Already clear",
+        "Cleanup",
+        "Clear model pricing",
+        "Clear stored pricing",
+        "Clear {{count}} models",
+        "Cleared pricing for {{count}} models",
+        "Clearing...",
+        "Failed to clean up model pricing",
+        "Failed to load model pricing records",
+        "Generate price table from expression",
+        "Generated prices applied to the draft. Save model pricing to activate them.",
+        "Model pricing cleanup",
+        "No model pricing records were found",
+        "No stored pricing",
+        "Pricing changed since this plan was prepared. Reload before clearing.",
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.",
+        "Select all models with pricing to clear",
+        "Select {{model}}",
+        "Stored pricing: {{fields}}",
+        "The built-in upstream price is not written back; the engine resolves it at billing time.",
+        "{{count}} models have stored pricing to clear"
+      ],
+      "removed": [],
+      "changed": [],
+      "root_preserved": true
+    },
+    "ru.json": {
+      "added": [
+        "Already clear",
+        "Cleanup",
+        "Clear model pricing",
+        "Clear stored pricing",
+        "Clear {{count}} models",
+        "Cleared pricing for {{count}} models",
+        "Clearing...",
+        "Failed to clean up model pricing",
+        "Failed to load model pricing records",
+        "Generate price table from expression",
+        "Generated prices applied to the draft. Save model pricing to activate them.",
+        "Model pricing cleanup",
+        "No model pricing records were found",
+        "No stored pricing",
+        "Pricing changed since this plan was prepared. Reload before clearing.",
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.",
+        "Select all models with pricing to clear",
+        "Select {{model}}",
+        "Stored pricing: {{fields}}",
+        "The built-in upstream price is not written back; the engine resolves it at billing time.",
+        "{{count}} models have stored pricing to clear"
+      ],
+      "removed": [],
+      "changed": [],
+      "root_preserved": true
+    },
+    "vi.json": {
+      "added": [
+        "Already clear",
+        "Cleanup",
+        "Clear model pricing",
+        "Clear stored pricing",
+        "Clear {{count}} models",
+        "Cleared pricing for {{count}} models",
+        "Clearing...",
+        "Failed to clean up model pricing",
+        "Failed to load model pricing records",
+        "Generate price table from expression",
+        "Generated prices applied to the draft. Save model pricing to activate them.",
+        "Model pricing cleanup",
+        "No model pricing records were found",
+        "No stored pricing",
+        "Pricing changed since this plan was prepared. Reload before clearing.",
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.",
+        "Select all models with pricing to clear",
+        "Select {{model}}",
+        "Stored pricing: {{fields}}",
+        "The built-in upstream price is not written back; the engine resolves it at billing time.",
+        "{{count}} models have stored pricing to clear"
+      ],
+      "removed": [],
+      "changed": [],
+      "root_preserved": true
+    },
+    "zh-TW.json": {
+      "added": [
+        "Already clear",
+        "Cleanup",
+        "Clear model pricing",
+        "Clear stored pricing",
+        "Clear {{count}} models",
+        "Cleared pricing for {{count}} models",
+        "Clearing...",
+        "Failed to clean up model pricing",
+        "Failed to load model pricing records",
+        "Generate price table from expression",
+        "Generated prices applied to the draft. Save model pricing to activate them.",
+        "Model pricing cleanup",
+        "No model pricing records were found",
+        "No stored pricing",
+        "Pricing changed since this plan was prepared. Reload before clearing.",
+        "Remove the stored model sales prices so the pricing list is empty. Model definitions, channels, groups, API keys, users and usage history are not affected, and built-in prices are not written back.",
+        "Select all models with pricing to clear",
+        "Select {{model}}",
+        "Stored pricing: {{fields}}",
+        "The built-in upstream price is not written back; the engine resolves it at billing time.",
+        "{{count}} models have stored pricing to clear"
+      ],
+      "removed": [],
+      "changed": [],
+      "root_preserved": true
+    },
+    "zh.json": {
+      "added": [
+        "Failed to load model pricing records"
+      ],
+      "removed": [],
+      "changed": [],
+      "root_preserved": true
+    }
+  },
+  "E": {
+    "source": "33fcb21d54d7a1e160f8a6a95b66677d61b91eab",
+    "method": "current Windows entry -> installed local-deploy-vps.py -> formal systemd backup; equivalent protection retained",
+    "tests": "local helper proof validation, deployment lock, predecessor identity; full encrypted backup; backup lock exit 75",
+    "old_workflows_enabled": false,
+    "historical_status_document_not_imported": true
+  }
+}

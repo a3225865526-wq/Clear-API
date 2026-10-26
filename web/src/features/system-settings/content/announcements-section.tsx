@@ -68,6 +68,7 @@ import { SettingsSwitchField } from '../components/settings-form-layout'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 import {
+  ANNOUNCEMENT_DISPLAYS,
   ANNOUNCEMENT_STATUSES,
   ANNOUNCEMENT_TYPES,
   getAnnouncementStatusOption,
@@ -90,6 +91,7 @@ const announcementSchema = z.object({
   publishDate: z.string().min(1, 'Publish date is required'),
   type: z.enum(['default', 'ongoing', 'success', 'warning', 'error']),
   status: z.enum(['draft', 'published', 'withdrawn']),
+  display: z.enum(['notice', 'timeline', 'both']),
   extra: z
     .string()
     .max(100, 'Extra must be less than 100 characters')
@@ -123,6 +125,7 @@ export function AnnouncementsSection({
       publishDate: new Date().toISOString(),
       type: 'default',
       status: 'draft',
+      display: 'both',
       extra: '',
     },
   })
@@ -168,6 +171,7 @@ export function AnnouncementsSection({
       publishDate: new Date().toISOString(),
       type: 'default',
       status: 'draft',
+      display: 'both',
       extra: '',
     })
     setShowDialog(true)
@@ -180,6 +184,7 @@ export function AnnouncementsSection({
       publishDate: announcement.publishDate,
       type: announcement.type,
       status: announcement.status,
+      display: announcement.display ?? 'timeline',
       extra: announcement.extra || '',
     })
     setShowDialog(true)
@@ -249,7 +254,10 @@ export function AnnouncementsSection({
       )
       toast.success(t('Announcement updated. Click "Save Settings" to apply.'))
     } else {
-      const newId = Math.max(...announcements.map((item) => item.id), 0) + 1
+      const newId = Math.max(
+        Date.now(),
+        ...announcements.map((item) => item.id + 1)
+      )
       setAnnouncements((prev) => [...prev, { id: newId, ...values }])
       toast.success(t('Announcement added. Click "Save Settings" to apply.'))
     }
@@ -401,6 +409,17 @@ export function AnnouncementsSection({
                   />
                 )
               },
+            },
+            {
+              id: 'display',
+              header: t('Display location'),
+              cell: (announcement) =>
+                t(
+                  ANNOUNCEMENT_DISPLAYS.find(
+                    (option) =>
+                      option.value === (announcement.display ?? 'timeline')
+                  )?.labelKey ?? 'Timeline only'
+                ),
             },
             {
               id: 'status',
@@ -620,6 +639,39 @@ export function AnnouncementsSection({
                       'Only published announcements are shown to users. Drafts and withdrawn announcements stay here for administrators.'
                     )}
                   </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name='display'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Display location')}</FormLabel>
+                  <Select
+                    items={ANNOUNCEMENT_DISPLAYS.map((option) => ({
+                      value: option.value,
+                      label: t(option.labelKey),
+                    }))}
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent alignItemWithTrigger={false}>
+                      <SelectGroup>
+                        {ANNOUNCEMENT_DISPLAYS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {t(option.labelKey)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

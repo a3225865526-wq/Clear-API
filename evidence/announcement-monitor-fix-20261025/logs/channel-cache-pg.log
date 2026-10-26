@@ -1,0 +1,13 @@
+=== RUN   TestManualChannelStatusSynchronizesCacheAndRouting
+=== RUN   TestManualChannelStatusSynchronizesCacheAndRouting/postgres
+    console_monitor_probe_test.go:99: isolated database: newapi_audit_1792898423581817019 (postgres)
+[SYS] 2026/10/25 - 03:20:23 | using PostgreSQL as database 
+    console_monitor_probe_test.go:99: database version: PostgreSQL 17.6 (Debian 17.6-2.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+[SYS] 2026/10/25 - 03:20:23 | channels synced from database 
+[SYS] 2026/10/25 - 03:20:23 | channels synced from database 
+[SYS] 2026/10/25 - 03:20:23 | channels synced from database 
+[SYS] 2026/10/25 - 03:20:23 | channels synced from database 
+--- PASS: TestManualChannelStatusSynchronizesCacheAndRouting (0.13s)
+    --- PASS: TestManualChannelStatusSynchronizesCacheAndRouting/postgres (0.13s)
+PASS
+ok  	github.com/QuantumNous/new-api/controller	0.186s

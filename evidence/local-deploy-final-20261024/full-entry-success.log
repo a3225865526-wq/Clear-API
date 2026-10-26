@@ -1,0 +1,13 @@
+{
+  "result": "SUCCESS",
+  "commit": "d9cd1299f6cb0442ba9d43af1a1ac368c94816c5",
+  "archive_sha256": "76de8c04d0b4f76434b9aa0421352f29d7376e28f2a2995867db456a0595596c",
+  "image_id": "sha256:a34b84f437efbacd174b20d0b54dd1b19a4dc3c5d63f40b75a7de79798731545",
+  "updated_service": "new-api",
+  "scope": "backend",
+  "backup_id": "20261023T180450Z",
+  "health": "PASS",
+  "rollback": false,
+  "target_mode": "isolated-test-v1",
+  "public_url": null
+}

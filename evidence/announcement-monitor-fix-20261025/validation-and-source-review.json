@@ -1,0 +1,49 @@
+{
+  "utc": "2026-10-25T03:28:19.586522+00:00",
+  "functional_commit": "0c5a06fd93ade4e710ca215a64e5ec025b4b4854",
+  "application_changes": [
+    "controller/channel.go",
+    "controller/console_monitor_admin.go",
+    "controller/console_monitor_probe.go",
+    "controller/console_monitor_probe_test.go",
+    "model/console_monitor_control.go",
+    "service/console_probe_test.go",
+    "web/src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx",
+    "web/src/features/system-settings/hooks/__tests__/use-update-option.test.tsx",
+    "web/src/features/system-settings/hooks/use-update-option.ts"
+  ],
+  "D_excluded_ancestry": {
+    "9725fe43": true,
+    "112f1cad": true,
+    "f126bd10": true
+  },
+  "D_frontend_absent": true,
+  "production_cost_guards_preserved_byte_for_byte": true,
+  "original_workspaces": {
+    "audit": {
+      "head": "a9fe76f301c023fb8ae716901bbe4f94a4184b3e",
+      "files_unchanged": true
+    },
+    "monitor": {
+      "head": "3124d8a1b6bbc44e8a6203266567f72c1734c877",
+      "files_unchanged": true
+    }
+  },
+  "production_deployed": false,
+  "real_vendor_or_paid_calls": false,
+  "local_results": {
+    "frontend_cache_regressions": "9 PASS; typecheck/lint/format PASS",
+    "monitor_admission_and_cost_matrix": "SQLite3.50.4/MySQL8.4.11/PostgreSQL17.6 PASS; initial aggregate log has one obsolete HTTP assertion, fixed and rerun separately PASS",
+    "manual_channel_state_cache_routing": "fresh three-database add/disable/enable PASS",
+    "trigger_endpoint": "cost denial persisted, no dispatch PASS; actual router role/header/confirm boundary PASS",
+    "runtime_billing_routing": "three synthetic successful relay requests, quotas2820/4200/4200; disabled503/no upstream call; enabled resumed; historical first bill unchanged",
+    "browser": "admin add/save/publish/current-page notification -> normal viewer new+old -> admin remove new only PASS",
+    "real_dynamic_monitoring": "BLOCKED: provider hard cost ceiling proof absent; UI activation/test remain disabled, no scheduler activation"
+  },
+  "commands": {
+    "service": "go test -count=1 -v ./service -run \"TestConsoleMonitor(Control|Pool|Lease|Executor|Probe|Reconciliation|Scheduler|Retention|Admission|Admin)|TestConsoleProbe\"; then rerun TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution after updating obsolete stub assertion",
+    "controller": "go test -count=1 -v ./controller -run \"TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch|TestManualChannelStatusSynchronizesCacheAndRouting|TestAnnouncementOptionsRejectOrdinaryUsers\"; final channel test /sqlite /mysql /postgres with dedicated loopback fixtures; existing TestAddChannel regressions",
+    "frontend": "tsgo -b; oxlint/oxfmt --check on 3 affected files; vitest run hooks/__tests__/use-update-option.test.tsx content/__tests__/announcements-lifecycle.test.tsx",
+    "build": "go build ./...; (cd relaykit && GOWORK=off go build ./...); Dockerfile linux/amd64 build, frontend/Go/bootstrap/migration binaries"
+  }
+}

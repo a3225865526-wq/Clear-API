@@ -53,8 +53,17 @@ export function CreditCatalog(props: { products?: readonly CreditProduct[] }) {
           {t('Contact support for large recharges with no handling fee!')}
         </h2>
         <div className='flex flex-wrap items-center gap-2'>
-          <span>QQ: 3225865526</span>
-          <CopyButton value='3225865526' tooltip={t('Copy support QQ')} />
+          <div className='inline-flex items-center gap-2 whitespace-nowrap'>
+            <span>QQ: 3225865526</span>
+            <CopyButton value='3225865526' tooltip={t('Copy support QQ')} />
+          </div>
+          <div className='inline-flex items-center gap-2 whitespace-nowrap'>
+            <span>{t('Support QQ group')}: 660466292</span>
+            <CopyButton
+              value='660466292'
+              tooltip={t('Copy support QQ group')}
+            />
+          </div>
         </div>
         <p className='text-muted-foreground text-sm'>
           {t('Confirm purchase and fee arrangements with support first.')}

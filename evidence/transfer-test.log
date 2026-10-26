@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "C:\Users\Chen\Documents\Codex\2026-10-23\referenced-chatgpt-conversation-this-is-an-2\work\transfer-test.py", line 36, in <module>
+    result = subprocess.run(ssh + [command], stdin=stream, capture_output=True, text=True, check=True)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Chen\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['ssh', '-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'IdentitiesOnly=yes', '-o', 'UserKnownHostsFile=C:\\Users\\Chen\\Documents\\Codex\\2026-10-23\\referenced-chatgpt-conversation-this-is-an-2\\work\\test_known_hosts', '-i', 'C:\\Users\\Chen\\Documents\\Codex\\2026-10-23\\referenced-chatgpt-conversation-this-is-an-2\\work\\test_ed25519', '-p', '54705', 'root@127.0.0.1', 'set -eu; umask 077; f=$(mktemp /tmp/clearapi-image.XXXXXX); trap \'rm -f "$f"\' EXIT; cat > "$f"; echo "227abff1e4ac6a3d38662287c4ec9e64c237400533aa59bb68775c65b28ad25b  $f" | sha256sum -c -; docker load -i "$f"; docker image inspect --format "{{.Id}}" sha256:96dfd337e209a88d3733c78f00c737dff4668a003ae2f416cacdeddceaa07777']' returned non-zero exit status 1.

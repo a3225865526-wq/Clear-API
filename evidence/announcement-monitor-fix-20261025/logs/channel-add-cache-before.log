@@ -1,0 +1,12 @@
+=== RUN   TestManualChannelStatusSynchronizesCacheAndRouting
+[SYS] 2026/10/25 - 03:19:19 | SQL_DSN not set, using SQLite as database 
+    console_monitor_probe_test.go:93: database version: 3.50.4
+[SYS] 2026/10/25 - 03:19:20 | channels synced from database 
+    console_monitor_probe_test.go:105: 
+        	Error Trace:	/work/controller/console_monitor_probe_test.go:105
+        	Error:      	Expected value not to be nil.
+        	Test:       	TestManualChannelStatusSynchronizesCacheAndRouting
+--- FAIL: TestManualChannelStatusSynchronizesCacheAndRouting (0.08s)
+FAIL
+FAIL	github.com/QuantumNous/new-api/controller	0.139s
+FAIL

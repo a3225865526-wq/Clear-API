@@ -1,0 +1,108 @@
+{
+  "observed_at": "2026-10-24T02:36:49.166608+00:00",
+  "main": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "variables": [
+    {
+      "name": "CLEARAPI_AUTO_PRODUCTION_ENABLED",
+      "value": "false",
+      "created_at": "2026-10-18T21:25:08Z",
+      "updated_at": "2026-10-19T14:16:55Z"
+    },
+    {
+      "name": "CLEARAPI_AUTO_RC_ENABLED",
+      "value": "false",
+      "created_at": "2026-10-16T20:46:46Z",
+      "updated_at": "2026-10-19T15:19:02Z"
+    }
+  ],
+  "workflows": [
+    {
+      "id": 377545312,
+      "name": "CI",
+      "path": ".github/workflows/ci.yml",
+      "state": "active"
+    },
+    {
+      "id": 378068457,
+      "name": "Release Candidate",
+      "path": ".github/workflows/release-candidate.yml",
+      "state": "active"
+    },
+    {
+      "id": 378101050,
+      "name": "Deploy Production",
+      "path": ".github/workflows/deploy-production.yml",
+      "state": "active"
+    },
+    {
+      "id": 378227091,
+      "name": "GHCR Pull Rehearsal",
+      "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+      "state": "active"
+    },
+    {
+      "id": 384204592,
+      "name": "PG03 reviewed main Gateway RC",
+      "path": ".github/workflows/release-pg03-gateway.yml",
+      "state": "active"
+    },
+    {
+      "id": 387486994,
+      "name": "Automatic production release",
+      "path": ".github/workflows/automatic-deploy.yml",
+      "state": "active"
+    },
+    {
+      "id": 387553097,
+      "name": "Deployment rehearsal",
+      "path": ".github/workflows/deployment-rehearsal.yml",
+      "state": "active"
+    },
+    {
+      "id": 389079463,
+      "name": "PG03 release state audit",
+      "path": ".github/workflows/release-state-audit.yml",
+      "state": "active"
+    },
+    {
+      "id": 390042545,
+      "name": "Failed production recovery",
+      "path": ".github/workflows/failed-production-recovery.yml",
+      "state": "active"
+    },
+    {
+      "id": 390820963,
+      "name": "PG03 isolated exact-image schema rehearsal",
+      "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+      "state": "active"
+    },
+    {
+      "id": 391551026,
+      "name": "PG03 successor independent grant",
+      "path": ".github/workflows/pg03-successor-approval.yml",
+      "state": "active"
+    }
+  ],
+  "in_flight": {
+    "queued": {
+      "count": 0,
+      "runs": []
+    },
+    "in_progress": {
+      "count": 0,
+      "runs": []
+    },
+    "waiting": {
+      "count": 0,
+      "runs": []
+    },
+    "pending": {
+      "count": 0,
+      "runs": []
+    },
+    "requested": {
+      "count": 0,
+      "runs": []
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "command": "curl.exe --silent --show-error --output NUL --max-time 15 --write-out public_api_status=%{http_code} https://www.clear999.com/api/status",
+  "http_status": 521,
+  "exit": 0,
+  "collection": "same command execution as vps-dependency-detail.json; no redirect or authenticated request"
+}

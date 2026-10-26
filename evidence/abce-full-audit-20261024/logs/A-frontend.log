@@ -1,0 +1,61 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.10 [39m[90m/work/web[39m
+
+ [32m✓[39m src/features/model-pricing/__tests__/pricing.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m src/features/model-pricing/__tests__/upstream-pricing.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m src/features/model-pricing/__tests__/cleanup-dialog.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 402[2mms[22m[39m
+   [33m[2m✓[22m[39m submits an empty draft for the reviewed selection so nothing is restored [33m 323[2mms[22m[39m
+[90mstderr[2m | src/features/system-settings/__tests__/pricing-sync.test.tsx[2m > [22m[2mpricing synchronization[2m > [22m[2mpreviews the expression, rejects a stale save and reloads before applying without residual ratio differences
+[22m[39mYou have Reduced Motion enabled on your device. Animations may not appear as expected.. For more information and steps for solving, visit https://motion.dev/troubleshooting/reduced-motion-disabled
+
+ [32m✓[39m src/features/model-pricing/__tests__/save-errors.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 1164[2mms[22m[39m
+   [33m[2m✓[22m[39m shows the backend pricing error once, preserves the draft, and reports a new attempt separately (HTTP 200) [33m 712[2mms[22m[39m
+   [33m[2m✓[22m[39m shows the backend pricing error once, preserves the draft, and reports a new attempt separately (HTTP 400) [33m 447[2mms[22m[39m
+ [32m✓[39m src/features/system-settings/__tests__/pricing-sync.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 3130[2mms[22m[39m
+     [33m[2m✓[22m[39m selects one complete source per model and keeps filtered-out selections [33m 916[2mms[22m[39m
+     [33m[2m✓[22m[39m previews the expression, rejects a stale save and reloads before applying without residual ratio differences [33m 1193[2mms[22m[39m
+   [33m[2m✓[22m[39m shows a source failure instead of a no-differences result and retries the selected source [33m 372[2mms[22m[39m
+ [32m✓[39m src/features/model-pricing/__tests__/upstream-pricing-dialog.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 2828[2mms[22m[39m
+   [33m[2m✓[22m[39m generates A pricing, invalidates the preview on multiplier changes, and applies only after review [33m 735[2mms[22m[39m
+   [33m[2m✓[22m[39m applies generated prices to the real settings draft and submits only on Save (server success: true) [33m 890[2mms[22m[39m
+   [33m[2m✓[22m[39m applies generated prices to the real settings draft and submits only on Save (server success: false) [33m 763[2mms[22m[39m
+ [32m✓[39m src/features/model-pricing/__tests__/editor-layout.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 4443[2mms[22m[39m
+   [33m[2m✓[22m[39m uses the none cache profile consistently in current billing and draft previews [33m 731[2mms[22m[39m
+   [33m[2m✓[22m[39m uses the standard cache profile consistently in current billing and draft previews [33m 424[2mms[22m[39m
+   [33m[2m✓[22m[39m uses the claude_ttl cache profile consistently in current billing and draft previews [33m 450[2mms[22m[39m
+   [33m[2m✓[22m[39m updates the preview for explicit zero and disabled prices and explains dependent audio controls [33m 794[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps the default pricing workspace shrinkable and saves from its fixed action bar [33m 1076[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps the unset pricing workspace shrinkable and saves from its fixed action bar [33m 566[2mms[22m[39m
+[90mstderr[2m | src/features/model-pricing/__tests__/editor-currency.test.tsx[2m > [22m[2mconverts task base charges and second, token and credit prices, including whole-column fill
+[22m[39mBase UI: A component that acts as a button expected a non-<button> because the `nativeButton` prop is false. Rendering a <button> keeps native behavior while Base UI applies non-native attributes and handlers, which can add unintended extra attributes (such as `role` or `aria-disabled`). Use a non-<button> in the `render` prop, or set `nativeButton` to `true`.
+    at Button (/work/web/src/components/ui/button.tsx:65:57)
+    at InputGroupButton (/work/web/src/components/ui/input-group.tsx:91:57)
+    at ComboboxInput (/work/web/src/components/ui/combobox.tsx:287:80)
+    at OptionCombobox (/work/web/src/components/ui/combobox.tsx:124:63)
+    at Combobox (/work/web/src/components/ui/combobox.tsx:60:88)
+    at /work/web/src/features/system-settings/models/task-usage-pricing-editor.tsx:154:66
+    at Array.map (<anonymous>)
+    at TaskBillingPreview (/work/web/src/features/system-settings/models/task-usage-pricing-editor.tsx:143:27)
+    at TaskUsagePricingEditor (/work/web/src/features/system-settings/models/task-usage-pricing-editor.tsx:648:55)
+    at ModelPricingEditorPanel (/work/web/src/features/system-settings/models/model-pricing-sheet.tsx:559:94)
+
+ [32m✓[39m src/features/model-pricing/__tests__/editor-currency.test.tsx [2m([22m[2m41 tests[22m[2m)[22m[33m 12528[2mms[22m[39m
+   [33m[2m✓[22m[39m previews legacy conversion in the selected currency and applies only after confirmation [33m 1124[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps configured cache prices visible on both sides for 'custom-cache' [33m 308[2mms[22m[39m
+   [33m[2m✓[22m[39m shows Gemini audio pricing when the legacy text price is zero without creating a ratio override [33m 320[2mms[22m[39m
+   [33m[2m✓[22m[39m defaults to USD, remembers a currency choice and restores it when reopened [33m 451[2mms[22m[39m
+   [33m[2m✓[22m[39m switches currencies and refreshes exchange rates without changing stored prices or dirty state [33m 628[2mms[22m[39m
+   [33m[2m✓[22m[39m converts edited token prices to USD ratios while preserving unfinished decimals and disabled lanes [33m 566[2mms[22m[39m
+   [33m[2m✓[22m[39m saves the CNY per-request price 0 as USD without display rounding [33m 392[2mms[22m[39m
+   [33m[2m✓[22m[39m saves the CNY per-request price 0.0000007 as USD without display rounding [33m 354[2mms[22m[39m
+   [33m[2m✓[22m[39m saves the CNY per-request price 14 as USD without display rounding [33m 332[2mms[22m[39m
+   [33m[2m✓[22m[39m converts tier price coefficients but leaves token thresholds and rule multipliers unchanged [33m 480[2mms[22m[39m
+   [33m[2m✓[22m[39m keeps time pricing and request rules unchanged when opening the simulator [33m 574[2mms[22m[39m
+   [33m[2m✓[22m[39m converts task base charges and second, token and credit prices, including whole-column fill [33m 806[2mms[22m[39m
+   [33m[2m✓[22m[39m preserves time billing on direct save and blocks incomplete local conditions [33m 558[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m97 passed[39m[22m[90m (97)[39m
+[2m   Start at [22m 02:52:18
+[2m   Duration [22m 25.00s[2m (transform 57.22s, setup 1.54s, import 73.52s, tests 24.55s, environment 5.23s)[22m
+

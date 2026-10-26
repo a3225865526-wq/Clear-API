@@ -1,0 +1,132 @@
+{
+  "captured_utc": "2026-10-25T02:39:35.874941+00:00",
+  "binary_sha256": "c69df666a7d5755917454609ba16922b3bdfcf4bb4f89fb35c804b601da4e7c7",
+  "frontend_assets": {
+    "/static/js/vendor-ui-primitives.5564bb5e9e.js": {
+      "bytes": 322376,
+      "origin_sha256": "356da346fc3eb102ca07ad8a3f56cf340d9f145383c7d9fd59f32cb1a404e040",
+      "public_sha256": "356da346fc3eb102ca07ad8a3f56cf340d9f145383c7d9fd59f32cb1a404e040"
+    },
+    "/static/js/vendor-tanstack.e331468f06.js": {
+      "bytes": 178389,
+      "origin_sha256": "81730bb1caff0f35f709125613c6dc831c0b3d820df90f351ce1a02275d232ba",
+      "public_sha256": "81730bb1caff0f35f709125613c6dc831c0b3d820df90f351ce1a02275d232ba"
+    },
+    "/static/js/lib-react.91bc21a6cf.js": {
+      "bytes": 189032,
+      "origin_sha256": "8cc40254295877b830502e0c0f15af6a7270b0934b56817d3c75e1ee88c3b17a",
+      "public_sha256": "8cc40254295877b830502e0c0f15af6a7270b0934b56817d3c75e1ee88c3b17a"
+    },
+    "/static/js/59486.358f4047ce.js": {
+      "bytes": 714528,
+      "origin_sha256": "a930b9ffc401d619a3b56ed9a9b0fd593b281af0dc3a032f858f83e565c85f4f",
+      "public_sha256": "a930b9ffc401d619a3b56ed9a9b0fd593b281af0dc3a032f858f83e565c85f4f"
+    },
+    "/static/js/index.55158802f7.js": {
+      "bytes": 5430637,
+      "origin_sha256": "55a9a87b926bea4f36f8f167759869d56cbf9aebef1b32565e538a83eb254e1a",
+      "public_sha256": "55a9a87b926bea4f36f8f167759869d56cbf9aebef1b32565e538a83eb254e1a"
+    },
+    "/static/css/index.d36ff0d4f8.css": {
+      "bytes": 434853,
+      "origin_sha256": "033015d328dbb786d0b4b7cbf8bc8a9532ba913e2d75aebae4c4f7420ecd33bb",
+      "public_sha256": "033015d328dbb786d0b4b7cbf8bc8a9532ba913e2d75aebae4c4f7420ecd33bb"
+    }
+  },
+  "incoming_archive": {
+    "exists": true,
+    "bytes": 142606336,
+    "sha256": "94101ca6fb96c2b7dc653de29f299e4ca4b5d0535a253547f1a3ad6308c3edce"
+  },
+  "public_pricing": {
+    "auto_groups": [
+      "default"
+    ],
+    "data": [
+      {
+        "model_name": "gpt-6-luna",
+        "vendor_id": -1012,
+        "quota_type": 0,
+        "model_ratio": 37.5,
+        "model_price": 0,
+        "owner_by": "",
+        "completion_ratio": 2,
+        "enable_groups": [
+          "default"
+        ],
+        "supported_endpoint_types": [
+          "openai"
+        ],
+        "pricing_version": "5a90f2b86c08bd983a9a2e6d66c255f4eaef9c4bc934386d2b6ae84ef0ff1f1f"
+      }
+    ],
+    "group_ratio": {
+      "default": 1
+    },
+    "pricing_version": "a42d372ccf0b5dd13ecf71203521f9d2",
+    "success": true,
+    "supported_endpoint": {
+      "openai": {
+        "path": "/v1/chat/completions",
+        "method": "POST"
+      }
+    },
+    "usable_group": {
+      "default": "默认分组"
+    },
+    "vendors": [
+      {
+        "id": -1012,
+        "name": "OpenAI",
+        "icon": "OpenAI"
+      }
+    ]
+  },
+  "mount_destinations": [
+    "/data",
+    "/app/logs",
+    "/run/clearapi",
+    "/run/secrets/crypto_secret",
+    "/run/secrets/session_secret",
+    "/run/secrets/sql_dsn",
+    "/run/secrets/token_encryption_key"
+  ],
+  "database": {
+    "pricing": {
+      "CacheRatio": "{}",
+      "ModelPrice": "{}",
+      "ModelRatio": "{}",
+      "CompletionRatio": "{}",
+      "billing_setting.billing_expr": "{}",
+      "billing_setting.billing_mode": "{}"
+    },
+    "policy_table": true,
+    "monitor_table": true
+  },
+  "monitor_runtime_database": {
+    "policy": [
+      {
+        "id": 1,
+        "enabled": false,
+        "daily_requests": 0,
+        "max_concurrent": 1,
+        "retention_days": 90,
+        "schema_version": 1,
+        "daily_cost_micros": 0
+      }
+    ],
+    "targets": [
+      {
+        "id": 1,
+        "model": "gpt-6-luna",
+        "enabled": false,
+        "archived": true,
+        "published": false,
+        "channel_id": 1,
+        "allowlisted": false,
+        "target_kind": "channel"
+      }
+    ],
+    "probe_count": 0
+  }
+}

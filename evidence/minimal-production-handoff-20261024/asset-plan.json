@@ -1,0 +1,121 @@
+{
+  "schema": "clearapi.local-handoff-install-plan/v1",
+  "mode": "plan_only",
+  "executed": false,
+  "approval_required": true,
+  "source_branch": "codex/clearapi-local-deploy-formal-integration",
+  "source_identity": "Final committed HEAD whose source file hashes match this plan; full SHA recorded in delivery message. No old RC approval is reused.",
+  "assets": [
+    {
+      "source": "scripts/local-deploy-vps.py",
+      "destination": "/opt/clearapi/bin/clearapi-local-deploy.py",
+      "owner": "root:root",
+      "mode": "0750",
+      "sha256": "66ecfffacfdbbd66b0c57894921dc12e6b39861ab419427e2a17556168bc6ec0",
+      "bytes": 30722
+    },
+    {
+      "source": "scripts/local-deploy-state.py",
+      "destination": "/opt/clearapi/bin/local-deploy-state.py",
+      "owner": "root:root",
+      "mode": "0750",
+      "sha256": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "bytes": 4506
+    },
+    {
+      "source": "scripts/runtime-identity-refresh.py",
+      "destination": "/opt/clearapi/bin/runtime-identity-refresh.py",
+      "owner": "root:root",
+      "mode": "0750",
+      "sha256": "9e64059039b6de48d6e88bce6a3cfb587f4835d9b4234f0cc0693343e1e4fa95",
+      "bytes": 9586
+    },
+    {
+      "source": "scripts/runtime-boot-recovery.py",
+      "destination": "/opt/clearapi/bin/runtime-boot-recovery.py",
+      "owner": "root:root",
+      "mode": "0750",
+      "sha256": "44a4ee9213d59db4d3151500446adcefa503a0d4ac47457e9af0de1b0d9e1fa3",
+      "bytes": 17979
+    },
+    {
+      "source": "scripts/pg03-failed-recovery.py",
+      "destination": "/opt/clearapi/bin/pg03-failed-recovery.py",
+      "owner": "root:root",
+      "mode": "0750",
+      "sha256": "c91a096461368f4405138ae801381202675e1428e80365e6d546abc506cb0ee7",
+      "bytes": 31719
+    },
+    {
+      "source": "scripts/backup-identity.py",
+      "destination": "/opt/clearapi/backups/bin/backup-identity.py",
+      "owner": "root:root",
+      "mode": "0750",
+      "sha256": "f0373c961a883b8d63e6d5d864ca523628ea01a1f3a4dbf8fd58f30307dddc4e",
+      "bytes": 17049
+    },
+    {
+      "source": "scripts/production-backup.sh",
+      "destination": "/opt/clearapi/backups/bin/clearapi-backup.sh",
+      "owner": "root:root",
+      "mode": "0750",
+      "sha256": "8a59049196861273b2c0e2b59e9c46f7f70dbbfba6dddf2740fadb2760fff8cc",
+      "bytes": 13099
+    }
+  ],
+  "ownership_only": [
+    {
+      "path": "/opt/clearapi/app/docker-compose.prod.yml",
+      "observed_uid": 1000,
+      "observed_gid": 1000,
+      "required_owner": "root:root",
+      "mode_preserved": "0644",
+      "contents_sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+      "content_change": false
+    }
+  ],
+  "preserved_assets": [
+    "existing four boot systemd/tmpfiles assets and loaded ordering",
+    "Gateway/Executor/PostgreSQL containers, image IDs, restart policies",
+    "original four Compose file contents",
+    "release-manifest.json, pg03-target-manifest.json, controlled-launch-state.json",
+    "existing admin SSH/sudo channel; adding a restricted sudoers fragment would not revoke existing admin ALL permissions"
+  ],
+  "new_metadata_after_authorization": [
+    "/opt/clearapi/app/compose-local.yaml",
+    "/opt/clearapi/app/local-deploy-state.json",
+    "existing website-restoration-{attempt,result,failure}-39347012653.json contract (only applicable outcome files)"
+  ],
+  "activation_after_website_pass": [
+    {
+      "path": "/opt/clearapi/config/local-deploy.json",
+      "owner": "root:root",
+      "mode": "0600",
+      "source": "scripts/local-deploy.vps-config.example.json"
+    },
+    {
+      "path": "/opt/clearapi/config/local-deploy.enabled",
+      "owner": "root:root",
+      "mode": "0600",
+      "contents": "LOCAL_DEPLOY_CUTOVER_APPROVED_V1"
+    }
+  ],
+  "root_dependencies_kept": {
+    "/opt/clearapi/bin/pg03-release-control.py": "08f457e01f7a10ab1870a31d5818f45fb784e98dfbfcc5dc2840e8c8ad745308",
+    "/opt/clearapi/bin/pg03-legacy-transition.py": "c078b3c815cf741a5e0c9765fc3c38142e67ce1c6b7b3a6ed07de4ed0331572e",
+    "/opt/clearapi/bin/controlled-traffic-hold.py": "b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90"
+  },
+  "source_only_pin_consistency_changes": [
+    "scripts/production-deploy-v2.sh",
+    "scripts/pg03-release-control.py"
+  ],
+  "not_authorized_now": [
+    "remote workflow disable",
+    "source Push/PR/main merge",
+    "root installation or ownership migration",
+    "adopt-running",
+    "formal production backup invocation",
+    "restore-adopted/Caddy start",
+    "activation"
+  ]
+}

@@ -1,0 +1,213 @@
+{
+  "assets": {
+    "/opt/clearapi/backups/bin/clearapi-backup.sh": "8a59049196861273b2c0e2b59e9c46f7f70dbbfba6dddf2740fadb2760fff8cc",
+    "/opt/clearapi/bin/clearapi-local-deploy.py": "b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f",
+    "/opt/clearapi/bin/local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e"
+  },
+  "backup_service": "Result=success\nExecMainStatus=0\nActiveState=inactive\nSubState=dead",
+  "container": {
+    "created": "2026-10-24T15:18:11.361128443Z",
+    "health": null,
+    "started": "2026-10-24T15:18:11.692823281Z"
+  },
+  "http": {
+    "/": {
+      "exit": 0,
+      "status": "200"
+    },
+    "/api/option/": {
+      "exit": 0,
+      "status": "401"
+    },
+    "/api/owner/pool/capability": {
+      "exit": 0,
+      "status": "404"
+    },
+    "/login": {
+      "exit": 0,
+      "status": "200"
+    },
+    "/register": {
+      "exit": 0,
+      "status": "200"
+    },
+    "/v1/models": {
+      "exit": 0,
+      "status": "401"
+    }
+  },
+  "latest_backup": {
+    "backup_id": "20261024T151740Z",
+    "encrypted_artifact": {
+      "bytes": 12416579,
+      "name": "clearapi-backup-20261024T151740Z.tar.gz.gpg",
+      "sha256": "e5a171ab877977c2c3ba5741dd715b46458416bd6e40444880e302108ca3c756"
+    },
+    "encrypted_bytes_verified": true,
+    "encrypted_sha256_verified": true,
+    "manifest_sha256": "7365b80bb85fdc21472d79abaa96a04c9ccaab17816971b9792123c3e264b2bf",
+    "running_identity": {
+      "compose_base_sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+      "compose_environment_sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a",
+      "compose_inputs_sha256": {
+        "compose-candidate.yaml": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+        "compose-pg03.yaml": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+        "compose-website-recovery-39957948359.json": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+        "docker-compose.prod.yml": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa"
+      },
+      "compose_override_sha256": "aee0bbc3a6f66a33ca37709c71a09c50ddded57d1f787088ac8723b27e0087db",
+      "container_created": "2026-10-23T14:07:58.190877394Z",
+      "container_id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+      "deployment_state_file": "local-deploy-state.json",
+      "docker_engine_image_id": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "docker_image_id": "sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f",
+      "ghcr_digest": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "ghcr_repo_digest": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "oci_revision": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "original_incident": {
+        "controlled-launch-state.json": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+        "pg03-target-manifest.json": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+        "release-manifest.json": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3"
+      },
+      "release_manifest_sha256": "cdcea86687eb58c9ce06d31c9ea7e9dd67402b71f24bb3c39441143dbdc7d8ec"
+    }
+  },
+  "live": {
+    "commit": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+    "container_id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+    "image_id": "sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728",
+    "image_ref": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7"
+  },
+  "pg03": {
+    "compose": {
+      "CLEARAPI_CLOSED_LAUNCH": "false",
+      "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+      "CLEARAPI_PG03_IMAGES": null,
+      "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+      "CLEARAPI_POOL_ENABLED": "false",
+      "DISABLE_RELAY": null
+    },
+    "container": {
+      "CLEARAPI_CLOSED_LAUNCH": "false",
+      "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+      "CLEARAPI_PG03_IMAGES": null,
+      "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+      "CLEARAPI_POOL_ENABLED": "false",
+      "DISABLE_RELAY": null
+    },
+    "process": {
+      "CLEARAPI_CLOSED_LAUNCH": "false",
+      "CLEARAPI_ENABLE_ROUTE_CHAIN": null,
+      "CLEARAPI_PG03_IMAGES": null,
+      "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false",
+      "CLEARAPI_POOL_ENABLED": "false",
+      "DISABLE_RELAY": null
+    }
+  },
+  "public_status": {
+    "announcements": [
+      {
+        "content": "ClearAPI首发范围：88token / gpt-6-luna / default，仅纯文本 Chat Completions。充值：云猫购买 → 钱包 → 其他兑换方式 → Legacy兑换码。500000 Quota 对应 $1 平台标称额度，不可提现。客服、退款与售后：QQ 3225865526。",
+        "extra": "使用步骤、模型价格及调用示例请查看使用指南。",
+        "publishDate": "2026-10-09T12:10:56Z",
+        "type": "default"
+      }
+    ],
+    "announcements_enabled": true,
+    "password_login_enabled": true,
+    "password_register_enabled": true,
+    "register_enabled": true,
+    "success": true
+  },
+  "services": [
+    {
+      "Command": "\"/entrypoint-secure.…\"",
+      "CreatedAt": "2026-10-24 15:18:11 +0000 UTC",
+      "HealthStatus": "none",
+      "ID": "aaf0638277ab",
+      "Image": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7",
+      "Labels": "com.docker.compose.config-hash=7fe4e77fd3d5d519e103c6f622f55a54301c689999bba69fc35dcf1547d71090,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.image=sha256:59e9d5dc9c238b917758d448fcd4e952de6e7f958f0027fbc185e48b43e2b804,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml,/opt/clearapi/app/compose-website-recovery-39957948359.json,/opt/clearapi/app/compose-local.yaml,com.docker.compose.project.environment_file=/opt/clearapi/config/pg03/pg03.env,com.docker.compose.project.working_dir=/opt/clearapi/app,com.docker.compose.project=clearapi,com.docker.compose.replace=new-api-1,com.docker.compose.service=new-api,com.docker.compose.version=5.6.0,org.opencontainers.image.created=2026-10-24T15:10:51Z,org.opencontainers.image.revision=dc685cbe338e8f700cae347e2eaac351d984c9c7,org.opencontainers.image.source=https://github.com/a3225865526-wq/Clear-API,org.opencontainers.image.version=",
+      "LocalVolumes": "0",
+      "Mounts": "/data/clearapi…,/opt/clearapi/…,/opt/clearapi/…,/opt/clearapi/…,/opt/clearapi/…,/opt/clearapi/…,/opt/clearapi/…",
+      "Names": "clearapi-new-api-1",
+      "Networks": "clearapi_internal",
+      "Platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      "Ports": "127.0.0.1:3000->3000/tcp",
+      "RunningFor": "About a minute ago",
+      "Size": "0B",
+      "State": "running",
+      "Status": "Up About a minute"
+    },
+    {
+      "Command": "\"/CLIProxyAPI/CLIPro…\"",
+      "CreatedAt": "2026-10-20 00:17:09 +0000 UTC",
+      "HealthStatus": "healthy",
+      "ID": "1081a1b576ad",
+      "Image": "cfad1b519288",
+      "Labels": "com.docker.compose.config-hash=388ef54492c69a51e1107c9a31ad81ae02fedbe11c44e8b0f68ea96bfe816f38,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.image=sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml,com.docker.compose.project.working_dir=/opt/clearapi/app,com.docker.compose.project=clearapi,com.docker.compose.service=pool-executor,com.docker.compose.version=5.6.0,org.opencontainers.image.created=2026-10-19T02:17:02Z,org.opencontainers.image.revision=b6e5a90fce6c0b3fa231d43ab07a65622f981be2,org.opencontainers.image.source=https://github.com/a3225865526-wq/CLIProxyAPI,org.opencontainers.image.title=ClearAPI pool-executor,org.opencontainers.image.version=pg03-images-rc1",
+      "LocalVolumes": "0",
+      "Mounts": "/opt/clearapi/…,/data/clearapi…,/data/clearapi…,/data/clearapi…",
+      "Names": "clearapi-pool-executor-1",
+      "Networks": "clearapi_internal",
+      "Platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      "Ports": "8317/tcp",
+      "RunningFor": "4 days ago",
+      "Size": "0B",
+      "State": "running",
+      "Status": "Up 4 days (healthy)"
+    },
+    {
+      "Command": "\"caddy run --config …\"",
+      "CreatedAt": "2026-10-06 14:46:12 +0000 UTC",
+      "HealthStatus": "none",
+      "ID": "54c8550bbaca",
+      "Image": "f2a1290d0463",
+      "Labels": "com.docker.compose.config-hash=e883106769df8227b86e58643ddf44abc8385660c49e415552da32f8bc8f205e,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.image=sha256:173b26306d711395accaeba8b67afcaad2a085ccb1e6bf26010bfe8c095a5229,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/opt/clearapi/edge/docker-compose.yml,com.docker.compose.project.working_dir=/opt/clearapi/edge,com.docker.compose.project=clearapi-edge,com.docker.compose.replace=clearapi-edge-caddy,com.docker.compose.service=caddy,com.docker.compose.version=5.6.0,org.opencontainers.image.description=a powerful, enterprise-ready, open source web server with automatic HTTPS written in Go,org.opencontainers.image.documentation=https://caddyserver.com/docs,org.opencontainers.image.licenses=Apache-2.0,org.opencontainers.image.source=https://github.com/caddyserver/caddy-docker,org.opencontainers.image.title=Caddy,org.opencontainers.image.url=https://caddyserver.com,org.opencontainers.image.vendor=Light Code Labs,org.opencontainers.image.version=v2.11.7",
+      "LocalVolumes": "0",
+      "Mounts": "/data/clearapi…,/data/clearapi…,/opt/clearapi/…,/data/clearapi…",
+      "Names": "clearapi-edge-caddy",
+      "Networks": "host",
+      "Platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      "Ports": "",
+      "RunningFor": "2 weeks ago",
+      "Size": "0B",
+      "State": "running",
+      "Status": "Up 12 hours"
+    },
+    {
+      "Command": "\"docker-entrypoint.s…\"",
+      "CreatedAt": "2026-10-06 11:43:39 +0000 UTC",
+      "HealthStatus": "healthy",
+      "ID": "99299db0bed7",
+      "Image": "postgres:17.6-alpine",
+      "Labels": "com.docker.compose.config-hash=334795d80847707b3cd4497e7986271aea491468d8e65ba5a8b7ed786c3f3188,com.docker.compose.container-number=1,com.docker.compose.depends_on=,com.docker.compose.image=sha256:747d5ed1fdeeb124b880fbe3d7c6557d2c4064ae41d6b6297d417882effce4be,com.docker.compose.oneoff=False,com.docker.compose.project.config_files=/opt/clearapi/app/docker-compose.prod.yml,com.docker.compose.project.working_dir=/opt/clearapi/app,com.docker.compose.project=clearapi,com.docker.compose.service=postgres,com.docker.compose.version=5.6.0",
+      "LocalVolumes": "0",
+      "Mounts": "/opt/clearapi/…,/data/clearapi…",
+      "Names": "clearapi-postgres-1",
+      "Networks": "clearapi_internal",
+      "Platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      },
+      "Ports": "5432/tcp",
+      "RunningFor": "2 weeks ago",
+      "Size": "0B",
+      "State": "running",
+      "Status": "Up 4 days (healthy)"
+    }
+  ],
+  "local_asset_comparison": {
+    "scripts/local-deploy-vps.py": true,
+    "scripts/local-deploy-state.py": true,
+    "scripts/production-backup.sh": true
+  }
+}

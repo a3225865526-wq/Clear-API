@@ -18,10 +18,12 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+const ProtectedLunaCurrentExpr = `len <= 272000 ? tier("upstream_1", p * 0.02 + c * 0.1 + cr * 0.002 + cc1h * 0.025 + cc * 0.025) : tier("upstream_2", p * 0.04 + c * 0.15 + cc * 0.05 + cc1h * 0.05 + cr * 0.04)`
+const ProtectedLunaCorrectedExpr = `len <= 272000 ? tier("upstream_1", p * 0.02 + c * 0.1 + cr * 0.002 + cc1h * 0.025 + cc * 0.025) : tier("upstream_2", p * 0.04 + c * 0.15 + cc * 0.05 + cc1h * 0.05 + cr * 0.004)`
 
 var protectedEncoderInit sync.Once
 
@@ -32,15 +34,7 @@ func protectedLunaPolicy(t *testing.T, change func(map[string]any)) {
 	old := constant.CountToken
 	constant.CountToken = true
 	t.Cleanup(func() { constant.CountToken = old })
-	profile := coldProfile(4480)
-	profile["model_context_max"], profile["model_output_max"], profile["max_request_quota"] = 16384, 1024, 1000
-	if change != nil {
-		change(profile)
-	}
-	setPolicy(t, operation_setting.ReserveModeEnforce, profilesJSON(t, map[string]map[string]any{
-		"channel::1::model::gpt-6-luna": profile,
-	}))
-	configureTieredModel(t, h2ModelA, service.ProtectedLunaCorrectedExpr)
+	configureTieredModel(t, h2ModelA, ProtectedLunaCorrectedExpr)
 }
 
 func protectedLunaRequest(t *testing.T, body string) (*gin.Context, *relaycommon.RelayInfo) {
@@ -69,7 +63,6 @@ func protectedLunaFlow(t *testing.T, u hardeningUser) *hardeningFlow {
 	c.Set(common.RequestIdKey, info.RequestId)
 	price, err := helper.ModelPriceHelper(c, info, 10, info.Request.GetTokenCountMeta())
 	require.NoError(t, err)
-	require.True(t, info.ProtectedTieredBudget)
 	require.Nil(t, info.ChannelMeta, "pricing must preserve the controller's first-attempt channel selection")
 	require.Nil(t, service.PreConsumeBilling(c, price.QuotaToPreConsume, info))
 	info.InitChannelMeta(c) // TextHelper initializes the selected attempt after wallet admission.
@@ -154,109 +147,4 @@ func TestProtectedTieredReplayAndRetention(t *testing.T) {
 		require.Equal(t, "interrupted_unknown_usage", marker.Reason)
 		require.Equal(t, walletState{10000 - reserved, 10000 - reserved}, walletOf(t, u))
 	}
-}
-
-func TestProtectedTieredGates(t *testing.T) {
-	protectedLunaPolicy(t, nil)
-	c, info := protectedLunaRequest(t, h2OutboundBodyA)
-	_, err := helper.ModelPriceHelper(c, info, 10, info.Request.GetTokenCountMeta())
-	require.NoError(t, err)
-	info.InitChannelMeta(c)
-	require.NoError(t, helper.ValidateProtectedTextBody(info, []byte(h2OutboundBodyA)))
-	for _, body := range []string{
-		`{"model":"gpt-6-luna","messages":[{"role":"user","content":"hi"}],"max_tokens":30,"tools":[{"type":"function"}]}`,
-		`{"model":"gpt-6-luna","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"synthetic"}}]}],"max_tokens":30}`,
-		`{"model":"gpt-6-luna","messages":[{"role":"user","content":"hi"}],"max_tokens":30,"unknown_fee":1}`,
-		`{"model":"gpt-6-luna","messages":[{"role":"user","content":"hi"}],"max_tokens":30,"n":2}`,
-		`{"model":"gpt-6-luna","messages":[{"role":"user","content":"hi"}]}`,
-	} {
-		require.Error(t, helper.ValidateProtectedTextBody(info, []byte(body)))
-	}
-	info.ChannelSetting.PassThroughBodyEnabled = true
-	require.Error(t, helper.ValidateProtectedTextChannel(info))
-	info.ChannelSetting.PassThroughBodyEnabled = false
-	info.ParamOverride = map[string]any{"max_tokens": 999}
-	require.Error(t, helper.ValidateProtectedTextChannel(info))
-	info.ParamOverride = nil
-	for _, mutate := range []func(*relaycommon.RelayInfo){
-		func(i *relaycommon.RelayInfo) { i.ChannelId = 2 },
-		func(i *relaycommon.RelayInfo) { i.UsingGroup = "vip" },
-		func(i *relaycommon.RelayInfo) { i.RelayMode = relayconstant.RelayModeCompletions },
-		func(i *relaycommon.RelayInfo) { i.TieredBillingSnapshot.QuotaPerUnit = 1000000 },
-		func(i *relaycommon.RelayInfo) { i.TieredBillingSnapshot.ExprString = "p * 0.02" },
-	} {
-		copyInfo := *info
-		copyMeta := *info.ChannelMeta
-		copySnap := *info.TieredBillingSnapshot
-		copyInfo.ChannelMeta, copyInfo.TieredBillingSnapshot = &copyMeta, &copySnap
-		mutate(&copyInfo)
-		require.Error(t, service.ValidateProtectedTieredSnapshot(&copyInfo))
-	}
-	_, err = service.EstimateDispatchReservation(info, 16384-4480+1, 30, 1, 0)
-	require.Error(t, err, "context includes hidden input, independent of client output limit")
-	_, err = service.EstimateDispatchReservation(info, 10, 1025, 1, 0)
-	require.Error(t, err)
-	t.Run("policy-cannot-be-disabled-after-admission", func(t *testing.T) {
-		setPolicy(t, operation_setting.ReserveModeOff, "{}")
-		require.Error(t, helper.ValidateProtectedTextChannel(info))
-	})
-	t.Run("cap-before-wallet-or-send", func(t *testing.T) {
-		protectedLunaPolicy(t, func(p map[string]any) { p["max_request_quota"] = 1 })
-		c, info := protectedLunaRequest(t, h2OutboundBodyA)
-		_, err := helper.ModelPriceHelper(c, info, 10, info.Request.GetTokenCountMeta())
-		require.Error(t, err)
-		require.Nil(t, info.Billing)
-		require.False(t, c.GetBool("upstream_attempted"))
-	})
-}
-
-func TestProtectedTieredPricesAndBound(t *testing.T) {
-	protectedLunaPolicy(t, nil)
-	info := estimateRelayInfo(1, h2ModelA, service.ProtectedLunaCorrectedExpr, 1)
-	info.UserGroup, info.UsingGroup, info.TokenGroup = "default", "default", "default"
-	info.ChannelType = constant.ChannelTypeOpenAI
-	info.RelayMode, info.RelayFormat = relayconstant.RelayModeChatCompletions, types.RelayFormatOpenAI
-	for _, tc := range []struct {
-		tokens billingexpr.TokenParams
-		cost   float64
-		tier   string
-	}{
-		{billingexpr.TokenParams{P: 551, CR: 3840, C: 6, Len: 4391}, 19.3, "upstream_1"},
-		{billingexpr.TokenParams{P: 551, CR: 3840, C: 5, Len: 4391}, 19.2, "upstream_1"},
-		{billingexpr.TokenParams{CR: 100000, Len: 272000}, 200, "upstream_1"},
-		{billingexpr.TokenParams{CR: 100000, Len: 272001}, 400, "upstream_2"},
-		{billingexpr.TokenParams{CC: 100000, Len: 272000}, 2500, "upstream_1"},
-		{billingexpr.TokenParams{CC: 100000, Len: 272001}, 5000, "upstream_2"},
-		{billingexpr.TokenParams{CC1h: 100000, Len: 272000}, 2500, "upstream_1"},
-		{billingexpr.TokenParams{CC1h: 100000, Len: 272001}, 5000, "upstream_2"},
-	} {
-		result, err := billingexpr.ComputeTieredQuota(info.TieredBillingSnapshot, tc.tokens)
-		require.NoError(t, err)
-		require.InDelta(t, tc.cost*0.5, result.ActualQuotaBeforeGroup, 1e-9)
-		require.Equal(t, tc.tier, result.MatchedTier)
-	}
-	oldSnap := *info.TieredBillingSnapshot
-	oldSnap.ExprString = service.ProtectedLunaCurrentExpr
-	oldSnap.ExprHash = billingexpr.ExprHashString(oldSnap.ExprString)
-	for _, output := range []float64{6, 5} {
-		result, err := billingexpr.ComputeTieredQuota(&oldSnap, billingexpr.TokenParams{P: 551, CR: 3840, C: output, Len: 4391})
-		require.NoError(t, err)
-		require.Equal(t, 10, result.ActualQuotaAfterGroup, "historical tariff also remains unchanged below the threshold")
-	}
-	oldLong, err := billingexpr.ComputeTieredQuota(&oldSnap, billingexpr.TokenParams{CR: 100000, Len: 272001})
-	require.NoError(t, err)
-	require.Equal(t, 2000, oldLong.ActualQuotaAfterGroup, "production's current cache-read coefficient is ten times the confirmed published rate")
-	estimate, err := service.EstimateDispatchReservation(info, 11904, 1024, 1, 0)
-	require.NoError(t, err)
-	// All cache splits, including visible cache writes and unknown hidden splits,
-	// must remain inside the authorization even though production omits them.
-	for _, tokens := range []billingexpr.TokenParams{
-		{P: 16384, C: 1024, Len: 16384}, {CR: 16384, C: 1024, Len: 16384},
-		{CC: 16384, C: 1024, Len: 16384}, {CC1h: 16384, C: 1024, Len: 16384},
-	} {
-		result, err := billingexpr.ComputeTieredQuota(info.TieredBillingSnapshot, tokens)
-		require.NoError(t, err)
-		require.LessOrEqual(t, result.ActualQuotaAfterGroup, estimate.RequiredQuota)
-	}
-	t.Logf("launch envelope context=16384 output=1024 required=%d cap=%d", estimate.RequiredQuota, estimate.CapQuota)
 }

@@ -1,0 +1,70 @@
+{
+  "Name": "clearapi-controlled-launch-20261020",
+  "Ref": "o50e5us9hcb4a9jlzmq5kfrzv",
+  "Context": ".",
+  "Dockerfile": "Dockerfile",
+  "VCSRepository": "https://github.com/a3225865526-wq/Clear-API.git",
+  "VCSRevision": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+  "Platform": [
+    "linux/amd64"
+  ],
+  "StartedAt": "2026-10-24T23:10:52.186275823+08:00",
+  "CompletedAt": "2026-10-24T23:12:12.385365312+08:00",
+  "Duration": 80199089489,
+  "Status": "completed",
+  "NumCompletedSteps": 34,
+  "NumTotalSteps": 34,
+  "NumCachedSteps": 8,
+  "BuildArgs": [
+    {
+      "Name": "BUILD_TIMESTAMP",
+      "Value": "2026-10-24T15:10:51Z"
+    },
+    {
+      "Name": "SOURCE_COMMIT",
+      "Value": "dc685cbe338e8f700cae347e2eaac351d984c9c7"
+    },
+    {
+      "Name": "SOURCE_REPO",
+      "Value": "https://github.com/a3225865526-wq/Clear-API"
+    }
+  ],
+  "Config": {
+    "ImageResolveMode": "local"
+  },
+  "Materials": [
+    {
+      "URI": "pkg:docker/debian@bookworm-slim?digest=sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a&platform=linux%2Famd64",
+      "Digests": [
+        "sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0f2837acbf89ab020a"
+      ]
+    },
+    {
+      "URI": "pkg:docker/golang@1.26.1-alpine?digest=sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039&platform=linux%2Famd64",
+      "Digests": [
+        "sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039"
+      ]
+    },
+    {
+      "URI": "pkg:docker/oven/bun@1.4.0?digest=sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6&platform=linux%2Famd64",
+      "Digests": [
+        "sha256:5ff609364c049b54eb0ff560ec96319729a972078ef2c755d758f0c6ef89c2d6"
+      ]
+    }
+  ],
+  "Attachments": [
+    {
+      "Digest": "sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020",
+      "Type": "application/vnd.oci.image.index.v1+json"
+    },
+    {
+      "Digest": "sha256:2c88884bc5214e3b5a5d14b8dee08756f8f3733eb1a6c9bed6f40778e597f81a",
+      "Type": "https://slsa.dev/provenance/v1"
+    },
+    {
+      "Digest": "sha256:59e9d5dc9c238b917758d448fcd4e952de6e7f958f0027fbc185e48b43e2b804",
+      "Platform": "linux/amd64",
+      "Type": "application/vnd.oci.image.manifest.v1+json"
+    }
+  ]
+}

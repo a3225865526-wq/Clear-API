@@ -28,7 +28,7 @@ func taskPluginProtocolHandlers(protocol, operation string) ([]gin.HandlerFunc, 
 	switch protocol + "." + operation {
 	case "openai_responses.create":
 		return []gin.HandlerFunc{
-			middleware.RouteTag("relay"), middleware.SystemPerformanceCheck(), middleware.TokenAuth(), relayConcurrencyLimit,
+			middleware.RouteTag("relay"), middleware.SystemPerformanceCheck(), middleware.TokenAuth(),
 			middleware.ModelRequestRateLimit(), middleware.PinTaskPluginEndpoint(), middleware.PrepareTaskPluginEndpoint(), middleware.Distribute(),
 			func(c *gin.Context) {
 				controller.RelayTaskPluginEndpoint(c, func(c *gin.Context) { controller.Relay(c, types.RelayFormatOpenAIResponses) })
@@ -36,7 +36,7 @@ func taskPluginProtocolHandlers(protocol, operation string) ([]gin.HandlerFunc, 
 		}, nil
 	case "openai_image.generate", "openai_image.edit":
 		return []gin.HandlerFunc{
-			middleware.RouteTag("relay"), middleware.SystemPerformanceCheck(), middleware.TokenAuth(), relayConcurrencyLimit,
+			middleware.RouteTag("relay"), middleware.SystemPerformanceCheck(), middleware.TokenAuth(),
 			middleware.ModelRequestRateLimit(), middleware.PinTaskPluginEndpoint(), middleware.PrepareTaskPluginEndpoint(), middleware.Distribute(),
 			func(c *gin.Context) {
 				controller.RelayTaskPluginEndpoint(c, func(c *gin.Context) { controller.Relay(c, types.RelayFormatOpenAIImage) })
@@ -44,17 +44,17 @@ func taskPluginProtocolHandlers(protocol, operation string) ([]gin.HandlerFunc, 
 		}, nil
 	case "openai_video.create":
 		return []gin.HandlerFunc{
-			middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, middleware.SystemPerformanceCheck(),
+			middleware.RouteTag("relay"), middleware.TokenAuth(), middleware.SystemPerformanceCheck(),
 			middleware.PinTaskPluginEndpoint(), middleware.TaskPluginEndpointOnly(middleware.ModelRequestRateLimit()), middleware.PrepareTaskPluginEndpoint(), middleware.Distribute(),
 			func(c *gin.Context) { controller.RelayTaskPluginEndpoint(c, controller.RelayTask) },
 		}, nil
 	case "openai_responses.retrieve":
-		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, controller.RetrieveTaskPluginResponse}, nil
+		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), controller.RetrieveTaskPluginResponse}, nil
 	case "openai_video.retrieve":
 		// Retrieval reads an existing task and has no model request to admit.
-		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, controller.RelayTaskFetch}, nil
+		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), controller.RelayTaskFetch}, nil
 	case "openai_video.content":
-		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), relayConcurrencyLimit, controller.VideoProxy}, nil
+		return []gin.HandlerFunc{middleware.RouteTag("relay"), middleware.TokenAuth(), controller.VideoProxy}, nil
 	default:
 		return nil, fmt.Errorf("host protocol registry operation %s.%s has no handler", protocol, operation)
 	}

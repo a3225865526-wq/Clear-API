@@ -186,6 +186,22 @@ func TestReferralManagementRequiresRootPermission(t *testing.T) {
 	}
 }
 
+func TestAnnouncementOptionsRejectOrdinaryUsers(t *testing.T) {
+	user, pat := setupAccessTokenAudit(t)
+	require.NoError(t, model.DB.Model(user).Update("role", common.RoleCommonUser).Error)
+	router := gin.New()
+	router.GET("/api/option/", middleware.RootAuth(), GetOptions)
+	router.PUT("/api/option/", middleware.RootAuth(), UpdateOption)
+	for _, method := range []string{http.MethodGet, http.MethodPut} {
+		request := httptest.NewRequest(method, "/api/option/", strings.NewReader(`{"key":"console_setting.announcements","value":"[]"}`))
+		request.Header.Set("Authorization", "Bearer "+pat)
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		assert.Equal(t, http.StatusForbidden, response.Code, method)
+	}
+}
+
 func TestAuditIsolationVisibilityAndFailureContracts(t *testing.T) {
 	user, pat := setupAccessTokenAudit(t)
 	metadata := model.AuditOther{

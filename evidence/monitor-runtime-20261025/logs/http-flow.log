@@ -1,0 +1,30 @@
+=== RUN   TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch
+[SYS] 2026/10/25 - 06:00:13 | SQL_DSN not set, using SQLite as database 
+    console_monitor_probe_test.go:22: database version: 3.50.4
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] POST   /monitors/:id/probe       --> github.com/QuantumNous/new-api/controller.TriggerConsoleMonitorAdmin (2 handlers)
+[ERR] 2026/10/25 - 06:00:13 | SYSTEM | audit actor role unavailable (request_id=202610250600134860625518268d9d63e8KWgSs, actor_role=0) 
+--- PASS: TestConsoleMonitorTriggerRecordsCostDenialWithoutDispatch (0.12s)
+=== RUN   TestConsoleMonitorConfiguredHTTPFlow
+[SYS] 2026/10/25 - 06:00:13 | SQL_DSN not set, using SQLite as database 
+    console_monitor_probe_test.go:96: database version: 3.50.4
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] PUT    /monitors/:id/cost-contract --> github.com/QuantumNous/new-api/controller.SaveConsoleMonitorCostContract (2 handlers)
+[GIN-debug] PUT    /policy                   --> github.com/QuantumNous/new-api/controller.SaveConsoleMonitorPolicyAdmin (2 handlers)
+[GIN-debug] PUT    /monitors/:id/:action     --> github.com/QuantumNous/new-api/controller.SwitchConsoleMonitorAdmin (2 handlers)
+[GIN-debug] POST   /monitors/:id/probe       --> github.com/QuantumNous/new-api/controller.TriggerConsoleMonitorAdmin (2 handlers)
+[GIN-debug] GET    /monitors                 --> github.com/QuantumNous/new-api/controller.ListConsoleMonitorAdmin (1 handlers)
+[GIN-debug] GET    /monitoring               --> github.com/QuantumNous/new-api/controller.GetConsoleMonitoring (1 handlers)
+[ERR] 2026/10/25 - 06:00:13 | SYSTEM | audit actor role unavailable (request_id=202610250600135759436548268d9d6LNlOOMsh, actor_role=0) 
+[ERR] 2026/10/25 - 06:00:13 | SYSTEM | audit actor role unavailable (request_id=202610250600135826233358268d9d62yNbnvjZ, actor_role=0) 
+[ERR] 2026/10/25 - 06:00:13 | SYSTEM | audit actor role unavailable (request_id=202610250600135866251958268d9d6QJrrbwxC, actor_role=0) 
+[ERR] 2026/10/25 - 06:00:13 | SYSTEM | audit actor role unavailable (request_id=202610250600135922024618268d9d6V4e3gN99, actor_role=0) 
+--- PASS: TestConsoleMonitorConfiguredHTTPFlow (0.11s)
+PASS
+ok  	github.com/QuantumNous/new-api/controller	0.286s

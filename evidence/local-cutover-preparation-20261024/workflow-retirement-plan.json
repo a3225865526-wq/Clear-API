@@ -1,0 +1,85 @@
+{
+  "mode": "plan_only",
+  "executed": false,
+  "base_main": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "preconditions": [
+    "确认两个 AUTO 变量仍为 false",
+    "重新查询 queued/in_progress/waiting/pending/requested 均为0；有任何旧生产运行则停止切换，不盲目取消已进入生产的运行"
+  ],
+  "ordered_workflows": [
+    {
+      "path": ".github/workflows/automatic-deploy.yml",
+      "id": 387486994,
+      "state_observed": "active",
+      "reason": "切断自动调用者",
+      "future_command": "gh workflow disable 387486994 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "a5c613c889dd30590af44b18db7a4d56cecb8622766f1953d26f99044184b350"
+    },
+    {
+      "path": ".github/workflows/deploy-production.yml",
+      "id": 378101050,
+      "state_observed": "active",
+      "reason": "关闭手动与可复用生产部署入口",
+      "future_command": "gh workflow disable 378101050 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "c362dc52712115984b87a9813057b48f5decbe52f9ee9c3f18aab70d5764c852"
+    },
+    {
+      "path": ".github/workflows/failed-production-recovery.yml",
+      "id": 390042545,
+      "state_observed": "active",
+      "reason": "关闭另一个可直接 SSH/恢复的写入口",
+      "future_command": "gh workflow disable 390042545 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "a2e358fc9c5b885125f9b766495bc56ec6cec72cb3cc54eda7b3577e22412e00"
+    },
+    {
+      "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+      "id": 378227091,
+      "state_observed": "active",
+      "reason": "关闭可 SSH/pull 修改生产镜像缓存的排练入口",
+      "future_command": "gh workflow disable 378227091 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "f1385f40ca37276e9dcf5d78861d5a69b6af8b71b00f0b4da827c7ce73dad7fe"
+    },
+    {
+      "path": ".github/workflows/release-pg03-gateway.yml",
+      "id": 384204592,
+      "state_observed": "active",
+      "reason": "退役 CI→PG03 RC 镜像发布",
+      "future_command": "gh workflow disable 384204592 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "7765a55b1ce69868a978d8fe55e0b3a4a3a5c1b3f85f17c24c152c59806d63a0"
+    },
+    {
+      "path": ".github/workflows/release-candidate.yml",
+      "id": 378068457,
+      "state_observed": "active",
+      "reason": "退役手动 OFF RC/GHCR 镜像发布",
+      "future_command": "gh workflow disable 378068457 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "d2c7fa448f85cdbed99b33973bbc15c03fe7cc9a481175abfdeda537d6235bb7"
+    },
+    {
+      "path": ".github/workflows/deployment-rehearsal.yml",
+      "id": 387553097,
+      "state_observed": "active",
+      "reason": "退役通向自动生产的旧排练链",
+      "future_command": "gh workflow disable 387553097 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "0ddd64c7f46ecc886b55a2c73d2109a9ba88e73b03d3f5218a5d86835dbc5860"
+    },
+    {
+      "path": ".github/workflows/pg03-successor-approval.yml",
+      "id": 391551026,
+      "state_observed": "active",
+      "reason": "退役旧发布授权产物入口",
+      "future_command": "gh workflow disable 391551026 --repo a3225865526-wq/Clear-API",
+      "source_sha256": "e38ee02c5971c1265225bda8b31f7f5c162e9f6de1cd466754390084a154a7d8"
+    }
+  ],
+  "retain": [
+    "CI 及 main 现有保护/必需检查",
+    "离线源代码审计和手动隔离测试不触达生产，不新增调度"
+  ],
+  "notes": [
+    "先关闭前四个生产可达入口，再停 RC/排练/授权源；之后才允许源码 Push/PR",
+    "不删除 Secrets，不改 Environment 或分支保护",
+    "仅禁用 workflow 不能作为 reusable workflow 永不被调用的唯一保证；集成提交保留终端 job 的不可执行退休门禁并移除旧 workflow_run 触发",
+    "现有 prepare-local-cutover.py 只覆盖四个文件，单独运行不足以覆盖最新远端入口；本轮未 apply"
+  ]
+}

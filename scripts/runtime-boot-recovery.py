@@ -19,10 +19,13 @@ import sys
 import time
 
 sys.dont_write_bytecode = True
+_spec = importlib.util.spec_from_file_location('local_state', Path(__file__).with_name('local-deploy-state.py'))
+STATE = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(STATE)
 APP = Path('/opt/clearapi/app')
 DIRECTORY = Path('/opt/clearapi/runtime/new-api')
 HELPER = Path('/opt/clearapi/bin/runtime-identity-refresh.py')
-HELPER_SHA = 'afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e'
+HELPER_SHA = '9e64059039b6de48d6e88bce6a3cfb587f4835d9b4234f0cc0693343e1e4fa95'
 CONTAINER = 'clearapi-new-api-1'
 SCRIPT = '/opt/clearapi/bin/runtime-boot-recovery.py'
 FAILED_COMMIT = 'c50a53c1b89e121bcade7dac41d3f11e53a9832a'
@@ -108,14 +111,22 @@ def unique(pairs):
 
 
 def approved_identity(app=APP):
-    raw = read_safe(app / 'release-manifest.json')
+    path = STATE.manifest_path(app)
+    raw = read_safe(path)
     current = json.loads(raw, object_pairs_hook=unique)['releases']['current']
-    ref, revision, digest, image_id = (current[k] for k in
-                                      ('image_ref', 'candidate_commit', 'image_digest', 'new_api_image_id'))
-    require(re.fullmatch(r'ghcr\.io/a3225865526-wq/clearapi@sha256:[a-f0-9]{64}', ref)
-            and re.fullmatch(r'[a-f0-9]{40}', revision)
-            and re.fullmatch(r'sha256:[a-f0-9]{64}', image_id)
-            and ref.rsplit('@', 1)[1] == digest, 'invalid release identity')
+    ref, revision, image_id = (current[k] for k in
+                               ('image_ref', 'candidate_commit', 'new_api_image_id'))
+    require(re.fullmatch(r'[a-f0-9]{40}', revision)
+            and re.fullmatch(r'sha256:[a-f0-9]{64}', image_id), 'invalid release identity')
+    digest = current.get('image_digest')
+    if ref == 'clearapi-local:' + revision:
+        require(current.get('status') == 'success'
+                and current.get('deployment_method') == 'local-build-ssh-archive-v1'
+                and re.fullmatch(r'[a-f0-9]{64}', current.get('archive_sha256', '')),
+                'archive deployment provenance missing')
+    else:
+        require(re.fullmatch(r'ghcr\.io/a3225865526-wq/clearapi@sha256:[a-f0-9]{64}', ref)
+                and ref.rsplit('@', 1)[1] == digest, 'invalid release identity')
     if current.get('status') == 'failed':
         require(revision == FAILED_COMMIT and digest == FAILED_DIGEST
                 and current.get('deployment_attempt', {}).get('status') == 'failed',
@@ -124,7 +135,14 @@ def approved_identity(app=APP):
             content = raw if name == 'release-manifest.json' else read_safe(app / name)
             require(hashlib.sha256(content).hexdigest() == expected, 'frozen incident evidence changed')
     else:
-        require(current.get('status') == 'success', 'release is not successful')
+        require(current.get('status') == 'success' or
+                path.name == STATE.NAME and current.get('status') == 'adopted'
+                and current.get('deployment_method') == 'existing-running-adoption-v1',
+                'release is not successful or explicitly adopted')
+    if path.name == STATE.NAME and not ref.startswith('clearapi-local:'):
+        engine_id=current['docker_engine_image_id']
+        require(re.fullmatch(r'sha256:[a-f0-9]{64}',engine_id), 'invalid adopted Docker engine identity')
+        image_id=engine_id
     return ref, revision, image_id
 
 
@@ -189,7 +207,9 @@ def runtime_directory(helper, expected):
     data = helper.docker_json('inspect', '--format',
                              '[{"Image":{{json .Image}},"Ref":{{json .Config.Image}},'
                              '"Mounts":{{json .Mounts}}}]', CONTAINER)[0]
-    require(data['Image'] == expected[2] and data['Ref'] == expected[0], 'container image drift')
+    image_id = (helper.archive_image_id(data['Image'])
+                if expected[0].startswith('clearapi-local:') else data['Image'])
+    require(image_id == expected[2] and data['Ref'] == expected[0], 'container image drift')
     mounts = [mount for mount in data['Mounts'] if mount.get('Destination') == '/run/clearapi']
     require(len(mounts) == 1 and mounts[0].get('Type') == 'bind'
             and mounts[0].get('RW') is False, 'runtime mount must be a single read-only bind')
@@ -207,12 +227,14 @@ def check_image(helper, expected, directory=DIRECTORY):
                              '[{"Image":{{json .Image}},"Ref":{{json .Config.Image}},'
                              '"Running":{{json .State.Running}},"Restarting":{{json .State.Restarting}}}]',
                              CONTAINER)[0]
-    require(data['Image'] == image_id and data['Ref'] == ref, 'container image drift')
+    archive = ref.startswith('clearapi-local:')
+    observed_id = helper.archive_image_id(data['Image']) if archive else data['Image']
+    require(observed_id == image_id and data['Ref'] == ref, 'container image drift')
     image = helper.docker_json('image', 'inspect', '--format',
                               '[{"Id":{{json .Id}},"Digests":{{json .RepoDigests}},'
                               '"Revision":{{index .Config.Labels "org.opencontainers.image.revision" | json}}}]',
-                              image_id)[0]
-    require(image['Id'] == image_id and ref in (image['Digests'] or [])
+                              data['Image'])[0]
+    require(image['Id'] == data['Image'] and (archive or ref in (image['Digests'] or []))
             and image['Revision'] == revision, 'image digest or revision drift')
     if data['Running'] and not data['Restarting']:
         helper.observe(CONTAINER, ref, revision, directory)

@@ -1,0 +1,40 @@
+{
+  "mode": "PLAN_ONLY_NOT_APPLIED",
+  "dns_record_candidate": {
+    "type": "A",
+    "name": "clear999.com",
+    "content": "103.42.181.219",
+    "proxied": true,
+    "ttl": 1
+  },
+  "phase": "http_request_dynamic_redirect",
+  "single_redirect_candidate": {
+    "description": "Canonical clear999.com to www.clear999.com preserving path and query",
+    "expression": "(http.host eq \"clear999.com\")",
+    "action": "redirect",
+    "action_parameters": {
+      "from_value": {
+        "status_code": 308,
+        "target_url": {
+          "expression": "concat(\"https://www.clear999.com\", http.request.uri.path)"
+        },
+        "preserve_query_string": true
+      }
+    },
+    "enabled": true
+  },
+  "order": [
+    "Read current Cloudflare zone/DNS/rules and Universal SSL status; preserve existing rules",
+    "Add exact apex-only edge redirect, without replacing the ruleset",
+    "Add the proxied apex A record only after confirming the redirect",
+    "Verify HTTP/HTTPS path/query and www unaffected; account for existing 1800-second negative caching"
+  ],
+  "existing_origin_caddy_change_required": false,
+  "edge_sni_certificate_verified": "clear999.com and *.clear999.com, valid until 2027-01-05; chain/hostname verification PASS",
+  "zone_id_and_existing_rule_ids": "NOT READ; existing dashboard navigation did not complete (about:blank), not evidence of logged-out state",
+  "no_ns_or_waf_bic_changes": true,
+  "references": [
+    "https://developers.cloudflare.com/rules/url-forwarding/single-redirects/settings/",
+    "https://developers.cloudflare.com/rules/url-forwarding/single-redirects/create-api/"
+  ]
+}

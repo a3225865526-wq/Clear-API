@@ -55,6 +55,7 @@ type GeneralOpenAIRequest struct {
 	ParallelTooCalls    *bool             `json:"parallel_tool_calls,omitempty"`
 	Tools               []ToolCallRequest `json:"tools,omitempty"`
 	ToolChoice          any               `json:"tool_choice,omitempty"`
+	Provider            json.RawMessage   `json:"provider,omitempty"`
 	FunctionCall        json.RawMessage   `json:"function_call,omitempty"`
 	User                json.RawMessage   `json:"user,omitempty"`
 	// ServiceTier specifies upstream service level and may affect billing.
@@ -214,6 +215,12 @@ func (r *GeneralOpenAIRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	for _, message := range r.Messages {
 		tokenCountMeta.MessagesCount++
 		texts = append(texts, message.Role)
+		if message.ToolCallId != "" {
+			texts = append(texts, message.ToolCallId)
+		}
+		if len(message.ToolCalls) > 0 {
+			texts = append(texts, string(message.ToolCalls))
+		}
 		if len(message.Tools) > 0 {
 			// Kimi K3 dynamic tool loading: tools declared on a message are
 			// visible to the model and are counted like top-level tools.
@@ -1015,6 +1022,7 @@ type OpenAIResponsesRequest struct {
 	Metadata          json.RawMessage `json:"metadata,omitempty"`
 	Moderation        json.RawMessage `json:"moderation,omitempty"`
 	ParallelToolCalls json.RawMessage `json:"parallel_tool_calls,omitempty"`
+	Provider          json.RawMessage `json:"provider,omitempty"`
 	// FrequencyPenalty/PresencePenalty are not part of the official OpenAI
 	// Responses API; they are forwarded verbatim for OpenAI-compatible upstreams
 	// (e.g. vLLM) that accept them.
@@ -1159,9 +1167,13 @@ type Reasoning struct {
 }
 
 type Input struct {
-	Type    string          `json:"type,omitempty"`
-	Role    string          `json:"role,omitempty"`
-	Content json.RawMessage `json:"content,omitempty"`
+	Type      string          `json:"type,omitempty"`
+	Role      string          `json:"role,omitempty"`
+	Content   json.RawMessage `json:"content,omitempty"`
+	Name      string          `json:"name,omitempty"`
+	Arguments json.RawMessage `json:"arguments,omitempty"`
+	Output    json.RawMessage `json:"output,omitempty"`
+	Summary   json.RawMessage `json:"summary,omitempty"`
 }
 
 type MediaInput struct {
@@ -1201,6 +1213,16 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 		var inputs []Input
 		_ = kitutil.Unmarshal(r.Input, &inputs)
 		for _, input := range inputs {
+			// Tool rounds and reasoning history are visible input, even when
+			// they are not wrapped in a message.content array.
+			if input.Name != "" {
+				mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: input.Name})
+			}
+			for _, text := range []json.RawMessage{input.Arguments, input.Output, input.Summary} {
+				if len(text) > 0 {
+					mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: string(text)})
+				}
+			}
 			if kitutil.GetJsonType(input.Content) == "string" {
 				var str string
 				_ = kitutil.Unmarshal(input.Content, &str)
@@ -1228,7 +1250,7 @@ func (r *OpenAIResponsesRequest) ParseInput() []MediaInput {
 						continue
 					}
 					switch typeVal {
-					case "input_text":
+					case "input_text", "output_text", "text":
 						text, _ := item["text"].(string)
 						mediaInputs = append(mediaInputs, MediaInput{Type: "input_text", Text: text})
 					case "input_image":

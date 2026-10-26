@@ -1,0 +1,404 @@
+{
+  "utc": "2026-10-24T03:14:10.700832+00:00",
+  "resolver": {
+    "exit": 0,
+    "stdout": "Global:\nLink 2 (ens17): 8.8.8.8 8.8.4.4\nLink 3 (docker0):\nLink 4 (br-5dd87e0b4454):\nLink 5 (veth42e0187):\nLink 6 (veth05ab2c4):\nLink 9 (veth0dcfa4c):\n",
+    "stderr": ""
+  },
+  "http": [
+    {
+      "utc": "2026-10-24T03:14:10.720426+00:00",
+      "method": "GET",
+      "url": "https://www.clear999.com/api/status?clearapi_readonly_dns=20261024",
+      "client": "curl/8.5.0 direct/default UA",
+      "exit": 0,
+      "metrics_http_remote_local_version": "521|104.21.2.201|10.1.253.2|2",
+      "headers": {
+        "date": "Sat, 24 Oct 2026 03:14:12 GMT",
+        "content-type": "text/plain; charset=UTF-8",
+        "server": "cloudflare",
+        "cf-ray": "a4f5cf5a5f85df9d-HKG"
+      },
+      "body_bytes": 16,
+      "error_codes": [
+        "521"
+      ],
+      "body_sha256": "4558ae09802e147610ebdb88e4472fe625c897af9a18b04d47dfcdb6b563a138",
+      "stderr": "",
+      "trace": null
+    },
+    {
+      "utc": "2026-10-24T03:14:12.248860+00:00",
+      "url": "https://www.clear999.com/api/status?clearapi_readonly_dns=20261024",
+      "method": "GET",
+      "client": "Python-urllib/3.12 direct",
+      "status": 403,
+      "headers": {
+        "date": "Sat, 24 Oct 2026 03:14:12 GMT",
+        "content-type": "text/plain; charset=UTF-8",
+        "server": "cloudflare",
+        "cf-ray": "a4f5cf5aeb77107b-HKG"
+      },
+      "body_bytes": 17,
+      "body_sha256": "2938e9f1284180959e33ab1718d0793a72ff6e4cdb8108c34dcd14e69446de5c",
+      "error_codes": [
+        "1010"
+      ]
+    },
+    {
+      "utc": "2026-10-24T03:14:12.337382+00:00",
+      "method": "GET",
+      "url": "https://www.cloudflare.com/cdn-cgi/trace",
+      "client": "curl/8.5.0 direct/default UA",
+      "exit": 0,
+      "metrics_http_remote_local_version": "200|104.16.124.96|10.1.253.2|2",
+      "headers": {
+        "date": "Sat, 24 Oct 2026 03:14:12 GMT",
+        "content-type": "text/plain",
+        "server": "cloudflare",
+        "cf-ray": "a4f5cf5b8b49099d-HKG"
+      },
+      "body_bytes": 212,
+      "error_codes": [],
+      "body_sha256": "bdfb61f81c59bb408970382d5abb3c2b38ff4c52f39306b10c602415862133b5",
+      "stderr": "",
+      "trace": {
+        "ip": "103.42.181.219",
+        "uag": "curl/8.5.0",
+        "colo": "HKG"
+      }
+    }
+  ],
+  "dns": [
+    {
+      "server": "default",
+      "name": "clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 42985\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; ANSWER SECTION:\nclear999.com.\t\t21600\tIN\tNS\tdrew.ns.cloudflare.com.\nclear999.com.\t\t21600\tIN\tNS\tkhloe.ns.cloudflare.com.\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "default",
+      "name": "clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 18081\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "default",
+      "name": "clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 19291\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; AUTHORITY SECTION:\nclear999.com.\t\t758\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "default",
+      "name": "clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 49050\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "default",
+      "name": "www.clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 33118\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "default",
+      "name": "www.clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 61040\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; ANSWER SECTION:\nwww.clear999.com.\t298\tIN\tA\t104.21.2.201\nwww.clear999.com.\t298\tIN\tA\t172.67.129.157\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "default",
+      "name": "www.clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 31603\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; ANSWER SECTION:\nwww.clear999.com.\t299\tIN\tAAAA\t2606:4700:3034::ac43:819d\nwww.clear999.com.\t299\tIN\tAAAA\t2606:4700:3031::6815:2c9\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "default",
+      "name": "www.clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 23117\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 65494\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 55279\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nclear999.com.\t\t86400\tIN\tNS\tdrew.ns.cloudflare.com.\nclear999.com.\t\t86400\tIN\tNS\tkhloe.ns.cloudflare.com.\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 44268\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 18923\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 59566\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "www.clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 4962\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "www.clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 55395\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwww.clear999.com.\t300\tIN\tA\t104.21.2.201\nwww.clear999.com.\t300\tIN\tA\t172.67.129.157\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "www.clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 11091\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwww.clear999.com.\t300\tIN\tAAAA\t2606:4700:3031::6815:2c9\nwww.clear999.com.\t300\tIN\tAAAA\t2606:4700:3034::ac43:819d\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "1.1.1.1",
+      "name": "www.clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 44871\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 40161\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; ANSWER SECTION:\nclear999.com.\t\t21600\tIN\tNS\tdrew.ns.cloudflare.com.\nclear999.com.\t\t21600\tIN\tNS\tkhloe.ns.cloudflare.com.\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 38636\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t1799\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 16018\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t757\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 39741\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "www.clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 13764\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "www.clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 9,
+        "stdout": ";; communications error to 8.8.8.8#53: timed out\n;; no servers could be reached\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "www.clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 29717\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; ANSWER SECTION:\nwww.clear999.com.\t300\tIN\tAAAA\t2606:4700:3034::ac43:819d\nwww.clear999.com.\t300\tIN\tAAAA\t2606:4700:3031::6815:2c9\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "8.8.8.8",
+      "name": "www.clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 7186\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 43441\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; ANSWER SECTION:\nclear999.com.\t\t43200\tIN\tNS\tdrew.ns.cloudflare.com.\nclear999.com.\t\t43200\tIN\tNS\tkhloe.ns.cloudflare.com.\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 18444\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 62294\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 20638\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "www.clear999.com",
+      "type": "NS",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 8930\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "www.clear999.com",
+      "type": "A",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 33647\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwww.clear999.com.\t300\tIN\tA\t104.21.2.201\nwww.clear999.com.\t300\tIN\tA\t172.67.129.157\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "www.clear999.com",
+      "type": "AAAA",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 25836\n;; flags: qr rd ra; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 1232\n;; ANSWER SECTION:\nwww.clear999.com.\t300\tIN\tAAAA\t2606:4700:3031::6815:2c9\nwww.clear999.com.\t300\tIN\tAAAA\t2606:4700:3034::ac43:819d\n\n",
+        "stderr": ""
+      }
+    },
+    {
+      "server": "9.9.9.9",
+      "name": "www.clear999.com",
+      "type": "CNAME",
+      "result": {
+        "exit": 0,
+        "stdout": ";; Got answer:\n;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 27096\n;; flags: qr rd ra; QUERY: 1, ANSWER: 0, AUTHORITY: 1, ADDITIONAL: 1\n\n;; OPT PSEUDOSECTION:\n; EDNS: version: 0, flags:; udp: 512\n;; AUTHORITY SECTION:\nclear999.com.\t\t1800\tIN\tSOA\tdrew.ns.cloudflare.com. dns.cloudflare.com. 2416861397 10000 2400 604800 1800\n\n",
+        "stderr": ""
+      }
+    }
+  ],
+  "containers": {
+    "exit": 0,
+    "stdout": "/clearapi-edge-caddy 54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf false 2026-10-24T02:52:19.16756893Z no sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772\n/clearapi-new-api-1 0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c true 2026-10-23T14:07:58.383082222Z no sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1\n/clearapi-postgres-1 99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb true 2026-10-20T00:46:43.870944528Z unless-stopped sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94\n/clearapi-pool-executor-1 1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f true 2026-10-20T00:46:43.85551099Z unless-stopped sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58\n",
+    "stderr": ""
+  },
+  "gateway_http": {
+    "exit": 0,
+    "stdout": "200",
+    "stderr": ""
+  }
+}

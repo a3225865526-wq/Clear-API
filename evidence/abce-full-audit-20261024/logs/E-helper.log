@@ -1,0 +1,22 @@
+test_only_fresh_complete_current_identity_backup_is_accepted (test_local_deploy_vps.BackupProofTest.test_only_fresh_complete_current_identity_backup_is_accepted) ... ok
+test_archive_verification_failure_blocks_without_compose (test_local_deploy_vps.MockDeploy.test_archive_verification_failure_blocks_without_compose) ... ok
+test_backend_failure_no_auto_rollback (test_local_deploy_vps.MockDeploy.test_backend_failure_no_auto_rollback) ... ok
+test_bad_digest (test_local_deploy_vps.MockDeploy.test_bad_digest) ... ok
+test_failed_rollback_reports_incident (test_local_deploy_vps.MockDeploy.test_failed_rollback_reports_incident) ... ok
+test_frontend_failed_health_restores_both_manifest_and_override (test_local_deploy_vps.MockDeploy.test_frontend_failed_health_restores_both_manifest_and_override) ... ok
+test_frontend_success (test_local_deploy_vps.MockDeploy.test_frontend_success) ... ok
+test_lock_conflict (test_local_deploy_vps.MockDeploy.test_lock_conflict) ... ok
+test_missing_backup_blocks_before_switch (test_local_deploy_vps.MockDeploy.test_missing_backup_blocks_before_switch) ... ok
+test_predecessor_mismatch (test_local_deploy_vps.MockDeploy.test_predecessor_mismatch) ... ok
+test_archive_tag_identity_allowed (test_local_deploy_vps.Security.test_archive_tag_identity_allowed) ... ok
+test_identity_input_validation (test_local_deploy_vps.Security.test_identity_input_validation) ... ok
+test_manifest_new_identity_preserves_predecessor (test_local_deploy_vps.Security.test_manifest_new_identity_preserves_predecessor) ... ok
+test_override_preview_preserves_non_image_configuration (test_local_deploy_vps.Security.test_override_preview_preserves_non_image_configuration) ... ok
+test_registry_name_locked (test_local_deploy_vps.Security.test_registry_name_locked) ... ok
+test_http_denial_redirect_invalid_json_or_unhealthy_status_blocks (test_local_deploy_vps.StatusProbeTest.test_http_denial_redirect_invalid_json_or_unhealthy_status_blocks) ... ok
+test_native_curl_identifies_probe_without_browser_spoofing (test_local_deploy_vps.StatusProbeTest.test_native_curl_identifies_probe_without_browser_spoofing) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 0.078s
+
+OK

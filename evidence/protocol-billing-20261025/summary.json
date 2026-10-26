@@ -1,0 +1,66 @@
+{
+  "base_commit": "377551526aaea9f64ff085ada3714c6ff8a7abee",
+  "branch": "codex/clearapi-protocol-billing-compat-20261025",
+  "runtime": "golang:1.25.1, GOTOOLCHAIN=local",
+  "isolation": "network none for local tests; dedicated internal Docker network and fresh tmpfs MySQL/PostgreSQL databases for the accounting matrix; no host ports",
+  "database_versions": {
+    "sqlite": "3.50.4",
+    "mysql": "8.4.11",
+    "postgres": "17.6 (Debian 17.6-2.pgdg13+1)"
+  },
+  "results": {
+    "verification-core": {
+      "top_level_passed": 112,
+      "failed": 0,
+      "sha256": "49bcae53e78adf2ed38fbd98c27df5f73d88f8f5820fda78868964e519a568a7"
+    },
+    "release-adapters": {
+      "top_level_passed": 72,
+      "failed": 0,
+      "sha256": "a81ab5a2b7f139aaa0c0917abdd24e5af01f2e3832e836c4529709871e930f23"
+    },
+    "verification-relaykit": {
+      "top_level_passed": 106,
+      "failed": 0,
+      "sha256": "b5a2eb49f570269bd58c7652b7461f2b167247ad98c14d0765e823a05e7877dc"
+    },
+    "release-sqlite": {
+      "top_level_passed": 4,
+      "failed": 0,
+      "sha256": "3bb3c2a5906328f8e3e263feceadf411f5b8ee046af1e177acb4c264a502c473"
+    },
+    "release-mysql": {
+      "top_level_passed": 4,
+      "failed": 0,
+      "sha256": "52015c7fcbfa0c714315559d61818d71fea63a2935b646633c86eebb84b60d6e"
+    },
+    "release-postgres": {
+      "top_level_passed": 4,
+      "failed": 0,
+      "sha256": "a56229b4278aff904648e2b6ead1b3ce2dd4737220ed6c363a80a5769a9d66d0"
+    }
+  },
+  "commands": {
+    "core": "go test -json ./service ./relay ./relay/helper ./router -run \"TestProtocolBilling|TestProtected|TestResponsesWS|TestNormalizeResponsesWS|TestBuildResponsesWS|TestHTTPResponsesRequest|TestOutboundTextBudget|TestPaidGeminiBatch|TestInterruptedStream|TestCompletedStreamEstimate|TestR7|TestCalculateTextQuotaSummary|TestApplyResponsesUsage|TestResponsesUsage|TestOrdinaryChannelRejection|TestCancelledDispatch|TestPool|TestPG03ZeroDispatchRefundBilling|TestHostProtocolRegistry|TestPrepareTieredBillingForSelectedGroup|TestTryTieredSettleUsesFinalGroupAfterRetry\" -count=1 -timeout=4m",
+    "adapters": "go test -json ./relay/channel/openai ./relay/channel/claude ./relay/channel/gemini -run \"TestOai|TestOpenaiImage|TestOpenaiOversized|TestGemini|TestClaudeCode|TestConvert|TestHandleClaudeResponseData|TestCountClaudeStream\" -count=1 -timeout=4m",
+    "relaykit": "cd relaykit && GOWORK=off go build ./... && GOWORK=off go test -json ./dto ./relayconvert -count=1 -timeout=3m",
+    "each_database": "go test -json ./service -run \"TestProtocolBilling|TestProtectedBillingDatabase|TestProtectedTieredReplayAndRetention\" -count=1 -timeout=3m",
+    "database_environments": {
+      "sqlite": "TEST_BILLING_DIALECT unset; temporary SQLite fixture",
+      "mysql": "TEST_BILLING_DIALECT=mysql TEST_BILLING_DSN=root:protocol_fixture@tcp(clearapi-protocol-mysql-20261025:3306)/billing_release?charset=utf8mb4&parseTime=true&loc=Local",
+      "postgres": "TEST_BILLING_DIALECT=postgres TEST_BILLING_DSN=host=clearapi-protocol-pg-20261025 user=fixture password=protocol_fixture dbname=billing_release port=5432 sslmode=disable"
+    }
+  },
+  "not_run": [
+    "production deployment/restart/configuration",
+    "paid upstream requests",
+    "historical full E2E",
+    "full root application build (web/dist absent)",
+    "formal CI/RC/release gates"
+  ],
+  "earlier_failures_preserved": [
+    "core.jsonl: WebSocket serialization fixtures omitted a billing state; fixed fixture prerequisites",
+    "final-core.jsonl: removed field referenced by router test and missing ChannelMeta in passthrough test fixture; corrected tests",
+    "verification-adapters.jsonl: new speech SSE fixture omitted StreamingTimeout initialization; corrected fixture"
+  ]
+}

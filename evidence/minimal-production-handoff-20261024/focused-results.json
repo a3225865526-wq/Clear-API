@@ -1,0 +1,50 @@
+[
+  {
+    "name": "adoption",
+    "command": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_local_deploy_adoption.py",
+      "-v"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "test_adoption_preserves_failed_and_only_creates_current_metadata (test_local_deploy_adoption.AdoptionTest.test_adoption_preserves_failed_and_only_creates_current_metadata) ... ok\ntest_boot_and_backup_agree_on_adopted_engine_and_config_identity (test_local_deploy_adoption.AdoptionTest.test_boot_and_backup_agree_on_adopted_engine_and_config_identity) ... ok\ntest_incident_or_environment_drift_never_falls_back_to_old_failed_manifest (test_local_deploy_adoption.AdoptionTest.test_incident_or_environment_drift_never_falls_back_to_old_failed_manifest) ... ok\ntest_inherited_compose_values_cannot_override_the_existing_root_environment (test_local_deploy_adoption.AdoptionTest.test_inherited_compose_values_cannot_override_the_existing_root_environment) ... ok\ntest_readonly_check_and_config_drift_never_publish_adoption (test_local_deploy_adoption.AdoptionTest.test_readonly_check_and_config_drift_never_publish_adoption) ... ok\ntest_receive_updates_local_state_and_terminal_overlay_preserving_original_four_layers (test_local_deploy_adoption.AdoptionTest.test_receive_updates_local_state_and_terminal_overlay_preserving_original_four_layers) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.019s\n\nOK\n"
+  },
+  {
+    "name": "recovery-final",
+    "command": [
+      "python3",
+      "scripts/ci/test-failed-recovery.py"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "......................................\n----------------------------------------------------------------------\nRan 38 tests in 2.963s\n\nOK\n"
+  },
+  {
+    "name": "caddy-final",
+    "command": [
+      "python3",
+      "scripts/ci/test-caddy-state-reconcile.py"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "....................\n----------------------------------------------------------------------\nRan 20 tests in 0.017s\n\nOK\n"
+  },
+  {
+    "name": "backup-final",
+    "command": [
+      "python3",
+      "scripts/ci/test-backup-identity.py",
+      "BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history (__main__.BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history) ... ok\n\n----------------------------------------------------------------------\nRan 1 test in 1.125s\n\nOK\n"
+  }
+]

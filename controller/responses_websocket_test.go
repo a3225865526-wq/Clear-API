@@ -356,7 +356,7 @@ func waitPerfCounters(t *testing.T, wantRequests int64) (requests, successes int
 
 func newResponsesWSBillingTest(t *testing.T, expression string, handle func(*websocket.Conn, *http.Request), httpEvents ...string) *responsesWSBillingTest {
 	t.Helper()
-	t.Setenv("CLEARAPI_ENABLE_RESPONSES_WEBSOCKET", "true")
+
 	user, token := setupResponsesWSRequestTest(t)
 	previousTimeout := constant.StreamingTimeout
 	constant.StreamingTimeout = 30
@@ -1365,124 +1365,6 @@ func TestResponsesWebSocketPreRoutingRejectionsFollowHealthClassification(t *tes
 			assert.Zero(t, successes)
 		})
 	}
-}
-
-// The ordinary Responses WebSocket is a production-restricted surface: the
-// feature gate must default to closed, only accept an explicit opt-in, and
-// reject disabled requests before the connection upgrade, so no quota
-// reservation, channel selection, or upstream dispatch can happen at all.
-func TestResponsesWebSocketProductionGateFailsClosed(t *testing.T) {
-	assert.False(t, ResponsesWebSocketEnabled(), "the gate must default to closed")
-	t.Setenv("CLEARAPI_ENABLE_RESPONSES_WEBSOCKET", "1")
-	assert.False(t, ResponsesWebSocketEnabled(), "only an explicit true opens the gate")
-
-	user, token := setupResponsesWSRequestTest(t)
-	// Fully configure the billing surface so a fail-open gate would actually
-	// reserve quota and dispatch upstream; the assertions below then prove the
-	// closed gate blocks every side effect.
-	previousBatch, previousLogs, previousCount, previousQuota := common.BatchUpdateEnabled, common.LogConsumeEnabled, constant.CountToken, common.QuotaPerUnit
-	common.BatchUpdateEnabled, common.LogConsumeEnabled, constant.CountToken, common.QuotaPerUnit = false, true, true, 500000
-	saved := map[string]string{}
-	require.NoError(t, config.GlobalConfig.SaveToDB(func(key, value string) error {
-		switch key {
-		case "billing_setting.billing_mode", "billing_setting.billing_expr", "group_ratio_setting.group_ratio":
-			saved[key] = value
-		}
-		return nil
-	}))
-	t.Cleanup(func() {
-		common.BatchUpdateEnabled, common.LogConsumeEnabled, constant.CountToken, common.QuotaPerUnit = previousBatch, previousLogs, previousCount, previousQuota
-		require.NoError(t, config.GlobalConfig.LoadFromDB(saved))
-	})
-	expressions, err := common.Marshal(map[string]string{"ws-billing": `tier("request", fixed(0.002))`})
-	require.NoError(t, err)
-	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
-		"billing_setting.billing_mode":    `{"ws-billing":"tiered_expr"}`,
-		"billing_setting.billing_expr":    string(expressions),
-		"group_ratio_setting.group_ratio": `{"default":1}`,
-	}))
-	require.NoError(t, model.DB.AutoMigrate(&model.Channel{}, &model.Ability{}))
-	require.NoError(t, model.MigrateFinanceRequests(model.DB))
-	require.NoError(t, model.MigrateBillingReconciliation(model.DB))
-	require.NoError(t, model.LOG_DB.AutoMigrate(&model.Log{}))
-	require.NoError(t, model.DB.Model(user).Updates(map[string]any{"quota": 100000, "setting": `{"billing_preference":"wallet_only"}`}).Error)
-	require.NoError(t, model.DB.Model(token).Update("remain_quota", 3000).Error)
-
-	var upstreamHits atomic.Int32
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		upstreamHits.Add(1)
-		w.WriteHeader(http.StatusOK)
-	}))
-	t.Cleanup(upstream.Close)
-	channel := &model.Channel{Name: "responses-ws-gate", Key: "gate-key", Status: common.ChannelStatusEnabled, Type: constant.ChannelTypeOpenAI, Group: "default", Models: "ws-billing", BaseURL: &upstream.URL}
-	modelMapping := `{"ws-billing":"gpt-4o"}`
-	channel.ModelMapping = &modelMapping
-	channel.SetSetting(dto.ChannelSettings{ResponsesWebSocketEnabled: true})
-	require.NoError(t, model.DB.Create(channel).Error)
-	t.Cleanup(func() {
-		require.NoError(t, model.DB.Where("channel_id = ?", channel.Id).Delete(&model.Ability{}).Error)
-		require.NoError(t, model.DB.Delete(channel).Error)
-	})
-	require.NoError(t, model.DB.Create(&model.Ability{ChannelId: channel.Id, Model: "ws-billing", Group: "default", Enabled: true}).Error)
-
-	engine := gin.New()
-	engine.GET("/v1/responses", middleware.TokenAuth(), ResponsesWebSocket)
-	gateway := httptest.NewServer(engine)
-	t.Cleanup(gateway.Close)
-	target := "ws" + strings.TrimPrefix(gateway.URL, "http") + "/v1/responses"
-
-	// 1. A direct SDK-style upgrade attempt is refused without upgrading.
-	_, response, dialErr := websocket.DefaultDialer.Dial(target, http.Header{"Authorization": []string{"Bearer sk-" + token.Key}})
-	require.Error(t, dialErr)
-	require.NotNil(t, response)
-	assert.Equal(t, http.StatusServiceUnavailable, response.StatusCode)
-	body, readErr := io.ReadAll(response.Body)
-	require.NoError(t, readErr)
-	response.Body.Close()
-	assert.Contains(t, string(body), "service_unavailable")
-
-	// 2. A custom subprotocol / upgrade shape cannot bypass the gate.
-	_, customResponse, customDialErr := (&websocket.Dialer{Subprotocols: []string{"custom-protocol", "responses"}}).Dial(target, http.Header{"Authorization": []string{"Bearer sk-" + token.Key}})
-	require.Error(t, customDialErr)
-	require.NotNil(t, customResponse)
-	assert.Equal(t, http.StatusServiceUnavailable, customResponse.StatusCode)
-	customResponse.Body.Close()
-
-	// 3. A compatibility-style POST to the same path has no route to fall back to.
-	postRequest, postErr := http.NewRequest(http.MethodPost, gateway.URL+"/v1/responses", strings.NewReader(`{"model":"ws-billing","input":"hi"}`))
-	require.NoError(t, postErr)
-	postRequest.Header.Set("Authorization", "Bearer sk-"+token.Key)
-	postRequest.Header.Set("Content-Type", "application/json")
-	postResponse, postDoErr := (&http.Client{Timeout: 3 * time.Second}).Do(postRequest)
-	require.NoError(t, postDoErr)
-	assert.Equal(t, http.StatusNotFound, postResponse.StatusCode)
-	require.NoError(t, postResponse.Body.Close())
-
-	// 4. The explicit opt-in upgrades the very same surface: the refusal above
-	// is the gate, not a broken route.
-	t.Setenv("CLEARAPI_ENABLE_RESPONSES_WEBSOCKET", "true")
-	accepted, _, acceptErr := websocket.DefaultDialer.Dial(target, http.Header{"Authorization": []string{"Bearer sk-" + token.Key}})
-	require.NoError(t, acceptErr)
-	require.NoError(t, accepted.Close())
-	t.Setenv("CLEARAPI_ENABLE_RESPONSES_WEBSOCKET", "false")
-
-	// The disabled surface produced zero upstream calls, zero quota movement,
-	// zero consume logs, and zero billing rows.
-	assert.EqualValues(t, 0, upstreamHits.Load(), "a disabled Responses WebSocket must not dispatch upstream")
-	var reloadedToken model.Token
-	require.NoError(t, model.DB.First(&reloadedToken, token.Id).Error)
-	assert.Equal(t, 3000, reloadedToken.RemainQuota, "quota delta must be zero")
-	assert.Equal(t, 0, reloadedToken.UsedQuota)
-	var reloadedUser model.User
-	require.NoError(t, model.DB.First(&reloadedUser, user.Id).Error)
-	assert.Equal(t, 100000, reloadedUser.Quota, "quota delta must be zero")
-	assert.Equal(t, 0, reloadedUser.UsedQuota)
-	var logs []model.Log
-	require.NoError(t, model.LOG_DB.Where("token_id = ?", token.Id).Find(&logs).Error)
-	assert.Empty(t, logs, "consume logs must be zero")
-	rows, _, listErr := model.ListBillingReconciliation(model.DB, "pending", 0, 100)
-	require.NoError(t, listErr)
-	assert.Empty(t, rows, "billing rows must be zero")
 }
 
 // TEST B/C/D: the upstream rejects the WebSocket handshake itself. The

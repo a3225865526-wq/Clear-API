@@ -13,7 +13,6 @@ import signal
 import subprocess
 import sys
 import time
-import urllib.request
 import zipfile
 
 sys.dont_write_bytecode = True
@@ -274,33 +273,46 @@ class WebsiteRestoration:
         return {'container_id': edge['Id'], 'image_id': edge['Image'], 'config_sha256': self.CONFIG_SHA}
 
     def public_health(self, run):
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), CONTROL.NoRedirect())
         pages = {}
+        self.public_observations = {}
         deadline = time.monotonic() + 30
         for path in ('/api/status', '/', '/login', '/dashboard/overview'):
-            request = urllib.request.Request('https://www.clear999.com' + path + '?clearapi_restore=' + str(run),
-                                             headers={'Cache-Control': 'no-store'})
             while True:
                 try:
-                    response = opener.open(request, timeout=min(5, max(0.1, deadline - time.monotonic())))
+                    response = self.command(['curl', '-q', '--noproxy', '*', '--silent', '--show-error',
+                        '--proto', '=https', '--max-time', str(min(5, max(0.1, deadline-time.monotonic()))),
+                        '--max-filesize', '262144', '--header', 'Cache-Control: no-store',
+                        '--header', 'X-ClearAPI-Probe: website-health-v1', '--dump-header', '-',
+                        '--write-out', '\nCLEARAPI_HTTP:%{http_code}',
+                        'https://www.clear999.com' + path + '?clearapi_restore=' + str(run)])
                     break
-                except OSError:
+                except (OSError, CONTROL.ReleaseBlocked):
                     require(time.monotonic() < deadline, 'public HTTPS startup deadline exceeded')
                     time.sleep(min(1, max(0, deadline - time.monotonic())))
-            with response:
-                require(response.status == 200 and response.headers.get('CF-Ray'), 'public HTTPS unavailable')
-                body = response.read(262145)
-                require(len(body) <= 262144, 'oversized public response')
-                if path == '/api/status':
-                    require(json.loads(body, object_pairs_hook=CONTROL.unique).get('success') is True,
-                            'public status is not healthy')
-                else:
-                    require('text/html' in response.headers.get('Content-Type', '').lower()
-                            and b'<html' in body.lower() and b'<script' in body.lower()
-                            and any(marker in body for marker in (b'id="root"', b"id='root'", b'id=root')),
-                            'application page unavailable')
-                pages[path] = 'status_https_200_via_cloudflare' if path == '/api/status' else 'application_shell_https_200_via_cloudflare'
-        return {'pages': pages, 'user_login': 'not_tested', 'admin_session': 'not_tested',
+            raw, separator, status = response.rpartition('\nCLEARAPI_HTTP:')
+            require(separator and re.fullmatch(r'\d{3}', status), 'invalid curl response metadata')
+            head, separator, body = raw.replace('\r\n', '\n').partition('\n\n')
+            require(separator, 'missing HTTPS response headers')
+            headers = dict(line.split(':', 1) for line in head.splitlines() if ':' in line)
+            headers = {k.lower(): v.strip() for k, v in headers.items()}
+            self.public_observations[path] = dict(status=int(status), cf_ray=headers.get('cf-ray'),
+                date=headers.get('date'), body_sha256=hashlib.sha256(body.encode()).hexdigest(),
+                error_codes=re.findall(r'error code:\s*(\d+)', body, re.I))
+            require(status == '200' and headers.get('cf-ray'),
+                    'public HTTPS unavailable: status=' + status + ' Ray=' + headers.get('cf-ray', 'absent'))
+            require(len(body.encode()) <= 262144, 'oversized public response')
+            if path == '/api/status':
+                require(json.loads(body, object_pairs_hook=CONTROL.unique).get('success') is True,
+                        'public status is not healthy')
+            else:
+                require('text/html' in headers.get('content-type', '').lower()
+                        and '<html' in body.lower() and '<script' in body.lower()
+                        and any(marker in body for marker in ('id="root"', "id='root'", 'id=root')),
+                        'application page unavailable')
+            pages[path] = 'status_https_200_via_cloudflare' if path == '/api/status' else 'application_shell_https_200_via_cloudflare'
+        return {'pages': pages, 'edge_responses': self.public_observations,
+                'client': 'native curl; X-ClearAPI-Probe: website-health-v1',
+                'normal_browser': 'not_tested', 'user_login': 'not_tested', 'admin_session': 'not_tested',
                 'provider_acceptance': 'deferred_to_owner_after_deployment'}
 
     def restore(self, authorization):
@@ -343,20 +355,95 @@ class WebsiteRestoration:
                     recovery_receipt_sha256=hashlib.sha256(raw).hexdigest(), incident=before,
                     edge=expected_edge, original_deployment_status='failed', circuit_cleared=False,
                     provider_acceptance='deferred_to_owner_after_deployment')
+        def verify():
+            require(self.recovery.snapshot(restore=True, ingress_open=True) == before, 'incident changed after opening')
+            require(LIFECYCLE.read_file(self.recovery.receipt) == raw, 'isolated recovery record changed')
+        return self.open_edge(base, expected_edge, verify, authorization['recovery_run'])
+
+    def restore_adopted(self, authorization, adapter):
+        """Root-authorized restoration of the separately observed current instance.
+
+        Does not manufacture the legacy GitHub recovery receipt or clear FAILED.
+        """
+        authorization = dict(authorization)
+        reviewed = authorization.pop('reviewed_failure_sha256', None)
+        require(set(authorization) == {'source_commit', 'scope'}
+                and authorization['scope'] == 'existing-gateway-original-caddy-v1',
+                'explicit existing-instance restoration scope required')
+        if reviewed is not None:
+            # A new owner-reviewed attempt preserves the prior failure and latch.
+            raw_failure = LIFECYCLE.read_file(self.failure_result)
+            failure = json.loads(raw_failure, object_pairs_hook=CONTROL.unique)
+            require(hashlib.sha256(raw_failure).hexdigest() == reviewed
+                    and failure.get('schema') == 'clearapi.website-restoration/v1'
+                    and failure.get('method') == 'existing-running-adoption-v1'
+                    and failure.get('status') == 'website_restoration_failed'
+                    and failure.get('containment_verified') is True
+                    and failure.get('public_traffic') == 'blocked'
+                    and failure.get('authorization') == authorization,
+                    'exact contained failure must be reviewed before another opening')
+            LIFECYCLE.read_file(self.attempt)
+            self.attempt = self.attempt.with_name(self.attempt.stem + '-reviewed-' + reviewed + '.json')
+            self.failure_result = self.failure_result.with_name(self.failure_result.stem + '-reviewed-' + reviewed + '.json')
+        require(not any(p.exists() or p.is_symlink() for p in (self.attempt,self.result,self.failure_result)),
+                'website opening already attempted; operator review required')
+        app=self.recovery.app
+        state=adapter.STATE.load(app)
+        require(state['adoption']['source_commit'] == authorization['source_commit']
+                and state['releases']['current']['status'] == 'adopted',
+                'restoration must identify the initial running-instance adoption')
+        before=adapter.adoption_snapshot(app)
+        require(all(state['adoption'].get(k)==v for k,v in before.items()), 'adopted instance changed')
+        if reviewed is not None:
+            require(failure.get('incident') == before, 'reviewed failure identifies another instance')
+        expected_edge=self.edge(False)
+        hold=TRAFFIC.TrafficHold(app,self.command)
+        hold.verify(hold.binding(FAILED_RUN,DIGEST,COMMIT))
+        self.command(['/usr/bin/python3','-I','/opt/clearapi/bin/runtime-boot-recovery.py','check-installed'])
+        self.command(['/usr/bin/python3','-I','/opt/clearapi/bin/runtime-boot-recovery.py','check'])
+        config={'app_dir':str(app),'service':'new-api','backup_service':'clearapi-backup.service',
+                'backup_dir':'/opt/clearapi/backups','compose_file':'docker-compose.prod.yml'}
+        backup_id=adapter.backup(config)
+        raw=adapter.STATE.read_file(app/adapter.STATE.NAME,private=True)
+        require(adapter.adoption_snapshot(app)==before, 'instance changed during backup')
+        base=dict(schema='clearapi.website-restoration/v1',authorization=authorization,
+                  method='existing-running-adoption-v1',adoption_sha256=hashlib.sha256(raw).hexdigest(),
+                  adoption_identity_sha256=hashlib.sha256(json.dumps(state['adoption'],sort_keys=True).encode()).hexdigest(),
+                  incident=before,backup_id=backup_id,edge=expected_edge,
+                  original_deployment_status='failed',circuit_cleared=False,
+                  gateway_replaced=False,database_restored=False)
+        if reviewed is not None:
+            base['reviewed_failure_sha256'] = reviewed
+        def verify():
+            adapter.STATE.load(app)
+            require(adapter.adoption_snapshot(app)==before, 'instance changed after opening')
+            require(adapter.STATE.read_file(app/adapter.STATE.NAME,private=True)==raw, 'adoption changed')
+            origin=self.command(['curl','--noproxy','*','--fail','--silent','--max-time','5',
+                '--resolve','www.clear999.com:443:127.0.0.1','https://www.clear999.com/api/status'])
+            require(json.loads(origin).get('success') is True, 'origin HTTPS Gateway forwarding failed')
+            redirect=self.command(['curl','--noproxy','*','--silent','--max-time','5',
+                '--resolve','www.clear999.com:80:127.0.0.1','-o','/dev/null','-w','%{http_code} %{redirect_url}',
+                'http://www.clear999.com/'])
+            require(redirect=='308 https://www.clear999.com/', 'origin HTTP redirect failed')
+            return {'https_gateway_forwarding': 'PASS', 'http_redirect': '308 https://www.clear999.com/'}
+        return self.open_edge(base,expected_edge,verify,authorization['source_commit'])
+
+    def open_edge(self, base, expected_edge, verify, health_nonce):
         LIFECYCLE.publish(self.attempt, dict(base, stage='opening', recorded_at=datetime.now(timezone.utc).isoformat()))
+        origin = None
         try:
             self.command(['docker', 'update', '--restart=unless-stopped', self.CADDY_ID])
             self.command(['docker', 'start', self.CADDY_ID])
             require(self.edge(True) == expected_edge, 'Caddy changed during opening')
-            health = self.public_health(authorization['recovery_run'])
-            require(self.recovery.snapshot(restore=True, ingress_open=True) == before, 'incident changed after opening')
-            require(LIFECYCLE.read_file(self.recovery.receipt) == raw, 'isolated recovery record changed')
+            origin = verify()
+            health = self.public_health(health_nonce)
+            verify()
             require(self.edge(True) == expected_edge, 'Caddy changed during verification')
-            result = dict(base, status='website_restored', public_traffic='open', health=health,
+            result = dict(base, status='website_restored', public_traffic='open', origin=origin, health=health,
                           recorded_at=datetime.now(timezone.utc).isoformat())
             LIFECYCLE.publish(self.result, result)
             return result
-        except BaseException:
+        except BaseException as error:
             # Both containment commands must be attempted even if one fails.
             contained = True
             for args in (['docker', 'stop', '--time', '150', self.CADDY_ID],
@@ -374,6 +461,7 @@ class WebsiteRestoration:
             if not self.failure_result.exists() and not self.failure_result.is_symlink():
                 LIFECYCLE.publish(self.failure_result, dict(base, status='website_restoration_failed',
                     public_traffic='blocked' if contained else 'UNKNOWN', containment_verified=contained,
+                    error=str(error), origin=origin, edge_responses=getattr(self, 'public_observations', {}),
                     recorded_at=datetime.now(timezone.utc).isoformat()))
             raise
 
@@ -383,6 +471,19 @@ def restoration_interrupted(signum, frame):
 
 
 def main():
+    if sys.argv[1:] == ['restore-adopted']:
+        require(os.geteuid()==0, 'root restoration required')
+        for signum in (signal.SIGTERM,signal.SIGHUP,signal.SIGINT):
+            signal.signal(signum,restoration_interrupted)
+        data=json.loads(sys.stdin.buffer.read(4097),object_pairs_hook=CONTROL.unique)
+        path=Path(__file__).with_name('clearapi-local-deploy.py')
+        if not path.exists():path=Path(__file__).with_name('local-deploy-vps.py')
+        spec=importlib.util.spec_from_file_location('local_adapter',path)
+        adapter=importlib.util.module_from_spec(spec);spec.loader.exec_module(adapter)
+        with adapter.deploy_lock():
+            result=WebsiteRestoration().restore_adopted(data,adapter)
+        print(json.dumps(result,sort_keys=True))
+        return
     require(sys.argv[1:] in (['authorize'], ['recover']), 'invalid recovery entry point')
     data = json.loads(sys.stdin.buffer.read(32769), object_pairs_hook=CONTROL.unique)
     token = data.pop('token')

@@ -2,12 +2,14 @@
 """Publish Docker-observed identity; never start containers or contact providers."""
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import stat
 import subprocess
+import tarfile
 import tempfile
 
 
@@ -25,11 +27,26 @@ def docker_json(*args):
     return json.loads(result.stdout)
 
 
+def archive_image_id(image):
+    """Docker config digest, including engines whose inspect ID is an index."""
+    with tempfile.TemporaryDirectory(prefix="runtime-image-id-") as folder:
+        archive = Path(folder) / "image.tar"
+        subprocess.run(["docker", "save", "--output", str(archive), image],
+                       check=True, capture_output=True, timeout=120)
+        with tarfile.open(archive) as bundle:
+            entries = json.load(bundle.extractfile("manifest.json"))
+            if len(entries) != 1:
+                raise IdentityError("SINGLE_IMAGE_REQUIRED")
+            return "sha256:" + hashlib.sha256(bundle.extractfile(entries[0]["Config"]).read()).hexdigest()
+
+
 def observe(container, image_ref, revision, directory):
-    if not re.fullmatch(r"[^\s@]+@sha256:[a-f0-9]{64}", image_ref):
-        raise IdentityError("EXACT_DIGEST_REQUIRED")
+    if not re.fullmatch(r"(?:[^\s@]+@sha256:[a-f0-9]{64}|clearapi-local:[0-9a-f]{40})", image_ref):
+        raise IdentityError("EXACT_ARCHIVE_IDENTITY_REQUIRED")
     if not re.fullmatch(r"[a-f0-9]{40}", revision):
         raise IdentityError("REVISION_REQUIRED")
+    if image_ref.startswith("clearapi-local:") and image_ref != "clearapi-local:" + revision:
+        raise IdentityError("REVISION_MISMATCH")
     # Request only identity evidence; never retrieve Config.Env or credentials.
     current = docker_json("inspect", "--format",
                           '[{"Id":{{json .Id}},"Image":{{json .Image}},'
@@ -55,7 +72,10 @@ def observe(container, image_ref, revision, directory):
                         current["Image"])[0]
     if image["Id"] != current["Image"] or current["Config"]["Image"] != image_ref:
         raise IdentityError("IMAGE_MISMATCH")
-    if image_ref not in image.get("RepoDigests", []):
+    if image_ref.startswith("clearapi-local:"):
+        if image_ref != current["Config"]["Image"]:
+            raise IdentityError("IMAGE_REF_MISMATCH")
+    elif image_ref not in image.get("RepoDigests", []):
         raise IdentityError("DIGEST_MISMATCH")
     if (image.get("Config", {}).get("Labels") or {}).get("org.opencontainers.image.revision") != revision:
         raise IdentityError("REVISION_MISMATCH")
@@ -63,8 +83,13 @@ def observe(container, image_ref, revision, directory):
     now = dt.datetime.now(dt.timezone.utc)
     if started.tzinfo is None or not dt.datetime(1970, 1, 1, tzinfo=dt.timezone.utc) < started <= now:
         raise IdentityError("INVALID_STARTED_AT")
-    return {"container_id": current["Id"], "started_at": state["StartedAt"],
-            "image_digest": image_ref.rsplit("@", 1)[1], "oci_revision": revision}
+    identity = {"container_id": current["Id"], "started_at": state["StartedAt"],
+                "oci_revision": revision}
+    if image_ref.startswith("clearapi-local:"):
+        identity["docker_image_id"] = image["Id"]
+    else:
+        identity["image_digest"] = image_ref.rsplit("@", 1)[1]
+    return identity
 
 
 def secure_directory(directory, prepare=False):

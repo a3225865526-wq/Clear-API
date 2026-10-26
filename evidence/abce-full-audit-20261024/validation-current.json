@@ -1,0 +1,103 @@
+{
+  "audit_utc": "2026-10-25T03:00:56.454401+00:00",
+  "database_versions": {
+    "production": "PostgreSQL 17.6 Alpine",
+    "isolated_sqlite": "3.50.4",
+    "isolated_mysql": "8.4.11",
+    "isolated_postgres": "17.6 Debian"
+  },
+  "go": "go1.26.9 linux/amd64",
+  "node": "24.22.1",
+  "production_Dockerfile": "Go1.26.1/Bun1.4.0",
+  "checks": [
+    {
+      "command": "go test -count=1 -v ./model -run \"TestModelPricing|TestApplyModelPricingCleanup|TestClearedModelPricing\"",
+      "observed": "PASS, real sqlite/mysql/postgres, no skip",
+      "log": "logs/A-model-matrix.log"
+    },
+    {
+      "command": "go test -count=1 -v ./controller -run \"TestModelPricingConversionDatabaseMatrix/(sqlite|postgres)\"",
+      "observed": "PASS, dedicated Postgres and SQLite fixtures",
+      "log": "logs/A-http-sqlite-pg.log"
+    },
+    {
+      "command": "go test -count=1 -v ./controller -run \"TestModelPricingConversionDatabaseMatrix/mysql\"",
+      "observed": "PASS, --network container:clearapi-audit-mysql-20261024 and loopback fixture",
+      "log": "logs/A-http-mysql.log"
+    },
+    {
+      "command": "vitest run src/features/model-pricing/__tests__ src/features/system-settings/__tests__/pricing-sync.test.tsx",
+      "observed": "PASS, 8 files 97 tests",
+      "log": "logs/A-frontend.log"
+    },
+    {
+      "command": "go test -count=1 -v ./service -run \"TestTryTieredSettle_CacheTokensAffectSettlement|TestTryTieredSettle_PreConsumeMatchesPostConsume|TestTryTieredSettle_GroupRatioScaling|TestTryTieredSettleUsesFrozenRequestInput|TestBuildTieredTokenParams_GPT_WithCache|TestSamePriceCacheReadsRemainInInput|TestConsoleMonitorAdminAuthorizationPublicationAndFailClosedExecution\"",
+      "observed": "PASS, 6 billing + 1 monitor top-level tests",
+      "log": "logs/A-billing-and-monitor.log"
+    },
+    {
+      "command": "vitest run src/features/system-settings/hooks/__tests__/use-update-option.test.tsx src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx",
+      "observed": "PASS, final 9 tests; includes legacy announcement preservation",
+      "log": "logs/B-cache-retention-final.log"
+    },
+    {
+      "command": "go test -count=1 -v ./setting/console_setting",
+      "observed": "PASS",
+      "log": "logs/B-backend-filter.log"
+    },
+    {
+      "command": "go test -count=1 -json ./relay/channel ./relay/channel/ali ./relay/channel/deepseek ./relay/channel/moonshot ./relay/channel/zhipu ./relay/channel/zhipu_4v ./relay/channel/xai",
+      "observed": "PASS 7 packages, simulated only",
+      "log": "logs/C-providers.jsonl"
+    },
+    {
+      "command": "go test -count=1 -v ./model -run \"TestUpdateChannelStatus|TestUpdateChannelPreserves\"",
+      "observed": "PASS, only TestUpdateChannelStatusPersistsMultiKeyState matched; no claim for nonexistent second name",
+      "log": "logs/channel-status-model.log"
+    },
+    {
+      "command": "go test -count=1 -v ./model -run TestSaveStatusStateFromSingleKeySnapshotPreservesUnownedColumns",
+      "observed": "PASS",
+      "log": "logs/channel-status-preserve.log"
+    },
+    {
+      "command": "go test -count=1 -v ./controller -run \"TestUpdateChannelRejectsStatusField|TestChannelStatusValidation\"",
+      "observed": "PASS 2 tests",
+      "log": "logs/channel-status-controller.log"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -p test_local_deploy_vps.py -v",
+      "observed": "PASS 17",
+      "log": "logs/E-helper.log"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -p test_local_deploy_adoption.py -v",
+      "observed": "PASS 7",
+      "log": "logs/E-adoption.log"
+    },
+    {
+      "command": "python3 scripts/ci/test-backup-identity.py",
+      "observed": "PASS 2, real isolated GPG/tar fixture",
+      "log": "logs/E-backup.log"
+    },
+    {
+      "command": "tsgo -b",
+      "observed": "PASS, final command exit0; log also captured earlier clean typecheck",
+      "log": "logs/B-typecheck.log"
+    },
+    {
+      "command": "oxlint -c .oxlintrc.json <3 modified TS/TSX files>; oxfmt --write <2 modified test files>",
+      "observed": "PASS, final 0 warnings 0 errors; formatter completed; earlier new-test lint 5 errors corrected",
+      "log": null
+    },
+    {
+      "command": "docker buildx build --load --tag clearapi-audit:notification-cache-fix-20261024 <candidate workspace> --build-arg SOURCE_COMMIT=local-audit-uncommitted-not-release",
+      "observed": "PASS, full Dockerfile, local only; subsequent changes tests/docs only",
+      "log": "logs/local-fix-build.log"
+    }
+  ],
+  "real_upstream_called": false,
+  "production_mutated": false,
+  "new_CI_run": false,
+  "prior_30_deployment_E2E_rerun": false
+}

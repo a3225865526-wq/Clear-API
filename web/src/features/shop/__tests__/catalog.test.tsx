@@ -66,6 +66,22 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
+it('shows both support contacts and copies the selected QQ number', async () => {
+  const user = userEvent.setup()
+  renderCatalog()
+  const support = await screen.findByRole('button', { name: 'Copy support QQ' })
+  expect(screen.getByText('QQ: 3225865526')).toBeVisible()
+  expect(screen.getByText('Support QQ group: 660466292')).toBeVisible()
+  const group = screen.getByRole('button', { name: 'Copy support QQ group' })
+  expect(group.parentElement).toHaveTextContent('Support QQ group: 660466292')
+  expect(group.parentElement).toHaveClass('inline-flex', 'whitespace-nowrap')
+
+  await user.click(support)
+  expect(await navigator.clipboard.readText()).toBe('3225865526')
+  await user.click(group)
+  expect(await navigator.clipboard.readText()).toBe('660466292')
+})
+
 it('shows the official product and safe external link with no payment or redemption request', async () => {
   const post = vi.spyOn(api, 'post')
   renderCatalog([
@@ -149,6 +165,7 @@ it('keeps a single column on mobile and switches the purchase content to Chinese
     await i18next.changeLanguage('zhCN')
   })
   expect(screen.getByRole('heading', { name: '购买额度' })).toBeVisible()
+  expect(screen.getByText('QQ群: 660466292')).toBeVisible()
   expect(screen.getByRole('link', { name: '购买 API 额度' })).toHaveAttribute(
     'href',
     'https://catfk.com/item/qmcse2'

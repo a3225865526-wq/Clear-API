@@ -1,0 +1,12 @@
+test_adoption_preserves_failed_and_only_creates_current_metadata (test_local_deploy_adoption.AdoptionTest.test_adoption_preserves_failed_and_only_creates_current_metadata) ... ok
+test_boot_and_backup_agree_on_adopted_engine_and_config_identity (test_local_deploy_adoption.AdoptionTest.test_boot_and_backup_agree_on_adopted_engine_and_config_identity) ... ok
+test_formal_backup_rejects_a_fresh_ciphertext_bound_to_another_gateway (test_local_deploy_adoption.AdoptionTest.test_formal_backup_rejects_a_fresh_ciphertext_bound_to_another_gateway) ... ok
+test_incident_or_environment_drift_never_falls_back_to_old_failed_manifest (test_local_deploy_adoption.AdoptionTest.test_incident_or_environment_drift_never_falls_back_to_old_failed_manifest) ... ok
+test_inherited_compose_values_cannot_override_the_existing_root_environment (test_local_deploy_adoption.AdoptionTest.test_inherited_compose_values_cannot_override_the_existing_root_environment) ... ok
+test_readonly_check_and_config_drift_never_publish_adoption (test_local_deploy_adoption.AdoptionTest.test_readonly_check_and_config_drift_never_publish_adoption) ... ok
+test_receive_updates_local_state_and_terminal_overlay_preserving_original_four_layers (test_local_deploy_adoption.AdoptionTest.test_receive_updates_local_state_and_terminal_overlay_preserving_original_four_layers) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.055s
+
+OK

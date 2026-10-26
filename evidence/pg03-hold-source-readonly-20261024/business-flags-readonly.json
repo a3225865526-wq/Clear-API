@@ -1,0 +1,21 @@
+{
+  "exit": 0,
+  "stderr": "",
+  "result": {
+    "utc": "2026-10-24T14:29:09.626737+00:00",
+    "process_flags": {
+      "CLEARAPI_CLOSED_LAUNCH": "false",
+      "DISABLE_RELAY": null,
+      "CLEARAPI_POOL_ENABLED": "false",
+      "CLEARAPI_POOL_CLIPROXY_DEDICATED": "false"
+    },
+    "status": {
+      "success": true,
+      "data": {
+        "register_enabled": true,
+        "password_register_enabled": true,
+        "password_login_enabled": true
+      }
+    }
+  }
+}

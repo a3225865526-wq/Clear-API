@@ -1,0 +1,58 @@
+{
+  "image": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7",
+  "url": "http://127.0.0.1:18084/system-settings/content/announcements",
+  "requests": [
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "21620.212",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "method": "PUT",
+      "body": "{\"key\":\"console_setting.announcements\",\"value\":\"[{\\\"id\\\":1,\\\"content\\\":\\\"ABCE isolated audit 20261024 — publication check\\\",\\\"publishDate\\\":\\\"2026-10-24T16:00:25.473Z\\\",\\\"type\\\":\\\"default\\\",\\\"status\\\":\\\"draft\\\",\\\"extra\\\":\\\"\\\"}]\"}"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "21620.212",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "21620.213",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "method": "GET"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "21620.213",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "21620.215",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "method": "PUT",
+      "body": "{\"key\":\"console_setting.announcements\",\"value\":\"[{\\\"id\\\":1,\\\"content\\\":\\\"ABCE isolated audit 20261024 — publication check\\\",\\\"publishDate\\\":\\\"2026-10-24T16:00:25.473Z\\\",\\\"type\\\":\\\"default\\\",\\\"status\\\":\\\"published\\\",\\\"extra\\\":\\\"\\\"}]\"}"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "21620.215",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "status": 200
+    },
+    {
+      "event": "Network.requestWillBeSent",
+      "requestId": "21620.216",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "method": "GET"
+    },
+    {
+      "event": "Network.responseReceived",
+      "requestId": "21620.216",
+      "url": "http://127.0.0.1:18084/api/option/",
+      "status": 200
+    }
+  ],
+  "publishedResponseBody": "UNKNOWN: CDP response body expired after full reload; HTTP status 200, database published row and public status payload independently captured",
+  "finding": "Real PostgreSQL save/publication succeeded; existing notification cache remained empty; full reload displayed the published announcement."
+}

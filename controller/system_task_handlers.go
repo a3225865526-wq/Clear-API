@@ -22,6 +22,27 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(consoleMonitorHandler{})
+}
+
+// Reuse the durable host task lease. The daily observation still runs while
+// paid execution is paused, recording skipped targets without upstream calls.
+type consoleMonitorHandler struct{}
+
+func (consoleMonitorHandler) Type() string            { return model.SystemTaskTypeConsoleMonitor }
+func (consoleMonitorHandler) Interval() time.Duration { return model.ConsoleMonitorDailyInterval }
+func (consoleMonitorHandler) NewPayload() any         { return nil }
+func (consoleMonitorHandler) Enabled() bool {
+	return model.ConsoleMonitoringReady(model.DB)
+}
+func (consoleMonitorHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	executor := service.ConsoleProbeExecutor{DB: model.DB, TaskID: task.TaskID, Adapters: map[string]service.ConsoleProbeAdapter{"channel": channelConsoleProbeAdapter{}}}
+	summary, err := executor.RunDailyScheduled(ctx)
+	status := model.SystemTaskStatusSucceeded
+	if err != nil {
+		status = model.SystemTaskStatusFailed
+	}
+	finishSystemTaskHandler(task, runnerID, status, summary, err)
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and

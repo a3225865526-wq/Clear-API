@@ -1,0 +1,447 @@
+{
+  "observed_at": "2026-10-24T01:03:03.462543+00:00",
+  "read_only": true,
+  "production_mutations": false,
+  "containers": {
+    "clearapi-new-api-1": {
+      "Id": "0a9a93c02646b1885323f6d4255277c1253e06794205d061f3fdbfca2cc1b56c",
+      "Image": "sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "Ref": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+      "Running": true,
+      "StartedAt": "2026-10-23T14:07:58.383082222Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Health": null,
+      "ComposeFiles": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml,/opt/clearapi/app/compose-website-recovery-39957948359.json",
+      "Mounts": [
+        {
+          "Destination": "/data",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/new-api",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/app/logs",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/opt/clearapi/logs",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/clearapi",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/runtime/new-api",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/crypto_secret",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/crypto_secret",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/session_secret",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/session_secret",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/sql_dsn",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/sql_dsn",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/run/secrets/token_encryption_key",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/token_encryption_key",
+          "Type": "bind"
+        }
+      ]
+    },
+    "clearapi-edge-caddy": {
+      "Id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+      "Image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+      "Ref": "caddy@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+      "Running": false,
+      "StartedAt": "2026-10-07T14:00:40.028691257Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "no"
+      },
+      "Health": null,
+      "ComposeFiles": "/opt/clearapi/edge/docker-compose.yml",
+      "Mounts": [
+        {
+          "Destination": "/config",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/caddy/config",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/data",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/caddy/data",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/etc/caddy/Caddyfile",
+          "Mode": "ro",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/edge/Caddyfile",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/log/caddy",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/caddy/logs",
+          "Type": "bind"
+        }
+      ]
+    },
+    "clearapi-postgres-1": {
+      "Id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+      "Image": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "Ref": "postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "Running": true,
+      "StartedAt": "2026-10-20T00:46:43.870944528Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "unless-stopped"
+      },
+      "Health": "healthy",
+      "ComposeFiles": "/opt/clearapi/app/docker-compose.prod.yml",
+      "Mounts": [
+        {
+          "Destination": "/run/secrets/pg_superuser_password",
+          "Mode": "",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/secrets/pg_superuser_password",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/postgresql/data",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/postgres",
+          "Type": "bind"
+        }
+      ]
+    },
+    "clearapi-pool-executor-1": {
+      "Id": "1081a1b576ad95e521c1d390b3cfe4d4f9c0eba880779a0391a7e9aef673e57f",
+      "Image": "sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+      "Ref": "ghcr.io/a3225865526-wq/clearapi-executor@sha256:cfad1b51928813cc6b932deb31adc71d5d23ae76fd2ea9d899bc740d1a06ae58",
+      "Running": true,
+      "StartedAt": "2026-10-20T00:46:43.85551099Z",
+      "RestartPolicy": {
+        "MaximumRetryCount": 0,
+        "Name": "unless-stopped"
+      },
+      "Health": "healthy",
+      "ComposeFiles": "/opt/clearapi/app/docker-compose.prod.yml,/opt/clearapi/app/compose-pg03.yaml,/opt/clearapi/app/compose-candidate.yaml",
+      "Mounts": [
+        {
+          "Destination": "/CLIProxyAPI/config.yaml",
+          "Mode": "ro",
+          "Propagation": "rprivate",
+          "RW": false,
+          "Source": "/opt/clearapi/config/pg03/executor.yaml",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/auths",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/auths",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/pool",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/pool",
+          "Type": "bind"
+        },
+        {
+          "Destination": "/var/lib/pool-executor/receipts",
+          "Mode": "rw",
+          "Propagation": "rprivate",
+          "RW": true,
+          "Source": "/data/clearapi/pool-executor/receipts",
+          "Type": "bind"
+        }
+      ]
+    }
+  },
+  "app_files": {
+    "compose-website-recovery-39957948359.json": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+      "bytes": 413
+    },
+    "pg03-account-import-release.json": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "92ce9ee9c86941c840a015a64a4fe44a484f17e647f95a67a5406a5fe4a33812",
+      "bytes": 1415
+    },
+    "controlled-launch-state.json": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+      "bytes": 571
+    },
+    "legacy-transition-authorization.json": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "ece4454128e8beb21c38d79a790fa2e55ef7682585a3c321108135955c100341",
+      "bytes": 1726
+    },
+    "gateway-image-release.json": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "31973b1fc0e3f95e40a3cb47fb018ed0fefdae7a02de76f7e0f7b52c4c508641",
+      "bytes": 2163
+    },
+    "release-manifest.json": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3",
+      "bytes": 5178
+    },
+    "pg03-target-manifest.json": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+      "bytes": 1902
+    },
+    "pg03-deploy-v2-secret-chain-release.json": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "d76f24d5aa8865218692a4ee17b677df1d1668e48ec0bfc158c5cd101184721c",
+      "bytes": 1435
+    },
+    "compose-candidate.yaml": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+      "bytes": 379
+    },
+    "docker-compose.prod.yml": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 1000,
+      "gid": 1000,
+      "sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+      "bytes": 5242
+    },
+    "executor-image-release.json": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "9c9d9f88e11a674587d39aff34150a179e31d9f967c2de8d42437c696fd87950",
+      "bytes": 1593
+    },
+    "compose-pg03.yaml": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+      "bytes": 2809
+    },
+    "legacy-transition-plan.json": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "af2fd3974120ef269c45921d1eba72f61891947c5dddde5c867448819dd0419f",
+      "bytes": 631
+    },
+    "legacy-transition-request.json": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7f426779efc3cf2fd2be8a157ccba70f26687e03f53a7f747e5e9b6530dc63c5",
+      "bytes": 5201
+    },
+    "pg03-runtime-init-release.json": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7afad3c2934709ba4d0f64386b6f59fc1129a72bfbead01c5f73d49549e752ed",
+      "bytes": 1655
+    }
+  },
+  "required_compose_environment_present": {
+    "CLEARAPI_PG02_GATEWAY_PROOF_KEY": true,
+    "CLEARAPI_PG02_PROCESS_EPOCH": false,
+    "CLEARAPI_PG03_POLICY_KEY": true,
+    "CLEARAPI_POOL_CLIPROXY_KEY": true,
+    "CLEARAPI_POOL_EXECUTOR_ID": false
+  },
+  "pool_enabled": "false",
+  "compose": {
+    "exit": 1,
+    "files": [
+      "/opt/clearapi/app/docker-compose.prod.yml",
+      "/opt/clearapi/app/compose-pg03.yaml",
+      "/opt/clearapi/app/compose-candidate.yaml",
+      "/opt/clearapi/app/compose-website-recovery-39957948359.json"
+    ]
+  },
+  "runtime_identity_check": {
+    "exit": 0,
+    "stdout": "Runtime identity PASS"
+  },
+  "assets": {
+    "/opt/clearapi/bin/pg03-release-control.py": {
+      "exists": true,
+      "mode": "0o750",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "08f457e01f7a10ab1870a31d5818f45fb784e98dfbfcc5dc2840e8c8ad745308",
+      "bytes": 32286
+    },
+    "/opt/clearapi/bin/pg03-legacy-transition.py": {
+      "exists": true,
+      "mode": "0o750",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "c078b3c815cf741a5e0c9765fc3c38142e67ce1c6b7b3a6ed07de4ed0331572e",
+      "bytes": 46597
+    },
+    "/opt/clearapi/bin/pg03-failed-recovery.py": {
+      "exists": false
+    },
+    "/opt/clearapi/bin/runtime-identity-refresh.py": {
+      "exists": true,
+      "mode": "0o750",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "afcefce7dcf05bf853a1c44244ddf834dd9e2d6fb023f6cb75495410fc7b7b8e",
+      "bytes": 8367
+    },
+    "/opt/clearapi/bin/runtime-boot-recovery.py": {
+      "exists": true,
+      "mode": "0o750",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7c205fa4861ecbfca344f8289472be9ecd6e52abc7008f3ece4ffe3ec012b8c2",
+      "bytes": 16647
+    },
+    "/opt/clearapi/backups/bin/clearapi-backup.sh": {
+      "exists": true,
+      "mode": "0o750",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "7edb9ce97eff93992dc15b9c0f7cccf78e28009fc5a5d35ab022e653770c85ac",
+      "bytes": 13043
+    },
+    "/opt/clearapi/backups/bin/backup-identity.py": {
+      "exists": true,
+      "mode": "0o750",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "e1e21e0227b8f668bc9945e13e460542d8a07f7e6d3bdf7eaf00546180d7dc0d",
+      "bytes": 13375
+    },
+    "/opt/clearapi/config/deploy.env": {
+      "exists": true,
+      "mode": "0o600",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "9d6056ad7cb56495b585a83b0f03630620c8038b8dc7b3cf752c2f3f2022345f",
+      "bytes": 2249
+    },
+    "/opt/clearapi/edge/Caddyfile": {
+      "exists": true,
+      "mode": "0o644",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "6b1246669fbab3287a5c9e99f041cbcff0c44ebbcedb9c0a751310f7b1b05969",
+      "bytes": 2494
+    }
+  },
+  "backup_service": {
+    "exit": 0,
+    "stdout": "Result=exit-code\nExecMainStatus=1\nExecStart={ path=/opt/clearapi/backups/bin/clearapi-backup.sh ; argv[]=/opt/clearapi/backups/bin/clearapi-backup.sh ; ignore_errors=no ; start_time=[Fri 2026-10-23 19:30:30 UTC] ; stop_time=[Fri 2026-10-23 19:30:31 UTC] ; pid=1282455 ; code=exited ; status=1 }\nActiveState=failed"
+  },
+  "backup_timer": {
+    "exit": 0,
+    "stdout": "ActiveState=active\nUnitFileState=enabled"
+  },
+  "status": {
+    "exit": 0,
+    "stdout": "200"
+  },
+  "hold": {
+    "binding": {
+      "commit": "c50a53c1b89e121bcade7dac41d3f11e53a9832a",
+      "digest": "sha256:22ecaa468c784cd41ee2604dd8f3ac189960744516a508fc8c9cee3ee1724e02",
+      "run": "39347012653",
+      "target_sha256": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e"
+    },
+    "edge": {
+      "id": "54c8550bbaca837ae906dfeb28a51ac54223da0405d908940caeb1d1920c00bf",
+      "image": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+      "paused": false,
+      "restart_policy": {
+        "MaximumRetryCount": 0,
+        "Name": "unless-stopped"
+      },
+      "running": true
+    },
+    "schema": "clearapi.controlled-traffic/v1",
+    "stage": "isolated"
+  }
+}

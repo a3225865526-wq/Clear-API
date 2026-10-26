@@ -1,0 +1,335 @@
+{
+  "scope": "Local-only removal of historical billing admission gates",
+  "base_commit": "86451cd20e9e0b3b3205afab44ebc3c422218502",
+  "early_comparison_commit": "bff96adb73dda5dcf168216da6aaa4623aacdd68",
+  "workspace": "D:\\Codex\\worktrees\\clearapi-historical-gates-20261026\\clearapi-controlled-launch-20261020",
+  "branch": "codex/clearapi-historical-gates-20261026",
+  "go_version": "go1.25.1 linux/amd64",
+  "databases": {
+    "sqlite": "3.50.4",
+    "mysql": "8.4.11",
+    "postgresql": "17.6 (Debian 17.6-2.pgdg13+1)"
+  },
+  "test_commands": [
+    "go test -json ./relay/helper ./service ./relay ./relay/channel/aws -run '^Test(Basic|ProtectedBillingDatabase|ProtocolBilling|Billing(OutputAllowanceTransport|PreservesOptionalOutputLimits)|OutboundTextBudgetCoversParameterOverrides|ModelPriceHelperTieredInputPreConsumeMultiplier|ModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice|ResponsesWSOutboundBillingBudget)' -count=1 -timeout=3m",
+    "TEST_BILLING_DIALECT=mysql TEST_BILLING_DSN='root:gates-local-test@tcp(clearapi-gates-20261026-mysql:3306)/gates_final?charset=utf8mb4&parseTime=true&loc=Local' go test -json ./service -run '^Test(BasicBillingSettlement|ProtocolBillingCompatibility|ProtectedBillingDatabase)$' -count=1 -timeout=3m",
+    "TEST_BILLING_DIALECT=postgres TEST_BILLING_DSN='host=clearapi-gates-20261026-postgres user=postgres password=gates-local-test dbname=gates_final port=5432 sslmode=disable' go test -json ./service -run '^Test(BasicBillingSettlement|ProtocolBillingCompatibility|ProtectedBillingDatabase)$' -count=1 -timeout=3m",
+    "go test -json ./service -run '^Test(InterruptedStream|CompletedStreamEstimate|R7ZeroChunkClosure|R7CompletedProxySettlement)' -count=1 -timeout=3m",
+    "go test -json ./relay/helper ./relay/channel/aws ./relay/channel/openai ./controller -run 'TestModelPriceHelper|TestFixedPricePreConsumeAndRealtimeRejection|TestInputPreConsumeMultiplier|TestOaiResponses|TestOaiStreamHandler.*(Done|PartialOutput)|TestAws.*(Stream|Context|Cancel)' -count=1 -timeout=3m",
+    "go version; gofmt -w relay/helper/price_test.go; go test ./relay/helper -run '^TestBillingPreservesOptionalOutputLimits$' -count=1"
+  ],
+  "runtime": "Docker golang:1.25.1; --network none except isolated database test network clearapi-gates-20261026; module/build caches reused; no upstream credentials or production data mounted",
+  "results": [
+    {
+      "file": "D:\\AI\\API\\evidence\\historical-gates-20261026\\focused-final.jsonl",
+      "sha256": "a089c11cb7d6d7e2f527a36d75849f9ad170f0e9d5aa3e1941bd95ff632f90f4",
+      "passed_tests": [
+        "TestBasicTextReservationDoesNotRequireOutputBudget",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/uses_the_estimated_context_branch",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/output_limit_does_not_change_basic_preconsume",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/fraction_scales_estimated_input",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/fraction_above_one_scales_estimated_input",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/small_input_has_no_token_floor",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/zero_input",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/free_group",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier",
+        "TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice/fixed_price_applies_image_count",
+        "TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice/ratio_price_ignores_request_billing_ratios",
+        "TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice",
+        "TestOutboundTextBudgetCoversParameterOverrides",
+        "TestBillingPreservesOptionalOutputLimits/chat",
+        "TestBillingPreservesOptionalOutputLimits/completions",
+        "TestBillingPreservesOptionalOutputLimits/responses",
+        "TestBillingPreservesOptionalOutputLimits/claude",
+        "TestBillingPreservesOptionalOutputLimits/gemini",
+        "TestBillingPreservesOptionalOutputLimits/reasoning",
+        "TestBillingPreservesOptionalOutputLimits/explicit",
+        "TestBillingPreservesOptionalOutputLimits",
+        "TestResponsesWSOutboundBillingBudget",
+        "TestProtectedBillingDatabase/codex-less",
+        "TestProtectedBillingDatabase/codex-more",
+        "TestProtectedBillingDatabase/codex-concurrent",
+        "TestProtectedBillingDatabase/codex-unknown",
+        "TestProtectedBillingDatabase/codex-db-failure",
+        "TestProtectedBillingDatabase",
+        "TestProtocolBillingCompatibility/chat-json",
+        "TestProtocolBillingCompatibility/chat-sse",
+        "TestProtocolBillingCompatibility/completions",
+        "TestProtocolBillingCompatibility/responses-json",
+        "TestProtocolBillingCompatibility/responses-sse",
+        "TestProtocolBillingCompatibility/codex-namespace-json",
+        "TestProtocolBillingCompatibility/codex-namespace-sse",
+        "TestProtocolBillingCompatibility/claude-json",
+        "TestProtocolBillingCompatibility/claude-sse",
+        "TestProtocolBillingCompatibility/gemini-json",
+        "TestProtocolBillingCompatibility/gemini-sse",
+        "TestProtocolBillingCompatibility/embedding",
+        "TestProtocolBillingCompatibility/rerank",
+        "TestProtocolBillingCompatibility/moderation",
+        "TestProtocolBillingCompatibility/audio-speech",
+        "TestProtocolBillingCompatibility/compact-json",
+        "TestProtocolBillingCompatibility",
+        "TestProtocolBillingReferencesDoNotRequireAdmission/previous_response",
+        "TestProtocolBillingReferencesDoNotRequireAdmission/encrypted_history",
+        "TestProtocolBillingReferencesDoNotRequireAdmission/item_reference",
+        "TestProtocolBillingReferencesDoNotRequireAdmission/cached_context",
+        "TestProtocolBillingReferencesDoNotRequireAdmission/MCP",
+        "TestProtocolBillingReferencesDoNotRequireAdmission/compact_budget",
+        "TestProtocolBillingReferencesDoNotRequireAdmission",
+        "TestBillingOutputAllowanceTransport/chat",
+        "TestBillingOutputAllowanceTransport/responses",
+        "TestBillingOutputAllowanceTransport/claude",
+        "TestBillingOutputAllowanceTransport/gemini",
+        "TestBillingOutputAllowanceTransport/codex-namespace",
+        "TestBillingOutputAllowanceTransport/custom-tool",
+        "TestBillingOutputAllowanceTransport/extension-tool",
+        "TestBillingOutputAllowanceTransport/paid-search",
+        "TestBillingOutputAllowanceTransport/unbounded-search",
+        "TestBillingOutputAllowanceTransport/code-interpreter",
+        "TestBillingOutputAllowanceTransport/file-search",
+        "TestBillingOutputAllowanceTransport/image-generation",
+        "TestBillingOutputAllowanceTransport",
+        "TestBasicBillingSettlement/actual-above-estimate",
+        "TestBasicBillingSettlement/actual-below-estimate",
+        "TestBasicBillingSettlement/insufficient-wallet",
+        "TestBasicBillingSettlement/insufficient-key",
+        "TestBasicBillingSettlement/storage-failure",
+        "TestBasicBillingSettlement/insufficient-preconsume",
+        "TestBasicBillingSettlement/refund",
+        "TestBasicBillingSettlement"
+      ],
+      "failed_tests": [],
+      "packages": [
+        {
+          "Package": "github.com/QuantumNous/new-api/relay/helper",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/QuantumNous/new-api/relay/channel/aws",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/QuantumNous/new-api/relay",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/QuantumNous/new-api/service",
+          "Action": "pass"
+        }
+      ]
+    },
+    {
+      "file": "D:\\AI\\API\\evidence\\historical-gates-20261026\\mysql-final.jsonl",
+      "sha256": "12fc7dda14cf2fe469d110bed2280558bd8b99b1a468bb59586caa0330f1a6a6",
+      "passed_tests": [
+        "TestProtectedBillingDatabase/codex-less",
+        "TestProtectedBillingDatabase/codex-more",
+        "TestProtectedBillingDatabase/codex-concurrent",
+        "TestProtectedBillingDatabase/codex-unknown",
+        "TestProtectedBillingDatabase/codex-db-failure",
+        "TestProtectedBillingDatabase",
+        "TestProtocolBillingCompatibility/chat-json",
+        "TestProtocolBillingCompatibility/chat-sse",
+        "TestProtocolBillingCompatibility/completions",
+        "TestProtocolBillingCompatibility/responses-json",
+        "TestProtocolBillingCompatibility/responses-sse",
+        "TestProtocolBillingCompatibility/codex-namespace-json",
+        "TestProtocolBillingCompatibility/codex-namespace-sse",
+        "TestProtocolBillingCompatibility/claude-json",
+        "TestProtocolBillingCompatibility/claude-sse",
+        "TestProtocolBillingCompatibility/gemini-json",
+        "TestProtocolBillingCompatibility/gemini-sse",
+        "TestProtocolBillingCompatibility/embedding",
+        "TestProtocolBillingCompatibility/rerank",
+        "TestProtocolBillingCompatibility/moderation",
+        "TestProtocolBillingCompatibility/audio-speech",
+        "TestProtocolBillingCompatibility/compact-json",
+        "TestProtocolBillingCompatibility",
+        "TestBasicBillingSettlement/actual-above-estimate",
+        "TestBasicBillingSettlement/actual-below-estimate",
+        "TestBasicBillingSettlement/insufficient-wallet",
+        "TestBasicBillingSettlement/insufficient-key",
+        "TestBasicBillingSettlement/storage-failure",
+        "TestBasicBillingSettlement/insufficient-preconsume",
+        "TestBasicBillingSettlement/refund",
+        "TestBasicBillingSettlement"
+      ],
+      "failed_tests": [],
+      "packages": [
+        {
+          "Package": "github.com/QuantumNous/new-api/service",
+          "Action": "pass"
+        }
+      ]
+    },
+    {
+      "file": "D:\\AI\\API\\evidence\\historical-gates-20261026\\postgres-final.jsonl",
+      "sha256": "e483159eddf9247ca6952233d52273cfab9d86b29d6c2113824951b02c8b70a6",
+      "passed_tests": [
+        "TestProtectedBillingDatabase/codex-less",
+        "TestProtectedBillingDatabase/codex-more",
+        "TestProtectedBillingDatabase/codex-concurrent",
+        "TestProtectedBillingDatabase/codex-unknown",
+        "TestProtectedBillingDatabase/codex-db-failure",
+        "TestProtectedBillingDatabase",
+        "TestProtocolBillingCompatibility/chat-json",
+        "TestProtocolBillingCompatibility/chat-sse",
+        "TestProtocolBillingCompatibility/completions",
+        "TestProtocolBillingCompatibility/responses-json",
+        "TestProtocolBillingCompatibility/responses-sse",
+        "TestProtocolBillingCompatibility/codex-namespace-json",
+        "TestProtocolBillingCompatibility/codex-namespace-sse",
+        "TestProtocolBillingCompatibility/claude-json",
+        "TestProtocolBillingCompatibility/claude-sse",
+        "TestProtocolBillingCompatibility/gemini-json",
+        "TestProtocolBillingCompatibility/gemini-sse",
+        "TestProtocolBillingCompatibility/embedding",
+        "TestProtocolBillingCompatibility/rerank",
+        "TestProtocolBillingCompatibility/moderation",
+        "TestProtocolBillingCompatibility/audio-speech",
+        "TestProtocolBillingCompatibility/compact-json",
+        "TestProtocolBillingCompatibility",
+        "TestBasicBillingSettlement/actual-above-estimate",
+        "TestBasicBillingSettlement/actual-below-estimate",
+        "TestBasicBillingSettlement/insufficient-wallet",
+        "TestBasicBillingSettlement/insufficient-key",
+        "TestBasicBillingSettlement/storage-failure",
+        "TestBasicBillingSettlement/insufficient-preconsume",
+        "TestBasicBillingSettlement/refund",
+        "TestBasicBillingSettlement"
+      ],
+      "failed_tests": [],
+      "packages": [
+        {
+          "Package": "github.com/QuantumNous/new-api/service",
+          "Action": "pass"
+        }
+      ]
+    },
+    {
+      "file": "D:\\AI\\API\\evidence\\historical-gates-20261026\\stream-settlement.jsonl",
+      "sha256": "6cf2bbd57ece520ba50657c8943288676e689906036adaa9c412b1ac01fa9992",
+      "passed_tests": [
+        "TestInterruptedStreamLocalEstimateRetainsReservation",
+        "TestInterruptedStreamUpstreamPartialRetainsReservation",
+        "TestInterruptedStreamExactMeterSettlesExactly",
+        "TestCompletedStreamEstimateSettlesEstimate",
+        "TestR7ZeroChunkClosure",
+        "TestR7CompletedProxySettlement/non-stream",
+        "TestR7CompletedProxySettlement/stream",
+        "TestR7CompletedProxySettlement"
+      ],
+      "failed_tests": [],
+      "packages": [
+        {
+          "Package": "github.com/QuantumNous/new-api/service",
+          "Action": "pass"
+        }
+      ]
+    },
+    {
+      "file": "D:\\AI\\API\\evidence\\historical-gates-20261026\\adapters-pricing.jsonl",
+      "sha256": "2b0ee74fdb3e1fe7c4c796fef17d388be222bc7cdceddf90d2a9c4df37265862",
+      "passed_tests": [
+        "TestModelPriceHelperTieredUsesPreloadedRequestInput",
+        "TestFixedPricePreConsumeAndRealtimeRejection/HTTP_charges_once",
+        "TestFixedPricePreConsumeAndRealtimeRejection/Realtime_rejects_even_unselected_fixed_branch",
+        "TestFixedPricePreConsumeAndRealtimeRejection",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/zero_input",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/free_group",
+        "TestModelPriceHelperTieredRejectsPreConsumeOverflow",
+        "TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice/fixed_price_applies_image_count",
+        "TestModelPriceHelperUsesSuffixedOriginLikeMain",
+        "TestModelPriceHelperHonorsCustomClaudeThinkingAlias",
+        "TestModelPriceHelperCanonicalBillingLadder/level2_full_form",
+        "TestModelPriceHelperCanonicalBillingLadder/level3_thinking_form_shuffled_budget",
+        "TestModelPriceHelperCanonicalBillingLadder/level4_base_fallback",
+        "TestModelPriceHelperCanonicalBillingLadder/thinking_minus_one_bills_as_on",
+        "TestModelPriceHelperCanonicalBillingLadder",
+        "TestModelPriceHelperMigratesLegacyGeminiWildcardToCanonical",
+        "TestModelPriceHelperModifierNameFallsBackToBase",
+        "TestModelPriceHelperExemptAtNameBillsVerbatim",
+        "TestModelPriceHelperPreservesGpt51CodexMaxIdentity",
+        "TestModelPriceHelperNativeGeminiNoThinkingDoesNotAliasBillingModel",
+        "TestInputPreConsumeMultiplierLegacyAndRequestPrices/legacy-input-policy/0.5/100",
+        "TestInputPreConsumeMultiplierLegacyAndRequestPrices/legacy-input-policy/2.5/100",
+        "TestInputPreConsumeMultiplierLegacyAndRequestPrices/legacy-input-policy/1/0",
+        "TestAwsHandlersCancelSdkRequestAndSkipRetry/non-stream",
+        "TestInputPreConsumeMultiplierLegacyAndRequestPrices/request-input-policy/2.5/100",
+        "TestAwsHandlersCancelSdkRequestAndSkipRetry/stream",
+        "TestAwsHandlersCancelSdkRequestAndSkipRetry/nova",
+        "TestAwsHandlersCancelSdkRequestAndSkipRetry",
+        "TestInputPreConsumeMultiplierLegacyAndRequestPrices/fixed-input-policy/2.5/100",
+        "TestInputPreConsumeMultiplierLegacyAndRequestPrices/image-input-policy/2.5/100",
+        "TestInputPreConsumeMultiplierLegacyAndRequestPrices",
+        "TestAwsStreamHandlerUsesFinalUpstreamUsage",
+        "TestAwsStreamHandlerStopsAtClientCancellation",
+        "TestOaiResponsesToChatStreamHandlerConvertsSSEOrderAndUsage",
+        "TestOaiResponsesToChatStreamHandlerConvertsClaudeSSETerminalsAndUsage",
+        "TestOaiResponsesToChatBufferedStreamHandlerReturnsJSONFromSSE",
+        "TestOaiResponsesToChatBufferedStreamHandlerPreservesInterleavedClaudeContent",
+        "TestOaiResponsesHandlerEstimatesMissingUsageFromOutput",
+        "TestOaiResponsesHandlerCountsOutputCallsNotDeclarations",
+        "TestOaiResponsesHandlerDeclaredToolsWithoutOutputCountZero",
+        "TestOaiResponsesHandlerCountsCompletedImageGenerationOutputs",
+        "TestOaiResponsesHandlerIncompleteStatusCommitsZeroImageGeneration",
+        "TestOaiResponsesStreamHandlerDeduplicatesCompletedImageOutput",
+        "TestOaiResponsesStreamHandlerDiscardsImageOutputOnIncomplete",
+        "TestOaiResponsesStreamHandlerDoesNotCountPartialImageEvent",
+        "TestOaiResponsesHandlerRewritesSGLangCreatedAtToInt",
+        "TestOaiResponsesStreamHandlerRewritesSGLangCreatedAtToInt",
+        "TestOaiResponsesStreamHandlerKeepsNonSGLangCreatedAt",
+        "TestOaiStreamHandlerMarksMissingDoneAsIncomplete",
+        "TestOaiStreamHandlerKeepsDoneForCompleteStream",
+        "TestOaiStreamHandlerBillsPartialOutputWithoutDone/estimated",
+        "TestOaiStreamHandlerBillsPartialOutputWithoutDone/upstream_usage",
+        "TestOaiStreamHandlerBillsPartialOutputWithoutDone"
+      ],
+      "failed_tests": [
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/reserves_the_most_expensive_possible_branch",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/bound_includes_every_pricing_branch",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/fraction_cannot_underreserve",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/fraction_above_one_increases_input_bound",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier/small_input_has_no_token_floor",
+        "TestModelPriceHelperTieredInputPreConsumeMultiplier",
+        "TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice/ratio_price_ignores_request_billing_ratios",
+        "TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice"
+      ],
+      "packages": [
+        {
+          "Package": "github.com/QuantumNous/new-api/relay/helper",
+          "Action": "fail"
+        },
+        {
+          "Package": "github.com/QuantumNous/new-api/relay/channel/aws",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/QuantumNous/new-api/relay/channel/openai",
+          "Action": "pass"
+        },
+        {
+          "Package": "github.com/QuantumNous/new-api/controller",
+          "Action": "pass"
+        }
+      ]
+    },
+    {
+      "file": "D:\\AI\\API\\evidence\\historical-gates-20261026\\helper-cleanup.log",
+      "sha256": "838bbd87156fda7844f28980e53245209a248ee6a4d64b622e9095bffd4f1b6a",
+      "passed_tests": [],
+      "failed_tests": [],
+      "packages": []
+    }
+  ],
+  "initial_failures": "Old output-budget expectations in two helper tests failed in adapters-pricing.jsonl, then were updated for basic input preconsume and passed in focused-final.jsonl. Earlier interrupted-stream fixtures were changed to explicitly reserve their synthetic held amount; stream-settlement.jsonl passed. Initial logs remain in the external evidence directory.",
+  "verification_limits": [
+    "No full historical regression matrix",
+    "No new schema, SQL, drivers or database model changes",
+    "No real paid upstream requests",
+    "No production deployment",
+    "No push or merge",
+    "Local deployment DryRun and release image build not run"
+  ],
+  "decision": "Ready to enter local deployment preflight; not a production release authorization or a claim that the reported stream incident is fixed"
+}

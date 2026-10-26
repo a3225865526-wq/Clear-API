@@ -1,0 +1,21 @@
+test_actual_old_release_and_distinct_identity_semantics (__main__.BackupIdentityTest.test_actual_old_release_and_distinct_identity_semantics) ... ok
+test_archive_capture_keeps_config_and_engine_identity_distinct (__main__.BackupIdentityTest.test_archive_capture_keeps_config_and_engine_identity_distinct) ... ok
+test_missing_revision_rejected (__main__.BackupIdentityTest.test_missing_revision_rejected) ... ok
+test_missing_override_rejected (__main__.BackupIdentityTest.test_missing_override_rejected) ... ok
+test_empty_override_rejected (__main__.BackupIdentityTest.test_empty_override_rejected) ... ok
+test_release_commit_mismatch_rejected (__main__.BackupIdentityTest.test_release_commit_mismatch_rejected) ... ok
+test_release_image_mismatch_rejected (__main__.BackupIdentityTest.test_release_image_mismatch_rejected) ... ok
+test_release_digest_mismatch_rejected (__main__.BackupIdentityTest.test_release_digest_mismatch_rejected) ... ok
+test_override_does_not_pin_effective_image_rejected (__main__.BackupIdentityTest.test_override_does_not_pin_effective_image_rejected) ... ok
+test_compose_image_mismatch_rejected (__main__.BackupIdentityTest.test_compose_image_mismatch_rejected) ... ok
+test_unverified_repo_digest_rejected (__main__.BackupIdentityTest.test_unverified_repo_digest_rejected) ... ok
+test_floating_compose_reference_rejected (__main__.BackupIdentityTest.test_floating_compose_reference_rejected) ... ok
+test_container_change_during_backup_rejected (__main__.BackupIdentityTest.test_container_change_during_backup_rejected) ... ok
+test_stopped_backup_is_explicit_and_rechecks_writer_isolation (__main__.BackupIdentityTest.test_stopped_backup_is_explicit_and_rechecks_writer_isolation) ... ok
+test_stopped_backup_rejects_restart_or_incident_drift (__main__.BackupIdentityTest.test_stopped_backup_rejects_restart_or_incident_drift) ... ok
+test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history (__main__.BackupIdentityTest.test_stopped_incident_encrypted_backup_preserves_failed_identity_and_history) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 5.601s
+
+OK

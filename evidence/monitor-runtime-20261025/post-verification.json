@@ -1,0 +1,108 @@
+{
+  "gateway": {
+    "id": "3c1e4ab2ae3c4680bde376d9893492ed79b5174a8b9362ff86887064ae474f2c",
+    "created": "2026-10-25T06:13:09.68791956Z",
+    "started": "2026-10-25T06:13:10.011644231Z",
+    "engine_id": "sha256:61614562f14aeb12bfd060e766510a1c727802fe92eea588afe6c652484b9c08",
+    "revision": "1aef1aec0e6337992f382836aaeea62c07eb41fd",
+    "repo_digests": [
+      "clearapi-local@sha256:61614562f14aeb12bfd060e766510a1c727802fe92eea588afe6c652484b9c08"
+    ],
+    "binary_sha256": "fcb484e1a07aef6dd2f22d2508aa3df1976c14cb928bfa856674697107ea4a57"
+  },
+  "state_current": {
+    "archive_sha256": "996d0af25b4113070b0c83f6436425d2ca7dabac346e41f0044c0b323709919d",
+    "candidate_commit": "1aef1aec0e6337992f382836aaeea62c07eb41fd",
+    "deployed_at_utc": "2026-10-25T06:13:22Z",
+    "deployment_method": "local-build-ssh-archive-v1",
+    "image_ref": "clearapi-local:1aef1aec0e6337992f382836aaeea62c07eb41fd",
+    "migration_mode": "preflight-only (no flags configured)",
+    "new_api_image_id": "sha256:3c2f84e2b4a162313676320f4aa640114136993dc03fbb20c159c505b9d7a47f",
+    "previous_image_id": "sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728",
+    "status": "success",
+    "tag": "clearapi-local:1aef1aec0e6337992f382836aaeea62c07eb41fd",
+    "workflow_run": "local-ssh"
+  },
+  "backup": {
+    "id": "20261025T061238Z",
+    "manifest_sha256": "e5c64bf7ba3d36c5d1ec4fa1863b17d13607f765218ce60d1943e3e3201a862c",
+    "running_identity": {
+      "archive_sha256": "94101ca6fb96c2b7dc653de29f299e4ca4b5d0535a253547f1a3ad6308c3edce",
+      "compose_base_sha256": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+      "compose_environment_sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a",
+      "compose_inputs_sha256": {
+        "compose-candidate.yaml": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+        "compose-pg03.yaml": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+        "compose-website-recovery-39957948359.json": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+        "docker-compose.prod.yml": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa"
+      },
+      "compose_override_sha256": "417366a4fe0c717859d7a051d9b0d431c465c6cb46ea6e3cf9c6d9e251962382",
+      "container_created": "2026-10-24T15:18:11.361128443Z",
+      "container_id": "aaf0638277ab12b71f6df795066e315d196e64952c4aa951d09d6998e0b433e0",
+      "deployment_method": "local-build-ssh-archive-v1",
+      "deployment_state_file": "local-deploy-state.json",
+      "docker_engine_image_id": "sha256:aec51220165189cae1eec95882de39e1ebb5c2c51a7ba195eb1ad8747dba3020",
+      "docker_image_id": "sha256:830b9755da75b6e1e085d24323eb48c4213a9f0b5b317abf12966fc240281728",
+      "ghcr_digest": null,
+      "ghcr_repo_digest": null,
+      "image_ref": "clearapi-local:dc685cbe338e8f700cae347e2eaac351d984c9c7",
+      "oci_revision": "dc685cbe338e8f700cae347e2eaac351d984c9c7",
+      "original_incident": {
+        "controlled-launch-state.json": "57a7152a312eba02e2c81b2973981894640c2088782827e6d2d112b2235dff4d",
+        "pg03-target-manifest.json": "521e60ce3edbe4cd073decaedd70134daf3d22d8039d0fed4de427b2318cb39e",
+        "release-manifest.json": "6c308146551dfab395e7202f775b23121ec460757e6b56b7f107decb5cae63d3"
+      },
+      "release_manifest_sha256": "7e3f6037e57df6cd24eb0eb632ddca5cb42400412afe044b3a55654bc4eebb7a"
+    },
+    "encrypted_artifact": {
+      "name": "clearapi-backup-20261025T061238Z.tar.gz.gpg",
+      "bytes": 12420860,
+      "sha256": "eb3c0416dd2bf902d527672f04b5f2cd5796b9484816848a8c359c0983c042e2"
+    },
+    "ciphertext_checksum_verified": true,
+    "actual_bytes": 12420860,
+    "systemd": "Result=success\nExecMainStatus=0\n"
+  },
+  "installed_assets": {
+    "/opt/clearapi/bin/clearapi-local-deploy.py": "b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f",
+    "/opt/clearapi/bin/local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+    "/opt/clearapi/backups/bin/clearapi-backup.sh": "8a59049196861273b2c0e2b59e9c46f7f70dbbfba6dddf2740fadb2760fff8cc"
+  },
+  "monitor": {
+    "policy": {
+      "enabled": false,
+      "daily_requests": 0,
+      "max_concurrent": 1,
+      "daily_cost_micros": 0
+    },
+    "probes": 0,
+    "monitors": [
+      {
+        "id": 1,
+        "enabled": false,
+        "archived": true,
+        "published": false,
+        "allowlisted": false
+      }
+    ],
+    "channel_status": [
+      {
+        "id": 1,
+        "status": 1
+      },
+      {
+        "id": 2,
+        "status": 2
+      },
+      {
+        "id": 3,
+        "status": 2
+      }
+    ]
+  },
+  "same_local_binary": true,
+  "deployment_tools_match_source": true,
+  "unchanged_announcements_prices_pg_executor_caddy_flags": true,
+  "dynamic_real_execution": "NOT_EXECUTED: supplier cost evidence absent",
+  "utc": "2026-10-25T06:14:32.817995+00:00"
+}

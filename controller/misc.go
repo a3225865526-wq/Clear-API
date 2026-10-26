@@ -133,7 +133,8 @@ func GetStatus(c *gin.Context) {
 		data["api_info"] = console_setting.GetApiInfo()
 	}
 	if cs.AnnouncementsEnabled {
-		data["announcements"] = console_setting.GetAnnouncements()
+		data["announcements"] = console_setting.GetAnnouncementsFor("timeline")
+		data["notification_announcements"] = console_setting.GetAnnouncementsFor("notice")
 	}
 	if cs.FAQEnabled {
 		data["faq"] = console_setting.GetFAQ()

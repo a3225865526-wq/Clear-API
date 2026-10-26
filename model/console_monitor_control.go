@@ -83,7 +83,7 @@ func MigrateConsoleMonitoringDB(db *gorm.DB) error {
 }
 
 func ConsoleMonitoringReady(db *gorm.DB) bool {
-	if db == nil || !db.Migrator().HasTable(&ConsoleMonitor{}) || !db.Migrator().HasTable(&ConsoleProbe{}) || !db.Migrator().HasTable(&ConsoleMonitorPolicy{}) || !db.Migrator().HasTable(&ConsoleMonitorAttempt{}) || !db.Migrator().HasColumn(&ConsoleMonitorPolicy{}, "schema_version") {
+	if db == nil || !db.Migrator().HasTable(&ConsoleMonitor{}) || !db.Migrator().HasTable(&ConsoleProbe{}) || !db.Migrator().HasTable(&ConsoleMonitorPolicy{}) || !db.Migrator().HasTable(&ConsoleMonitorAttempt{}) || !db.Migrator().HasColumn(&ConsoleMonitorPolicy{}, "schema_version") || !db.Migrator().HasColumn(&ConsoleProbe{}, "task_id") {
 		return false
 	}
 	var policy ConsoleMonitorPolicy
@@ -247,6 +247,14 @@ func SaveConsoleMonitorPolicy(ctx context.Context, db *gorm.DB, p ConsoleMonitor
 	})
 }
 
+// LockConsoleMonitorPolicy serializes configuration with admission on every
+// supported database, using the same dialect-aware lock as reservations.
+func LockConsoleMonitorPolicy(tx *gorm.DB) (*ConsoleMonitorPolicy, error) {
+	var policy ConsoleMonitorPolicy
+	err := lockForUpdate(tx).First(&policy, 1).Error
+	return &policy, err
+}
+
 func SetConsoleMonitorSwitch(ctx context.Context, db *gorm.DB, id int, action string, value bool) error {
 	if !ConsoleMonitoringReady(db) {
 		return ErrMonitorNotReady
@@ -305,7 +313,7 @@ func ReserveConsoleMonitorAttempt(ctx context.Context, db *gorm.DB, id int, now 
 		if err := tx.First(&m, id).Error; err != nil {
 			return err
 		}
-		if !m.Enabled || m.Archived {
+		if !m.Allowlisted || !m.Published || !m.Enabled || m.Archived {
 			return ErrMonitorPaused
 		}
 		if err := ValidateMonitorTarget(tx, &m); err != nil {

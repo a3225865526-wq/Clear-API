@@ -1,0 +1,7 @@
+{
+  "observed_at": "2026-10-24T02:53:18.696225+00:00",
+  "phase": "maintenance-progress",
+  "exit": 0,
+  "stdout": "{\"backup\": \"Result=success\\nExecMainStatus=0\\nActiveState=inactive\\nSubState=dead\", \"edge\": {\"Running\": false, \"StartedAt\": \"2026-10-24T02:52:19.16756893Z\", \"RestartPolicy\": {\"Name\": \"no\", \"MaximumRetryCount\": 0}}, \"recent_backup_log\": [\"2026-10-23T10:21:09Z OK backup_id=20261023T102102Z enc_sha=995100eb925127adcbb063bf8e7f8cee93597d3f5e11e488d7835d2ad988e609\", \"2026-10-23T10:21:09Z END backup_id=20261023T102102Z rc=0\", \"2026-10-23T19:30:30Z START backup_id=20261023T193030Z\", \"2026-10-23T19:30:31Z FAIL backup_id=20261023T193030Z phase=identity_capture rc=1\", \"2026-10-23T19:30:31Z END backup_id=20261023T193030Z rc=1\", \"2026-10-24T02:51:43Z START backup_id=20261024T025143Z\", \"2026-10-24T02:52:07Z OK backup_id=20261024T025143Z enc_sha=7e77bb3aba44e22bc3be0be2b272f454ce122811e2676cac44bec3cfa732f54a\", \"2026-10-24T02:52:07Z END backup_id=20261024T025143Z rc=0\"]}\n",
+  "stderr": ""
+}

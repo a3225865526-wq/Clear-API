@@ -1,0 +1,418 @@
+{
+  "utc": "2026-10-25T03:07:51.346294+00:00",
+  "sources": {
+    "audit": {
+      "worktree": "D:\\Codex\\worktrees\\clearapi-abce-release-20261024\\clearapi-controlled-launch-20261020",
+      "head": "a9fe76f301c023fb8ae716901bbe4f94a4184b3e",
+      "branch": "codex/clearapi-abce-release-20261024",
+      "status": " M CLEARAPI_MASTER_STATUS.md\n M web/src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx\n M web/src/features/system-settings/hooks/use-update-option.ts\n?? CLEARAPI_ABCE_FULL_AUDIT_20261024.md\n?? evidence/abce-full-audit-20261024/B-browser-before-fix.json\n?? evidence/abce-full-audit-20261024/B-browser-fixed-network.json\n?? evidence/abce-full-audit-20261024/B-isolated-cleanup-page.png\n?? evidence/abce-full-audit-20261024/B-isolated-cleanup.json\n?? evidence/abce-full-audit-20261024/announcement-management-add-save-entry.png\n?? evidence/abce-full-audit-20261024/announcement-stale-before-fix.png\n?? evidence/abce-full-audit-20261024/announcement-visible-after-reload.png\n?? evidence/abce-full-audit-20261024/announcement-visible-normal-user-after-fix.png\n?? evidence/abce-full-audit-20261024/announcement-visible-without-reload-after-fix.png\n?? evidence/abce-full-audit-20261024/auto-release-variables.json\n?? evidence/abce-full-audit-20261024/isolated-resources-cleanup.json\n?? evidence/abce-full-audit-20261024/monitor-activation-source.json\n?? evidence/abce-full-audit-20261024/pricing-locales-bundle.json\n?? evidence/abce-full-audit-20261024/production-artifacts-and-monitor.json\n?? evidence/abce-full-audit-20261024/production-end-snapshot.json\n?? evidence/abce-full-audit-20261024/production-fresh.json\n?? evidence/abce-full-audit-20261024/provider-mock-wire.json\n?? evidence/abce-full-audit-20261024/release-build-record.json\n?? evidence/abce-full-audit-20261024/runtime-mock-and-permissions.json\n?? evidence/abce-full-audit-20261024/source-comparison.json\n?? evidence/abce-full-audit-20261024/system-notice-has-no-add-publish.png\n?? evidence/abce-full-audit-20261024/validation-current.json\n?? evidence/abce-full-audit-20261024/workflows.json\n?? evidence/abce-full-audit-20261024/workspace-inventory.json\n?? web/src/features/system-settings/hooks/__tests__/use-update-option.test.tsx\n",
+      "files": {
+        "CLEARAPI_ABCE_FULL_AUDIT_20261024.md": {
+          "sha256": "517539f0be99e916ba0b52e7a83c01ddcc6009fccbf23a627134e2a51abbd846",
+          "bytes": 28446
+        },
+        "CLEARAPI_MASTER_STATUS.md": {
+          "sha256": "79ddd87089fdd34e802b3952e25dc0d77c2f821c32d6e891dc9af0b0ed84fe0c",
+          "bytes": 262978
+        },
+        "evidence/abce-full-audit-20261024/B-browser-before-fix.json": {
+          "sha256": "38bfa09163eda5bf2b8ff69120a0010576477d4f59007e61a49965da32ee6f6f",
+          "bytes": 2382
+        },
+        "evidence/abce-full-audit-20261024/B-browser-fixed-network.json": {
+          "sha256": "86dd033a60fab301fb6dbc0be60e73083a31287d2ce7214db4b21396fa91bffc",
+          "bytes": 7027
+        },
+        "evidence/abce-full-audit-20261024/B-isolated-cleanup-page.png": {
+          "sha256": "bac846bb29c99ea0d2f609ff56e5cbe1ac94ff02a2f414483436df17b3cbc71b",
+          "bytes": 14516
+        },
+        "evidence/abce-full-audit-20261024/B-isolated-cleanup.json": {
+          "sha256": "b7ae01a22f433cffcb1752cbb7cfd147225c45f64143c9365188f6802d12dbf5",
+          "bytes": 132
+        },
+        "evidence/abce-full-audit-20261024/announcement-management-add-save-entry.png": {
+          "sha256": "f5aec442d9d183ccedf08ff44c765a1d1384d4f8b45d6307d7ae2ff38a88a4a9",
+          "bytes": 16557
+        },
+        "evidence/abce-full-audit-20261024/announcement-stale-before-fix.png": {
+          "sha256": "f2d99ad29a7d70830add8134cbd6d7870539bd86633e51196ee15c54ffe59375",
+          "bytes": 13916
+        },
+        "evidence/abce-full-audit-20261024/announcement-visible-after-reload.png": {
+          "sha256": "4e07c6125a4f035bce5310347d01efc290dad32bea9877513ae5989514a6bb37",
+          "bytes": 16528
+        },
+        "evidence/abce-full-audit-20261024/announcement-visible-normal-user-after-fix.png": {
+          "sha256": "678245ee53d2dab804279f91bb2c7b27c2656c6066a7ead5f581d662075c8766",
+          "bytes": 21259
+        },
+        "evidence/abce-full-audit-20261024/announcement-visible-without-reload-after-fix.png": {
+          "sha256": "c2d9554b9fe34780badf26c76891d31e3070cb1d26a7256de6c33730ad74bb2e",
+          "bytes": 15653
+        },
+        "evidence/abce-full-audit-20261024/auto-release-variables.json": {
+          "sha256": "89c0a607a59f60db7e6bf2080f182e6b0acfd4d352fd0831f1ee74272c6437b1",
+          "bytes": 161
+        },
+        "evidence/abce-full-audit-20261024/isolated-resources-cleanup.json": {
+          "sha256": "c071d8c4e0f69163c326e3c3d14735bca6ee0fb80e841807755ca714f6a4856e",
+          "bytes": 460
+        },
+        "evidence/abce-full-audit-20261024/monitor-activation-source.json": {
+          "sha256": "930da6f7364086729c304147970f1b1e50d552e4f2a951b1c6f6c6498b8cb59c",
+          "bytes": 1475
+        },
+        "evidence/abce-full-audit-20261024/pricing-locales-bundle.json": {
+          "sha256": "1dcdf449e822ae8d7c64b0ac7a73fccca6d43868a76937c2036f0d39533ecfb3",
+          "bytes": 20245
+        },
+        "evidence/abce-full-audit-20261024/production-artifacts-and-monitor.json": {
+          "sha256": "f2dfe848b231439ee8fe1d6180d48fd46afb09a1bb5020cbad6a64bd3e261b77",
+          "bytes": 4003
+        },
+        "evidence/abce-full-audit-20261024/production-end-snapshot.json": {
+          "sha256": "361363c16d5bae8b6c9f546724dcb78cdf9aee3f8501d9fe867e1df136425635",
+          "bytes": 2302
+        },
+        "evidence/abce-full-audit-20261024/production-fresh.json": {
+          "sha256": "7bb7b81be81e9e5890448d7b3b471fe872071009354542d53b30e5ac7edcaac3",
+          "bytes": 30658
+        },
+        "evidence/abce-full-audit-20261024/provider-mock-wire.json": {
+          "sha256": "a1e1ef079c2c4c3f2bd6d0abf1490eed7de1fc28c3bad291010dfeb73e362b13",
+          "bytes": 1628
+        },
+        "evidence/abce-full-audit-20261024/release-build-record.json": {
+          "sha256": "431a03f55f60b97b18503c63a2e8157f317835b2d4cfea5133a59c971ae33848",
+          "bytes": 2335
+        },
+        "evidence/abce-full-audit-20261024/runtime-mock-and-permissions.json": {
+          "sha256": "27d8c37366bddb3b1c2dddb33e9d762ad15389debd1b96ca7f50672b9d88c3e1",
+          "bytes": 75781
+        },
+        "evidence/abce-full-audit-20261024/source-comparison.json": {
+          "sha256": "0423d5e2e0a0159e96bd9c8e79fb2631b864d57a49943b871b7aaef606e3f0cf",
+          "bytes": 14141
+        },
+        "evidence/abce-full-audit-20261024/system-notice-has-no-add-publish.png": {
+          "sha256": "84ccda43ccfa4b91ffe6645b90cccd8cf51e9045c5eee9655950cbf90ef2301e",
+          "bytes": 11800
+        },
+        "evidence/abce-full-audit-20261024/validation-current.json": {
+          "sha256": "49154c27aaedd129cac2c1dc56d79a61c1b1a0894f4b531abd60936c6b3d6f0d",
+          "bytes": 4796
+        },
+        "evidence/abce-full-audit-20261024/workflows.json": {
+          "sha256": "ac7fe2f559580ed92dc59c64f46bc8d39f8f83537ffa19c7a8dcec3f07965aa4",
+          "bytes": 1108
+        },
+        "evidence/abce-full-audit-20261024/workspace-inventory.json": {
+          "sha256": "dff3bf7c664bccddbf45cd78b311ee5885d80c12c3399a1ff2c3f479077f3b7e",
+          "bytes": 20153
+        },
+        "web/src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx": {
+          "sha256": "830d319ac9ddec307448737f691ea89dc50f76463970699524a690fb0eaa1089",
+          "bytes": 7496
+        },
+        "web/src/features/system-settings/hooks/__tests__/use-update-option.test.tsx": {
+          "sha256": "af89b93b587f271826f33f95f01fb4359b7de7f88ef9560400163a5c8bcc9fcc",
+          "bytes": 4740
+        },
+        "web/src/features/system-settings/hooks/use-update-option.ts": {
+          "sha256": "69d4d5e348433eb13d3cf2e7eb6e3e1bbd19f68abd4e09980f5a3e812a944396",
+          "bytes": 3842
+        }
+      },
+      "snapshot_branch": "codex/abce-audit-preserved-20261025",
+      "snapshot_commit": "8230b6013c36b5ead13217c46bffcc18e6be039d"
+    },
+    "monitor": {
+      "worktree": "D:\\AI\\runtime\\clearapi-monitor-runtime-activation",
+      "head": "3124d8a1b6bbc44e8a6203266567f72c1734c877",
+      "branch": "codex/monitor-runtime-activation",
+      "status": " M controller/console_monitor_admin.go\n M model/console_monitor_control.go\n M service/console_probe.go\n M service/console_probe_test.go\n?? controller/console_monitor_probe.go\n",
+      "files": {
+        "controller/console_monitor_admin.go": {
+          "sha256": "696971d633b4f4419e9d7bb72dda6991c5481856dfd3fdac1d49c464c1a62a50",
+          "bytes": 7882
+        },
+        "controller/console_monitor_probe.go": {
+          "sha256": "548d4642c1bdba56037cdaef4078bba85a517b3a538cc8728b3f5c01e7769407",
+          "bytes": 5098
+        },
+        "model/console_monitor_control.go": {
+          "sha256": "444bba1c54fe45c406badf943e82ba53ef823f9e625ffd7c76f0f26846a2d439",
+          "bytes": 15594
+        },
+        "service/console_probe.go": {
+          "sha256": "0e9d6101a6c6ac085c6574b7f508badfb9eea06c892cfe5f9ada94ebd9e1100f",
+          "bytes": 11450
+        },
+        "service/console_probe_test.go": {
+          "sha256": "836114f921c0e31b6ca1f98935b78bb88d53e09e5aeea9c81f626dd81cb3903c",
+          "bytes": 47021
+        }
+      },
+      "snapshot_branch": "codex/monitor-activation-preserved-20261025",
+      "snapshot_commit": "c3dd1a2cfecbf474ce673f792e2ae3dcb032e19e"
+    }
+  },
+  "worktrees": [
+    {
+      "worktree": "C:/Users/Chen/AppData/Local/Temp/opencode/clearapi-probe-cost-policy",
+      "HEAD": "7af3b1292793ae1def4df59e680f8107cb946c39",
+      "branch": "refs/heads/codex/probe-cost-policy",
+      "prunable": "gitdir file points to non-existent location",
+      "status": "UNAVAILABLE"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-announcements",
+      "HEAD": "f7b4884dbc3bdba2633ff661a3adb3c407f8472a",
+      "branch": "refs/heads/codex/clearapi-announcements",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-auto-cicd-20261015",
+      "HEAD": "520007d535b545a8742c1a6de70a74a9367c619d",
+      "branch": "refs/heads/codex/clearapi-auto-cicd-20261015",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-auto-deploy-v2-proof-20261017",
+      "HEAD": "598988a6110fa2a15964a1e4b2201c7f6dbb71e7",
+      "branch": "refs/heads/codex/auto-deploy-v2-proof-20261017",
+      "status": "?? scripts/__pycache__/pg03-legacy-transition.cpython-314.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-312.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-314.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-314.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-314.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-312.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-314.pyc\n?? scripts/ci/__pycache__/test-automatic-release.cpython-312.pyc\n?? scripts/ci/__pycache__/test-automatic-release.cpython-314.pyc\n?? scripts/ci/__pycache__/test-pg03-release.cpython-312.pyc\n?? scripts/ci/__pycache__/test-pg03-release.cpython-314.pyc\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-auto-rehearsal-20261017",
+      "HEAD": "0e15d7ace5e20a4e257fbb1afba65d98c04d23b6",
+      "branch": "refs/heads/codex/rehearsal-failure-remediation-20261017",
+      "status": "?? scripts/__pycache__/pg03-legacy-transition.cpython-314.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-312.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-314.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-314.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-314.pyc\n?? scripts/ci/__pycache__/assemble-release-proof.cpython-312.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-312.pyc\n?? scripts/ci/__pycache__/produce-gate-receipt.cpython-312.pyc\n?? scripts/ci/__pycache__/test-legacy-transition.cpython-314.pyc\n?? scripts/ci/__pycache__/test-rehearsal-producer.cpython-312.pyc\n?? scripts/ci/__pycache__/verify-rehearsal-input.cpython-312.pyc\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-commercial-autodeploy-20261016",
+      "HEAD": "6edc66f7c70b7a459832a8851e166fa8e8206f10",
+      "branch": "refs/heads/codex/clearapi-rc-event-contract-20261017",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-controlled-launch-20261020",
+      "HEAD": "a032815cb6244a7ee5e812de82f8300c02554e99",
+      "branch": "refs/heads/codex/clearapi-non-pg03-rc-20261022",
+      "status": " M .github/workflows/ci.yml\n M .github/workflows/deploy-production.yml\n M CLEARAPI_MASTER_STATUS.md\n M evidence/non-pg03-20261021/RESULT.md\n M evidence/pg03-autonomous-progress-20261021.md\n M evidence/pg03-production-approval-package-20261021.md\n M scripts/ci/automatic-release.py\n M scripts/ci/test-automatic-release.py\n M scripts/ci/test-pg03-observation.py\n M scripts/pg03-observation.py\n M scripts/pg03-successor-host.py\n?? CLEARAPI_READONLY_IDENTITY_ADMIN_CHECKLIST.md\n?? container\n?? evidence/boot-install-compatibility-stop-20261020T075513Z.json\n?? evidence/boot-recovery-assets-supplement-rc39357150402-attempt1-20261020.json\n?? evidence/boot-recovery-assets-supplement-rc39357150402-attempt1-20261020.json.sha256\n?? evidence/boot-recovery-dependency-preflight-20261020T074500Z.json\n?? evidence/boot-recovery-independent-preflight-20261020T073948Z.json\n?? evidence/boot-recovery-independent-review-20261020.md\n?? evidence/boot-recovery-install-authorization-20261020.md\n?? evidence/boot-recovery-install-local-review-20261020.md\n?? evidence/boot-recovery-preflight-followup-20261020T074134Z.json\n?? evidence/controlled-recovery-local-review-20261020.md\n?? evidence/controlled-recovery-ssh-audit-20261020.md\n?? evidence/non-pg03-20261021/RESULT.before-approved-diagnostic.md\n?? evidence/non-pg03-20261021/RESULT.before-continuation.md\n?? evidence/non-pg03-20261021/RESULT.before-local-repair.md\n?? evidence/non-pg03-20261021/approved-diagnostic-inventory.sha256.json\n?? evidence/non-pg03-20261021/backend-ci.log\n?? evidence/non-pg03-20261021/bounded-diagnostic-execution.json\n?? evidence/non-pg03-20261021/bounded-diagnostic-findings.json\n?? evidence/non-pg03-20261021/bounded-production-diagnostic.py\n?? evidence/non-pg03-20261021/candidate-verification.json\n?? evidence/non-pg03-20261021/ci-run.json\n?? evidence/non-pg03-20261021/compose.non-pg03.candidate.yaml\n?? evidence/non-pg03-20261021/continuation-inventory.sha256.json\n?? evidence/non-pg03-20261021/continuation-local-audit.json\n?? evidence/non-pg03-20261021/continuation-local-audit.py\n?? evidence/non-pg03-20261021/final-boundary.json\n?? evidence/non-pg03-20261021/formal-rc-39698686281/artifact-hashes.json\n?? evidence/non-pg03-20261021/formal-rc-39698686281/gateway-image-release.json\n?? evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/artifact-hashes.json\n?? evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/boot-recovery-install.py\n?? evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/gateway-image-release.json\n?? evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/inventory.json\n?? evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/scripts/runtime-boot-recovery.py\n?? evidence/non-pg03-20261021/formal-rc-39698686281/runtime-assets/scripts/runtime-identity-refresh.py\n?? evidence/non-pg03-20261021/frontend-ci.log\n?? evidence/non-pg03-20261021/inspection-run.json\n?? evidence/non-pg03-20261021/inventory.sha256.json\n?? evidence/non-pg03-20261021/latest-deployment-failure-projection.log\n?? evidence/non-pg03-20261021/local-backup-diagnostic-after.log\n?? evidence/non-pg03-20261021/local-backup-diagnostic-before.log\n?? evidence/non-pg03-20261021/local-minimal-repair.patch\n?? evidence/non-pg03-20261021/local-mode-proof-final-tests.log\n?? evidence/non-pg03-20261021/local-mode-proof-linux-tests.log\n?? evidence/non-pg03-20261021/local-mode-proof-tests.log\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/artifact-hashes.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/billing-migrate\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/build-metadata.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/build.log\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/entrypoint-secure.sh\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/finance-migrate\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/gateway-image-release.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/image.tar\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/legacy-store-retire\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/production-bootstrap\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/artifact-hashes.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/boot-recovery-install.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/gateway-image-release.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/inventory.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/scripts/runtime-boot-recovery.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/runtime-assets/scripts/runtime-identity-refresh.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/source-changes.txt\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/source-identity.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build1/source.tar\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/artifact-hashes.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/billing-migrate\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/build-metadata.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/build.log\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/entrypoint-secure.sh\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/finance-migrate\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/gateway-image-release.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/image.tar\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/legacy-store-retire\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/production-bootstrap\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/artifact-hashes.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/boot-recovery-install.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/gateway-image-release.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/inventory.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/scripts/runtime-boot-recovery.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/runtime-assets/scripts/runtime-identity-refresh.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/source-changes.txt\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/source-identity.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build3/source.tar\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/artifact-hashes.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/billing-migrate\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/build-metadata.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/build.log\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/entrypoint-secure.sh\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/finance-migrate\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/gateway-image-release.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/image.tar\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/legacy-store-retire\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/production-bootstrap\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/artifact-hashes.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/boot-recovery-install.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/gateway-image-release.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/inventory.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/scripts/runtime-boot-recovery.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/runtime-assets/scripts/runtime-identity-refresh.py\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/source-changes.txt\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/source-identity.json\n?? evidence/non-pg03-20261021/local-off-rc-20261022T-build4/source.tar\n?? evidence/non-pg03-20261021/local-producer-compatibility-tests.log\n?? evidence/non-pg03-20261021/local-repair-receipt.json\n?? evidence/non-pg03-20261021/mysql-ci.log\n?? evidence/non-pg03-20261021/off-backup-collision-tests.log\n?? evidence/non-pg03-20261021/off-backup-identity-tests-full.log\n?? evidence/non-pg03-20261021/off-preparation-policy-tests-full.log\n?? evidence/non-pg03-20261021/off-preparation-policy-tests.log\n?? evidence/non-pg03-20261021/off-release-39808120659/artifact-hashes.json\n?? evidence/non-pg03-20261021/off-release-39808120659/automatic-deploy-skipped.json\n?? evidence/non-pg03-20261021/off-release-39808120659/gateway-image-release.json\n?? evidence/non-pg03-20261021/off-release-39808120659/local-evidence-hashes.json\n?? evidence/non-pg03-20261021/off-release-39808120659/rc-run.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/backup_restore.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/billing.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/mysql_upgrade_idempotency.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/ordinary_provider_usage_billing.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/pool_disabled.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/postgres_upgrade_idempotency.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/replay_and_duplicate_charge.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/runtime_integrity.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/safe_rollback.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/sqlite_upgrade_idempotency.json\n?? evidence/non-pg03-20261021/off-release-39808120659/receipts/state_isolation.json\n?? evidence/non-pg03-20261021/off-release-39808120659/rehearsal-jobs.json\n?? evidence/non-pg03-20261021/off-release-39808120659/rehearsal-run.json\n?? evidence/non-pg03-20261021/off-release-39808120659/release-proof.json\n?? evidence/non-pg03-20261021/off-release-39808120659/schema-observation.json\n?? evidence/non-pg03-20261021/off-release-39808120659/schema-rehearsal.json\n?? evidence/non-pg03-20261021/off-release-39808120659/schema-rehearsal.target.sql\n?? evidence/non-pg03-20261021/off-release-39817772180/FINAL-REVIEW.md\n?? evidence/non-pg03-20261021/off-release-39817772180/FRESH-BACKUP-JOURNAL-REPAIR-PLAN-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/FRESH-BACKUP-ONLY-PLAN-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/MINIMAL-PRODUCTION-RECOVERY-PLAN-20261023.md\n?? evidence/non-pg03-20261021/off-release-39817772180/OFF-HOST-CONTRACT-GAP-REVIEW-20261023.md\n?? evidence/non-pg03-20261021/off-release-39817772180/OFFLINE-RESTORE-PAIR-PLAN-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/OFFLINE-RESTORE-PAIR-UTC-Z-PLAN-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/OFFLINE-TRUST-BOOTSTRAP-PROPOSAL-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/PRODUCTION-DEPLOYMENT-REPORT.md\n?? evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-first-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-pair-result-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-utc-z-first-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/actual-offline-restore-utc-z-second-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/artifact-hashes.json\n?? evidence/non-pg03-20261021/off-release-39817772180/artifact-metadata.json\n?? evidence/non-pg03-20261021/off-release-39817772180/asset-reconciliation-local-check-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/automatic-deploy-jobs.json\n?? evidence/non-pg03-20261021/off-release-39817772180/automatic-deploy-skipped.json\n?? evidence/non-pg03-20261021/off-release-39817772180/basic-recovery-local-identity-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/basic-site-readiness-20261023T035743Z.json\n?? evidence/non-pg03-20261021/off-release-39817772180/continuous-fence-writer-cgroup-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/continuous-fence-writer-mapped-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/continuous-fence-writer-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/diagnostics/schema-observation.json\n?? evidence/non-pg03-20261021/off-release-39817772180/edge-basic-access-projection-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/encrypted-backup-input-readiness-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/executor-activity-window-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/executor-channel-dependency-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/executor-independent-mechanisms-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/executor-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-authorized-execution-result-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-decryption-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-failure-cleanup-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-failure-diagnostic-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-journal-repair-authorized-result-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-journal-repair-execution-20261023.py\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-journal-repair-local-validation-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-offline-transfer-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-only-approval-readiness-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-only-execution-20261023.py\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-only-local-validation-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-preparation-compatibility-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/fresh-backup-root-cause-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/gateway-image-release.json\n?? evidence/non-pg03-20261021/off-release-39817772180/historical-backup-payload-check-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/journal-fix-live-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/journal-fix-offline-candidate-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/journal-repair-formal-source-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/local-evidence-hashes.json\n?? evidence/non-pg03-20261021/off-release-39817772180/local-validation.json\n?? evidence/non-pg03-20261021/off-release-39817772180/main-ci-jobs.json\n?? evidence/non-pg03-20261021/off-release-39817772180/main-ci-run.json\n?? evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/CONTINUATION-BLOCKERS-0748.md\n?? evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/INDEPENDENT-REVIEW.md\n?? evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/compatible-tools-and-control-snapshot.tar\n?? evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/execution-plan.json\n?? evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/inventory.json\n?? evidence/non-pg03-20261021/off-release-39817772180/off-release-coverage-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-ciphertext-transfer-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-daemon-readiness-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-daemon-readiness-verified-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-decryption-discovery-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-engine-source-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-environment-preparation-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-policy-approved-install-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-policy-candidate-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-runtime-prerequisite-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/offline-trust-bootstrap-result-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pg03-checkpoint-reconciliation-result-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pg03-checkpoint-reconciliation-scope-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pg03-checkpoint-reconciliation-scope-invalid-newline-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pg03-empty-history-live-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pg03-journal-fix-validation-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pg03-off-local-validation-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pg03-running-binary-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/post-actual-restore-progress-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/post-backup-health-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pr-ci-jobs.json\n?? evidence/non-pg03-20261021/off-release-39817772180/pr-ci-run.json\n?? evidence/non-pg03-20261021/off-release-39817772180/production-current-state-20261023T0458.json\n?? evidence/non-pg03-20261021/off-release-39817772180/production-preflight-39823787085.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/backup_restore.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/billing.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/mysql_upgrade_idempotency.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/ordinary_provider_usage_billing.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/pool_disabled.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/postgres_upgrade_idempotency.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/replay_and_duplicate_charge.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/runtime_integrity.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/safe_rollback.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/sqlite_upgrade_idempotency.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/receipts/state_isolation.json\n?? evidence/non-pg03-20261021/off-release-39817772180/proof/release-proof.json\n?? evidence/non-pg03-20261021/off-release-39817772180/rc-jobs.json\n?? evidence/non-pg03-20261021/off-release-39817772180/rc-run.json\n?? evidence/non-pg03-20261021/off-release-39817772180/reconcile-empty-checkpoint-20261023.py\n?? evidence/non-pg03-20261021/off-release-39817772180/recovery-authority-trace-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/recovery-key-discovery-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/rehearsal-jobs.json\n?? evidence/non-pg03-20261021/off-release-39817772180/rehearsal-run.json\n?? evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/clearapi-backup.sh\n?? evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/inspection.json\n?? evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/pg03-release-control.py\n?? evidence/non-pg03-20261021/off-release-39817772180/remote-assets-20261023/production-deploy-v2.sh\n?? evidence/non-pg03-20261021/off-release-39817772180/restore-input-contract-check-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/artifact-hashes.json\n?? evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/boot-recovery-install.py\n?? evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/gateway-image-release.json\n?? evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/inventory.json\n?? evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/scripts/runtime-boot-recovery.py\n?? evidence/non-pg03-20261021/off-release-39817772180/runtime-assets/scripts/runtime-identity-refresh.py\n?? evidence/non-pg03-20261021/off-release-39817772180/schema-rehearsal.json\n?? evidence/non-pg03-20261021/off-release-39817772180/schema-rehearsal.target.sql\n?? evidence/non-pg03-20261021/off-release-39817772180/scope-correction-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/shared-executor-source-contract-validation-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/source-identity.json\n?? evidence/non-pg03-20261021/off-release-39817772180/source-inventory-and-off-delta-validation-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/source-inventory-formal-ci-39942181557.json\n?? evidence/non-pg03-20261021/off-release-39817772180/source-inventory-live-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/source-inventory-main-ci-39944096489.json\n?? evidence/non-pg03-20261021/off-release-39817772180/source-inventory-prerequisites-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/startup-side-effect-counts-20261023T040432Z.json\n?? evidence/non-pg03-20261021/off-release-39817772180/website-effective-compose-preview-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/website-effective-compose-readonly-20261023.py\n?? evidence/non-pg03-20261021/off-release-39817772180/website-production-schema-staging-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/website-recovery-priority-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/website-recovery-scope-decision-20261023.json\n?? evidence/non-pg03-20261021/off-release-39817772180/website-schema-compatibility-invocation-20261023.py\n?? evidence/non-pg03-20261021/off-release-39817772180/website-startup-options-readonly-20261023.json\n?? evidence/non-pg03-20261021/off-release-39957948359/WEBSITE-RECOVERY-PREPARATION-20261023.json\n?? evidence/non-pg03-20261021/off-release-39957948359/artifact-hashes.json\n?? evidence/non-pg03-20261021/off-release-39957948359/authorized-boot-install-result.json\n?? evidence/non-pg03-20261021/off-release-39957948359/authorized-gateway-start-result.json\n?? evidence/non-pg03-20261021/off-release-39957948359/authorized-gateway-start.py\n?? evidence/non-pg03-20261021/off-release-39957948359/authorized-image-pull-result.json\n?? evidence/non-pg03-20261021/off-release-39957948359/authorized-recovery-stage.py\n?? evidence/non-pg03-20261021/off-release-39957948359/authorized-runtime-login-preparation.json\n?? evidence/non-pg03-20261021/off-release-39957948359/authorized-stage-result.json\n?? evidence/non-pg03-20261021/off-release-39957948359/gateway-image-release.json\n?? evidence/non-pg03-20261021/off-release-39957948359/image-pull-progress.json\n?? evidence/non-pg03-20261021/off-release-39957948359/image-pull-transfer-progress.json\n?? evidence/non-pg03-20261021/off-release-39957948359/local-identity-validation.json\n?? evidence/non-pg03-20261021/off-release-39957948359/production-image-store-details.json\n?? evidence/non-pg03-20261021/off-release-39957948359/production-image-store-identity.json\n?? evidence/non-pg03-20261021/off-release-39957948359/production-public-recovery-settings.json\n?? evidence/non-pg03-20261021/off-release-39957948359/production-schema-compatibility-result.json\n?? evidence/non-pg03-20261021/off-release-39957948359/production-source-refresh-comparison.json\n?? evidence/non-pg03-20261021/off-release-39957948359/production-source-refresh.json\n?? evidence/non-pg03-20261021/off-release-39957948359/production-source-schema-same-nonce-check.json\n?? evidence/non-pg03-20261021/off-release-39957948359/release-record-shape.json\n?? evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/artifact-hashes.json\n?? evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/boot-recovery-install.py\n?? evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/gateway-image-release.json\n?? evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/inventory.json\n?? evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/scripts/runtime-boot-recovery.py\n?? evidence/non-pg03-20261021/off-release-39957948359/runtime-assets/scripts/runtime-identity-refresh.py\n?? evidence/non-pg03-20261021/off-release-39957948359/runtime-probe-session-metadata.json\n?? evidence/non-pg03-20261021/off-release-39957948359/schema-rehearsal.json\n?? evidence/non-pg03-20261021/off-release-39957948359/schema-rehearsal.target.sql\n?? evidence/non-pg03-20261021/off-release-39957948359/schema-transport-identity-refusal.json\n?? evidence/non-pg03-20261021/off-runtime-recovery-tests-full.log\n?? evidence/non-pg03-20261021/off-workflow-integration-tests-full.log\n?? evidence/non-pg03-20261021/off-workflow-integration-tests.log\n?? evidence/non-pg03-20261021/postgres-ci.log\n?? evidence/non-pg03-20261021/preflight.json\n?? evidence/non-pg03-20261021/production-approval-package-20261022.md\n?? evidence/non-pg03-20261021/production-bounded-diagnostic.json\n?? evidence/non-pg03-20261021/production-db-readonly.json\n?? evidence/non-pg03-20261021/production-readonly-v2.json\n?? evidence/non-pg03-20261021/production-readonly.json\n?? evidence/non-pg03-20261021/production-rollback-readonly.json\n?? evidence/non-pg03-20261021/production-route-readonly.json\n?? evidence/non-pg03-20261021/production-schema-readonly.json\n?? evidence/non-pg03-20261021/rc-original.zip\n?? evidence/non-pg03-20261021/rc-run.json\n?? evidence/non-pg03-20261021/rc/artifact-hashes.json\n?? evidence/non-pg03-20261021/rc/binary-build-info.txt\n?? evidence/non-pg03-20261021/rc/gateway-image-release.json\n?? evidence/non-pg03-20261021/rc/schema-rehearsal.json\n?? evidence/non-pg03-20261021/rc/schema-rehearsal.target.sql\n?? evidence/non-pg03-20261021/readonly-production-probe.py\n?? evidence/non-pg03-20261021/sqlite-ci.log\n?? evidence/non-pg03-20261021/vps-inspection/vps-authorization-inspection.json\n?? evidence/pg03-actions-isolated-rehearsal-design-20261020T155803Z.md\n?? evidence/pg03-actions-safe-integration-review-20261021.md\n?? evidence/pg03-control-ci-39513279138.json\n?? evidence/pg03-control-main-ci-39514438745.json\n?? evidence/pg03-control-premerge-boundary-20261021.json\n?? evidence/pg03-control-race-20261021/REPORT.md\n?? evidence/pg03-control-race-20261021/adjacent-results.json\n?? evidence/pg03-control-race-20261021/baseline.json\n?? evidence/pg03-control-race-20261021/candidate-manifest.json\n?? evidence/pg03-control-race-20261021/candidate-manifest.json.sha256\n?? evidence/pg03-control-race-20261021/candidate.patch\n?? evidence/pg03-control-race-20261021/candidate/scripts/ci/test-pg03-observation.py\n?? evidence/pg03-control-race-20261021/candidate/scripts/pg03-observation.py\n?? evidence/pg03-control-race-20261021/candidate/scripts/pg03-successor-host.py\n?? evidence/pg03-control-race-20261021/diff-check.log\n?? evidence/pg03-control-race-20261021/final-consistency.json\n?? evidence/pg03-control-race-20261021/final-diff-check.log\n?? evidence/pg03-control-race-20261021/final-document-diff-check.log\n?? evidence/pg03-control-race-20261021/final-static-check.json\n?? evidence/pg03-control-race-20261021/final-test-pg03-observation.py.log\n?? evidence/pg03-control-race-20261021/final-test-pg03-successor-host.py.log\n?? evidence/pg03-control-race-20261021/final-test-pg03-successor-plan.py.log\n?? evidence/pg03-control-race-20261021/final-test-results.json\n?? evidence/pg03-control-race-20261021/independent-final-review.json\n?? evidence/pg03-control-race-20261021/independent-initial-review.json\n?? evidence/pg03-control-race-20261021/original/scripts/ci/test-pg03-observation.py\n?? evidence/pg03-control-race-20261021/original/scripts/pg03-observation.py\n?? evidence/pg03-control-race-20261021/original/scripts/pg03-successor-adapter.py\n?? evidence/pg03-control-race-20261021/original/scripts/pg03-successor-host.py\n?? evidence/pg03-control-race-20261021/platform-final-linux.log\n?? evidence/pg03-control-race-20261021/platform-final-results.json\n?? evidence/pg03-control-race-20261021/platform-final-windows.log\n?? evidence/pg03-control-race-20261021/regression-after-first.log\n?? evidence/pg03-control-race-20261021/regression-after-result.json\n?? evidence/pg03-control-race-20261021/regression-after.log\n?? evidence/pg03-control-race-20261021/regression-before.log\n?? evidence/pg03-control-race-20261021/rejected-admission-v1/scripts/ci/test-pg03-observation.py\n?? evidence/pg03-control-race-20261021/rejected-admission-v1/scripts/pg03-observation.py\n?? evidence/pg03-control-race-20261021/test-pg03-successor-host.py.log\n?? evidence/pg03-control-race-20261021/test-pg03-successor-plan.py.log\n?? evidence/pg03-exact-image-access-20261020T153750Z.md\n?? evidence/pg03-final-boundary-20261021.json\n?? evidence/pg03-fixed-candidate-binding-20261021.json\n?? evidence/pg03-fixed-control-independent-review-20261021.json\n?? evidence/pg03-hostname-ci-39516682473.json\n?? evidence/pg03-hostname-ci-test-summary-20261021.json\n?? evidence/pg03-hostname-premerge-boundary-20261021.json\n?? evidence/pg03-latest-successor-local-20261020.md\n?? evidence/pg03-logfix-ci-test-summary-20261021.json\n?? evidence/pg03-offline-restore-ci-39578824035.json\n?? evidence/pg03-offline-restore-ci-39578824035.log\n?? evidence/pg03-package-read-approval-20261020T154609Z.md\n?? evidence/pg03-policy-source-delivery-20261021.md\n?? evidence/pg03-policy-source-independent-review-20261021.json\n?? evidence/pg03-premerge-boundary-20261021.json\n?? evidence/pg03-readiness-ci-39576186446-postgres.log\n?? evidence/pg03-readiness-ci-39577444624-backend.log\n?? evidence/pg03-readiness-ci-39577444624-postgres.log\n?? evidence/pg03-readiness-ci-39578824035-attempt1.json\n?? evidence/pg03-readiness-ci-39578824035-controls.log\n?? evidence/pg03-readiness-ci-39578824035-frontend-attempt2.log\n?? evidence/pg03-readiness-ci-39578824035-frontend.log\n?? evidence/pg03-readiness-final-receipt-20261021.json\n?? evidence/pg03-readiness-premerge-20261021.json\n?? evidence/pg03-repair2-dispatch-boundary-20261021.json\n?? evidence/pg03-successor-local-components-20261021.json\n?? evidence/readonly-collection-authorization-execution-20261020T133917Z.md\n?? evidence/readonly-collection-blocker-evidence-20261020T134321Z.md\n?? evidence/readonly-observer-identity-plan-v1-20261020.md\n?? evidence/readonly-observer-review-20261020-r2.md\n?? evidence/recovery-tools-entry-final-snapshot-20261020T082915Z.json\n?? evidence/recovery-tools-entry-leaves-20261020T083018Z.json\n?? evidence/recovery-tools-github-controls-20261020T082706Z.json\n?? evidence/recovery-tools-github-entry-audit-20261020.py\n?? evidence/recovery-tools-github-entry-audit-20261020T082313Z.json\n?? evidence/recovery-tools-pinned-indirect-source-audit-20261020.json\n?? evidence/recovery-tools-preflight-decision-20261020T081749Z.md\n?? evidence/recovery-tools-production-preflight-20261020T081749Z.json\n?? evidence/recovery-tools-quiescent-window-review-20261020.md\n?? evidence/recovery-tools-readonly-preflight-20261020.py\n?? evidence/recovery-tools-upgrade-review-20261020.md\n?? evidence/recovery-tools-vps-entry-audit-20261020.py\n?? evidence/recovery-tools-vps-entry-audit-20261020T082550Z.json\n?? evidence/recovery-tools-vps-indirect-20261020T082822Z.json\n?? evidence/recovery-tools-window-gate-local-review-20261020.md\n?? evidence/recovery-tools-workflow-sources-20261020T082452Z.json\n?? scripts/__pycache__/backup-identity.cpython-314.pyc\n?? scripts/__pycache__/boot-recovery-install.cpython-314.pyc\n?? scripts/__pycache__/caddy-state-reconcile.cpython-312.pyc\n?? scripts/__pycache__/caddy-state-reconcile.cpython-314.pyc\n?? scripts/__pycache__/clearapi-observer-gate.cpython-314.pyc\n?? scripts/__pycache__/controlled-traffic-hold.cpython-314.pyc\n?? scripts/__pycache__/pg03-candidate-qualification.cpython-312.pyc\n?? scripts/__pycache__/pg03-failed-recovery.cpython-312.pyc\n?? scripts/__pycache__/pg03-failed-recovery.cpython-314.pyc\n?? scripts/__pycache__/pg03-legacy-transition.cpython-314.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-314.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-312.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-314.pyc\n?? scripts/__pycache__/pg03-source-inventory.cpython-312.pyc\n?? scripts/__pycache__/pg03-successor-adapter.cpython-312.pyc\n?? scripts/__pycache__/pg03-successor-transaction.cpython-312.pyc\n?? scripts/__pycache__/recovery-tool-observer.cpython-312.pyc\n?? scripts/__pycache__/recovery-tool-observer.cpython-314.pyc\n?? scripts/__pycache__/recovery-tool-readers.cpython-312.pyc\n?? scripts/__pycache__/recovery-tool-readers.cpython-314.pyc\n?? scripts/__pycache__/recovery-tool-upgrade.cpython-312.pyc\n?? scripts/__pycache__/recovery-tool-vps-helper.cpython-312.pyc\n?? scripts/__pycache__/recovery-tool-vps-helper.cpython-314.pyc\n?? scripts/__pycache__/recovery-tool-vps-reader.cpython-312.pyc\n?? scripts/__pycache__/recovery-tool-vps-reader.cpython-314.pyc\n?? scripts/__pycache__/recovery-tool-window.cpython-312.pyc\n?? scripts/__pycache__/recovery-tool-window.cpython-314.pyc\n?? scripts/__pycache__/runtime-boot-recovery.cpython-314.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-314.pyc\n?? scripts/ci/__pycache__/assemble-release-proof.cpython-312.pyc\n?? scripts/ci/__pycache__/assemble-release-proof.cpython-314.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-312.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-314.pyc\n?? scripts/ci/__pycache__/build-local-off-rc.cpython-314.pyc\n?? scripts/ci/__pycache__/build-runtime-assets.cpython-312.pyc\n?? scripts/ci/__pycache__/build-runtime-assets.cpython-314.pyc\n?? scripts/ci/__pycache__/inspect-vps-authorization.cpython-314.pyc\n?? scripts/ci/__pycache__/pg03-isolated-rehearsal.cpython-312.pyc\n?? scripts/ci/__pycache__/produce-gate-receipt.cpython-314.pyc\n?? scripts/ci/__pycache__/release_proof.cpython-312.pyc\n?? scripts/ci/__pycache__/release_proof.cpython-314.pyc\n?? scripts/ci/__pycache__/test-automatic-release.cpython-312.pyc\n?? scripts/ci/__pycache__/test-automatic-release.cpython-314.pyc\n?? scripts/ci/__pycache__/test-backup-identity.cpython-314.pyc\n?? scripts/ci/__pycache__/test-boot-recovery-install.cpython-314.pyc\n?? scripts/ci/__pycache__/test-caddy-state-reconcile.cpython-312.pyc\n?? scripts/ci/__pycache__/test-pg03-restore-acceptance.cpython-312.pyc\n?? scripts/ci/__pycache__/test-pg03-successor-plan.cpython-312.pyc\n?? scripts/ci/__pycache__/test-rehearsal-producer.cpython-312.pyc\n?? scripts/ci/__pycache__/test-rehearsal-producer.cpython-314.pyc\n?? scripts/ci/__pycache__/test-runtime-boot-recovery.cpython-314.pyc\n?? scripts/ci/__pycache__/verify-rehearsal-input.cpython-312.pyc\n?? scripts/ci/__pycache__/verify-rehearsal-input.cpython-314.pyc\n?? scripts/ci/build-local-off-rc.py\n?? scripts/ci/test-clearapi-observer-gate.py\n?? scripts/ci/test-off-host-contract.py\n?? scripts/ci/test-recovery-tool-observer.py\n?? scripts/ci/test-recovery-tool-readers.py\n?? scripts/ci/test-recovery-tool-upgrade.py\n?? scripts/ci/test-recovery-tool-vps-reader.py\n?? scripts/clearapi-observer-gate.py\n?? scripts/off-host-contract.py\n?? scripts/recovery-tool-observer.py\n?? scripts/recovery-tool-readers.py\n?? scripts/recovery-tool-upgrade.py\n?? scripts/recovery-tool-vps-helper.py\n?? scripts/recovery-tool-vps-reader.py\n?? scripts/recovery-tool-window.py\n?? tools/pg03/__pycache__/qualification-authority.cpython-312.pyc\n?? tools/pg03/__pycache__/qualification-authority.cpython-314.pyc\n?? tools/pg03/__pycache__/qualification-policy-source.cpython-312.pyc\n?? tools/pg03/__pycache__/qualification-policy-source.cpython-314.pyc\n?? tools/pg03/__pycache__/test-qualification-policy-source.cpython-312.pyc\n?? tools/pg03/__pycache__/test-qualification-policy-source.cpython-314.pyc\n?? tools/pg03/qualification-authority.py\n?? tools/pg03/qualification-policy-source.py\n?? tools/pg03/test-qualification-policy-source.py\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-gate-audit",
+      "HEAD": "33fcb21d54d7a1e160f8a6a95b66677d61b91eab",
+      "branch": "refs/heads/codex/clearapi-gate-audit",
+      "status": "?? scripts/__pycache__/pg03-backup-state.cpython-312.pyc\n?? scripts/__pycache__/pg03-legacy-transition.cpython-312.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-312.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-312.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-312.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-312.pyc\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-image-generation",
+      "HEAD": "112f1cad3127d625bf94aaec7b77e7c32b13dab4",
+      "branch": "refs/heads/codex/clearapi-image-generation",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-integration-b",
+      "HEAD": "1b04b8bc0e2ad92d42e3bc7e6900a6692a31085f",
+      "branch": "refs/heads/integrate/clearapi-announcements",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-local-deploy-integration",
+      "HEAD": "2c5f575750b7def1ed55848d3420502e96ad7ca5",
+      "branch": "refs/heads/codex/clearapi-local-deploy-integration",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-maintenance-reissue-20261017",
+      "HEAD": "61ec2ac2abdfb341e2f4ed877a9f35c6aec38462",
+      "branch": "refs/heads/codex/clearapi-maintenance-reissue-20261017",
+      "status": "?? scripts/__pycache__/pg03-legacy-transition.cpython-312.pyc\n?? scripts/__pycache__/pg03-legacy-transition.cpython-314.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-312.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-314.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-314.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-314.pyc\n?? scripts/ci/__pycache__/test-legacy-transition.cpython-312.pyc\n?? scripts/ci/__pycache__/test-legacy-transition.cpython-314.pyc\n?? scripts/ci/__pycache__/test-production-deploy.cpython-314.pyc\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-master-status-20261016",
+      "HEAD": "c0aded7b82ae0601e3c5a430e20dbc5866f52ce4",
+      "branch": "refs/heads/codex/clearapi-master-status-20261016",
+      "status": " M CLEARAPI_MASTER_STATUS.md\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-master-status-unification",
+      "HEAD": "c7a9a23b2013e4f2348c55222e41329444f47ef6",
+      "branch": "refs/heads/codex/clearapi-master-status-unification",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-pg03-full-launch",
+      "HEAD": "fe8a8d12512b6e921cbe6e6566a6ad0b825fe708",
+      "status": "?? PG03_ISOLATED_ACCEPTANCE_HANDOFF_20261018.md\n?? scripts/__pycache__/pg03-legacy-transition.cpython-312.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-312.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-312.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-312.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-312.pyc\n?? scripts/ci/__pycache__/test-production-deploy.cpython-312.pyc\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-pricing",
+      "HEAD": "b140f5a7b73c00f022eae00062b41759b25cec56",
+      "branch": "refs/heads/codex/clearapi-pricing",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-providers",
+      "HEAD": "88e935b934b3eb04f2619a8b6bf94997acea498c",
+      "branch": "refs/heads/codex/clearapi-providers",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-providers-integration",
+      "HEAD": "7de1273925d445e6ba8d68f2053e4daa35dc4d40",
+      "branch": "refs/heads/integrate/clearapi-providers",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-runtime-store-policy-20261019",
+      "HEAD": "550c2b2e9a8a33a4c28d96bcd5ed1770c5766c3d",
+      "branch": "refs/heads/codex/pg03-runtime-store-policy-20261019",
+      "status": "?? scripts/__pycache__/pg03-legacy-transition.cpython-314.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-314.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-314.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-314.pyc\n?? scripts/ci/__pycache__/inspect-vps-authorization.cpython-314.pyc\n"
+    },
+    {
+      "worktree": "D:/AI/API/worktrees/clearapi-unified-integration",
+      "HEAD": "f1a75fb9c92908e46e73b806a53571d2de1635df",
+      "branch": "refs/heads/integrate/clearapi-pg03-abce",
+      "status": "?? scripts/__pycache__/pg03-backup-state.cpython-314.pyc\n?? scripts/__pycache__/pg03-legacy-transition.cpython-314.pyc\n?? scripts/__pycache__/pg03-release-control.cpython-314.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-312.pyc\n?? scripts/__pycache__/pg03-schema-rehearsal.cpython-314.pyc\n?? scripts/__pycache__/runtime-probe-session.cpython-314.pyc\n?? scripts/ci/__pycache__/audit-release-state.cpython-312.pyc\n?? scripts/ci/__pycache__/audit-release-state.cpython-314.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-312.pyc\n?? scripts/ci/__pycache__/automatic-release.cpython-314.pyc\n?? scripts/ci/__pycache__/inspect-vps-authorization.cpython-314.pyc\n?? scripts/ci/__pycache__/test-legacy-transition.cpython-314.pyc\n?? scripts/ci/__pycache__/test-production-deploy.cpython-314.pyc\n"
+    },
+    {
+      "worktree": "D:/AI/runtime/clearapi-monitor-init-3124d8a1",
+      "HEAD": "3124d8a1b6bbc44e8a6203266567f72c1734c877",
+      "status": " M cmd/monitor-init/main.go\n?? monitor-init-linux-amd64\n"
+    },
+    {
+      "worktree": "D:/AI/runtime/clearapi-monitor-runtime-activation",
+      "HEAD": "3124d8a1b6bbc44e8a6203266567f72c1734c877",
+      "branch": "refs/heads/codex/monitor-runtime-activation",
+      "status": " M controller/console_monitor_admin.go\n M model/console_monitor_control.go\n M service/console_probe.go\n M service/console_probe_test.go\n?? controller/console_monitor_probe.go\n"
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-admin-audit-log",
+      "HEAD": "4b7831a2fbf4f20aecbcae5071183dfb14f3737b",
+      "branch": "refs/heads/codex/clearapi-admin-audit-log",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-docs-center",
+      "HEAD": "5204976d2dae3c22c384f0b59a41c42cfc4f88b2",
+      "branch": "refs/heads/clearapi-docs-docker-fix",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-dynamic-monitor",
+      "HEAD": "72d26b2693b6ad290992caff22044860968f43c7",
+      "branch": "refs/heads/feat/dynamic-channel-monitor",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-finance-pg-fix",
+      "HEAD": "4a0edf064054eb621ca246f41cf653d57e5954e2",
+      "branch": "refs/heads/codex/clearapi-finance-pg-fix-20261011",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-ghcr-stdin-fix",
+      "HEAD": "c5cdf2e29bf1eb77011a0f951a5f8a5a9092ea8b",
+      "branch": "refs/heads/codex/clearapi-ghcr-stdin-fix",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-live-deploy-gate-fix",
+      "HEAD": "77b8770547c32ec2fa1390d5932dc0725d51f38d",
+      "branch": "refs/heads/codex/clearapi-live-deploy-gate-fix",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-pr-rules",
+      "HEAD": "dd04e83e1de1a258550d67e16b061595abfcb4ea",
+      "branch": "refs/heads/codex/pr-rules-automation",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-production-deploy-safety",
+      "HEAD": "fc7d0d26aa445c9981017d283506433229c18a36",
+      "branch": "refs/heads/codex/installer-run-lock-compat",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-public-docs",
+      "HEAD": "7d5bf650e236f85cf727c8fc3ae91fbac9bc347c",
+      "branch": "refs/heads/clearapi-public-docs",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-release-manifest-lite",
+      "HEAD": "d21e113ed25d3865664487945c2b483559cc0832",
+      "branch": "refs/heads/codex/release-manifest-lite-v1",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-email-baseline-check",
+      "HEAD": "0067558c6c835238debae6a1285a3cea6f4c939a",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-email-registration",
+      "HEAD": "37f1e0152f248c2177b1a7115e920b02fb4f736f",
+      "branch": "refs/heads/codex/clearapi-shop-email-registration",
+      "status": "?? shop-build.log\n?? shop-final-targeted-frontend.log\n?? shop-frontend-tests.log\n?? shop-full-frontend-tests.log\n?? shop-full-go-tests.log\n?? shop-icon-baseline.log\n?? shop-mysql-tests.log\n?? shop-postgres-tests.log\n?? shop-race-tests.log\n?? shop-typecheck.log\n"
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-referral-rewards",
+      "HEAD": "6e3cdc45d4872bbc283eb288bff9275989649007",
+      "branch": "refs/heads/codex/shop-referral-rewards-20261010",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-store-link",
+      "HEAD": "604183c27f92e0ffeb96db7cffd399e5274987f4",
+      "branch": "refs/heads/fix/clearapi-shop-store-link",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-shop-typecheck-baseline",
+      "HEAD": "da6e5f1715e921d6750dca45befbf1c50a4887d3",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-store-approval",
+      "HEAD": "cd4ee62d3b247a3b95567305078282ea68d9c11d",
+      "branch": "refs/heads/feat/clearapi-store-approval",
+      "status": ""
+    },
+    {
+      "worktree": "D:/AI/worktrees/clearapi-store-deploy-gate",
+      "HEAD": "b95c88c7f1cacc3b948d2c74b098a305668c2977",
+      "branch": "refs/heads/fix/clearapi-store-deploy-gate",
+      "status": ""
+    },
+    {
+      "worktree": "D:/Codex/worktrees/clearapi-abce-release-20261024/clearapi-controlled-launch-20261020",
+      "HEAD": "a9fe76f301c023fb8ae716901bbe4f94a4184b3e",
+      "branch": "refs/heads/codex/clearapi-abce-release-20261024",
+      "status": " M CLEARAPI_MASTER_STATUS.md\n M web/src/features/system-settings/content/__tests__/announcements-lifecycle.test.tsx\n M web/src/features/system-settings/hooks/use-update-option.ts\n?? CLEARAPI_ABCE_FULL_AUDIT_20261024.md\n?? evidence/abce-full-audit-20261024/B-browser-before-fix.json\n?? evidence/abce-full-audit-20261024/B-browser-fixed-network.json\n?? evidence/abce-full-audit-20261024/B-isolated-cleanup-page.png\n?? evidence/abce-full-audit-20261024/B-isolated-cleanup.json\n?? evidence/abce-full-audit-20261024/announcement-management-add-save-entry.png\n?? evidence/abce-full-audit-20261024/announcement-stale-before-fix.png\n?? evidence/abce-full-audit-20261024/announcement-visible-after-reload.png\n?? evidence/abce-full-audit-20261024/announcement-visible-normal-user-after-fix.png\n?? evidence/abce-full-audit-20261024/announcement-visible-without-reload-after-fix.png\n?? evidence/abce-full-audit-20261024/auto-release-variables.json\n?? evidence/abce-full-audit-20261024/isolated-resources-cleanup.json\n?? evidence/abce-full-audit-20261024/monitor-activation-source.json\n?? evidence/abce-full-audit-20261024/pricing-locales-bundle.json\n?? evidence/abce-full-audit-20261024/production-artifacts-and-monitor.json\n?? evidence/abce-full-audit-20261024/production-end-snapshot.json\n?? evidence/abce-full-audit-20261024/production-fresh.json\n?? evidence/abce-full-audit-20261024/provider-mock-wire.json\n?? evidence/abce-full-audit-20261024/release-build-record.json\n?? evidence/abce-full-audit-20261024/runtime-mock-and-permissions.json\n?? evidence/abce-full-audit-20261024/source-comparison.json\n?? evidence/abce-full-audit-20261024/system-notice-has-no-add-publish.png\n?? evidence/abce-full-audit-20261024/validation-current.json\n?? evidence/abce-full-audit-20261024/workflows.json\n?? evidence/abce-full-audit-20261024/workspace-inventory.json\n?? web/src/features/system-settings/hooks/__tests__/use-update-option.test.tsx\n"
+    },
+    {
+      "worktree": "D:/Codex/worktrees/clearapi-local-formal-integration/clearapi-controlled-launch-20261020",
+      "HEAD": "80d3dc5b3a58655f736e4fcd49372971c30014b4",
+      "branch": "refs/heads/codex/clearapi-local-deploy-formal-integration",
+      "status": ""
+    },
+    {
+      "worktree": "D:/Codex/worktrees/clearapi-monitor-allowlist/clearapi-store-deploy-gate",
+      "HEAD": "a55fffb9a1c4ab17c0c219546a04c2aae973f888",
+      "branch": "refs/heads/codex/monitor-admin-allowlist",
+      "status": ""
+    },
+    {
+      "worktree": "D:/Codex/worktrees/runtime-identity-v1/clearapi-store-deploy-gate",
+      "HEAD": "0e31977683e6f660959af43d2c50f75ae492e25f",
+      "branch": "refs/heads/feat/runtime-identity-v1",
+      "status": ""
+    }
+  ]
+}

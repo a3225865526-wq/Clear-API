@@ -103,6 +103,7 @@ type ModelRatioVisualEditorProps = {
   filterMode?: 'all' | 'unset'
   onChange: (field: string, value: string) => void
   onSave: () => void | Promise<void>
+  onDirtyChange?: (dirty: boolean) => void
   isSaving: boolean
 }
 
@@ -144,6 +145,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     filterMode = 'all',
     onChange,
     onSave,
+    onDirtyChange,
     isSaving,
   },
   ref
@@ -154,6 +156,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editData, setEditData] = useState<ModelRatioData | null>(null)
+  const [editorDirty, setEditorDirty] = useState(false)
   const pricingConfig = useModelPricing(
     editData?.name ? [editData.name] : [],
     Boolean(editData?.name)
@@ -357,6 +360,33 @@ const ModelRatioVisualEditorComponent = forwardRef<
     },
     [isMobile]
   )
+
+  useEffect(() => {
+    onDirtyChange?.(editorDirty && editorOpen && (!isMobile || sheetOpen))
+  }, [onDirtyChange, editorDirty, editorOpen, isMobile, sheetOpen])
+
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
+
+  useEffect(() => {
+    if (
+      !editorOpen ||
+      (isMobile && !sheetOpen) ||
+      editorDirty ||
+      !editData?.name
+    ) {
+      return
+    }
+    const model = models.find((row) => row.name === editData.name)
+    if (model) handleEdit(model)
+  }, [
+    models,
+    editorOpen,
+    isMobile,
+    sheetOpen,
+    editorDirty,
+    editData?.name,
+    handleEdit,
+  ])
 
   const handleAdd = useCallback(() => {
     setEditData(null)
@@ -742,6 +772,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
           {editorOpen ? (
             <ModelPricingEditorPanel
               ref={editorPanelRef}
+              onDirtyChange={setEditorDirty}
               editData={editData}
               pluginVariants={
                 pricingConfig.data?.entries.find(
@@ -790,6 +821,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
       {isMobile && (
         <ModelPricingSheet
           ref={editorPanelRef}
+          onDirtyChange={setEditorDirty}
           open={sheetOpen}
           onOpenChange={setSheetOpen}
           editData={editData}
@@ -844,6 +876,7 @@ export const ModelRatioVisualEditor = memo(
       prevProps.filterMode === nextProps.filterMode &&
       prevProps.onChange === nextProps.onChange &&
       prevProps.onSave === nextProps.onSave &&
+      prevProps.onDirtyChange === nextProps.onDirtyChange &&
       prevProps.isSaving === nextProps.isSaving
     )
   }

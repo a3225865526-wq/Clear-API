@@ -1,0 +1,28 @@
+{
+  "scope": "existing_recovery_key_and_PG17_method_preconditions_only",
+  "historical_backup_id": "20261020T002138Z",
+  "historical_restore_receipts": [
+    {
+      "file": "incident-backup-restore-043543c2469c43dbb2ad021f5d6d0aa0.json",
+      "status": "PASS",
+      "backup_id": "20261020T002138Z",
+      "key_exported": false,
+      "cleartext_files_written": false,
+      "owned_containers_removed": true
+    },
+    {
+      "file": "incident-backup-restore.json",
+      "status": "FAIL",
+      "backup_id": "20261020T002138Z",
+      "key_exported": false,
+      "cleartext_files_written": false,
+      "owned_containers_removed": true
+    }
+  ],
+  "recovery_private_key_available": true,
+  "legacy_ciphertext_decrypt_exit": 0,
+  "plaintext_files_written": false,
+  "key_exported": false,
+  "production_database_restore": false,
+  "fresh_production_backup_acceptance": false
+}

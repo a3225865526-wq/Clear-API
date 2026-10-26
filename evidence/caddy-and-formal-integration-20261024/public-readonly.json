@@ -1,0 +1,14 @@
+{
+  "observed_at": "2026-10-24T00:55:07.363945+00:00",
+  "read_only": true,
+  "checks": {
+    "/api/status": {
+      "status": 403,
+      "cf_ray_present": true
+    },
+    "/": {
+      "status": 403,
+      "cf_ray_present": true
+    }
+  }
+}

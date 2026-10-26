@@ -16,7 +16,6 @@ import (
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -82,7 +81,6 @@ func runtimeProbeFixture(t *testing.T, emptyCatalog ...bool) (*gin.Engine, strin
 	sqlDB.SetMaxOpenConns(1)
 	priorMap, priorSecret, priorRedis := common.OptionMap, common.SessionSecret, common.RedisEnabled
 	priorStore, priorPayment := operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments
-	priorMode := operation_setting.GetBillingReservePolicy().Mode
 	common.RedisEnabled = false
 	common.SessionSecret = "runtime-probe-fixture-signing-secret"
 	t.Cleanup(func() {
@@ -92,7 +90,6 @@ func runtimeProbeFixture(t *testing.T, emptyCatalog ...bool) (*gin.Engine, strin
 		common.OptionMap, common.SessionSecret, common.RedisEnabled = priorMap, priorSecret, priorRedis
 		operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments = priorStore, priorPayment
 		// Restore through the existing config registry without a database write.
-		require.NoError(t, config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_reserve_policy"), map[string]string{"mode": priorMode}))
 		_ = sqlDB.Close()
 	})
 	var version string
@@ -170,9 +167,9 @@ func TestRuntimeIntegrityStateAndFailures(t *testing.T) {
 		{"unsynchronized database", func(t *testing.T, db *gorm.DB) {
 			require.NoError(t, db.Model(&model.Option{}).Where(&model.Option{Key: "StoreRechargeEnabled"}).Update("value", "false").Error)
 		}, "RUNTIME_CONFIG_MISMATCH"},
-		{"unsynchronized billing mode", func(t *testing.T, db *gorm.DB) {
+		{"retired billing mode is ignored", func(t *testing.T, db *gorm.DB) {
 			require.NoError(t, db.Model(&model.Option{}).Where(&model.Option{Key: "billing_reserve_policy.mode"}).Update("value", "monitor").Error)
-		}, "RUNTIME_CONFIG_MISMATCH"},
+		}, ""},
 		{"unsynchronized payment switch", func(t *testing.T, db *gorm.DB) {
 			require.NoError(t, db.Model(&model.Option{}).Where(&model.Option{Key: "DisableOnlinePayments"}).Update("value", "false").Error)
 		}, "RUNTIME_CONFIG_MISMATCH"},
@@ -243,7 +240,7 @@ func TestRuntimeIntegrityStateAndFailures(t *testing.T) {
 			assert.ElementsMatch(t, []string{"instance_id", "build_identity", "config_generation", "online_payment_enabled", "store_enabled", "billing_mode", "referral_enabled", "pool_enabled", "approval_schema", "catalog_version", "product_view_digest", "generated_at", "schema_version", "report_version", "status", "container_id", "started_at", "config_digest", "approval_view_digest", "effective_product_count"}, keys)
 			assert.Equal(t, false, body.Data["online_payment_enabled"])
 			assert.Equal(t, true, body.Data["store_enabled"])
-			assert.Equal(t, "enforce", body.Data["billing_mode"])
+			assert.Equal(t, "off", body.Data["billing_mode"])
 			assert.Equal(t, false, body.Data["referral_enabled"])
 			assert.Equal(t, false, body.Data["pool_enabled"])
 			for _, key := range []string{"instance_id", "build_identity", "config_generation", "product_view_digest", "generated_at", "schema_version", "report_version", "status", "container_id", "started_at", "config_digest", "approval_view_digest", "effective_product_count"} {
@@ -594,7 +591,7 @@ func TestLegacyRetirementPreservesHistoryAndRuntime(t *testing.T) {
 			require.Equal(t, http.StatusOK, response.Code, response.Body.String())
 			assert.Contains(t, response.Body.String(), `"effective_product_count":0`)
 			assert.Contains(t, response.Body.String(), `"status":"PASS"`)
-			assert.Contains(t, response.Body.String(), `"billing_mode":"enforce"`)
+			assert.Contains(t, response.Body.String(), `"billing_mode":"off"`)
 			// Even a later switch change cannot resurrect retired cached cards.
 			require.NoError(t, model.UpdateOption("StoreRechargeEnabled", "true"))
 			for _, path := range []string{"/purchase/legacy/1", "/purchase/product/credit-1?revision=0"} {
@@ -781,7 +778,6 @@ func TestLegacyRetirementRecoveryFixture(t *testing.T) {
 	priorMain, priorLogType := common.MainDatabaseType(), common.LogDatabaseType()
 	priorPath, priorOptions := common.SQLitePath, common.OptionMap
 	priorStore, priorPayments := operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments
-	priorMode := operation_setting.GetBillingReservePolicy().Mode
 	common.SQLitePath = "/evidence/recovery-sqlite.db"
 	t.Setenv("LOG_SQL_DSN", "")
 	switch dialect {
@@ -803,11 +799,9 @@ func TestLegacyRetirementRecoveryFixture(t *testing.T) {
 		model.InitColumnQuotingForTest()
 		common.SQLitePath, common.OptionMap = priorPath, priorOptions
 		operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments = priorStore, priorPayments
-		require.NoError(t, config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_reserve_policy"), map[string]string{"mode": priorMode}))
 	})
 	common.OptionMap = map[string]string{model.PoolMasterOptionKey: "false", "DisableOnlinePayments": "true", "StoreRechargeEnabled": "false", "billing_reserve_policy.mode": "enforce"}
 	operation_setting.StoreRechargeEnabled, operation_setting.DisableOnlinePayments = false, true
-	require.NoError(t, config.UpdateConfigFromMap(config.GlobalConfig.Get("billing_reserve_policy"), map[string]string{"mode": "enforce"}))
 	before, err := model.GetCreditCatalog()
 	require.NoError(t, err)
 	for range 2 {

@@ -434,7 +434,7 @@ func TestSessionRulesInheritOrOverrideGlobalDefault(t *testing.T) {
 				assert.Equal(t, expected, state.SessionMode)
 				assert.Equal(t, source, state.SessionModeSource)
 				assert.Equal(t, expected == "strict", ShouldSkipRetryAfterChannelAffinityFailure(ctx))
-				decision := DecideRelayRetry(ctx, types.NewOpenAIError(errors.New("upstream"), types.ErrorCodeBadResponseStatusCode, http.StatusTooManyRequests), 2)
+				decision := DecideRelayRetry(ctx, types.NewOpenAIError(errors.New("upstream"), types.ErrorCodeBadResponseStatusCode, http.StatusBadGateway), 2)
 				if expected == "strict" {
 					assert.Equal(t, PolicyDecision{Action: "stop", Reason: "strict_session", Source: source}, decision)
 				} else {

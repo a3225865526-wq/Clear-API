@@ -42,34 +42,12 @@ type BillingSession struct {
 	mu               sync.Mutex
 	codexFinalized   bool
 	completionMeter  *dto.CodexMetering
-	dispatchAuth     *model.BillingAuthSnapshot // 发送前冻结的授权快照（hardening）
 }
 
 // Durable reports whether this session settles through the durable wallet
-// reservation ledger. Reservation hardening only admits durable sessions.
+// reservation ledger.
 func (s *BillingSession) Durable() bool {
 	return s.durable
-}
-
-// SetDispatchAuth freezes the dispatch-time authorization estimate. The next
-// Reserve raise persists it in the same transaction; when no raise is needed
-// PersistDispatchAuth writes it before the request is sent.
-func (s *BillingSession) SetDispatchAuth(snapshot *model.BillingAuthSnapshot) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.dispatchAuth = snapshot
-}
-
-// PersistDispatchAuth durably records the frozen authorization facts.
-func (s *BillingSession) PersistDispatchAuth() error {
-	s.mu.Lock()
-	snapshot := s.dispatchAuth
-	s.mu.Unlock()
-	if snapshot == nil {
-		return nil
-	}
-	snapshot.ReservedQuota = s.preConsumedQuota
-	return model.UpsertBillingAuthSnapshot(snapshot)
 }
 
 // SettleUncertain retains the approved charge while durably flagging missing
@@ -118,14 +96,28 @@ func (s *BillingSession) Settle(actualQuota int) error {
 		if info.ChannelMeta != nil {
 			detail.ChannelId = info.ChannelId
 		}
+		// A reservation is an estimate, not a maximum charge. Reuse the atomic
+		// wallet/token debit for measured usage above it. If balances cannot
+		// cover the debit, the completion retains the target for review.
+		var reserveErr error
+		if actualQuota > s.preConsumedQuota {
+			reserveErr = model.RaiseBillingReservation(info.RequestId, actualQuota)
+			if reserveErr == nil {
+				s.preConsumedQuota, s.tokenConsumed, s.chargedQuota = actualQuota, actualQuota, actualQuota
+				s.syncRelayInfo()
+			}
+		}
 		if err := model.RequestBillingCompletion(info.RequestId, actualQuota, false, detail); err != nil {
-			return err
+			return errors.Join(reserveErr, err)
 		}
 		charged, err := model.ApplyBillingCompletion(s.relayInfo.RequestId)
 		if err == nil {
 			s.chargedQuota, s.settled, s.fundingSettled = charged, true, true
 		}
-		return err
+		if err != nil {
+			return errors.Join(reserveErr, err)
+		}
+		return nil
 	}
 	delta := actualQuota - s.preConsumedQuota
 	if delta == 0 {
@@ -289,10 +281,7 @@ func (s *BillingSession) Reserve(targetQuota int) error {
 		if targetQuota <= s.preConsumedQuota {
 			return nil
 		}
-		if BillingProtectionEnabled() {
-			return errors.New("protected request cannot exceed its frozen reservation")
-		}
-		if err := model.RaiseBillingReservationWithAuth(s.relayInfo.RequestId, targetQuota, s.dispatchAuth); err != nil {
+		if err := model.RaiseBillingReservation(s.relayInfo.RequestId, targetQuota); err != nil {
 			return err
 		}
 		s.preConsumedQuota = targetQuota
@@ -531,35 +520,16 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	if relayInfo == nil {
 		return nil, types.NewError(fmt.Errorf("relayInfo is nil"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
 	}
-
 	pref := common.NormalizeBillingPreference(relayInfo.UserSetting.BillingPreference)
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
-		if BillingProtectionEnabled() || DurableWalletBillingEnabled() && !relayInfo.IsPlayground {
-			if err := ValidateBillingProtection(); err != nil {
-				return nil, types.NewError(err, types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
-			}
-			if BillingProtectionEnabled() && (!relayInfo.ProtectedTextBudget || relayInfo.IsPlayground || relayInfo.TokenGroup == "auto") {
-				return nil, types.NewError(errors.New("billing protection requires a fixed-group wallet text request"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
-			}
-			if BillingProtectionEnabled() && relayInfo.TieredBillingSnapshot != nil {
-				if !relayInfo.ProtectedTieredBudget {
-					return nil, types.NewError(errors.New("protected expression budget is missing"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
-				}
-				admission := *relayInfo
-				if admission.ChannelMeta == nil {
-					admission.InitChannelMeta(c)
-				}
-				if err := ValidateProtectedTieredSnapshot(&admission); err != nil {
-					return nil, types.NewError(err, types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
-				}
-			}
+		if DurableWalletBillingEnabled() && !relayInfo.IsPlayground {
 			if err := model.ReserveBillingRequest(relayInfo.RequestId, relayInfo.UserId, relayInfo.TokenId, preConsumedQuota); err != nil {
 				if errors.Is(err, model.ErrBillingReservationQuota) {
-					return nil, types.NewErrorWithStatusCode(errors.New("protected billing reservation exceeds available quota"), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry())
+					return nil, types.NewErrorWithStatusCode(errors.New("billing reservation exceeds available quota"), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry())
 				}
-				return nil, types.NewError(errors.New("protected billing reservation could not be committed"), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
+				return nil, types.NewError(errors.New("billing reservation could not be committed"), types.ErrorCodeUpdateDataError, types.ErrOptionWithSkipRetry())
 			}
 			session := &BillingSession{relayInfo: relayInfo, funding: &WalletFunding{userId: relayInfo.UserId}, durable: true, preConsumedQuota: preConsumedQuota, tokenConsumed: preConsumedQuota, chargedQuota: preConsumedQuota}
 			c.Set(model.BillingExecutionContextKey, append(c.GetStringSlice(model.BillingExecutionContextKey), relayInfo.RequestId))
@@ -595,9 +565,6 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 	}
 
 	trySubscription := func() (*BillingSession, *types.NewAPIError) {
-		if BillingProtectionEnabled() {
-			return nil, types.NewError(errors.New("subscription billing is not admitted by billing protection"), types.ErrorCodeInvalidRequest, types.ErrOptionWithSkipRetry())
-		}
 		subConsume := int64(preConsumedQuota)
 		if subConsume <= 0 {
 			subConsume = 1

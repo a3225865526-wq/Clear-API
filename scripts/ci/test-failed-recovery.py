@@ -342,6 +342,48 @@ class WebsiteRestorationTest(unittest.TestCase):
             self.running = False
         return ''
 
+    def current_adapter(self):
+        before={'gateway':{'container_id':'current-healthy-gateway'},'shared':{}}
+        state={'adoption':{**before,'source_commit':'a'*40},'releases':{'current':{'status':'adopted'}}}
+        path=self.app/'local-deploy-state.json'
+        RECOVERY.LIFECYCLE.publish(path,state)
+        adapter=SimpleNamespace(STATE=SimpleNamespace(NAME=path.name,load=lambda app:state,
+            read_file=lambda p,**kw:p.read_bytes()),adoption_snapshot=MagicMock(return_value=before),
+            backup=MagicMock(return_value='20261024T010000Z'))
+        command=self.restore.command
+        def origin(args):
+            if args[0]=='curl':
+                return '{"success":true}' if args[-1].endswith('/api/status') else '308 https://www.clear999.com/'
+            return command(args)
+        self.restore.command=origin
+        return adapter,{'source_commit':'a'*40,'scope':'existing-gateway-original-caddy-v1'},path
+
+    def test_adopted_current_instance_restores_original_edge_without_legacy_receipt_rewrite(self):
+        adapter,authorization,path=self.current_adapter();raw=path.read_bytes()
+        result=self.restore.restore_adopted(authorization,adapter)
+        self.assertEqual(result['status'],'website_restored')
+        self.assertFalse(result['gateway_replaced']);self.assertFalse(result['database_restored'])
+        self.assertEqual(result['backup_id'],'20261024T010000Z')
+        self.assertEqual(path.read_bytes(),raw);self.assert_preserved()
+        writes=[args for args in self.calls if args[:2] in (['docker','start'],['docker','update'])]
+        self.assertTrue(writes);self.assertTrue(all(args[-1]==self.restore.CADDY_ID for args in writes))
+
+    def test_adopted_backup_failure_blocks_before_edge_mutation(self):
+        adapter,authorization,path=self.current_adapter()
+        adapter.backup.side_effect=ValueError('actual backup invocation failed')
+        with self.assertRaises(ValueError):self.restore.restore_adopted(authorization,adapter)
+        self.assertFalse(self.running);self.assertFalse(self.restore.attempt.exists())
+        self.assertFalse(any(args[:2]==['docker','start'] for args in self.calls));self.assert_preserved()
+
+    def test_adopted_public_failure_returns_original_caddy_to_isolation(self):
+        adapter,authorization,path=self.current_adapter();raw=path.read_bytes()
+        self.health.side_effect=RECOVERY.CONTROL.ReleaseBlocked('public health 403')
+        with self.assertRaises(RECOVERY.CONTROL.ReleaseBlocked):self.restore.restore_adopted(authorization,adapter)
+        self.assertFalse(self.running);self.assertEqual(self.policy,'no')
+        result=RECOVERY.LIFECYCLE.read_json(self.restore.failure_result)
+        self.assertTrue(result['containment_verified']);self.assertEqual(result['public_traffic'],'blocked')
+        self.assertEqual(path.read_bytes(),raw);self.assert_preserved()
+
     def assert_preserved(self):
         for path, raw in self.original.items():
             self.assertEqual(path.read_bytes(), raw)
@@ -422,46 +464,88 @@ class WebsiteRestorationTest(unittest.TestCase):
         self.assert_preserved()
 
     def test_public_checks_require_valid_status_cf_and_application_html_without_claiming_login(self):
-        opener = MagicMock()
-        response = opener.open.return_value
-        response.__enter__.return_value = response
-        response.status = 200
-        response.headers = {'CF-Ray': 'synthetic', 'Content-Type': 'text/html'}
-        response.read.side_effect = [b'{"success":true}'] + [b'<html><div id="root"></div><script src="/static/app.js"></script></html>'] * 3
-        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener):
-            result = RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
-        self.assertEqual(result['user_login'], 'not_tested')
-        self.assertEqual(result['admin_session'], 'not_tested')
-        self.assertEqual(len(result['pages']), 4)
-        self.assertTrue(all(c.args[0].full_url.startswith('https://www.clear999.com/') for c in opener.open.call_args_list))
-        response.read.side_effect = None
-        response.read.return_value = b'{"success":false}'
-        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
-                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'not healthy'):
-            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
+        html='<html><div id="root"></div><script src="/static/app.js"></script></html>'
+        command=MagicMock(side_effect=[self.curl_response('{"success":true}')]+[self.curl_response(html)]*3)
+        with patch.object(self.restore,'command',command):
+            result=RECOVERY.WebsiteRestoration.public_health(self.restore,'124')
+        self.assertEqual(result['user_login'],'not_tested')
+        self.assertEqual(result['normal_browser'],'not_tested')
+        self.assertEqual(len(result['pages']),4)
+        self.assertTrue(all(c.args[0][0]=='curl' and '--location' not in c.args[0]
+            and '--insecure' not in c.args[0] and '--user-agent' not in c.args[0]
+            and 'X-ClearAPI-Probe: website-health-v1' in c.args[0]
+            and c.args[0][-1].startswith('https://www.clear999.com/') for c in command.call_args_list))
+        with patch.object(self.restore,'command',return_value=self.curl_response('{"success":false}')), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'not healthy'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore,'124')
+
+    @staticmethod
+    def curl_response(body,status=200,cf=True):
+        return ('HTTP/2 '+str(status)+'\nContent-Type: text/html\n'
+            +('CF-Ray: synthetic\n' if cf else '')+'\n'+body+'\nCLEARAPI_HTTP:'+str(status))
 
     def test_missing_cf_or_generic_html_cannot_claim_application_available(self):
-        opener = MagicMock()
-        response = opener.open.return_value
-        response.status = 200
-        response.headers = {'Content-Type': 'text/html'}
-        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
-                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'HTTPS unavailable'):
-            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
-        response.headers['CF-Ray'] = 'synthetic'
-        response.read.side_effect = [b'{"success":true}', b'<html><script>challenge()</script></html>']
-        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
-                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'page unavailable'):
-            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
+        with patch.object(self.restore,'command',return_value=self.curl_response('{}',cf=False)), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'HTTPS unavailable'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore,'124')
+        with patch.object(self.restore,'command',side_effect=[self.curl_response('{"success":true}'),
+                self.curl_response('<html><script>challenge()</script></html>')]), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'page unavailable'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore,'124')
+
+    def test_cloudflare_denial_records_ray_and_stops_without_retries(self):
+        command=MagicMock(return_value=self.curl_response('error code: 1010',403))
+        with patch.object(self.restore,'command',command), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'status=403 Ray=synthetic'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore,'124')
+        self.assertEqual(command.call_count,1)
+        self.assertEqual(self.restore.public_observations['/api/status']['error_codes'],['1010'])
 
     def test_public_transport_startup_retry_stops_at_deadline(self):
-        opener = MagicMock()
-        opener.open.side_effect = OSError('synthetic unavailable edge')
-        with patch.object(RECOVERY.urllib.request, 'build_opener', return_value=opener), \
-                patch.object(RECOVERY.time, 'monotonic', side_effect=[0, 0, 31]), \
-                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked, 'deadline exceeded'):
-            RECOVERY.WebsiteRestoration.public_health(self.restore, '124')
-        self.assertEqual(opener.open.call_count, 1)
+        command=MagicMock(side_effect=OSError('synthetic unavailable edge'))
+        with patch.object(self.restore,'command',command), \
+                patch.object(RECOVERY.time,'monotonic',side_effect=[0,0,31]), \
+                self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'deadline exceeded'):
+            RECOVERY.WebsiteRestoration.public_health(self.restore,'124')
+        self.assertEqual(command.call_count,1)
+
+    def test_reviewed_adopted_retry_preserves_previous_failure_and_is_one_use(self):
+        adapter,authorization,path=self.current_adapter()
+        self.health.side_effect=ValueError('previous public signature failure')
+        with self.assertRaises(ValueError):self.restore.restore_adopted(authorization,adapter)
+        prior_failure=self.restore.failure_result;prior_attempt=self.restore.attempt
+        raw_failure=prior_failure.read_bytes();raw_attempt=prior_attempt.read_bytes()
+        reviewed=hashlib.sha256(raw_failure).hexdigest()
+        retry_authorization=dict(authorization,reviewed_failure_sha256=reviewed)
+        previous=self.restore
+        self.restore=RECOVERY.WebsiteRestoration(RECOVERY.Recovery(self.app,previous.command))
+        self.restore.CONFIG=previous.CONFIG;self.restore.CONFIG_SHA=previous.CONFIG_SHA
+        with patch.object(self.restore,'public_health',return_value={'normal_browser':'not_tested'}):
+            result=self.restore.restore_adopted(retry_authorization,adapter)
+        self.assertEqual(result['authorization'],authorization)
+        self.assertEqual(result['reviewed_failure_sha256'],reviewed)
+        self.assertEqual(prior_failure.read_bytes(),raw_failure);self.assertEqual(prior_attempt.read_bytes(),raw_attempt)
+        self.assertEqual(result['origin']['https_gateway_forwarding'],'PASS')
+        self.assert_preserved()
+        another=RECOVERY.WebsiteRestoration(RECOVERY.Recovery(self.app,self.restore.command))
+        with self.assertRaises(RECOVERY.CONTROL.ReleaseBlocked):
+            another.restore_adopted(retry_authorization,adapter)
+
+    def test_unreviewed_or_uncontained_failure_cannot_reopen_edge(self):
+        adapter,authorization,path=self.current_adapter()
+        self.health.side_effect=ValueError('previous failure')
+        with self.assertRaises(ValueError):self.restore.restore_adopted(authorization,adapter)
+        self.calls.clear()
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'already attempted'):
+            self.restore.restore_adopted(authorization,adapter)
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'exact contained failure'):
+            self.restore.restore_adopted(dict(authorization,reviewed_failure_sha256='0'*64),adapter)
+        failure=json.loads(self.restore.failure_result.read_bytes());failure['containment_verified']=False
+        self.restore.failure_result.write_text(json.dumps(failure));self.restore.failure_result.chmod(0o600)
+        digest=hashlib.sha256(self.restore.failure_result.read_bytes()).hexdigest()
+        with self.assertRaisesRegex(RECOVERY.CONTROL.ReleaseBlocked,'exact contained failure'):
+            self.restore.restore_adopted(dict(authorization,reviewed_failure_sha256=digest),adapter)
+        self.assertEqual(self.calls,[])
 
 
 class FailedManifestParserTest(unittest.TestCase):

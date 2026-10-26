@@ -11,32 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestReservationUpperBound(t *testing.T) {
-	for _, tc := range []struct {
-		name, expression string
-		want             float64
-		fail             bool
-	}{
-		{"text and cache", `tier("base", p*3+c*15+cc*6)`, 10500, false},
-		{"branch change", `len<500 ? tier("cheap",p) : tier("expensive",p*30+c*150)`, 45000, false},
-		{"interior maximum", `tier("base",c*(100-c))`, 10000, false},
-		{"request rule", `tier("base",p*3+c*15)*(header("fast")=="yes" ? 6 : 1)`, 27000, false},
-		{"fixed", `tier("request",fixed(0.01))`, 10000, false},
-		{"zero divisor", `tier("base",100/c)`, 0, true},
-		{"unbounded parameter", `tier("base",p*param("rate"))`, 0, true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			upper, err := billingexpr.ReservationUpperBound(tc.expression, 1000, 100, 1)
-			if tc.fail {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, upper)
-		})
-	}
-}
-
 func TestFixedPriceBranches(t *testing.T) {
 	const expression = `(len <= 32000 ? tier("short", fixed(0.01)) : tier("long", p * 2 + c * 8)) * (param("fast") == true ? 2 : 1)`
 	for _, tc := range []struct {

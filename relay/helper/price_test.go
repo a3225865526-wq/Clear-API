@@ -23,9 +23,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
-func TestPaidTextReservationIncludesEveryOutput(t *testing.T) {
+func TestBasicTextReservationDoesNotRequireOutputBudget(t *testing.T) {
 	oldRatios, oldPrices := ratio_setting.ModelRatio2JSONString(), ratio_setting.ModelPrice2JSONString()
 	oldCount, oldQuota := constant.CountToken, *operation_setting.GetQuotaSetting()
 	constant.CountToken = true
@@ -45,9 +46,9 @@ func TestPaidTextReservationIncludesEveryOutput(t *testing.T) {
 		info := &relaycommon.RelayInfo{OriginModelName: "security-budget", UserGroup: "default", UsingGroup: "default", RelayMode: relayconstant.RelayModeChatCompletions, Request: &dto.GeneralOpenAIRequest{MaxTokens: &limit, N: &count}}
 		price, err := ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{MaxTokens: 100})
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, price.QuotaToPreConsume, 1000+100*count)
+		assert.Equal(t, 1000, price.QuotaToPreConsume)
 		_, err = ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{})
-		require.ErrorContains(t, err, "bounded output limit")
+		require.NoError(t, err)
 	}
 }
 
@@ -166,11 +167,11 @@ func TestModelPriceHelperTieredInputPreConsumeMultiplier(t *testing.T) {
 		multiplier float64
 		expected   int
 	}{
-		{"reserves the most expensive possible branch", "default", 1000, 0, 1, 15000},
-		{"bound includes every pricing branch", "default", 1000, 100, 1, 15000},
-		{"fraction cannot underreserve", "default", 1000, 0, 0.5, 15000},
-		{"fraction above one increases input bound", "default", 1000, 0, 2.5, 37500},
-		{"small input has no token floor", "default", 100, 0, 1, 1500},
+		{"uses the estimated context branch", "default", 1000, 0, 1, 1500},
+		{"output limit does not change basic preconsume", "default", 1000, 100, 1, 1500},
+		{"fraction scales estimated input", "default", 1000, 0, 0.5, 750},
+		{"fraction above one scales estimated input", "default", 1000, 0, 2.5, 3750},
+		{"small input has no token floor", "default", 100, 0, 1, 150},
 		{"zero input", "default", 0, 100, 1, 0},
 		{"free group", "free", 1000, 0, 2.5, 0},
 	}
@@ -287,7 +288,7 @@ func TestModelPriceHelperRequestBillingRatiosOnlyApplyToFixedPrice(t *testing.T)
 		{
 			name:         "ratio price ignores request billing ratios",
 			model:        "ratio-image-price",
-			wantQuota:    30000,
+			wantQuota:    15000,
 			wantUsePrice: false,
 		},
 	}
@@ -743,7 +744,7 @@ func TestInputPreConsumeMultiplierLegacyAndRequestPrices(t *testing.T) {
 		multiplier   float64
 		prompt, want int
 	}{
-		{"legacy-input-policy", 0.5, 100, 300},
+		{"legacy-input-policy", 0.5, 100, 75},
 		{"legacy-input-policy", 2.5, 100, 375},
 		{"legacy-input-policy", 1, 0, 0},
 		{"request-input-policy", 2.5, 100, 5000},
@@ -770,49 +771,100 @@ func TestInputPreConsumeMultiplierLegacyAndRequestPrices(t *testing.T) {
 }
 
 // priceTestReservation observes the reservation requested before image submission.
-type priceTestReservation struct{ held int }
+type priceTestReservation struct{ held, available int }
 
 func (s *priceTestReservation) Settle(int) error         { return nil }
 func (s *priceTestReservation) Refund(*gin.Context)      {}
 func (s *priceTestReservation) NeedsRefund() bool        { return false }
 func (s *priceTestReservation) GetPreConsumedQuota() int { return s.held }
-func (s *priceTestReservation) Reserve(quota int) error  { s.held = max(s.held, quota); return nil }
+func (s *priceTestReservation) Reserve(quota int) error {
+	if s.available > 0 && quota > s.available {
+		return fmt.Errorf("insufficient quota")
+	}
+	s.held = max(s.held, quota)
+	return nil
+}
 
 func TestOutboundTextBudgetCoversParameterOverrides(t *testing.T) {
-	old := constant.CountToken
-	constant.CountToken = true
-	t.Cleanup(func() { constant.CountToken = old })
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
 	reservation := &priceTestReservation{held: 10}
-	info := &relaycommon.RelayInfo{Request: &dto.GeneralOpenAIRequest{}, RelayMode: relayconstant.RelayModeChatCompletions, RelayFormat: types.RelayFormatOpenAI, Billing: reservation, PriceData: hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}, QuotaToPreConsume: 10}}
-	require.NoError(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"synthetic prompt"}],"max_tokens":200,"n":2}`)))
-	assert.GreaterOrEqual(t, reservation.held, 400)
-	require.ErrorContains(t, PrepareOutboundTextBudget(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"fixture"}]}`)), "bounded output limit")
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}, Request: &dto.GeneralOpenAIRequest{}, RelayMode: relayconstant.RelayModeChatCompletions, RelayFormat: types.RelayFormatOpenAI, Billing: reservation, PriceData: hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}, QuotaToPreConsume: 10}}
+	_, err := ValidateOutboundBilling(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"synthetic prompt"}],"max_tokens":200,"n":2}`))
+	require.NoError(t, err)
+	assert.Equal(t, 10, reservation.held)
+	body, err := ValidateOutboundBilling(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"fixture"}]}`))
+	require.NoError(t, err)
+	assert.False(t, gjson.GetBytes(body, "max_tokens").Exists())
+	assert.Equal(t, 10, reservation.held)
+	info.ChannelSetting.PassThroughBodyEnabled = true
+	body, err = ValidateOutboundBilling(ctx, info, []byte(`{"model":"synthetic","messages":[{"role":"user","content":"fixture"}],"max_tokens":200,"service_tier":"priority","provider_extension":{"value":true}}`))
+	require.NoError(t, err)
+	assert.True(t, gjson.GetBytes(body, "provider_extension.value").Bool())
+	_, err = ValidateOutboundBilling(ctx, info, []byte(`{"model":"synthetic","max_tokens":200,"parameters":{"n":1000}}`))
+	require.ErrorContains(t, err, "parameters.n")
 }
 
-func TestPaidGeminiBatchBudgetIncludesEveryRequest(t *testing.T) {
-	old := constant.CountToken
-	constant.CountToken = true
-	t.Cleanup(func() { constant.CountToken = old })
-	limit := uint(100)
-	n := 2
-	batch := &dto.GeminiChatRequest{Requests: []dto.GeminiChatRequest{
-		{GenerationConfig: dto.GeminiChatGenerationConfig{MaxOutputTokens: &limit}},
-		{GenerationConfig: dto.GeminiChatGenerationConfig{MaxOutputTokens: &limit, CandidateCount: &n}},
-	}}
-	info := &relaycommon.RelayInfo{Request: batch, RelayFormat: types.RelayFormatGemini}
-	budget, err := requestOutputBudget(info, batch.GetTokenCountMeta())
+func TestBillingPreservesOptionalOutputLimits(t *testing.T) {
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	oldCount := constant.CountToken
+	constant.CountToken = false
+	t.Cleanup(func() { constant.CountToken = oldCount })
+	previous := config.GlobalConfig.ExportAllConfigs()
+	t.Cleanup(func() { require.NoError(t, config.GlobalConfig.LoadFromDB(previous)) })
+	for _, tc := range []struct {
+		name, path, body string
+		request          dto.Request
+		format           types.RelayFormat
+		mode             int
+	}{
+		{"chat", "/v1/chat/completions", `{"model":"synthetic","messages":[{"role":"user","content":"hello"}],"n":2,"extension":true}`, &dto.GeneralOpenAIRequest{}, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions},
+		{"completions", "/v1/completions", `{"model":"synthetic","prompt":"hello"}`, &dto.GeneralOpenAIRequest{}, types.RelayFormatOpenAI, relayconstant.RelayModeCompletions},
+		{"responses", "/v1/responses", `{"model":"synthetic","input":"hello","service_tier":"priority","extension":true}`, &dto.OpenAIResponsesRequest{}, types.RelayFormatOpenAIResponses, relayconstant.RelayModeResponses},
+		{"claude", "/v1/messages", `{"model":"synthetic","messages":[{"role":"user","content":"hello"}]}`, &dto.ClaudeRequest{}, types.RelayFormatClaude, relayconstant.RelayModeChatCompletions},
+		{"gemini", "/v1beta/models/synthetic:generateContent", `{"contents":[{"role":"user","parts":[{"text":"hello"}]}],"generationConfig":{"candidate_count":2},"extension":true}`, &dto.GeminiChatRequest{}, types.RelayFormatGemini, 0},
+		{"reasoning", "/v1/chat/completions", `{"model":"gpt-5","messages":[{"role":"user","content":"hello"}]}`, &dto.GeneralOpenAIRequest{}, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions},
+		{"explicit", "/v1/chat/completions", `{"model":"synthetic","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":123}`, &dto.GeneralOpenAIRequest{}, types.RelayFormatOpenAI, relayconstant.RelayModeChatCompletions},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Request = httptest.NewRequest("POST", tc.path, nil)
+			reservation := &priceTestReservation{}
+			info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}, OriginModelName: "synthetic", RequestURLPath: tc.path, Request: tc.request, RelayFormat: tc.format, RelayMode: tc.mode, Billing: reservation, PriceData: hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}}}
+			info.ChannelSetting.PassThroughBodyEnabled = true
+			require.NoError(t, common.Unmarshal([]byte(tc.body), tc.request))
+			require.NoError(t, ValidateBillingCapabilities(info))
+			// Reuse the original raw input, as a passthrough channel does.
+			wire, err := ValidateOutboundBilling(ctx, info, []byte(tc.body))
+			require.NoError(t, err)
+			assert.JSONEq(t, tc.body, string(wire))
+			require.NoError(t, common.Unmarshal(wire, tc.request))
+			prompt, err := service.EstimateRequestToken(ctx, tc.request.GetTokenCountMeta(), info)
+			require.NoError(t, err)
+			assert.Positive(t, prompt, "durable billing counts input even with optional estimation disabled")
+			assert.Zero(t, reservation.held)
+			if gjson.Get(tc.body, "extension").Exists() {
+				assert.True(t, gjson.GetBytes(wire, "extension").Bool())
+			}
+			reservation.held, reservation.available = 0, 1
+			_, err = ValidateOutboundBilling(ctx, info, []byte(tc.body))
+			require.NoError(t, err)
+			assert.Zero(t, reservation.held)
+		})
+	}
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest("POST", "/v1/chat/completions", nil)
+	for _, body := range []string{`{"max_tokens":1073741824}`, `{"max_tokens":18446744073709551615}`, `{"max_tokens":10,"n":129}`} {
+		info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}, Request: &dto.GeneralOpenAIRequest{}, RelayMode: relayconstant.RelayModeChatCompletions, RelayFormat: types.RelayFormatOpenAI, Billing: &priceTestReservation{}}
+		_, err := ValidateOutboundBilling(ctx, info, []byte(body))
+		require.Error(t, err)
+	}
+	// Batch children receive independent wire limits and all candidates reserve.
+	batch := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}, Request: &dto.GeminiChatRequest{}, RelayFormat: types.RelayFormatGemini, Billing: &priceTestReservation{}, PriceData: hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 1, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}}}
+	wire, err := ValidateOutboundBilling(ctx, batch, []byte(`{"requests":[{"contents":[{"parts":[{"text":"a"}]}]},{"contents":[{"parts":[{"text":"b"}]}],"generationConfig":{"maxOutputTokens":20,"candidateCount":2}}]}`))
 	require.NoError(t, err)
-	assert.Equal(t, 300.0, budget)
-	batch.Requests[0].GenerationConfig.MaxOutputTokens = nil
-	_, err = requestOutputBudget(info, batch.GetTokenCountMeta())
-	require.ErrorContains(t, err, "bounded output limit")
-	embedding := &relaycommon.RelayInfo{Request: &dto.GeminiChatRequest{}, RequestURLPath: "/v1beta/models/synthetic:embedContent", RelayFormat: types.RelayFormatGemini}
-	budget, err = requestOutputBudget(embedding, &types.TokenCountMeta{})
-	require.NoError(t, err)
-	assert.Zero(t, budget)
-	assert.False(t, RequiresOutboundTextBudget(embedding))
-	_, err = requestToolBudget(&relaycommon.RelayInfo{Request: &dto.OpenAIResponsesRequest{Tools: []byte(`[{"type":"code_interpreter"}]`)}})
-	require.ErrorContains(t, err, "cannot bound provider-hosted tool")
+	assert.False(t, gjson.GetBytes(wire, "requests.0.generationConfig.maxOutputTokens").Exists())
+	require.NoError(t, common.Unmarshal(wire, batch.Request))
+	require.NoError(t, validateTextQuantities(batch.Request))
 }

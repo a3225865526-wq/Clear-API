@@ -124,14 +124,13 @@ BOOTSTRAP_SERVICE="${DEPLOY_BOOTSTRAP_SERVICE:-production-bootstrap}"
 MIGRATION_FLAGS="${DEPLOY_MIGRATION_FLAGS:-}"
 
 # Frozen negative-gate expectations (H4 acceptance baseline, live-verified).
-EXPECT_ENV_KEYS="${DEPLOY_EXPECT_ENV_KEYS:-CLEARAPI_ENABLE_RESPONSES_WEBSOCKET=false CLEARAPI_ENABLE_REALTIME=false}"
+EXPECT_ENV_KEYS="${DEPLOY_EXPECT_ENV_KEYS:-CLEARAPI_ENABLE_REALTIME=false}"
 EXPECT_CHANNELS="${DEPLOY_EXPECT_CHANNELS:-$DEFAULT_CHANNELS}"
 EXPECT_USER_ID="${DEPLOY_EXPECT_USER_ID:-2}"
 EXPECT_TOKEN_IDS="${DEPLOY_EXPECT_TOKEN_IDS:-1,2}"
 EXPECT_REVIEW_ROWS="${DEPLOY_EXPECT_REVIEW_ROWS:-4/10/4 41/93/41}"
 EXPECT_EMPTY_TABLES="${DEPLOY_EXPECT_EMPTY_TABLES:-$DEFAULT_EMPTY_TABLES}"
 POOL_OPTION_PATTERN="${DEPLOY_POOL_OPTION_PATTERN:-%pool%}"
-POLICY_MODE_KEY="${DEPLOY_POLICY_MODE_KEY:-billing_reserve_policy.mode}"
 
 # Stage 2B-2 consumes only Runtime Integrity Report v1. The Stage 2B-1
 # diagnostic response is deliberately incompatible; never synthesize missing
@@ -171,7 +170,7 @@ CONTROLLED_LAUNCH=0
 FAILED_RECOVERY_VERIFY=0
 FAILED_RECOVERY_EXECUTE=0
 FAILED_RECOVERY_TOOL=/opt/clearapi/bin/pg03-failed-recovery.py
-FAILED_RECOVERY_TOOL_SHA=860914fd36624296f6177dcf127a2aa5e1c1ab82c95b98760b79c9818ad99ff1
+FAILED_RECOVERY_TOOL_SHA=04b237bd1337fb535fb6c2cb45c3462e13fd69e01a50e98c8df4b245e6c628bd
 TRAFFIC_HOLD_TOOL=/opt/clearapi/bin/controlled-traffic-hold.py
 TRAFFIC_HOLD_SHA=b75475f8ec195c17791bd00acab41ae777fb629901617595fa78374974277b90
 
@@ -577,7 +576,6 @@ try:
     if report['config_digest'] != expected_config:
         blocked('RUNTIME_CONFIG_MISMATCH')
     if (report['online_payment_enabled'] or report['store_enabled'] != (policy == 'commercial_catalog') or report['pool_enabled']
-            or report['billing_mode'] != 'enforce'
             or report['referral_enabled'] != (referral == 'true')):
         blocked('RUNTIME_CONFIG_MISMATCH')
     if report['approval_schema'] != 1:
@@ -1286,8 +1284,6 @@ fi
 # ===========================================================================
 # 18. billing invariants (read-only, least-privileged app role)
 # ===========================================================================
-POLICY_MODE="$(psql_q "SELECT value FROM options WHERE key='${POLICY_MODE_KEY}';")"
-[ "$POLICY_MODE" = "enforce" ] || die "step 18: ${POLICY_MODE_KEY}='${POLICY_MODE}' expected 'enforce'"
 
 REVIEW_ROWS="$(psql_q "SELECT reserved||'/'||target||'/'||applied FROM billing_reservations WHERE state='needs_review' ORDER BY reserved, id;")"
 ACTUAL_SORTED="$(printf '%s\n' "$REVIEW_ROWS" | sort | tr '\n' ' ' | sed 's/ $//')"

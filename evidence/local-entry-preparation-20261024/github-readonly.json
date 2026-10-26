@@ -1,0 +1,90 @@
+{
+  "utc": "2026-10-24T13:34:46.406310+00:00",
+  "mode": "GET only",
+  "results": {
+    "workflows": {
+      "data": [
+        {
+          "id": 377545312,
+          "path": ".github/workflows/ci.yml",
+          "state": "active"
+        },
+        {
+          "id": 378068457,
+          "path": ".github/workflows/release-candidate.yml",
+          "state": "active"
+        },
+        {
+          "id": 384204592,
+          "path": ".github/workflows/release-pg03-gateway.yml",
+          "state": "active"
+        },
+        {
+          "id": 387553097,
+          "path": ".github/workflows/deployment-rehearsal.yml",
+          "state": "active"
+        },
+        {
+          "id": 389079463,
+          "path": ".github/workflows/release-state-audit.yml",
+          "state": "active"
+        },
+        {
+          "id": 390820963,
+          "path": ".github/workflows/pg03-isolated-rehearsal.yml",
+          "state": "active"
+        },
+        {
+          "id": 391551026,
+          "path": ".github/workflows/pg03-successor-approval.yml",
+          "state": "active"
+        },
+        {
+          "id": 378101050,
+          "path": ".github/workflows/deploy-production.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 378227091,
+          "path": ".github/workflows/ghcr-pull-rehearsal.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 387486994,
+          "path": ".github/workflows/automatic-deploy.yml",
+          "state": "disabled_manually"
+        },
+        {
+          "id": 390042545,
+          "path": ".github/workflows/failed-production-recovery.yml",
+          "state": "disabled_manually"
+        }
+      ]
+    },
+    "variables": {
+      "data": {
+        "CLEARAPI_AUTO_PRODUCTION_ENABLED": "false",
+        "CLEARAPI_AUTO_RC_ENABLED": "false"
+      }
+    },
+    "main": {
+      "data": "a032815cb6244a7ee5e812de82f8300c02554e99"
+    },
+    "queued": {
+      "data": 0
+    },
+    "in_progress": {
+      "data": 0
+    },
+    "waiting": {
+      "data": 0
+    },
+    "pending": {
+      "data": 0
+    },
+    "requested": {
+      "data": 0
+    }
+  },
+  "earlier_requests": "One wrong variable endpoint returned404; a subsequent workflow read had transientTLS failure, then the explicit workflow list succeeded. No remote writes."
+}

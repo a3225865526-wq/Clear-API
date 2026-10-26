@@ -302,7 +302,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 		// the attempt freeze still happens per call, right before the send.
 		service.BeginFinanceAttempt(c, info)
 		var payload []byte
-		payload, apiErr = buildResponsesWSCreatePayload(c, info, create.Request, create.Generate, create.StreamID)
+		payload, apiErr = buildResponsesWSCreatePayload(c, info, *info.Request.(*dto.OpenAIResponsesRequest), create.Generate, create.StreamID)
 		if apiErr != nil {
 			return apiErr
 		}
@@ -337,7 +337,7 @@ func (s *responsesWSSession) runCall(c *gin.Context, state *responsesWSCallState
 			info.RetryIndex = retry.GetRetry()
 			policy.BeginAttempt(channel, info.UsingGroup)
 			var payload []byte
-			payload, apiErr = buildResponsesWSCreatePayload(c, info, create.Request, create.Generate, create.StreamID)
+			payload, apiErr = buildResponsesWSCreatePayload(c, info, *info.Request.(*dto.OpenAIResponsesRequest), create.Generate, create.StreamID)
 			if apiErr != nil {
 				return apiErr
 			}
@@ -657,6 +657,10 @@ func buildResponsesWSCreatePayload(c *gin.Context, info *relaycommon.RelayInfo, 
 	jsonData, err := io.ReadAll(body)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeReadRequestBodyFailed, types.ErrOptionWithSkipRetry())
+	}
+	jsonData, err = helper.ValidateOutboundBilling(c, info, jsonData)
+	if err != nil {
+		return nil, newResponsesWSInvalidRequestError(err)
 	}
 	event, err := buildResponsesWSCreateEvent(jsonData, generate, streamID)
 	if err != nil {

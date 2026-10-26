@@ -31,6 +31,8 @@ const STATUS_RELATED_KEYS = new Set([
   'HeaderNavModules',
   'SidebarModulesAdmin',
   'Notice',
+  'console_setting.announcements',
+  'console_setting.announcements_enabled',
   'LogConsumeEnabled',
   'QuotaPerUnit',
   'USDExchangeRate',
@@ -58,9 +60,14 @@ export function useUpdateOption() {
         // Always refresh system-options
         queryClient.invalidateQueries({ queryKey: ['system-options'] })
 
+        if (variables.key === 'Notice') {
+          queryClient.invalidateQueries({ queryKey: ['notice'] })
+        }
+
         // If updating frontend-display-related config, also refresh status
         if (STATUS_RELATED_KEYS.has(variables.key)) {
           queryClient.invalidateQueries({ queryKey: ['status'] })
+          queryClient.invalidateQueries({ queryKey: ['announcement-reads'] })
           try {
             window.localStorage.removeItem('status')
           } catch {
@@ -96,6 +103,7 @@ export function useUpdatePasskeyDomains() {
       if (request.preview || !result.success) return
       queryClient.invalidateQueries({ queryKey: ['system-options'] })
       queryClient.invalidateQueries({ queryKey: ['status'] })
+      queryClient.invalidateQueries({ queryKey: ['announcement-reads'] })
       try {
         window.localStorage.removeItem('status')
       } catch {

@@ -102,7 +102,9 @@ docker exec clearapi-postgres-1 pg_dumpall -U clearapi_admin --globals-only \
 
 # 3. config + legal + secrets archives
 PHASE=archives
-tar -czf "$STAGE/clearapi-config-$TS.tar.gz" -C / opt/clearapi/app/docker-compose.prod.yml opt/clearapi/app/compose-candidate.yaml
+CONFIG_PATHS=$(python3 "$IDENTITY_TOOL" archive-paths --archive-root /)
+mapfile -t CONFIG_FILES <<< "$CONFIG_PATHS"
+tar -czf "$STAGE/clearapi-config-$TS.tar.gz" -C / "${CONFIG_FILES[@]}"
 tar -czf "$STAGE/clearapi-legal-$TS.tar.gz" -C / opt/clearapi/legal
 tar -cf  "$STAGE/clearapi-secrets-$TS.tar"  -C / opt/clearapi/secrets
 # Stage 3: edge configuration (non-secret: Caddyfile + edge compose; ACME keys excluded by design)

@@ -1,0 +1,7 @@
+{
+  "observed_at": "2026-10-24T03:30:34.820482+00:00",
+  "phase": "install-curl-probe",
+  "exit": 0,
+  "stdout": "{\"result\": \"single_recovery_asset_updated\", \"source_commit\": \"8a081ff2d07951d8fa7b0626743df51dcb3899cf\", \"installed\": {\"exists\": true, \"uid\": 0, \"gid\": 0, \"mode\": \"0o750\", \"nlink\": 1, \"symlink\": false, \"bytes\": 34573, \"sha256\": \"04b237bd1337fb535fb6c2cb45c3462e13fd69e01a50e98c8df4b245e6c628bd\"}, \"target\": \"/opt/clearapi/bin/pg03-failed-recovery.py\", \"preserved_directory\": \"/opt/clearapi/backups/www-restoration-20261024-8a081ff2d0\", \"other_assets_unchanged\": true, \"containers_unchanged\": true, \"utc\": \"2026-10-24T03:30:35.545948+00:00\"}\n",
+  "stderr": ""
+}

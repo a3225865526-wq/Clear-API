@@ -495,7 +495,7 @@ class CandidateBundleTest(unittest.TestCase):
         self.repository = self.root / 'source'
         self.repository.mkdir()
         scripts = Path(__file__).resolve().parents[1]
-        for name in ('runtime-boot-recovery.py', 'runtime-identity-refresh.py', 'boot-recovery-install.py'):
+        for name in ('runtime-boot-recovery.py', 'runtime-identity-refresh.py', 'local-deploy-state.py', 'boot-recovery-install.py'):
             target = self.repository / 'scripts' / name
             target.parent.mkdir(exist_ok=True)
             shutil.copyfile(scripts / name, target)
@@ -532,7 +532,7 @@ class CandidateBundleTest(unittest.TestCase):
         artifacts = candidate.payloads(self.output / 'inventory.json', self.output)
         self.assertEqual(inventory['source']['root_tree'], self.tree)
         self.assertIsNone(inventory['source']['commit'])
-        self.assertEqual(len(artifacts), 6)
+        self.assertEqual(len(artifacts), 7)
         self.assertNotIn('/opt/clearapi/bin/pg03-failed-recovery.py', artifacts)
         host = self.root / 'host'
         host.mkdir(mode=0o700)

@@ -1,0 +1,7 @@
+{
+  "observed_at": "2026-10-24T13:30:26.890772+00:00",
+  "phase": "candidate-status-readonly",
+  "exit": 0,
+  "stdout": "{\"mode\": \"candidate_status_component_only_read_only_in_memory\", \"utc\": \"2026-10-24T13:30:28.502329+00:00\", \"source_sha256\": \"b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f\", \"checks\": {\"origin\": {\"url\": \"http://127.0.0.1:3000/api/status\", \"status_and_success\": \"HTTP200 and success=true\", \"result\": \"PASS\"}, \"cloudflare\": {\"url\": \"https://www.clear999.com/api/status\", \"status_and_success\": \"HTTP200 and success=true\", \"result\": \"PASS\"}}, \"client\": \"native curl/default UA; X-ClearAPI-Probe: local-deploy-v1\", \"no_assets_installed\": true, \"no_config_or_sentinel_written\": true, \"no_Docker_save_or_temp_archives\": true, \"containers_and_metadata_unchanged\": true, \"full_formal_preflight\": \"NOT RUN: official config and activation sentinel remain absent\"}\n",
+  "stderr": ""
+}

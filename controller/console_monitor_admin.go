@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,6 +45,12 @@ func monitorAdminError(c *gin.Context, err error) {
 		status, code = 501, "MONITOR_INTEGRATION_PENDING"
 	case errors.Is(err, model.ErrMonitorLease):
 		status, code = 409, "MONITOR_LEASE_UNRESOLVED"
+	case errors.Is(err, service.ErrMonitorLeaseUnresolved):
+		status, code = 409, "MONITOR_LEASE_UNRESOLVED"
+	case errors.Is(err, service.ErrMonitorCostUnverified):
+		status, code = 409, "MONITOR_COST_UNVERIFIED"
+	case errors.Is(err, service.ErrMonitorCostExceeded):
+		status, code = 409, "MONITOR_COST_EXCEEDED"
 	}
 	c.JSON(status, gin.H{"success": false, "code": code, "message": code})
 }
@@ -69,7 +76,7 @@ func DiscoverConsoleMonitorTargets(c *gin.Context) {
 		monitorAdminError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"success": true, "data": gin.H{"channels": channels, "groups": groups, "account_pool": "integration_pending", "real_probe_ready": false}})
+	c.JSON(200, gin.H{"success": true, "data": gin.H{"channels": channels, "groups": groups, "account_pool": "integration_pending"}})
 }
 
 func ListConsoleMonitorAdmin(c *gin.Context) {
@@ -87,7 +94,16 @@ func ListConsoleMonitorAdmin(c *gin.Context) {
 		monitorAdminError(c, err)
 		return
 	}
-	c.JSON(200, gin.H{"success": true, "data": gin.H{"monitors": monitors, "policy": policy, "real_probe_ready": false}})
+	ready := false
+	if policy.Enabled {
+		for _, m := range monitors {
+			if (channelConsoleProbeAdapter{}).Authorize(c.Request.Context(), m) == nil {
+				ready = true
+				break
+			}
+		}
+	}
+	c.JSON(200, gin.H{"success": true, "data": gin.H{"monitors": monitors, "policy": policy, "real_probe_ready": ready}})
 }
 
 func SaveConsoleMonitorAdmin(c *gin.Context) {
@@ -121,11 +137,17 @@ func SwitchConsoleMonitorAdmin(c *gin.Context) {
 		return
 	}
 	action := c.Param("action")
-	// No production transport is registered yet; do not accept a misleading
-	// enable request that could start executing when an adapter is later added.
 	if action == "enabled" && input.Value {
-		monitorAdminError(c, model.ErrMonitorIntegration)
-		return
+		var m model.ConsoleMonitor
+		if err := model.DB.WithContext(c.Request.Context()).First(&m, id).Error; err != nil {
+			monitorAdminError(c, model.ErrMonitorInvalid)
+			return
+		}
+		m.Enabled = true
+		if err := (channelConsoleProbeAdapter{}).Authorize(c.Request.Context(), m); err != nil {
+			monitorAdminError(c, err)
+			return
+		}
 	}
 	if err := model.SetConsoleMonitorSwitch(c.Request.Context(), model.DB, id, action, input.Value); err != nil {
 		monitorAdminError(c, err)
@@ -144,10 +166,6 @@ func SaveConsoleMonitorPolicyAdmin(c *gin.Context) {
 		monitorAdminError(c, model.ErrMonitorInvalid)
 		return
 	}
-	if input.Policy.Enabled {
-		monitorAdminError(c, model.ErrMonitorIntegration)
-		return
-	}
 	if err := model.SaveConsoleMonitorPolicy(c.Request.Context(), model.DB, input.Policy); err != nil {
 		monitorAdminError(c, err)
 		return
@@ -156,7 +174,66 @@ func SaveConsoleMonitorPolicyAdmin(c *gin.Context) {
 	c.JSON(200, gin.H{"success": true})
 }
 
-func TriggerConsoleMonitorAdmin(c *gin.Context) { monitorAdminError(c, model.ErrMonitorIntegration) }
+func SaveConsoleMonitorCostContract(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	var input struct {
+		Confirm  bool                             `json:"confirm"`
+		Contract service.ConsoleProbeCostContract `json:"contract"`
+	}
+	if err != nil || id <= 0 || c.ShouldBindJSON(&input) != nil || !input.Confirm {
+		monitorAdminError(c, model.ErrMonitorInvalid)
+		return
+	}
+	var m model.ConsoleMonitor
+	if model.DB.WithContext(c.Request.Context()).First(&m, id).Error != nil {
+		monitorAdminError(c, model.ErrMonitorInvalid)
+		return
+	}
+	if err := service.SaveConsoleProbeCostContract(c.Request.Context(), model.DB, m, input.Contract); err != nil {
+		monitorAdminError(c, err)
+		return
+	}
+	recordManageAudit(c, "monitor.cost_contract", map[string]any{"monitor_id": id, "hard_ceiling_micros": input.Contract.HardCeilingMicros, "expires_at": input.Contract.ExpiresAt.Unix()})
+	c.JSON(200, gin.H{"success": true})
+}
+
+func GetConsoleMonitorCostContract(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		monitorAdminError(c, model.ErrMonitorInvalid)
+		return
+	}
+	var m model.ConsoleMonitor
+	if model.DB.WithContext(c.Request.Context()).First(&m, id).Error != nil {
+		monitorAdminError(c, model.ErrMonitorInvalid)
+		return
+	}
+	contract, err := service.LoadConsoleProbeCostContract(c.Request.Context(), model.DB, m)
+	if err != nil {
+		monitorAdminError(c, err)
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "data": contract})
+}
+
+func TriggerConsoleMonitorAdmin(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	var input struct {
+		Confirm bool `json:"confirm"`
+	}
+	if err != nil || id <= 0 || c.ShouldBindJSON(&input) != nil || !input.Confirm {
+		monitorAdminError(c, model.ErrMonitorInvalid)
+		return
+	}
+	executor := service.ConsoleProbeExecutor{DB: model.DB, Adapters: map[string]service.ConsoleProbeAdapter{"channel": channelConsoleProbeAdapter{}}}
+	result, err := executor.RunWithResult(c.Request.Context(), id)
+	if err != nil {
+		monitorAdminError(c, err)
+		return
+	}
+	recordManageAudit(c, "monitor.probe", map[string]any{"monitor_id": id, "attempt_id": result.AttemptID, "probe_id": result.ProbeID, "metered_cost_micros": result.MeteredCostMicros, "upstream_response_id": result.UpstreamResponseID, "status": result.Status, "error_code": result.ErrorCode})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": result})
+}
 
 func ConsoleMonitorHistoryAdmin(c *gin.Context) {
 	if !model.ConsoleMonitoringReady(model.DB) {

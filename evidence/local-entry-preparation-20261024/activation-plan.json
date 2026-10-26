@@ -1,0 +1,45 @@
+{
+  "mode": "PREPARATION_ONLY_NOT_AUTHORIZED_OR_EXECUTED",
+  "source_commit": "ce84487c4d1838e3f911c826f1dd4d781d6b5e20",
+  "production_target": "clearadmin@103.42.181.219:22",
+  "changes": [
+    {
+      "source": "scripts/local-deploy-vps.py",
+      "target": "/opt/clearapi/bin/clearapi-local-deploy.py",
+      "owner": "root:root",
+      "mode": "0750",
+      "expected_previous_sha256": "66ecfffacfdbbd66b0c57894921dc12e6b39861ab419427e2a17556168bc6ec0",
+      "sha256": "b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f",
+      "bytes": 31111
+    },
+    {
+      "source": "evidence/local-entry-preparation-20261024/local-deploy.vps-config.json.candidate",
+      "target": "/opt/clearapi/config/local-deploy.json",
+      "owner": "root:root",
+      "mode": "0600",
+      "must_be_absent_before": true,
+      "sha256": "22833e916fc368b208959d55442f006e5b551e81dc5261be40a92803bb188286",
+      "bytes": 388
+    },
+    {
+      "source": "evidence/local-entry-preparation-20261024/local-deploy.enabled.candidate",
+      "target": "/opt/clearapi/config/local-deploy.enabled",
+      "owner": "root:root",
+      "mode": "0600",
+      "must_be_absent_before": true,
+      "sha256": "00d09becb7e5b07482cf917cf361befd457a12e664d193645454e0e6a4904f16",
+      "bytes": 33,
+      "publish_order": "LAST"
+    }
+  ],
+  "additional_allowed_if_later_approved": [
+    "Preserve old helper and before/after metadata in a root-only backup directory",
+    "Temporary Docker-save inspection archives made and removed by existing preflight; no load/build/update"
+  ],
+  "no_gateway_update": true,
+  "no_website_restart": true,
+  "no_sudoers_or_identity_or_business_changes": true,
+  "stop_and_revoke_activation_on_any_failure": true,
+  "helper_implementation_commit": "14d7c09582e99c3144a76fcbeb06f509f3225489",
+  "artifact_encoding": "Exact LF bytes from git show source_commit:source; candidates also have scoped eol=lf attributes"
+}

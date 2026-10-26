@@ -466,12 +466,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		}
 	}
 
-	// Reservation hardening: usage that escaped the approved hidden domain is
-	// an anomaly. While the target still fits the approved reservation, retain
-	// the reservation for review instead of treating it as ordinary income;
-	// targets beyond the reservation keep the existing needs_review boundary.
-	var hardeningAnomaly *UsageAnomaly
+	// Interrupted streams without final usage retain their reservation.
 	hardeningRetained := false
+	interruptedUnknownRetained := false
 	// Interrupted stream without upstream exact usage (Final Launch Gate §3):
 	// hidden usage (unflushed output, reasoning tokens, cache writes, tool
 	// rounds) is unknowable, so a local estimate or a partial upstream frame
@@ -481,11 +478,10 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	// flags are set by the relay handlers (MarkTokenInterrupted /
 	// MarkTokenEstimate), so this single settlement-side hook covers every
 	// text-stream provider (OpenAI, Claude, xAI, responses) uniformly.
-	interruptedUnknownRetained := false
 	// DoRequest sets upstream_attempted only after a successful HTTP request
 	// write. Budget preparation, cancellation and zero output cannot prove dispatch.
 	if session, ok := relayInfo.Billing.(*BillingSession); ok && session.Durable() &&
-		ctx.GetBool("upstream_attempted") && summary.Quota <= session.GetPreConsumedQuota() &&
+		ctx.GetBool("upstream_attempted") &&
 		// Exact codex metering is upstream-exact usage even on an interrupted
 		// stream: settle it exactly, retention would overcharge.
 		(usage == nil || usage.CodexMetering == nil) {
@@ -494,27 +490,11 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			// Retention must not depend on the marker committing: the
 			// reserved charge is the fail-closed floor, the marker is only
 			// the reconciliation pointer.
-			summary.Quota = session.GetPreConsumedQuota()
+			summary.Quota = max(summary.Quota, session.GetPreConsumedQuota())
 			hardeningRetained = true
 			interruptedUnknownRetained = true
 			if err := model.MarkBillingReviewMarker(relayInfo.RequestId, "interrupted_unknown_usage"); err != nil {
 				logger.LogError(ctx, "interrupted usage review marker could not be persisted: "+err.Error())
-			}
-		}
-	}
-	if billingUsage != nil && !interruptedUnknownRetained {
-		if session, ok := relayInfo.Billing.(*BillingSession); ok && session.Durable() && summary.hasBillableUsage() {
-			anomaly := EvaluateTextUsageAnomaly(relayInfo, billingUsage, summary.IsClaudeUsageSemantic, tieredUsedVars)
-			if anomaly.Anomaly && summary.Quota <= session.GetPreConsumedQuota() {
-				if err := model.MarkBillingReviewMarker(relayInfo.RequestId, anomaly.Reason); err == nil {
-					summary.Quota = session.GetPreConsumedQuota()
-					hardeningRetained = true
-				} else {
-					logger.LogError(ctx, "reserve anomaly review marker could not be persisted: "+err.Error())
-				}
-			}
-			if anomaly.Anomaly || anomaly.ProfileSource != "" {
-				hardeningAnomaly = &anomaly
 			}
 		}
 	}
@@ -607,13 +587,6 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		other.SetAdmin("settlement_failed", true)
 		other.SetAdmin("expected_quota", expectedQuota)
 		other.SetAdmin("charged_quota", summary.Quota)
-	}
-	if hardeningAnomaly != nil {
-		other.SetAdmin("reserve_anomaly", hardeningAnomaly)
-		if hardeningRetained {
-			other.SetAdmin("usage_retained_for_review", true)
-			other.SetAdmin("expected_quota", expectedQuota)
-		}
 	}
 	if interruptedUnknownRetained {
 		other.SetAdmin("interrupted_unknown_usage", true)

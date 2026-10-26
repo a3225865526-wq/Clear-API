@@ -115,6 +115,16 @@ Inside `relaykit/`, use `kitutil.*` from `relaykit/relayconvert/kitutil/json.go`
 - Preserve explicit zero values in upstream relay request DTOs: absent client JSON fields must become `nil` and be omitted, while explicit `0`, `0.0`, or `false` values must remain non-`nil` and be sent upstream.
 - Avoid non-pointer scalars with `omitempty` for optional request parameters, because zero values will be silently dropped during marshal.
 
+**Protocol compatibility and unified billing:**
+
+- Protocol adapters own native request validation, conversion and usage extraction. Reuse `dto.Request` / `TokenCountMeta`, `Usage` / `BillingUsage`, token observations and the shared `BillingSession`; do not force different protocols into one raw JSON format or build per-protocol accounting systems.
+- Billing admission must validate cost facts, not impose a Chat/Responses-only top-level field whitelist, a text-only rule or an SSE-only rule on other supported protocols. Preserve typed DTO serialization and channel privacy controls. Untyped passthrough must not forward unparsed cost multipliers.
+- Keep finite non-negative prices, bounded billing quantities, native balance checks, actual usage/cache/tool settlement, durable recovery, outbox delivery and idempotency. Preserve required image/task quantity reservations. Ordinary text protocols use the basic input estimate and actual usage settlement; do not impose maximum-output or tool-call budgets, hidden-input approval profiles, caps or model allowlists.
+- Preserve optional native output limits and protocol references, including encrypted history and cached context. Never invent universal output caps or treat unknown usage as zero. Restrict only specific independently charged capabilities without a supported native or ClearAPI usage/price settlement path; tools already covered by native actual-call billing do not require a predeclared maximum call count.
+- Verify by actual protocol capability with focused existing tests and shared billing fixtures. Keep automated tests, isolated database/transport integration and real-provider verification separate. An unimplemented route or untested capability must never be recorded as passed.
+- A normal model addition reusing an existing adapter requires mapping, pricing, channel and required-parameter checks; it does not require repeating protocol suites, database matrices or a paid provider call. Run the database matrix when accounting/persistence behavior changes. Real-provider calls require a concrete protocol risk or failure that automation cannot cover, and explicit non-production scope and budget.
+- Current launch boundaries remain: PG03 commercial launch is deferred; D image generation is not approved for deployment. Protocol tests do not change those decisions.
+
 **JavaScript task plugins (mandatory):**
 
 - Before implementing, modifying, or reviewing JavaScript task plugins or their host API/runtime, MUST read [Task Plugin API v1](docs/plugin-api/v1.md), including its description writing and translation conventions. When changing the plugin contract, also check `docs/plugin-api/v1.schema.json` and `docs/plugin-api/v1.d.ts` for consistency.

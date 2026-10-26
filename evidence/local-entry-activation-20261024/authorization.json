@@ -1,0 +1,7 @@
+{
+  "approved_head": "133336060a650be577d618a046f001a124f379aa",
+  "authority": "Human user explicitly authorized activation-plan scope in this turn",
+  "plan_sha256": "173091c98b170749c4d79d2b92b4ce3faeda236078e5ddc40394eb94d009ccc4",
+  "artifact_source_commit": "ce84487c4d1838e3f911c826f1dd4d781d6b5e20",
+  "application_deployment": false
+}

@@ -1,0 +1,19 @@
+=== RUN   TestConsoleMonitorControlMatrix
+=== RUN   TestConsoleMonitorControlMatrix/sqlite
+    console_probe_test.go:224: 
+        	Error Trace:	/work/service/console_probe_test.go:224
+        	Error:      	Expected error with "MONITOR_PAUSED" in chain but got nil.
+        	Test:       	TestConsoleMonitorControlMatrix/sqlite
+        	Messages:   	allowlisted
+--- FAIL: TestConsoleMonitorControlMatrix (0.02s)
+    --- FAIL: TestConsoleMonitorControlMatrix/sqlite (0.02s)
+=== RUN   TestConsoleMonitorSchedulerRespectsPauseAndPublication
+    console_probe_test.go:568: 
+        	Error Trace:	/work/service/console_probe_test.go:568
+        	Error:      	Should be zero, but was 1
+        	Test:       	TestConsoleMonitorSchedulerRespectsPauseAndPublication
+        	Messages:   	unpublished targets cannot execute
+--- FAIL: TestConsoleMonitorSchedulerRespectsPauseAndPublication (0.15s)
+FAIL
+FAIL	github.com/QuantumNous/new-api/service	0.232s
+FAIL

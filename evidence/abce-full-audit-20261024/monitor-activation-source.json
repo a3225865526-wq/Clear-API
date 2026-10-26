@@ -1,0 +1,40 @@
+{
+  "head": "3124d8a1b6bbc44e8a6203266567f72c1734c877",
+  "branch": "codex/monitor-runtime-activation",
+  "status": [
+    " M controller/console_monitor_admin.go",
+    " M model/console_monitor_control.go",
+    " M service/console_probe.go",
+    " M service/console_probe_test.go",
+    "?? controller/console_monitor_probe.go"
+  ],
+  "diff_stat": [
+    " controller/console_monitor_admin.go | 22 +++++++++++--",
+    " model/console_monitor_control.go    |  2 +-",
+    " service/console_probe.go            | 64 +++++++++++++++++++++++++++----------",
+    " service/console_probe_test.go       | 47 ++++++++++++++++++++++++---",
+    " 4 files changed, 109 insertions(+), 26 deletions(-)"
+  ],
+  "files": [
+    {
+      "path": "controller/console_monitor_admin.go",
+      "sha256": "696971d633b4f4419e9d7bb72dda6991c5481856dfd3fdac1d49c464c1a62a50"
+    },
+    {
+      "path": "model/console_monitor_control.go",
+      "sha256": "444bba1c54fe45c406badf943e82ba53ef823f9e625ffd7c76f0f26846a2d439"
+    },
+    {
+      "path": "service/console_probe.go",
+      "sha256": "0e9d6101a6c6ac085c6574b7f508badfb9eea06c892cfe5f9ada94ebd9e1100f"
+    },
+    {
+      "path": "service/console_probe_test.go",
+      "sha256": "836114f921c0e31b6ca1f98935b78bb88d53e09e5aeea9c81f626dd81cb3903c"
+    },
+    {
+      "path": "controller/console_monitor_probe.go",
+      "sha256": "548d4642c1bdba56037cdaef4078bba85a517b3a538cc8728b3f5c01e7769407"
+    }
+  ]
+}

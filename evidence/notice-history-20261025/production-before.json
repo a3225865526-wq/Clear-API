@@ -1,0 +1,32 @@
+{
+  "utc": "2026-10-25T06:31:37.153593+00:00",
+  "revision": "1aef1aec0e6337992f382836aaeea62c07eb41fd",
+  "image": "sha256:61614562f14aeb12bfd060e766510a1c727802fe92eea588afe6c652484b9c08",
+  "container": "3c1e4ab2ae3c4680bde376d9893492ed79b5174a8b9362ff86887064ae474f2c",
+  "started": "2026-10-25T06:13:10.011644231Z",
+  "database": {
+    "tasks": null,
+    "policy": {
+      "enabled": false,
+      "daily_requests": 0,
+      "max_concurrent": 1,
+      "daily_cost_micros": 0
+    },
+    "probes": 0,
+    "attempts": 0,
+    "monitors": [
+      {
+        "id": 1,
+        "enabled": false,
+        "archived": true,
+        "published": false,
+        "channel_id": 1,
+        "allowlisted": false,
+        "interval_seconds": 600
+      }
+    ],
+    "announcement_hash": "b9e0e8e3a4530bb45299ae47d62d75a8",
+    "announcement_count": 2
+  },
+  "monitor_flags": []
+}

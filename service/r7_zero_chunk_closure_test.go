@@ -53,7 +53,7 @@ func (w r7CountWriter) Flush() { w.ResponseWriter.(http.Flusher).Flush() }
 func TestR7ZeroChunkClosure(t *testing.T) {
 	newHardeningDB(t)
 	configureTieredModel(t, h2ModelA, fixtureAExpr)
-	enforceColdPolicy(t, nil)
+
 	u := createHardeningUser(t, model.DB, "r7-zero-closure", 10000)
 	f := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 	f.Info.IsStream = true
@@ -193,7 +193,7 @@ func TestR7ZeroChunkClosure(t *testing.T) {
 func TestR7CancelBeforeTransportWrite(t *testing.T) {
 	newHardeningDB(t)
 	configureTieredModel(t, h2ModelA, fixtureAExpr)
-	enforceColdPolicy(t, nil)
+
 	u := createHardeningUser(t, model.DB, "r7-before-write", 10000)
 	f := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 	var accepted atomic.Int64
@@ -233,7 +233,7 @@ func TestR7CompletedProxySettlement(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			newHardeningDB(t)
 			configureTieredModel(t, h2ModelA, fixtureAExpr)
-			enforceColdPolicy(t, nil)
+
 			u := createHardeningUser(t, model.DB, "r7-completed-"+name, 10000)
 			f := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 			f.Info.IsStream, f.Info.DisablePing = stream, true

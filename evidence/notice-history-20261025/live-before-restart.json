@@ -1,0 +1,55 @@
+{
+  "utc": "2026-10-25T06:58:55.001905+00:00",
+  "reads": [
+    [
+      1,
+      "announcement:f48a35a32f03039ccfc5779d6a9986c495f24961366cc5806ef601f07419583a",
+      1792911515
+    ],
+    [
+      1,
+      "announcement:cfb0a2ae8722e96bf4c0d16244bd70fdd32055289116dbd4e08c40f213a9b356",
+      1792911515
+    ],
+    [
+      1,
+      "announcement:792870a38c98eb96743738d7081a7752c0bbaefe01ded278270964182c626de2",
+      1792911515
+    ]
+  ],
+  "tasks": [
+    [
+      "systask_9cyIapW8OvXo5og7IUu4G0oAffPKo8yb",
+      "succeeded",
+      "{\"normal\":0,\"failed\":0,\"blocked\":0,\"skipped\":1}",
+      1792911456,
+      1792911456
+    ]
+  ],
+  "probes": [
+    [
+      1,
+      1,
+      "normal",
+      "",
+      "",
+      1
+    ],
+    [
+      2,
+      1,
+      "blocked",
+      "MONITOR_BUDGET_OR_CONCURRENCY",
+      "",
+      0
+    ],
+    [
+      3,
+      1,
+      "skipped",
+      "MONITOR_PAUSED",
+      "systask_9cyIapW8OvXo5og7IUu4G0oAffPKo8yb",
+      0
+    ]
+  ]
+}

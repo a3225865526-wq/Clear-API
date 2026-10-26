@@ -1,0 +1,39 @@
+{
+  "utc": "2026-10-25T07:21:36.922768+00:00",
+  "base_commit": "879eff62e0179aedea7ded0867abaf4185cc04b3",
+  "production_application": "1aef1aec0e6337992f382836aaeea62c07eb41fd",
+  "production_modified": false,
+  "paid_supplier_requests": 0,
+  "fixture": "explicit synthetic local HTTP provider, not supplier acceptance",
+  "isolated_image": {
+    "tag": "clearapi-notice-history:validation",
+    "engine_id": "sha256:0b4913f9e508e2c53c06a7dc1fe3ca24e95203d876f29ba95c3781bb14282797",
+    "repo_digests": [
+      "clearapi-notice-history@sha256:0b4913f9e508e2c53c06a7dc1fe3ca24e95203d876f29ba95c3781bb14282797"
+    ],
+    "revision_label": "",
+    "binary_hashes": [
+      "0e4ad22e31775c25506aa8228e8f71d73511b6ffe50f4c6e059cd8c6e08c10fc  /new-api",
+      "37ea315e89f7b37ebf5316fccda5019eda258e10daa50338d633c7dc3ec655ae  /monitor-init"
+    ],
+    "container_id": "623c506417743804a889ab7da11f47c3557f7cc48285f9f169488ee061857e34"
+  },
+  "schema": {
+    "announcement_display": "existing options JSON, no announcement content table migration",
+    "reads": "new announcement_reads composite primary key(user_id,key)",
+    "monitoring": "existing console_probes gains task_id and attempt_id; explicit opt-in monitor-init migration",
+    "log_database": "not used by these tables; no log schema changes"
+  },
+  "database_versions": {
+    "sqlite": "3.50.4",
+    "mysql": "8.4.11",
+    "postgres": "17.6"
+  },
+  "frontend_tests": {
+    "files": 6,
+    "passed": 31
+  },
+  "preservation_manifest": "D:/Codex/backups/clearapi-notice-history-20261025/preservation.json",
+  "production_daily_cycle": "NOT VERIFIED; production policy disabled, target archived/unpublished, zero historical executions",
+  "formal_rc": "NOT RUN; isolated image intentionally carries no source commit label"
+}

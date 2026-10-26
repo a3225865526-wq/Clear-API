@@ -1,0 +1,14 @@
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite/incomplete
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite/concurrent
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite/missing-usage
+=== RUN   TestConsoleProbeConfiguredExecutionMatrix/sqlite/timeout
+--- PASS: TestConsoleProbeConfiguredExecutionMatrix (1.02s)
+    --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite (1.02s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite/incomplete (0.00s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite/concurrent (0.00s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite/missing-usage (0.00s)
+        --- PASS: TestConsoleProbeConfiguredExecutionMatrix/sqlite/timeout (1.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/service	1.087s

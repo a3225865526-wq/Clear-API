@@ -13,3 +13,6 @@ docs
 /web/node_modules
 /web/dist
 !THIRD-PARTY-LICENSES.md
+
+# Isolated candidate fixtures and local verification outputs.
+.local-tests/

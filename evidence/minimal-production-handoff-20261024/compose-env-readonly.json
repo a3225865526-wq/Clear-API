@@ -1,0 +1,46 @@
+{
+  "observed_at": "2026-10-24T01:04:01.370258+00:00",
+  "read_only": true,
+  "env_file": {
+    "path": "/opt/clearapi/config/pg03/pg03.env",
+    "mode": "0o600",
+    "uid": 0,
+    "gid": 0,
+    "sha256": "43eb3ff1843437dbe03b93d0b72a5b41d8d37a58c1a3d71e0f7420c21d11db0a"
+  },
+  "compose_exit": 0,
+  "services": [
+    "new-api",
+    "pool-executor",
+    "postgres"
+  ],
+  "image": "ghcr.io/a3225865526-wq/clearapi@sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1",
+  "pool_enabled": "false",
+  "runtime": [
+    {
+      "type": "bind",
+      "source": "/opt/clearapi/runtime/new-api",
+      "target": "/run/clearapi",
+      "read_only": true,
+      "bind": {
+        "create_host_path": false
+      }
+    }
+  ],
+  "ports": [
+    {
+      "mode": "ingress",
+      "host_ip": "127.0.0.1",
+      "target": 3000,
+      "published": "3000",
+      "protocol": "tcp"
+    }
+  ],
+  "config_sha256": "268fd97e61f8347ab38e5f0060adacde2adbdebf6ece00906aee482e0f3229e9",
+  "hash_check": {
+    "exit": 0,
+    "computed": "new-api a2ab7e6c055fe0e7ef37b5dad6ef6a5cdceb855f852f8133ea40f7a1d65ce3e7",
+    "container_label": "a2ab7e6c055fe0e7ef37b5dad6ef6a5cdceb855f852f8133ea40f7a1d65ce3e7",
+    "matches": true
+  }
+}

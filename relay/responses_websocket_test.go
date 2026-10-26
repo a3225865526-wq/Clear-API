@@ -15,13 +15,13 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	appdto "github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/i18n"
-	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	hosttypes "github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -86,12 +86,10 @@ func TestResponsesWSActiveHeartbeatPreservesLongRequest(t *testing.T) {
 	}
 }
 
-func TestResponsesWSIdleClosesAndReleasesAdmission(t *testing.T) {
+func TestResponsesWSIdleCloses(t *testing.T) {
 	t.Setenv("RESPONSES_WS_IDLE_TIMEOUT", "1")
-	t.Setenv("RELAY_CONCURRENCY_USER", "1")
 	router := gin.New()
 	router.Use(func(c *gin.Context) { c.Set("id", 7); c.Set("token_id", 9) })
-	router.Use(middleware.RelayConcurrencyLimit())
 	upgrader := websocket.Upgrader{}
 	done := make(chan struct{})
 	router.GET("/ws", func(c *gin.Context) {
@@ -101,7 +99,7 @@ func TestResponsesWSIdleClosesAndReleasesAdmission(t *testing.T) {
 		}
 		ResponsesWebSocketHelper(c, conn, nil)
 	})
-	// This outer middleware runs after the admission defer releases its slot.
+	// Observe completion after the idle session returns.
 	outer := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		router.ServeHTTP(w, r)
 		if r.URL.Path == "/ws" {
@@ -116,7 +114,7 @@ func TestResponsesWSIdleClosesAndReleasesAdmission(t *testing.T) {
 	defer client.Close()
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, httptest.NewRequest("GET", "/ok", nil))
-	require.Equal(t, 429, w.Code)
+	require.Equal(t, 204, w.Code)
 	require.NoError(t, client.SetReadDeadline(time.Now().Add(5*time.Second)))
 	_, _, err = client.ReadMessage() // answers pings, still idle
 	require.Error(t, err)
@@ -698,12 +696,56 @@ func TestResponsesWSPassthroughPreservesRawPricingParameters(t *testing.T) {
 	common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
 	common.SetContextKey(c, constant.ContextKeyChannelSetting, dto.ChannelSettings{PassThroughBodyEnabled: true})
 	info := relaycommon.GenRelayInfoResponses(c, &create.Request)
+	info.PriceData.FreeModel = true // This test exercises serialization, without a paid reservation.
 	payload, apiErr := buildResponsesWSCreatePayload(c, info, create.Request, create.Generate, create.StreamID)
 	require.Nil(t, apiErr)
 	assert.JSONEq(t, `{"type":"response.create","generate":false,"model":"gpt-5.1","input":"hi","vendor":{"tier":"premium"}}`, string(payload))
 	storage, err := common.GetBodyStorage(c)
 	require.NoError(t, err)
 	require.NoError(t, storage.Close())
+}
+
+type responsesWSBudgetBilling struct {
+	fakeTextBilling
+	reject bool
+}
+
+func (b *responsesWSBudgetBilling) Reserve(quota int) error {
+	if b.reject {
+		return errors.New("fixture insufficient wallet quota")
+	}
+	b.preConsumed = max(b.preConsumed, quota)
+	return nil
+}
+
+func TestResponsesWSOutboundBillingBudget(t *testing.T) {
+	t.Setenv("CLEARAPI_BILLING_PROTECTION", "true")
+	oldCount := constant.CountToken
+	constant.CountToken = true
+	t.Cleanup(func() { constant.CountToken = oldCount })
+	service.InitTokenEncoders()
+	var request dto.OpenAIResponsesRequest
+	require.NoError(t, common.Unmarshal([]byte(`{"model":"fixture","input":[{"type":"function_call_output","call_id":"a","output":"tool result"}],"max_output_tokens":200,"reasoning":{"effort":"high"},"store":false}`), &request))
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/v1/responses", nil)
+	common.SetContextKey(c, constant.ContextKeyOriginalModel, request.Model)
+	common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
+	info := relaycommon.GenRelayInfoResponses(c, &request)
+	billing := &responsesWSBudgetBilling{fakeTextBilling: fakeTextBilling{preConsumed: 10}}
+	info.Billing = billing
+	info.PriceData = hosttypes.PriceData{ModelRatio: 1, CompletionRatio: 2, GroupRatioInfo: hosttypes.GroupRatioInfo{GroupRatio: 1}}
+	for _, streamID := range []string{"", "named-fixture"} {
+		payload, apiErr := buildResponsesWSCreatePayload(c, info, request, nil, streamID)
+		require.Nil(t, apiErr)
+		assert.Contains(t, string(payload), "tool result")
+		assert.Equal(t, 10, billing.preConsumed)
+	}
+	billing.reject = true
+	payload, apiErr := buildResponsesWSCreatePayload(c, info, request, nil, "")
+	require.Nil(t, apiErr)
+	assert.NotEmpty(t, payload)
+	assert.Equal(t, 10, billing.preConsumed)
+	assert.False(t, c.GetBool("upstream_attempted"))
 }
 
 func TestResponsesWSStreamIdentity(t *testing.T) {
@@ -741,6 +783,7 @@ func TestResponsesWSStreamIdentity(t *testing.T) {
 				common.SetContextKey(c, constant.ContextKeyChannelType, constant.ChannelTypeOpenAI)
 				common.SetContextKey(c, constant.ContextKeyChannelSetting, dto.ChannelSettings{PassThroughBodyEnabled: passthrough})
 				info := relaycommon.GenRelayInfoResponses(c, &create.Request)
+				info.PriceData.FreeModel = true // Stream identity alone carries no billing fixture.
 				payload, apiErr := buildResponsesWSCreatePayload(c, info, create.Request, create.Generate, create.StreamID)
 				require.Nil(t, apiErr)
 				var event map[string]any

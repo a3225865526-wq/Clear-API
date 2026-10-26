@@ -42,7 +42,8 @@ import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 
 import { aggregateMonitorStatus, type Channel } from './api'
-import { statusColors } from './constants'
+import { probeReasonKeys, probeStatusKeys, statusColors } from './constants'
+import { MonitorHistory } from './monitor-history'
 
 export function ChannelCard(props: {
   channel: Channel
@@ -137,7 +138,10 @@ export function ChannelCard(props: {
                           }
                         >
                           {t(
-                            `monitor.${props.stale ? 'unknown' : item.status}`
+                            props.stale
+                              ? 'monitor.unknown'
+                              : (probeStatusKeys[item.status] ??
+                                  'monitor.unknown')
                           )}
                         </Badge>
                       </TableCell>
@@ -161,6 +165,23 @@ export function ChannelCard(props: {
                   ))}
                 </TableBody>
               </Table>
+              <p className='mt-4 text-sm'>
+                {t('Channel business status')} ·{' '}
+                {t(
+                  (
+                    { 1: 'Enabled', 2: 'Disabled', 3: 'Disabled' } as Record<
+                      number,
+                      string
+                    >
+                  )[props.channel.business_status ?? 0] ?? 'monitor.unknown'
+                )}
+              </p>
+              <p className='text-muted-foreground text-xs'>
+                {t('Monitoring results do not change channel business status')}
+              </p>
+              {props.channel.models.map((item) => (
+                <MonitorHistory key={item.id} monitor={item} />
+              ))}
             </div>
           )}
         </Dialog>
@@ -213,16 +234,16 @@ export function ChannelCard(props: {
                         variant='ghost'
                         size='icon'
                         className={`relative z-10 h-7 w-2 min-w-2 shrink-0 rounded-sm p-0 ${statusColors[record.status] || statusColors.unknown}`}
-                        aria-label={`${timestamp(record.checked_at)} · ${t(`monitor.${record.status}`)} · ${milliseconds(record.latency_ms)} ms`}
+                        aria-label={`${timestamp(record.checked_at)} · ${t(probeStatusKeys[record.status] ?? 'monitor.unknown')} · ${milliseconds(record.latency_ms)} ms`}
                       />
                     }
                   />
                   <TooltipContent>
                     {timestamp(record.checked_at)} ·{' '}
-                    {t(`monitor.${record.status}`)} ·{' '}
+                    {t(probeStatusKeys[record.status] ?? 'monitor.unknown')} ·{' '}
                     {milliseconds(record.latency_ms)} ms
-                    {record.error_code === 'probe_failed' &&
-                      ` · ${t('monitor.probeFailed')}`}
+                    {record.error_code &&
+                      ` · ${t(probeReasonKeys[record.error_code] ?? 'monitor.probeFailed')}`}
                   </TooltipContent>
                 </Tooltip>
               ))
@@ -237,6 +258,14 @@ export function ChannelCard(props: {
             <span>{t('monitor.now')}</span>
           </div>
         </div>
+        {primary?.latest && (
+          <p className='text-sm'>
+            {t('Latest monitoring result')} ·{' '}
+            {t(probeStatusKeys[primary.latest.status] ?? 'monitor.unknown')}{' '}
+            {primary.latest.error_code &&
+              `· ${t(probeReasonKeys[primary.latest.error_code] ?? 'monitor.probeFailed')}`}
+          </p>
+        )}
         <p className='text-muted-foreground text-xs'>
           {primary?.latest
             ? t('monitor.checkedAt', {

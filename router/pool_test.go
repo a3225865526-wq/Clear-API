@@ -66,7 +66,7 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{"synthetic-native":1}`))
 	require.NoError(t, ratio_setting.UpdateCompletionRatioByJSONString(`{"synthetic-native":1}`))
 	service.InitTokenEncoders()
-	for _, scenario := range []string{"all-reject", "success", "started", "unknown", "tools", "multimodal", "over-budget", "insufficient-quota"} {
+	for _, scenario := range []string{"all-reject", "success", "started", "unknown", "tools", "unmetered-reference", "over-budget", "insufficient-quota"} {
 		t.Run(scenario, func(t *testing.T) {
 			setup := newPoolTestSetup(t, true)
 			require.NoError(t, setup.db.AutoMigrate(&model.Token{}, &model.UserSubscription{}, &model.Channel{}, &model.Log{}, &model.BillingReviewMarker{}))
@@ -95,8 +95,8 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 			switch scenario {
 			case "tools":
 				request.Tools = []byte(`[{"type":"web_search"}]`)
-			case "multimodal":
-				request.Input = []byte(`[{"role":"user","content":[{"type":"input_image","image_url":"synthetic"}]}]`)
+			case "unmetered-reference":
+				request.Input = []byte(`[{"role":"user","content":[{"type":"input_file","file_id":"unmetered-fixture"}]}]`)
 			case "over-budget":
 				limit = 1 << 31
 			case "insufficient-quota":
@@ -117,7 +117,7 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 			info.UsingGroup, info.UserGroup = "default", "default"
 			info.UserSetting.BillingPreference = "wallet_only"
 			apiErr := relay.PrepareRequestBilling(c, info)
-			if scenario == "tools" || scenario == "multimodal" || scenario == "over-budget" || scenario == "insufficient-quota" {
+			if scenario == "tools" || scenario == "unmetered-reference" || scenario == "over-budget" || scenario == "insufficient-quota" {
 				require.NotNil(t, apiErr)
 				require.Nil(t, info.Billing)
 				var count int64
@@ -130,7 +130,7 @@ func TestPG03ZeroDispatchRefundBilling(t *testing.T) {
 				return
 			}
 			require.Nil(t, apiErr)
-			require.True(t, info.ProtectedTextBudget)
+			require.True(t, info.Billing.(*service.BillingSession).Durable())
 			require.NotNil(t, info.Billing)
 			require.Contains(t, c.GetStringSlice(model.BillingExecutionContextKey), info.RequestId)
 			billing := info.Billing

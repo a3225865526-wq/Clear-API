@@ -30,7 +30,9 @@ vi.mock('../api', () => ({ getGuide: vi.fn(), getGuideAccess: vi.fn() }))
 vi.mock('@tanstack/react-router', async (original) => ({
   ...(await original<typeof import('@tanstack/react-router')>()),
   getRouteApi: () => ({ useSearch: () => ({ article: '/a' }) }),
-  Link: ({ children }: { children: ReactNode }) => <a>{children}</a>,
+  Link: ({ children, to }: { children: ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }))
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -44,7 +46,7 @@ it.each([false, true])(
   async (canEdit) => {
     useAuthStore.getState().auth.setUser({ id: 5, username: 'QA', role: 100 })
     vi.mocked(getGuide).mockResolvedValue({
-      revision: 0,
+      revision: 44,
       catalog: [],
       inaccessible: {},
       pages: {
@@ -67,6 +69,9 @@ it.each([false, true])(
       </QueryClientProvider>
     )
     await screen.findByRole('heading', { name: 'Guide' })
+    expect(
+      screen.getByRole('link', { name: 'footer.columns.docs.links.quickStart' })
+    ).toHaveAttribute('href', '/docs/clearapi')
     expect(screen.queryByText('guide.sourceTitle')).not.toBeInTheDocument()
     expect(screen.queryByText('guide.sourceNotice')).not.toBeInTheDocument()
     expect(screen.queryByText('guide.original')).not.toBeInTheDocument()

@@ -1,0 +1,50 @@
+{
+  "recorded_at": "2026-10-24T13:32:14.017619+00:00",
+  "executed_commands": [
+    [
+      "python",
+      "tests/test_cutover_prepare.py",
+      "WindowsClassification",
+      "-v"
+    ],
+    [
+      "docker",
+      "run",
+      "--rm",
+      "--network",
+      "none",
+      "--read-only",
+      "--tmpfs",
+      "/tmp",
+      "-v",
+      "D:\\Codex\\worktrees\\clearapi-local-formal-integration\\clearapi-controlled-launch-20261020:/work:ro",
+      "-w",
+      "/work",
+      "python:3.12-slim",
+      "python",
+      "-B",
+      "tests/test_local_deploy_vps.py",
+      "StatusProbeTest",
+      "-v"
+    ]
+  ],
+  "results": [
+    "WindowsClassification PASS: seven contracts on both PowerShell runtimes",
+    "StatusProbeTest PASS: two focused tests; HTTP denial/redirect/invalid/unhealthy cases included"
+  ],
+  "runtimes": [
+    "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+    "C:\\Users\\Chen\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\native\\powershell\\pwsh.EXE"
+  ],
+  "initial_test_issue": "PowerShell5.1 Restricted prevented test .ps1 launch; fixture now runs inline AST/classification checks; execution policies unchanged",
+  "policy": {
+    "WindowsPowerShell5.1": "Restricted",
+    "PowerShell7.6.5": "RemoteSigned"
+  },
+  "source_sha256": {
+    "scripts/local-deploy-vps.py": "b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f",
+    "scripts/deploy-local.ps1": "939bb244688d4e1260d1fe85a967a958cb8b106a76cfe46efc9df30b3589aba7"
+  },
+  "historical_30_e2e": "not rerun; scoped compatibility changes verified separately",
+  "python_compile": "PASS"
+}

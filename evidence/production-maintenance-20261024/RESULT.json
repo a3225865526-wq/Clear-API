@@ -1,0 +1,56 @@
+{
+  "authorized_tool_commit": "1aa591f4bb230c4fce5770114e45e9311beb87a4",
+  "maintenance_outcome": "STOPPED_AFTER_PUBLIC_HEALTH_FAILURE_CONTAINMENT_VERIFIED",
+  "production_workflows_disabled": true,
+  "other_seven_workflows_unchanged": true,
+  "root_assets_installed": 7,
+  "restricted_sudoers_installed": true,
+  "metadata_adopted": true,
+  "historical_FAILED_target_hold_preserved": true,
+  "formal_backup": {
+    "result": "PASS",
+    "backup_id": "20261024T025143Z",
+    "cipher_sha256": "7e77bb3aba44e22bc3be0be2b272f454ce122811e2676cac44bec3cfa732f54a",
+    "cipher_bytes": 12377896,
+    "all_nine_artifacts_authenticated_and_hash_verified": true,
+    "pg17_dump_toc_readable": true,
+    "fresh_full_database_restore_performed": false
+  },
+  "runtime": "PASS",
+  "boot_installed_and_live": "PASS",
+  "caddy": {
+    "started_at": "2026-10-24T02:52:19.16756893Z",
+    "initial_start_succeeded": true,
+    "public_health_contract": "FAIL",
+    "running_now": false,
+    "restart_policy": "no",
+    "containment_verified": true
+  },
+  "website_restored": false,
+  "windows_local_deploy_activated": false,
+  "remaining_blockers": {
+    "www.clear999.com": {
+      "status": 403,
+      "server": "cloudflare",
+      "cf_ray": "a4f5b5eb6bc93030-HKG",
+      "numeric_error_codes": [
+        "1010"
+      ],
+      "access_denied": false,
+      "body_sha256": "2938e9f1284180959e33ab1718d0793a72ff6e4cdb8108c34dcd14e69446de5c",
+      "body_bytes": 17
+    },
+    "clear999.com": {
+      "error": "URLError",
+      "reason_type": "gaierror",
+      "reason": "[Errno -5] No address associated with hostname"
+    }
+  },
+  "gateway_postgres_executor_unchanged": true,
+  "business_database_write_or_restore_executed": false,
+  "pg03_commercial_enabled": false,
+  "push_or_main_merge_executed": false,
+  "cloudflare_rules_modified": false,
+  "plaintext_backup_files_written": false,
+  "private_key_exported": false
+}

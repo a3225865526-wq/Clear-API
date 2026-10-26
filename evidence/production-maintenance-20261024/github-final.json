@@ -1,0 +1,27 @@
+{
+  "observed_at": "2026-10-24T02:59:59.966520+00:00",
+  "four_production_workflows_disabled": true,
+  "other_seven_unchanged": true,
+  "main": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "variables": [
+    {
+      "name": "CLEARAPI_AUTO_PRODUCTION_ENABLED",
+      "value": "false",
+      "created_at": "2026-10-18T21:25:08Z",
+      "updated_at": "2026-10-19T14:16:55Z"
+    },
+    {
+      "name": "CLEARAPI_AUTO_RC_ENABLED",
+      "value": "false",
+      "created_at": "2026-10-16T20:46:46Z",
+      "updated_at": "2026-10-19T15:19:02Z"
+    }
+  ],
+  "in_flight": {
+    "queued": 0,
+    "in_progress": 0,
+    "waiting": 0,
+    "pending": 0,
+    "requested": 0
+  }
+}

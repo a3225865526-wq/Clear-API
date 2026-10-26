@@ -38,7 +38,7 @@ func markerOf(t *testing.T, requestID string) (model.BillingReviewMarker, bool) 
 func TestInterruptedStreamLocalEstimateRetainsReservation(t *testing.T) {
 	newHardeningDB(t)
 	configureTieredModel(t, h2ModelA, fixtureAExpr)
-	enforceColdPolicy(t, nil)
+
 	u := createHardeningUser(t, model.DB, "interrupted-estimate", 10000)
 
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
@@ -72,7 +72,7 @@ func TestInterruptedStreamLocalEstimateRetainsReservation(t *testing.T) {
 func TestInterruptedStreamUpstreamPartialRetainsReservation(t *testing.T) {
 	newHardeningDB(t)
 	configureTieredModel(t, h2ModelA, fixtureAExpr)
-	enforceColdPolicy(t, nil)
+
 	u := createHardeningUser(t, model.DB, "interrupted-partial", 10000)
 
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
@@ -104,7 +104,7 @@ func TestInterruptedStreamUpstreamPartialRetainsReservation(t *testing.T) {
 func TestInterruptedStreamExactMeterSettlesExactly(t *testing.T) {
 	newHardeningDB(t)
 	configureTieredModel(t, h2ModelA, fixtureAExpr)
-	enforceColdPolicy(t, nil)
+
 	u := createHardeningUser(t, model.DB, "interrupted-exact", 10000)
 
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
@@ -136,7 +136,7 @@ func TestInterruptedStreamExactMeterSettlesExactly(t *testing.T) {
 func TestCompletedStreamEstimateSettlesEstimate(t *testing.T) {
 	newHardeningDB(t)
 	configureTieredModel(t, h2ModelA, fixtureAExpr)
-	enforceColdPolicy(t, nil)
+
 	u := createHardeningUser(t, model.DB, "completed-estimate", 10000)
 
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
@@ -162,7 +162,7 @@ func TestR7UndispatchedUnknownUsageDoesNotRetain(t *testing.T) {
 		t.Run(quality, func(t *testing.T) {
 			newHardeningDB(t)
 			configureTieredModel(t, h2ModelA, fixtureAExpr)
-			enforceColdPolicy(t, nil)
+
 			u := createHardeningUser(t, model.DB, "r7-undispatched-"+quality, 10000)
 			flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 			require.NoError(t, flow.dispatch(t)) // Prepared budget is not a transport write.
@@ -187,7 +187,7 @@ func TestR7UndispatchedUnknownUsageDoesNotRetain(t *testing.T) {
 func TestR7InterruptedExactZeroSettlesZero(t *testing.T) {
 	newHardeningDB(t)
 	configureTieredModel(t, h2ModelA, fixtureAExpr)
-	enforceColdPolicy(t, nil)
+
 	u := createHardeningUser(t, model.DB, "r7-exact-zero", 10000)
 	flow := startHardeningFlow(t, u, h2ChannelA, h2ModelA, h2OutboundBodyA)
 	require.NoError(t, flow.dispatch(t))

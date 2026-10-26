@@ -82,10 +82,6 @@ services:
       - BATCH_UPDATE_ENABLED=false
       - MAX_UPSTREAM_RESPONSE_MB=64
       - MAX_REQUEST_BODY_MB=32
-      - RELAY_CONCURRENCY_GLOBAL=32
-      - RELAY_CONCURRENCY_USER=8
-      - RELAY_CONCURRENCY_TOKEN=4
-      - RELAY_CONCURRENCY_IP=32
     ports:
       - "127.0.0.1:3000:3000"
     volumes:
@@ -135,10 +131,6 @@ services:
       - BATCH_UPDATE_ENABLED=false
       - MAX_UPSTREAM_RESPONSE_MB=64
       - MAX_REQUEST_BODY_MB=32
-      - RELAY_CONCURRENCY_GLOBAL=32
-      - RELAY_CONCURRENCY_USER=8
-      - RELAY_CONCURRENCY_TOKEN=4
-      - RELAY_CONCURRENCY_IP=32
     volumes:
       # operator-provided legal documents (root-owned, read-only)
       - /etc/clearapi/legal:/etc/clearapi/legal:ro

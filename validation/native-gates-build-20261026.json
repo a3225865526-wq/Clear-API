@@ -1,0 +1,87 @@
+{
+  "kind": "local-build-receipt",
+  "formal_github_rc": false,
+  "source_commit": "fb695711c19106209ddbe7de73cb273a0cd67b20",
+  "source_tree": "8b5e94ccb03deec11899aeab6b0c5d11480af6d8",
+  "platform": "linux/amd64",
+  "image_tag": "clearapi-local:fb695711c19106209ddbe7de73cb273a0cd67b20",
+  "engine_image_id": "sha256:37c71c119a69f7a60abdd39264d956698fa7857f209ea9293a7c2e14ea83cda1",
+  "manifest_digest": "sha256:37c71c119a69f7a60abdd39264d956698fa7857f209ea9293a7c2e14ea83cda1",
+  "platform_manifest_digest": "sha256:d7ff6fe856ee4872da73b7ab0097d38b792762be4b50be97abe34daf2087b3e4",
+  "oci_config_digest": "sha256:b7bb8edcc21a898bc4a098fe998bbde7de0929d5aedcb9ecde0ad23eb44bea8c",
+  "archive_bytes": 156133376,
+  "archive_sha256": "573a590af8ae60a32110b8d6371fe33a6a9dc68cd834cbf39c328a9f766eface",
+  "binaries": {
+    "billing-migrate": {
+      "sha256": "fa2e8e2fc3e3b4416ba461a47e13133bde9d4016618582de08534752887b9c31",
+      "bytes": 37519522
+    },
+    "finance-migrate": {
+      "sha256": "52aa3c4dc257f2e1bc85186f8fda64f92d4cd54d922a9c5a522acde905880c77",
+      "bytes": 37404834
+    },
+    "legacy-store-retire": {
+      "sha256": "430d791774d433ec49bfca58209f8e859de93b0f891ebf44bc8097d854c1a891",
+      "bytes": 39649442
+    },
+    "monitor-init": {
+      "sha256": "01144468cfefa2e25c50a9793469fecaa2ac22f806d09eae94803e8e7a0de080",
+      "bytes": 37544098
+    },
+    "new-api": {
+      "sha256": "d08cfa3c5b23592cfac4d080a5373396b41fae2b07c0baeb84bee4d501a5fb49",
+      "bytes": 148644002
+    },
+    "production-bootstrap": {
+      "sha256": "b4b75ff0bd515dcddb5d4987aed3450da2a11f6bc3f5c25b6e0b050ecd97a840",
+      "bytes": 44593314
+    }
+  },
+  "frontend_file_count": 1815,
+  "frontend_total_bytes": 74030824,
+  "frontend_assets_sha256": "00f94f042847afa23b528140c2f15ee3ea5103debbc80394ca9846111e096cbb",
+  "source_locks": {
+    "web/package.json": {
+      "worktree_sha256": "f0de4e55f527141134b02bd0c056e601e4d5f7e1653eb46caa1e157c78b81251",
+      "git_blob_sha256": "f0de4e55f527141134b02bd0c056e601e4d5f7e1653eb46caa1e157c78b81251"
+    },
+    "web/bun.lock": {
+      "worktree_sha256": "a2fadebda73a3f757c989b1d1fc2e95b18c800ebeb58bf8be3933a4966857cbd",
+      "git_blob_sha256": "0f00e73a9fdd947885fabf63b13391aec5ecd3b5031ff347c831c37e72eade77"
+    },
+    "go.mod": {
+      "worktree_sha256": "6015aeb99b863f2ec2285954dc89b92140077017dfa33563cde2e027a9aee051",
+      "git_blob_sha256": "2baefa0b16f2dfaa68e0f6e4e1e0efa187e25b4b115a62bdcaf64626af02420d"
+    },
+    "go.sum": {
+      "worktree_sha256": "2420a4a300026a1dde1d962f23ed34fa7c22cf1c34a4a596106a37c8ac439055",
+      "git_blob_sha256": "6bdc38d1b46878c7587821cb5bb5af7ce5b9b76a7f81ef2776258eed22c83181"
+    },
+    "relaykit/go.mod": {
+      "worktree_sha256": "913a56da64a04badfe0a4a706c44cc9da780ef9017b284bb457742030a7907b2",
+      "git_blob_sha256": "612007f65b3a4d6578df90695cc967be6f455c06fd86d16429dde7e45230e2e0"
+    },
+    "relaykit/go.sum": {
+      "worktree_sha256": "4b1779b070dbb885724f9bc9c3c17e045319698d876b4f3241ea4aa820e55077",
+      "git_blob_sha256": "ac34b93a2954f88485f4ccac717f906d41f0070cd371342c87624bf5bcbb4aad"
+    },
+    "Dockerfile": {
+      "worktree_sha256": "790538a8223cab9347705bb5bbe2b1ba020528a2c84972c82e7b0ae9b751f3ff",
+      "git_blob_sha256": "b1e2f50df934e8aa8dc4cffc74ece6784f8ee0b729ddddd2e24928e63ffbe3b8"
+    }
+  },
+  "gateway_started": false,
+  "production_operations": false,
+  "docker_build_exit_code": 0,
+  "go_125_root_build_exit_code": 0,
+  "locked_dependency": "github.com/joho/godotenv v1.5.1 restored through existing Windows proxy at Docker host address; checksums match go.sum",
+  "evidence_directory": "D:\\AI\\API\\evidence\\native-gates-build-20261026",
+  "formal_rc": "not_started",
+  "production_dryrun": "BLOCKED source diff classification: cmd/production-bootstrap/bootstrap/envcheck.go; no production writes",
+  "remote_main_at_preflight": "a032815cb6244a7ee5e812de82f8300c02554e99",
+  "auto_rc": false,
+  "auto_production": false,
+  "deploy_production_workflow": "disabled_manually",
+  "startup_boundary": "model.InitDB/InitLogDB and retired options migration happen at application initialization; scheduled jobs, wallet recovery and reporting workers can write after startup; build/extraction never started Gateway",
+  "next": "Existing required PR CI, protected merge, then off RC; no production deployment authorization"
+}

@@ -9,6 +9,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+import hashlib
 from unittest.mock import Mock, patch
 
 
@@ -242,6 +244,26 @@ class CaddyStateReconcileTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'symlinks'):
             RECONCILE.append_audit_record(alias, {})
         self.assertEqual(target.read_text(), '{"previous":true}\n')
+
+    def test_current_restoration_result_supersedes_historical_hold_without_rewriting_it(self):
+        adoption={'source_commit':'a'*40,'gateway':{'container_id':'current'}}
+        result={'schema':'clearapi.website-restoration/v1','method':'existing-running-adoption-v1',
+            'status':'website_restored','public_traffic':'open',
+            'adoption_identity_sha256':hashlib.sha256(json.dumps(adoption,sort_keys=True).encode()).hexdigest(),
+            'authorization':{'source_commit':'a'*40,'scope':'existing-gateway-original-caddy-v1'},
+            'edge':{'container_id':self.original_edge['id'],'image_id':self.original_edge['image']}}
+        path=self.root/'website-restoration-result-39347012653.json';path.write_text(json.dumps(result))
+        module=SimpleNamespace(load=lambda app:{'adoption':adoption},read_file=lambda p,**kw:p.read_bytes())
+        spec=SimpleNamespace(loader=SimpleNamespace(exec_module=lambda m:None))
+        frozen=self.state.read_bytes()
+        with patch.object(RECONCILE.importlib.util,'spec_from_file_location',return_value=spec), \
+                patch.object(RECONCILE.importlib.util,'module_from_spec',return_value=module):
+            record=RECONCILE.probe(self.state,self.command(self.original_edge))
+            self.assertEqual(record['status'],'PASS');self.assertEqual(record['persisted_stage'],'isolated')
+            self.assertEqual(record['effective_stage'],'website_restored')
+            result['adoption_identity_sha256']='f'*64;path.write_text(json.dumps(result))
+            self.assertEqual(RECONCILE.probe(self.state,self.command(self.original_edge))['status'],'UNKNOWN')
+        self.assertEqual(self.state.read_bytes(),frozen)
 
 
 if __name__ == '__main__':

@@ -163,7 +163,11 @@ export function ChannelStatusPage() {
             <p>{t('monitor.rules')}</p>
             <p>{t('monitor.pingDefinition')}</p>
             <p>{t('monitor.coverageRule')}</p>
-            <p>{t('monitor.staleRule')}</p>
+            <p>
+              {t(
+                'Stored monitoring results expire according to target validity; refresh does not run probes'
+              )}
+            </p>
           </div>
         </div>
       </SectionPageLayout.Content>
