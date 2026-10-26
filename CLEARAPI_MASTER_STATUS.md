@@ -1,3 +1,17 @@
+## 2026-10-27 Asia/Shanghai — Windows 本地发布预检通过；等待正式部署及监测迁移授权
+
+- **实际工作区及提交：** `D:/Codex/worktrees/clearapi-monitor-archive-fix/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-monitor-archive-fix-20261026`。应用变更提交 `1f0d26934a0a9ff540938616c5cc497b68bdf530`；本节为其后的状态记录提交，最终候选完整 HEAD 及只读 DryRun 回执保存在下述外部证据目录。原有其他工作树未清理或覆盖。未推送、未触发 GitHub Actions/RC/部署。
+- **发布范围：** 监测模型/协议条件放开、原生 HTTP 媒体样本与费用合同、明确错误原因、已归档监测目录软删除及相关测试/翻译。27 个文件；无部署脚本、工作流、PG03 配置、生产价格或凭据差异。监测仍保留 Root 权限、合同/预算/并发和状态保护，不自动为生产创建有效合同。
+- **实际测试证据：** 复用本轮此前权限、前端 12/12、原生协议 11 个用例、监测 service 与归档删除迁移三库通过结果，不重复完整 CI/E2E。最终合同校验修改后补验 `go test ./service -run '^TestConsoleProbe(WorstCaseCost|LocalTransport|CostDenialPrecedesDeadline|CostExecutorMatrix)$' -count=1 -v`：四个顶层测试 PASS；该费用执行器矩阵只有 SQLite 实跑，MySQL/PG 可选子项跳过，不冒充三库费用验证。归档删除/迁移的既有真实三库证据为 SQLite 3.50.4 / MySQL 8.4.11 / PostgreSQL 17.6 全 PASS。差异检查通过，无凭据、备份或敏感生成物进入提交。
+- **真实只读生产预检：** 固定目标 `clearadmin@103.42.181.219:22`，脚本实际位置为本工作树 `scripts/deploy-local.ps1`，使用原机器已存在的忽略配置，未提交配置。SSH ED25519 指纹 `SHA256:kVqtsCzwAanVxCoVB5OA4b1lvMVdF9bpxYhy8xjNuLc`，严格 pinned host key。部署锁可用；PG03 在运行容器及有效 Compose 中均为 `CLEARAPI_POOL_ENABLED=false`。已安装部署 helper 与仓库文件 SHA256 均为 `b9c11350b7d8d3aef15165bd7a5ea2a5a1ab0f731c39d1f8983bad672e45417f`。
+- **生产前驱与身份：** commit `fb695711c19106209ddbe7de73cb273a0cd67b20`，`clearapi-local:fb695711c19106209ddbe7de73cb273a0cd67b20`，规范 OCI config ID `sha256:b7bb8edcc21a898bc4a098fe998bbde7de0929d5aedcb9ecde0ad23eb44bea8c`，Gateway 容器 `bc81f815a080847077eef70b9d49b6283559d3ebacad28617b2188c5dc83e598`；运行身份检查 PASS，helper 本地及公网 `/api/status` 健康检查 PASS。这是现有版本预检，不是变更后的公网验收。
+- **备份前置：** 备份单元 loaded、Result=success；既有 `20261026T193116Z` 加密备份的 manifest、文件大小和密文 SHA256 校验通过，身份对应当前前驱。未启动备份单元，未创建本候选正式备份；正式执行仍必须由 helper 生成并核验新备份、镜像/归档/commit 身份及并发锁，不能用本次旧备份检查替代。
+- **真实 DryRun：** 对应用提交实际执行 `pwsh -NoProfile -File .\scripts\deploy-local.ps1 -DryRun`，exit 0，`DRY_RUN_NO_PRODUCTION_WRITES`，previous_commit=`fb695711...`、architecture=amd64、service=new-api、scope=backend、changed_files=27、estimated_backup=true。无 fixture、无测试目标、未绕过 preflight。写入本记录后只对最终元数据提交补做相同只读身份预检；真实输出及退出码见外部目录，不预先声称补检通过。
+- **明确发布阻塞：** 生产 PostgreSQL 17.6 只读确认 `console_monitors.deleted_at` 尚不存在，目录数 2、未完成 attempt 数 0。本地脚本按路径分类不能识别此模型字段增量，DryRun 成功不等于迁移已完成。生产功能可用前需要单独授权并安排现有 `cmd/monitor-init` / `MigrateConsoleMonitoringDB` 显式监测迁移及其备份前置；helper 本身不执行该迁移，未迁移将返回监测未初始化。生产合同/预算/样本仍需要有效配置，未执行配置写入。不得仅因后续授权部署便隐式写数据库。
+- **证据和停止点：** `D:/AI/API/evidence/monitor-release-preflight-20261027/` 中保存 `preliminary-helper-preflight.json`、`readonly-safety-projection.json`、`release-cost-tests.log`、`application-dry-run.json`、`final-dry-run.json` 及实际退出码。新候选镜像尚未构建，镜像 config ID/归档 SHA 未产生。未正式部署、未重启、未迁移或写生产业务配置，未调用真实上游；PG03 继续关闭，D 生图未部署。等待用户明确说“本次授权正式部署”，且迁移阻塞仍须单独解决，才可进入相应生产操作。
+
+---
+
 ## 2026-10-27 Asia/Shanghai — 监测模型/协议名单已取消；媒体原生 HTTP 探测本地验证通过（未部署）
 
 - 用户补充明确要求所有模型、所有协议，并确认包括图片、音频和视频。本条取代下文 A 的“保留 Luna/Responses 特定条件”本地方案；历史调查及 B 原记录保留。

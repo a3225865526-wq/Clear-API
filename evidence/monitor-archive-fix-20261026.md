@@ -1,3 +1,13 @@
+## 2026-10-27 发布准备回执（正式部署尚未授权）
+
+- 应用已提交：`1f0d26934a0a9ff540938616c5cc497b68bdf530`；真实 `scripts/deploy-local.ps1 -DryRun` exit 0，`DRY_RUN_NO_PRODUCTION_WRITES`，范围 backend、amd64/new-api，27 个差异文件，正式部署需要新备份。写入总控及本记录后补做最终提交的只读 DryRun，最终候选身份及实测结果保存在 `D:/AI/API/evidence/monitor-release-preflight-20261027/final-dry-run.json` 与对应退出码中。
+- 本次费用路径补验四个顶层测试 PASS；MySQL/PG 可选费用子项跳过。其余既有本地权限、前端、媒体及归档删除三库验证证据复用，无完整 CI/E2E 或生产构建。详见总控顶部发布条目及该目录 `release-cost-tests.log`。
+- pinned SSH、运行身份、部署锁、既有加密备份只读校验 PASS，已安装部署 helper 与仓库哈希一致；PG03 运行与有效 Compose 均关闭。现网仍是 `fb695711c19106209ddbe7de73cb273a0cd67b20`，规范 OCI config ID `sha256:b7bb8edcc21a898bc4a098fe998bbde7de0929d5aedcb9ecde0ad23eb44bea8c`；候选镜像尚未构建。
+- 真实生产只读确认缺少 `console_monitors.deleted_at`。这是明确的显式监测迁移前置，DryRun 不会迁移，现有 helper 不会自动迁移；需要独立授权及备份安排。未进行生产配置写入、数据库迁移、备份启动、服务重启、正式部署或真实上游调用。
+- 后续等待“本次授权正式部署”，并解决迁移授权/实施前置；GitHub 不作为部署入口。本节之后旧“未提交”等表述为当时历史状态，以上应用提交记录取代其当前交付结论。
+
+---
+
 ## 2026-10-27 补充：取消模型/协议名单，包含图片、音频、视频
 
 本节取代下文 A 中“保留 Luna/Responses 专用条件”的本地实施结论；下文现场快照、原始调查及 B 的记录完整保留。用户明确要求模型/协议不限制，并进一步确认包含图片、音频和视频。本轮仍限本地源码、合成测试和状态记录，没有新增生产操作授权。
