@@ -264,7 +264,7 @@ func TestPreConsumePolicyDatabaseMatrix(t *testing.T) {
 				{"fractional threshold", 10.5, 1, 5250001, 5250001, false, false, 1500},
 				{"unlimited token", 10, 1, 5500000, 0, false, true, 1500},
 				{"forced reservation", 10, 1, 5500000, 5500000, true, false, 1500},
-				{"fractional multiple retains minimum input reserve", 0, 0.5, 100000, 100000, false, false, 1500},
+				{"fractional multiple scales the input estimate", 0, 0.5, 100000, 100000, false, false, 750},
 				{"fractional multiple refunds excess", 0, 2.5, 100000, 100000, false, false, 3750},
 			}
 			for i, tc := range cases {

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/QuantumNous/new-api/common"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/mysql"
@@ -71,7 +72,7 @@ func TestConsoleDatabaseMatrix(t *testing.T) {
 			require.False(t, empty.Ready)
 			require.Empty(t, empty.Channels)
 			// Representative pre-feature tables exist before opt-in monitor migration.
-			require.NoError(t, db.AutoMigrate(&User{}, &Token{}, &Log{}, &Model{}, &Vendor{}))
+			require.NoError(t, db.AutoMigrate(&User{}, &Token{}, &Log{}, &Model{}, &Vendor{}, &Channel{}))
 			require.NoError(t, db.Create(&User{Id: 1, Username: "console-user", AffCode: "fixture-one", Quota: 123, UsedQuota: 9, RequestCount: 2}).Error)
 			require.NoError(t, db.Create(&User{Id: 2, Username: "other-user", AffCode: "fixture-two", Quota: 456}).Error)
 			require.NoError(t, db.Create(&Token{UserId: 1, Key: "fixture-not-a-real-key", Status: 1, ExpiredTime: -1, UnlimitedQuota: true}).Error)
@@ -105,6 +106,7 @@ func TestConsoleDatabaseMatrix(t *testing.T) {
 			require.Equal(t, "Configured provider", snapshot.Platforms[0].Name)
 			require.EqualValues(t, 9, snapshot.Platforms[0].Total.Quota)
 			// Fresh migration and repeated upgrade must preserve prior users and monitor records.
+			require.NoError(t, db.Create(&Channel{Id: 10, Name: "monitor-fixture", Key: "fixture-not-a-provider-key", Status: common.ChannelStatusEnabled}).Error)
 			require.NoError(t, MigrateConsoleMonitoring())
 			require.NoError(t, db.Create(&ConsoleMonitor{ID: 1, ChannelID: 10, DisplayName: "Published channel", Platform: "Configured provider", Model: "model-a", Published: true}).Error)
 			require.NoError(t, db.Create(&ConsoleMonitor{ID: 2, ChannelID: 11, DisplayName: "Private channel", Model: "secret-model", Published: false}).Error)
