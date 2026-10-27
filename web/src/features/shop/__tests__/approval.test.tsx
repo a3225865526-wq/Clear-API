@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+import { useSecureVerification } from '@/features/auth/secure-verification/hooks/use-secure-verification'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth-store'
 
@@ -12,20 +13,26 @@ import { ProductOperations } from '../components/product-operations'
 
 vi.mock(
   '@/features/auth/secure-verification/hooks/use-secure-verification',
-  () => ({
-    useSecureVerification: () => ({
-      requestVerification: vi
-        .fn()
-        .mockResolvedValue({ proof_token: 'test-operation-proof' }),
-      dialogProps: { state: { phase: 'idle' } },
-    }),
+  () => ({ useSecureVerification: vi.fn() })
+)
+beforeEach(() => {
+  vi.mocked(useSecureVerification).mockReturnValue({
+    requestVerification: vi
+      .fn()
+      .mockResolvedValue({ proof_token: 'test-operation-proof' }),
+    requestLoginVerification: vi.fn(),
+    cancel: vi.fn(),
+    isActive: false,
+    dialogProps: {
+      state: { phase: 'idle' },
+      passkeyDomains: null,
+      onCancel: vi.fn(),
+      onRetry: vi.fn(),
+      onInputChange: vi.fn(),
+      onVerify: vi.fn(),
+    },
   })
-)
-
-vi.mock(
-  '@/features/auth/secure-verification/components/secure-verification-dialog',
-  () => ({ SecureVerificationDialog: () => null })
-)
+})
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -498,5 +505,178 @@ it('opens batch generation with the published product already selected and does 
       within(dialog).getByRole('combobox', { name: 'Product ID' })
     ).toHaveValue('automatic')
   )
+  expect(post).not.toHaveBeenCalled()
+})
+
+it.each(['click', 'enter'])(
+  'verifies identity with %s without submitting the catalog form or changing its version',
+  async (submission) => {
+    const actual = await vi.importActual<
+      typeof import('@/features/auth/secure-verification/hooks/use-secure-verification')
+    >('@/features/auth/secure-verification/hooks/use-secure-verification')
+    vi.mocked(useSecureVerification).mockImplementation(
+      actual.useSecureVerification
+    )
+    useAuthStore.setState((s) => ({
+      auth: {
+        ...s.auth,
+        user: {
+          id: 7,
+          role: 100,
+          username: 'operator',
+          display_name: 'operator',
+        },
+      },
+    }))
+    const product = {
+      ...creditProducts[0],
+      id: 'automatic',
+      name: 'Automatic credit',
+      currency: 'CNY',
+      state: 'pending',
+      revision: 5,
+      base_quota: 500000,
+      evidence_batch_id: 4,
+      purchase_url: 'https://catfk.com/item/qmcse2',
+    }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => {
+      if (String(url) === '/api/verify/methods') {
+        return {
+          data: {
+            success: true,
+            data: {
+              scope: 'store.product.operation',
+              methods: [{ method: 'password', available: true }],
+              oauth_providers: [],
+              password_encryption_enabled: false,
+            },
+          },
+        }
+      }
+      if (String(url).endsWith('/review')) {
+        return {
+          data: {
+            success: true,
+            data: {
+              product,
+              digest: 'bound-digest',
+              confirmation: 'automatic@5:bound-digest',
+              events: [],
+            },
+          },
+        }
+      }
+      return {
+        data: { success: true, data: { version: 29, products: [product] } },
+      }
+    })
+    const put = vi
+      .spyOn(api, 'put')
+      .mockResolvedValue({ data: { success: true } })
+    const post = vi.spyOn(api, 'post').mockImplementation(async (url) => ({
+      data: {
+        success: true,
+        data:
+          String(url) === '/api/verify'
+            ? {
+                proof_token: 'test-real-dialog-proof',
+                method: 'password',
+                scope: 'store.product.operation',
+                expires_at: Math.floor(Date.now() / 1000) + 300,
+              }
+            : undefined,
+      },
+    }))
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    })
+    render(
+      <QueryClientProvider client={client}>
+        <CatalogEditor />
+      </QueryClientProvider>
+    )
+    const user = userEvent.setup()
+    await user.click(
+      await screen.findByRole('button', { name: 'Save and enable' })
+    )
+    const password = await screen.findByLabelText('Password', {
+      selector: 'input',
+    })
+    await user.type(password, 'fixture-password')
+    if (submission === 'click') {
+      await user.click(screen.getByRole('button', { name: 'Verify' }))
+    } else {
+      await user.type(password, '{Enter}')
+    }
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/api/clearapi/credit-catalog/products/automatic/activate',
+        expect.objectContaining({ version: 29, revision: 5 }),
+        { headers: { 'X-Security-Proof': 'test-real-dialog-proof' } }
+      )
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Save and enable' })
+      ).toBeEnabled()
+    )
+    expect(put).not.toHaveBeenCalled()
+    expect(
+      post.mock.calls.filter(([url]) => url === '/api/verify')
+    ).toHaveLength(1)
+    expect(
+      post.mock.calls.filter(([url]) => String(url).endsWith('/activate'))
+    ).toHaveLength(1)
+  }
+)
+
+it('still saves drafts when the catalog form itself is submitted', async () => {
+  useAuthStore.setState((s) => ({
+    auth: {
+      ...s.auth,
+      user: {
+        id: 7,
+        role: 100,
+        username: 'operator',
+        display_name: 'operator',
+      },
+    },
+  }))
+  const product = {
+    ...creditProducts[0],
+    id: 'draft-item',
+    currency: 'CNY',
+    state: 'draft',
+    revision: 1,
+    base_quota: 500000,
+  }
+  vi.spyOn(api, 'get').mockResolvedValue({
+    data: { success: true, data: { version: 29, products: [product] } },
+  })
+  const put = vi
+    .spyOn(api, 'put')
+    .mockResolvedValue({ data: { success: true } })
+  const post = vi.spyOn(api, 'post')
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <CatalogEditor />
+    </QueryClientProvider>
+  )
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Save drafts' })
+  )
+  await waitFor(() =>
+    expect(put).toHaveBeenCalledWith(
+      '/api/clearapi/credit-catalog',
+      expect.objectContaining({ version: 29 })
+    )
+  )
+  expect(put).toHaveBeenCalledTimes(1)
   expect(post).not.toHaveBeenCalled()
 })

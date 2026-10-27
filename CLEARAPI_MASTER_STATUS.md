@@ -1,3 +1,14 @@
+## 2026-10-27 Asia/Shanghai — “保存并启用”失败已复现并修复，准备部署补丁
+
+- 生产 Docker 日志明确记录 23:05:25、23:10:14、23:11:24 的 `catalog changed; reload before saving`；不是证据校验拒绝。23:12:57 只读快照为目录版本 29，credit-1@5=pending、证据批次 4 启用，售价/Quota/绑定未变。每次失败前出现内容未变的全目录 edit 审计；没有 auto_validate 或 activate 成功记录。
+- **根因：** 商品 CatalogForm 包含通过 Portal 展示的真实身份验证表单；React submit 事件仍沿组件树冒泡。点击验证或密码框回车意外调用外层 SaveCatalog，使目录版本递增，随后携带原版本的启用请求被现有后端并发保护拒绝。上一版测试将验证弹窗替换为空组件，遗漏了真实表单交互。
+- **最小修复：** 商品表单只处理 target===currentTarget 的自身提交，忽略验证弹窗等其他表单的 submit；不修改或关闭身份验证，不放宽目录版本、摘要、权限和证据校验。后端版本冲突返回 STORE_CATALOG_CHANGED，其余自动校验失败返回独立稳定代码；前端安全消息映射与七语言文案让 toast 和页面都显示准确原因，不泄露内部错误。
+- **实证回归：** 真实 useSecureVerification＋真实 SecureVerificationDialog、只 mock HTTP 边界，修复前点击和回车两例都因额外 PUT 草稿保存失败，见 reproduce-form-submit.log。修复后两例额外 PUT=0，验证与启用各一次；正常保存草稿仍正常。商品测试 16 项、错误提示 6 项（含真实中文资源）通过，controller SQLite 权限回归通过，tsgo、变更文件 lint/格式和差异检查通过。
+- 模型、SQL、事务、Schema、审批策略及计费没有变化，沿用上一版真实 SQLite/MySQL/PostgreSQL 定向结果，不重复数据库矩阵。无生产直接写库、启用商品、发正式码、付款、兑换或证据重建；PG03、邀请奖励和 D 生图不变。
+- 证据在 D:/AI/API/runtime/product-activation-failure-20261027/；完成代码后按原 Windows 本地构建 → SSH → VPS helper 预检、备份、部署与健康检查。上线结果另追加，不能把本地通过写成生产业务验收。
+
+---
+
 ## 2026-10-27 Asia/Shanghai — 商品自动校验发布＋一键发码下载已部署
 
 - **生产版本：** 821da2bbca3c8ca1e7124ae27fa8dd0b29bfc548，2026-10-27 22:55:29 +08:00。既有 Windows 本地构建 → SSH → VPS helper，DryRun 后只构建/部署一次；SUCCESS、health=PASS、rollback=false，仅更新 new-api，未推送或使用 GitHub Actions/RC。

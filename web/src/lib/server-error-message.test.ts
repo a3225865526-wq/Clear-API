@@ -16,9 +16,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import i18next from 'i18next'
 import { describe, expect, test } from 'vitest'
 
-import { getServerErrorMessageKey } from './server-error-message'
+import zh from '@/i18n/locales/zh.json'
+
+import {
+  getServerErrorMessage,
+  getServerErrorMessageKey,
+} from './server-error-message'
 
 describe('server error message mapping', () => {
   test('maps the active-session limit to recovery instructions', () => {
@@ -65,4 +71,49 @@ describe('server error message mapping', () => {
       })
     ).toBe(expected.TELEGRAM_BIND_INTERNAL_ERROR)
   })
+})
+
+test.each([
+  [
+    'STORE_CATALOG_CHANGED',
+    'The product catalog changed. Reload the page and try again.',
+  ],
+  [
+    'STORE_AUTOMATIC_VALIDATION_FAILED',
+    'Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying.',
+  ],
+])(
+  'maps %s to a safe localized product error instead of internal text',
+  (code, message) => {
+    expect(
+      getServerErrorMessage({
+        response: {
+          data: { code, message: 'private SQL detail must not be shown' },
+        },
+      })
+    ).toBe(message)
+  }
+)
+
+test('shows the catalog conflict in Chinese instead of the raw English toast', async () => {
+  const previousLanguage = i18next.language
+  const previousResources = structuredClone(
+    i18next.getResourceBundle('zh', 'translation')
+  )
+  try {
+    i18next.addResourceBundle('zh', 'translation', zh.translation, true, true)
+    await i18next.changeLanguage('zh')
+    expect(
+      getServerErrorMessage({
+        code: 'STORE_CATALOG_CHANGED',
+        message: 'The product catalog changed. Reload the page and try again.',
+      })
+    ).toBe('商品配置已更新，请刷新页面后重试。')
+  } finally {
+    i18next.removeResourceBundle('zh', 'translation')
+    if (previousResources) {
+      i18next.addResourceBundle('zh', 'translation', previousResources)
+    }
+    await i18next.changeLanguage(previousLanguage)
+  }
 })

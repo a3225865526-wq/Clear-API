@@ -1318,4 +1318,5 @@ export const STATIC_I18N_KEYS = [
   'auto_validate',
   'activate',
   'Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying.',
+  'The product catalog changed. Reload the page and try again.',
 ] as const

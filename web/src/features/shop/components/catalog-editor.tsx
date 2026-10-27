@@ -144,7 +144,14 @@ function CatalogForm(props: {
   })
   return (
     <form
-      onSubmit={form.handleSubmit((values) => save.mutate(values))}
+      onSubmit={(event) => {
+        // Portal forms (identity verification) still bubble through React's
+        // parent tree. Only this form may submit a catalog save.
+        if (event.target !== event.currentTarget) {
+          return
+        }
+        void form.handleSubmit((values) => save.mutate(values))(event)
+      }}
       className='space-y-5'
     >
       <p className='text-muted-foreground text-sm'>

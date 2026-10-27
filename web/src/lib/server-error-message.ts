@@ -23,6 +23,10 @@ import i18next from 'i18next'
 export const safeServerErrorMessage = Symbol('safeServerErrorMessage')
 
 const serverErrorMessageKeys = {
+  STORE_CATALOG_CHANGED:
+    'The product catalog changed. Reload the page and try again.',
+  STORE_AUTOMATIC_VALIDATION_FAILED:
+    'Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying.',
   TELEGRAM_OAUTH_NOT_CONFIGURED:
     'Telegram OAuth is not configured or enabled. Please contact your administrator.',
   TELEGRAM_OAUTH_CONFLICT:

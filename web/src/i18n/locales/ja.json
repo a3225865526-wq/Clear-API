@@ -1,5 +1,6 @@
 {
   "translation": {
+    "The product catalog changed. Reload the page and try again.": "商品設定が更新されました。ページを再読み込みしてから再試行してください。",
     "Activation cancelled. The saved draft is retained.": "有効化を中止しました。保存済みの下書きは保持されます。",
     "Advanced settings": "詳細設定",
     "auto_validate": "システム自動検証",

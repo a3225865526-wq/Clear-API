@@ -1,5 +1,6 @@
 {
   "translation": {
+    "The product catalog changed. Reload the page and try again.": "商品設定已更新，請重新整理頁面後再試。",
     "Activation cancelled. The saved draft is retained.": "已取消啟用，保留已儲存的草稿。",
     "Advanced settings": "進階設定",
     "auto_validate": "系統自動驗證",

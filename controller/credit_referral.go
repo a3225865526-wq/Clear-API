@@ -176,7 +176,13 @@ func ChangeCreditProductState(c *gin.Context) {
 	if err != nil {
 		if c.Param("action") == "activate" {
 			common.SysError("product automatic validation failed: " + err.Error())
-			common.ApiErrorMsg(c, "Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying.")
+			code := "STORE_AUTOMATIC_VALIDATION_FAILED"
+			message := "Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying."
+			if err.Error() == "catalog changed; reload before saving" || err.Error() == "product revision changed" {
+				code = "STORE_CATALOG_CHANGED"
+				message = "The product catalog changed. Reload the page and try again."
+			}
+			c.JSON(http.StatusOK, gin.H{"success": false, "code": code, "message": message})
 			return
 		}
 		common.ApiError(c, err)
