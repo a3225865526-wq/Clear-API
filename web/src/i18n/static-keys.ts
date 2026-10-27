@@ -19,6 +19,14 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'Invalid batch fields. Check the product ID, revision, amount, quantity and expiry.',
+  'Failed to create batch. Please contact an administrator with the request time.',
+  'Product not found. Use the approved catalog product ID, not the legacy product number.',
+  'The product revision or face value does not match the current catalog.',
+  'The product requires a valid approval for its current revision.',
+  'Product delivery evidence is unavailable, disabled, expired or inconsistent. Review the delivery evidence before creating stock.',
+  'A batch with this name already exists for this product. Refresh the list before retrying.',
+  'A delivery sample requires one code for a draft revision in preparation mode, and may only be issued once per revision.',
   'Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted.',
   'An unfinished monitoring attempt must be resolved before this operation.',
   'Monitoring must be allowlisted, published, enabled, and not archived before a probe can run.',

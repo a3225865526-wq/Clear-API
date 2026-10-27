@@ -63,7 +63,7 @@ func creditApprovalFixture(t *testing.T) {
 	}
 	require.NoError(t, db.Raw(query).Scan(&version).Error)
 	t.Logf("%s %s", db.Dialector.Name(), version)
-	for _, table := range []any{&CreditApprovalEvent{}, &Option{}, &StoreProduct{}, &RedemptionBatch{}, &Redemption{}} {
+	for _, table := range []any{&OfflineOrderCode{}, &OfflineOrder{}, &BalanceTransaction{}, &FinanceSyncEvent{}, &ReferralReward{}, &Log{}, &User{}, &CreditApprovalEvent{}, &Option{}, &StoreProduct{}, &RedemptionBatch{}, &Redemption{}} {
 		require.NoError(t, db.Migrator().DropTable(table))
 	}
 	for range 2 {
@@ -579,4 +579,183 @@ func TestCreditApprovalSampleRollback(t *testing.T) {
 	assert.Zero(t, count)
 	_, _, err = CreateRedemptionBatch(input)
 	require.NoError(t, err)
+}
+
+func TestCommercialBatchCreationValidationAndRollback(t *testing.T) {
+	creditApprovalFixture(t)
+	p := creditApprovalProduct(t, "commercial", 100)
+	input := CreateRedemptionBatchInput{Name: "normal-stock", FaceValueCents: 100, Count: 100, AdminUserID: 7, ProductID: p.ID, ProductRevision: p.Revision}
+	for _, tc := range []struct {
+		name   string
+		change func(*CreateRedemptionBatchInput)
+		want   string
+	}{
+		{"unknown product", func(i *CreateRedemptionBatchInput) { i.ProductID = "1" }, "approved product not found"},
+		{"draft product", func(i *CreateRedemptionBatchInput) {}, "invalid product approval state"},
+		{"revision", func(i *CreateRedemptionBatchInput) { i.ProductRevision++ }, "product revision or price mismatch"},
+		{"price", func(i *CreateRedemptionBatchInput) { i.FaceValueCents++ }, "product revision or price mismatch"},
+		{"zero count", func(i *CreateRedemptionBatchInput) { i.Count = 0 }, "生成数量须为 1-100"},
+		{"excess count", func(i *CreateRedemptionBatchInput) { i.Count = 101 }, "生成数量须为 1-100"},
+		{"empty name", func(i *CreateRedemptionBatchInput) { i.Name = " " }, "批次名称长度须为 1-64"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := input
+			tc.change(&candidate)
+			batch, keys, err := CreateRedemptionBatch(candidate)
+			require.EqualError(t, err, tc.want)
+			assert.Nil(t, batch)
+			assert.Nil(t, keys)
+		})
+	}
+	creditApprovalAction(t, p.ID, "submit")
+	creditApprovalAction(t, p.ID, "approve")
+	var before int64
+	require.NoError(t, DB.Model(&Redemption{}).Count(&before).Error)
+	insertions := 0
+	require.NoError(t, DB.Callback().Create().Before("gorm:create").Register("commercial-code-failure", func(tx *gorm.DB) {
+		if _, ok := tx.Statement.Dest.(*Redemption); ok {
+			insertions++
+			if insertions == 2 {
+				tx.AddError(errors.New("isolated insertion failure"))
+			}
+		}
+	}))
+	_, _, err := CreateRedemptionBatch(input)
+	require.EqualError(t, err, "redemption code insertion failed")
+	require.NoError(t, DB.Callback().Create().Remove("commercial-code-failure"))
+	var after int64
+	require.NoError(t, DB.Model(&Redemption{}).Count(&after).Error)
+	assert.Equal(t, before, after)
+	require.NoError(t, DB.Model(&RedemptionBatch{}).Where("name = ?", input.Name).Count(&after).Error)
+	assert.Zero(t, after)
+	batch, keys, err := CreateRedemptionBatch(input)
+	require.NoError(t, err)
+	assert.Zero(t, batch.ExpiredTime)
+	assert.Len(t, keys, 100)
+	_, _, err = CreateRedemptionBatch(input)
+	require.EqualError(t, err, "batch name already exists for this product")
+	require.NoError(t, DB.Model(&Redemption{}).Count(&after).Error)
+	assert.Equal(t, before+100, after)
+	input.Name, input.Count = "concurrent-stock", 1
+	sqlDB, err := DB.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(2)
+	start := make(chan struct{})
+	results := make(chan error, 2)
+	var workers sync.WaitGroup
+	for range 2 {
+		workers.Go(func() {
+			<-start
+			_, _, err := CreateRedemptionBatch(input)
+			results <- err
+		})
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+	successes := 0
+	for err := range results {
+		if err == nil {
+			successes++
+		}
+	}
+	assert.Equal(t, 1, successes)
+	require.NoError(t, DB.Model(&RedemptionBatch{}).Where("name = ?", input.Name).Count(&after).Error)
+	assert.EqualValues(t, 1, after)
+	_, err = DisableRedemptionBatchById(p.EvidenceBatchID)
+	require.NoError(t, err)
+	input.Name = "after-disabled-evidence"
+	_, _, err = CreateRedemptionBatch(input)
+	require.EqualError(t, err, "evidence batch does not match product promise")
+}
+
+func TestCommercialBatchArchivePreservesHistory(t *testing.T) {
+	creditApprovalFixture(t)
+	require.NoError(t, DB.AutoMigrate(&User{}, &VIPLevel{}, &Log{}, &OfflineOrder{}, &OfflineOrderCode{}, &BalanceTransaction{}, &FinanceSyncEvent{}, &ReferralReward{}))
+	p := creditApprovalProduct(t, "archive", 100)
+	creditApprovalAction(t, p.ID, "submit")
+	creditApprovalAction(t, p.ID, "approve")
+	_, err := ArchiveRedemptionBatch(p.EvidenceBatchID)
+	require.ErrorIs(t, err, ErrRedemptionBatchEvidenceInUse)
+	batch, keys, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "archive-stock", FaceValueCents: 100, Count: 3, AdminUserID: 7, ProductID: p.ID, ProductRevision: p.Revision})
+	require.NoError(t, err)
+	user := User{Username: "commercial-redeemer", AffCode: "commercial-redeemer", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create(&user).Error)
+	_, err = RedeemStoreCode(keys[0], user.Id)
+	require.NoError(t, err)
+	var used Redemption
+	require.NoError(t, DB.Where(commonKeyCol+" = ?", keys[0]).First(&used).Error)
+	order := OfflineOrder{OrderNo: "historical-order", Status: OfflineOrderPaid}
+	require.NoError(t, DB.Create(&order).Error)
+	require.NoError(t, DB.Create(&OfflineOrderCode{OrderID: order.Id, RedemptionID: used.Id}).Error)
+	require.NoError(t, DB.Create(&FinanceSyncEvent{EventKey: "archive-fixture", Topic: "offline_redemption", RefID: int64(used.Id)}).Error)
+	require.NoError(t, DB.Create(&ReferralReward{RedemptionID: used.Id, Status: "paid"}).Error)
+	preview, err := GetRedemptionBatchDeletion(batch.Id)
+	require.NoError(t, err)
+	assert.EqualValues(t, 3, preview.Total)
+	assert.EqualValues(t, 1, preview.Used)
+	assert.EqualValues(t, 2, preview.Unused)
+	assert.EqualValues(t, 1, preview.Orders)
+	assert.EqualValues(t, 1, preview.BalanceEntries)
+	assert.EqualValues(t, 1, preview.FinanceEvents)
+	assert.EqualValues(t, 1, preview.Rewards)
+	require.False(t, preview.Blocked)
+	_, err = ArchiveRedemptionBatch(batch.Id)
+	require.NoError(t, err)
+	_, err = ArchiveRedemptionBatch(batch.Id)
+	require.NoError(t, err)
+	_, err = DisableRedemptionBatchById(batch.Id)
+	require.NoError(t, err)
+	var stored RedemptionBatch
+	require.NoError(t, DB.First(&stored, batch.Id).Error)
+	assert.Equal(t, RedemptionBatchStatusArchived, stored.Status)
+	_, err = GetUnusedRedemptionBatchKeys(batch.Id)
+	require.Error(t, err)
+	_, err = RedeemStoreCode(keys[1], user.Id)
+	require.Error(t, err)
+	var unchanged Redemption
+	require.NoError(t, DB.First(&unchanged, used.Id).Error)
+	assert.Equal(t, used, unchanged)
+	require.NoError(t, DB.First(&user, user.Id).Error)
+	assert.Equal(t, batch.Quota, user.Quota)
+	items, _, err := GetRedemptionBatches(0, 100)
+	require.NoError(t, err)
+	for _, item := range items {
+		assert.NotEqual(t, batch.Id, item.Id)
+	}
+	// Archive protects every code against individual edit/delete and cleanup.
+	var unused Redemption
+	require.NoError(t, DB.Where(commonKeyCol+" = ?", keys[1]).First(&unused).Error)
+	unused.Status = common.RedemptionCodeStatusEnabled
+	require.Error(t, unused.Update())
+	require.Error(t, unused.Delete())
+	_, err = DeleteInvalidRedemptions()
+	require.NoError(t, err)
+	after, err := GetRedemptionBatchDeletion(batch.Id)
+	require.NoError(t, err)
+	assert.EqualValues(t, 3, after.Total)
+	assert.EqualValues(t, 1, after.Used)
+	assert.Equal(t, preview.Orders, after.Orders)
+	assert.Equal(t, preview.BalanceEntries, after.BalanceEntries)
+	assert.Equal(t, preview.FinanceEvents, after.FinanceEvents)
+	assert.Equal(t, preview.Rewards, after.Rewards)
+}
+
+func TestCommercialBatchArchiveRollback(t *testing.T) {
+	creditApprovalFixture(t)
+	require.NoError(t, DB.AutoMigrate(&OfflineOrder{}, &OfflineOrderCode{}, &BalanceTransaction{}, &FinanceSyncEvent{}, &ReferralReward{}))
+	require.NoError(t, DB.Callback().Update().Before("gorm:update").Register("archive-failure", func(tx *gorm.DB) {
+		if tx.Statement.Table == "redemption_batches" {
+			tx.AddError(errors.New("isolated archive failure"))
+		}
+	}))
+	_, err := ArchiveRedemptionBatch(77)
+	require.Error(t, err)
+	require.NoError(t, DB.Callback().Update().Remove("archive-failure"))
+	var code Redemption
+	require.NoError(t, DB.Where("batch_id = ?", 77).First(&code).Error)
+	assert.Equal(t, common.RedemptionCodeStatusEnabled, code.Status)
+	var batch RedemptionBatch
+	require.NoError(t, DB.First(&batch, 77).Error)
+	assert.Equal(t, RedemptionBatchStatusEnabled, batch.Status)
 }

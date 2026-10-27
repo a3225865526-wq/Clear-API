@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/QuantumNous/new-api/common"
@@ -13,6 +14,7 @@ import (
 const (
 	RedemptionBatchStatusEnabled  = 1
 	RedemptionBatchStatusDisabled = 2
+	RedemptionBatchStatusArchived = 3
 )
 
 // maxRedemptionBatchCount 与 AddRedemption 单次生成上限保持一致。
@@ -71,6 +73,11 @@ type CreateRedemptionBatchInput struct {
 // CreateRedemptionBatch 创建批次并一次性生成全部商城码（单事务，任一码插入
 // 失败整体回滚）。quota 按创建当时 Price 冻结。
 func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, []string, error) {
+	input.Name = strings.TrimSpace(input.Name)
+	input.ProductID = strings.TrimSpace(input.ProductID)
+	if utf8.RuneCountInString(input.Note) > 255 {
+		return nil, nil, errors.New("batch note must be at most 255 characters")
+	}
 	if input.EvidenceOnly && (input.ProductID == "" || input.Count != 1) {
 		return nil, nil, errors.New("evidence sample requires one code bound to a draft revision")
 	}
@@ -129,6 +136,15 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 			}
 			if input.ProductID == "" && catalog.ApprovalSchema == 1 {
 				return errors.New("new inventory requires a product revision")
+			}
+			// The catalog lock serializes issuance across processes. A retry
+			// must never silently mint another batch with the same identity.
+			var duplicate []RedemptionBatch
+			if err := lockForUpdate(tx).Select("id").Where("product_id = ? AND name = ?", input.ProductID, input.Name).Limit(1).Find(&duplicate).Error; err != nil {
+				return err
+			}
+			if len(duplicate) != 0 && !input.EvidenceOnly {
+				return errors.New("batch name already exists for this product")
 			}
 			if input.ProductID != "" {
 				found := false
@@ -241,13 +257,13 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 // GetRedemptionBatches 分页列出批次并实时聚合已用/未用/已禁用数量。
 func GetRedemptionBatches(startIdx int, num int) ([]*RedemptionBatchWithStats, int64, error) {
 	var total int64
-	if err := DB.Model(&RedemptionBatch{}).Count(&total).Error; err != nil {
+	if err := DB.Model(&RedemptionBatch{}).Where("status <> ?", RedemptionBatchStatusArchived).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 	batches := []*RedemptionBatchWithStats{}
 	// 显式指定 Model：Find 的目标类型是带统计字段的包装结构体，
 	// 不指定时 GORM 会用目标类型推导出错误的表名。
-	if err := DB.Model(&RedemptionBatch{}).Order("id desc").Limit(num).Offset(startIdx).Find(&batches).Error; err != nil {
+	if err := DB.Model(&RedemptionBatch{}).Where("status <> ?", RedemptionBatchStatusArchived).Order("id desc").Limit(num).Offset(startIdx).Find(&batches).Error; err != nil {
 		return nil, 0, err
 	}
 	if len(batches) > 0 {
@@ -297,6 +313,9 @@ func GetUnusedRedemptionBatchKeys(batchId int) ([]string, error) {
 	if err := DB.First(&batch, "id = ?", batchId).Error; err != nil {
 		return nil, err
 	}
+	if batch.Status == RedemptionBatchStatusArchived {
+		return nil, errors.New("batch is archived")
+	}
 	keyCol := "`key`"
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		keyCol = `"key"`
@@ -321,7 +340,7 @@ func DisableRedemptionBatchById(id int) (disabledCodes int64, err error) {
 		if err := lockForUpdate(tx).First(batch, "id = ?", id).Error; err != nil {
 			return err
 		}
-		if batch.Status == RedemptionBatchStatusDisabled {
+		if batch.Status == RedemptionBatchStatusDisabled || batch.Status == RedemptionBatchStatusArchived {
 			// 幂等：重复禁用直接成功，返回 0。
 			return nil
 		}
@@ -342,4 +361,100 @@ func DisableRedemptionBatchById(id int) (disabledCodes int64, err error) {
 		return nil
 	})
 	return disabledCodes, err
+}
+
+var ErrRedemptionBatchEvidenceInUse = errors.New("This batch is current product delivery evidence. Replace and review the evidence before deleting it.")
+
+type RedemptionBatchDeletion struct {
+	Batch          RedemptionBatch `json:"batch"`
+	Total          int64           `json:"total"`
+	Used           int64           `json:"used"`
+	Unused         int64           `json:"unused"`
+	Disabled       int64           `json:"disabled"`
+	Orders         int64           `json:"orders"`
+	BalanceEntries int64           `json:"balance_entries"`
+	FinanceEvents  int64           `json:"finance_events"`
+	Rewards        int64           `json:"rewards"`
+	ApprovalEvents int64           `json:"approval_events"`
+	Blocked        bool            `json:"blocked"`
+}
+
+// inspectRedemptionBatchDeletion shares the catalog lock with approval and
+// issuance. All records remain in place, including already soft-deleted codes.
+func inspectRedemptionBatchDeletion(tx *gorm.DB, id int) (*RedemptionBatchDeletion, error) {
+	_, catalog, err := lockedCreditCatalog(tx)
+	if err != nil {
+		return nil, err
+	}
+	result := &RedemptionBatchDeletion{}
+	if err := lockForUpdate(tx).First(&result.Batch, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	for _, product := range catalog.Products {
+		if product.EvidenceBatchID == id {
+			result.Blocked = true
+		}
+	}
+	var codes []Redemption
+	if err := lockForUpdate(tx.Unscoped()).Select("id", "status", "used_user_id", "redeemed_time", "deleted_at").Where("batch_id = ?", id).Find(&codes).Error; err != nil {
+		return nil, err
+	}
+	for _, code := range codes {
+		result.Total++
+		switch {
+		case code.Status == common.RedemptionCodeStatusUsed || code.UsedUserId > 0 || code.RedeemedTime > 0:
+			result.Used++
+		case code.Status == common.RedemptionCodeStatusEnabled && !code.DeletedAt.Valid:
+			result.Unused++
+		default:
+			result.Disabled++
+		}
+	}
+	ids := tx.Unscoped().Model(&Redemption{}).Select("id").Where("batch_id = ?", id)
+	if err := tx.Model(&OfflineOrderCode{}).Where("redemption_id IN (?)", ids).Distinct("order_id").Count(&result.Orders).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Model(&BalanceTransaction{}).Where("reference_type = ? AND reference_id IN (?)", BalanceTxReferenceRedemption, ids).Count(&result.BalanceEntries).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Model(&FinanceSyncEvent{}).Where("topic = ? AND ref_id IN (?)", "offline_redemption", ids).Count(&result.FinanceEvents).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Model(&ReferralReward{}).Where("redemption_id IN (?)", ids).Count(&result.Rewards).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Model(&CreditApprovalEvent{}).Where("evidence_batch_id = ?", id).Count(&result.ApprovalEvents).Error; err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func GetRedemptionBatchDeletion(id int) (result *RedemptionBatchDeletion, err error) {
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		result, err = inspectRedemptionBatchDeletion(tx, id)
+		return err
+	})
+	return
+}
+
+// ArchiveRedemptionBatch invalidates unused inventory atomically, then hides
+// the batch. It never deletes codes, approvals, orders, rewards or ledger rows.
+func ArchiveRedemptionBatch(id int) (result *RedemptionBatchDeletion, err error) {
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		result, err = inspectRedemptionBatchDeletion(tx, id)
+		if err != nil {
+			return err
+		}
+		if result.Batch.Status == RedemptionBatchStatusArchived {
+			return nil
+		}
+		if result.Blocked {
+			return ErrRedemptionBatchEvidenceInUse
+		}
+		if err := tx.Model(&Redemption{}).Where("batch_id = ? AND status = ?", id, common.RedemptionCodeStatusEnabled).Update("status", common.RedemptionCodeStatusDisabled).Error; err != nil {
+			return err
+		}
+		return tx.Model(&RedemptionBatch{}).Where("id = ?", id).Updates(map[string]any{"status": RedemptionBatchStatusArchived, "updated_time": common.GetTimestamp()}).Error
+	})
+	return
 }

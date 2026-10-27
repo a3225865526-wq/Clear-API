@@ -72,6 +72,7 @@ var auditContentTemplates = map[string]string{
 
 	"store.batch_create":   "Created store batch ${name} (ID: ${batch_id}) with ${count} codes (face value ${face_value_cents})",
 	"store.batch_disable":  "Disabled store batch ${batch_id} and ${count} unused codes",
+	"store.batch_archive":  "Archived store batch ${name} (ID: ${batch_id}); invalidated ${unused} unused codes and preserved historical records",
 	"store.batch_export":   "Exported ${count} unused codes from batch ${batch_id}",
 	"store.product_create": "Created store product ${name} (ID: ${id})",
 	"store.product_update": "Updated store product ${name} (ID: ${id})",

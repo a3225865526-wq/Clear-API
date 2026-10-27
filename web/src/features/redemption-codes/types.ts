@@ -138,3 +138,17 @@ export interface CreateRedemptionBatchResponse {
     keys: string[]
   }
 }
+
+export interface RedemptionBatchDeletion {
+  batch: RedemptionBatch
+  total: number
+  used: number
+  unused: number
+  disabled: number
+  orders: number
+  balance_entries: number
+  finance_events: number
+  rewards: number
+  approval_events: number
+  blocked: boolean
+}

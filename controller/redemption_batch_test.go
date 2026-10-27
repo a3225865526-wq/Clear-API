@@ -107,6 +107,32 @@ func TestDeleteRedemptionBatch(t *testing.T) {
 			router := gin.New()
 			router.Use(middleware.RequestId())
 			router.POST("/api/redemption/batch", middleware.AdminAuth(), DeleteRedemptionBatch)
+			router.GET("/api/redemption/batches/:id/deletion", middleware.AdminAuth(), InspectRedemptionBatchDeletion)
+			router.DELETE("/api/redemption/batches/:id", middleware.AdminAuth(), ArchiveRedemptionBatch)
+			router.POST("/api/redemption/batches", middleware.AdminAuth(), AddRedemptionBatch)
+			ordinaryToken := "batch-permission-ordinary-fixture"
+			ordinary := model.User{Username: "batch-ordinary", AffCode: "batch-ordinary", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AccessToken: &ordinaryToken}
+			require.NoError(t, db.Create(&ordinary).Error)
+			for _, route := range []struct{ method, path string }{
+				{http.MethodGet, "/api/redemption/batches/1/deletion"},
+				{http.MethodDelete, "/api/redemption/batches/1"},
+				{http.MethodPost, "/api/redemption/batches"},
+			} {
+				for _, credential := range []string{"", ordinaryToken} {
+					request := httptest.NewRequest(route.method, route.path, bytes.NewBufferString("{}"))
+					if credential != "" {
+						request.Header.Set("Authorization", "Bearer "+credential)
+					}
+					response := httptest.NewRecorder()
+					router.ServeHTTP(response, request)
+					if credential == "" {
+						assert.Equal(t, http.StatusUnauthorized, response.Code)
+					} else {
+						assert.Equal(t, http.StatusForbidden, response.Code)
+						assert.Contains(t, response.Body.String(), "AUTH_INSUFFICIENT_PRIVILEGE")
+					}
+				}
+			}
 
 			overLimit := make([]int, 1001)
 			for index := range overLimit {

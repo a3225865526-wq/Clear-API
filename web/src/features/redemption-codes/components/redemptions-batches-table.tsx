@@ -16,8 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Download, Plus, ShieldBan } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Download, Plus, ShieldBan, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -33,14 +33,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { formatCnyCents } from '@/features/wallet/lib/money'
 import { formatQuota } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 
-import { disableRedemptionBatch, getRedemptionBatches } from '../api'
-import { formatCnyCents } from '@/features/wallet/lib/money'
-import type { RedemptionBatch } from '../types'
-import { RedemptionsBatchExportDialog } from './redemptions-batch-export-dialog'
+import {
+  archiveRedemptionBatch,
+  disableRedemptionBatch,
+  getRedemptionBatches,
+  inspectRedemptionBatchDeletion,
+} from '../api'
+import type { RedemptionBatch, RedemptionBatchDeletion } from '../types'
 import { RedemptionsBatchCreateDialog } from './redemptions-batch-create-dialog'
+import { RedemptionsBatchExportDialog } from './redemptions-batch-export-dialog'
 
 const MAX_BATCH_COUNT = 100 // matches backend cap; backend stays authoritative
 
@@ -60,6 +65,10 @@ export function RedemptionsBatchesTable() {
     null
   )
   const [disabling, setDisabling] = useState(false)
+  const [deletion, setDeletion] = useState<RedemptionBatchDeletion | null>(null)
+  const [checkingDeletion, setCheckingDeletion] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const deletionPending = useRef(false)
 
   const fetchBatches = useCallback(async (targetPage: number) => {
     try {
@@ -107,6 +116,54 @@ export function RedemptionsBatchesTable() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / 10))
+
+  const inspectDeletion = async (id: number) => {
+    if (deletionPending.current) return
+    deletionPending.current = true
+    setCheckingDeletion(true)
+    try {
+      const response = await inspectRedemptionBatchDeletion(id)
+      if (response.success && response.data) {
+        setDeletion(response.data)
+      } else {
+        handleServerError(response, undefined, {
+          title: t(response.message || 'Failed to inspect batch deletion'),
+        })
+      }
+    } catch (error) {
+      handleServerError(error)
+    } finally {
+      deletionPending.current = false
+      setCheckingDeletion(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deletion || deletion.blocked || deletionPending.current) return
+    deletionPending.current = true
+    setDeleting(true)
+    try {
+      const response = await archiveRedemptionBatch(deletion.batch.id)
+      if (response.success) {
+        toast.success(
+          t(
+            'Batch deleted. Unused codes are invalidated and historical records are preserved.'
+          )
+        )
+        setDeletion(null)
+        await fetchBatches(batches.length === 1 ? Math.max(1, page - 1) : page)
+      } else {
+        handleServerError(response, undefined, {
+          title: t(response.message || 'Failed to delete batch'),
+        })
+      }
+    } catch (error) {
+      handleServerError(error)
+    } finally {
+      deletionPending.current = false
+      setDeleting(false)
+    }
+  }
 
   return (
     <div className='space-y-3'>
@@ -178,9 +235,7 @@ export function RedemptionsBatchesTable() {
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={
-                        batch.status === 1 ? 'secondary' : 'destructive'
-                      }
+                      variant={batch.status === 1 ? 'secondary' : 'destructive'}
                     >
                       {batch.status === 1 ? t('Enabled') : t('Disabled')}
                     </Badge>
@@ -198,6 +253,16 @@ export function RedemptionsBatchesTable() {
                       >
                         <Download className='h-4 w-4' />
                         {t('Export Unused')}
+                      </Button>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='text-destructive h-8 px-2'
+                        disabled={checkingDeletion || deleting}
+                        onClick={() => void inspectDeletion(batch.id)}
+                      >
+                        <Trash2 className='h-4 w-4' />
+                        {t('Delete')}
                       </Button>
                       <Button
                         variant='ghost'
@@ -271,6 +336,60 @@ export function RedemptionsBatchesTable() {
           'All unused codes in this batch will be invalidated. This cannot be undone for now.'
         )}
         confirmText={t('Disable Batch')}
+      />
+      <ConfirmDialog
+        destructive
+        open={deletion !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleting) setDeletion(null)
+        }}
+        handleConfirm={() => void handleDelete()}
+        isLoading={deleting}
+        disabled={!deletion || deletion.blocked}
+        title={t('Delete Batch')}
+        confirmText={t('Delete Batch')}
+        desc={
+          <div className='space-y-2'>
+            <p>
+              {deletion?.batch.name} · #{deletion?.batch.id}
+            </p>
+            <p>
+              {t(
+                'Codes: {{total}} total, {{used}} used, {{unused}} unused, {{disabled}} disabled',
+                {
+                  total: deletion?.total,
+                  used: deletion?.used,
+                  unused: deletion?.unused,
+                  disabled: deletion?.disabled,
+                }
+              )}
+            </p>
+            <p>
+              {t(
+                'Related records: {{orders}} orders, {{balance}} balance entries, {{finance}} finance events, {{rewards}} rewards, {{approvals}} approval events',
+                {
+                  orders: deletion?.orders,
+                  balance: deletion?.balance_entries,
+                  finance: deletion?.finance_events,
+                  rewards: deletion?.rewards,
+                  approvals: deletion?.approval_events,
+                }
+              )}
+            </p>
+            <p>
+              {t(
+                'The batch will be archived and hidden. Unused codes will stop working. Used codes, orders and accounting history will be retained.'
+              )}
+            </p>
+            {deletion?.blocked ? (
+              <p className='text-destructive'>
+                {t(
+                  'This batch is current product delivery evidence. Replace and review the evidence before deleting it.'
+                )}
+              </p>
+            ) : null}
+          </div>
+        }
       />
     </div>
   )

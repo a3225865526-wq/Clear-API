@@ -310,7 +310,7 @@ func DeleteInvalidRedemptions() (int64, error) {
 	now := common.GetTimestamp()
 	query := DB.Where("status IN ? OR (status = ? AND expired_time != 0 AND expired_time < ?)", []int{common.RedemptionCodeStatusUsed, common.RedemptionCodeStatusDisabled}, common.RedemptionCodeStatusEnabled, now)
 	if DB.Migrator().HasTable(&RedemptionBatch{}) {
-		query = query.Where("batch_id IS NULL OR batch_id NOT IN (?)", DB.Model(&RedemptionBatch{}).Select("id").Where("product_id <> ?", ""))
+		query = query.Where("batch_id IS NULL OR batch_id NOT IN (?)", DB.Model(&RedemptionBatch{}).Select("id").Where("product_id <> ? OR status = ?", "", RedemptionBatchStatusArchived))
 	}
 	result := query.
 		Where("id NOT IN (SELECT redemption_id FROM offline_order_codes)").Delete(&Redemption{})
@@ -345,7 +345,7 @@ func rejectStoreBatchCodeChanges(ids []int) error {
 	}
 	var count int64
 	err := DB.Model(&Redemption{}).Where("id IN ?", ids).
-		Where("batch_id IN (?)", DB.Model(&RedemptionBatch{}).Select("id").Where("product_id <> ?", "")).Count(&count).Error
+		Where("batch_id IN (?)", DB.Model(&RedemptionBatch{}).Select("id").Where("product_id <> ? OR status = ?", "", RedemptionBatchStatusArchived)).Count(&count).Error
 	if err != nil {
 		return err
 	}

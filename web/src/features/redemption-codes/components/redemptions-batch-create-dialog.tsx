@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -28,6 +28,7 @@ import { Label } from '@/components/ui/label'
 import { formatCnyCents, parseCnyToCents } from '@/features/wallet/lib/money'
 import { handleServerError } from '@/lib/handle-server-error'
 import { ROLE } from '@/lib/roles'
+import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { createRedemptionBatch } from '../api'
@@ -58,6 +59,8 @@ export function RedemptionsBatchCreateDialog(
   const [evidenceOnly, setEvidenceOnly] = useState(false)
   const root = useAuthStore((s) => s.auth.user?.role === ROLE.SUPER_ADMIN)
   const [submitting, setSubmitting] = useState(false)
+  const submitPending = useRef(false)
+  const [errorMessage, setErrorMessage] = useState('')
 
   const reset = () => {
     setName('')
@@ -71,12 +74,14 @@ export function RedemptionsBatchCreateDialog(
   }
 
   const handleSubmit = async () => {
+    if (submitPending.current) return
+    setErrorMessage('')
     const faceValueCents = parseCnyToCents(faceValue)
     if (faceValueCents === null) {
       toast.error(t('Enter a valid CNY amount with up to 2 decimals'))
       return
     }
-    const parsedCount = Number.parseInt(count, 10)
+    const parsedCount = Number(count)
     if (
       !Number.isInteger(parsedCount) ||
       parsedCount < 1 ||
@@ -87,11 +92,26 @@ export function RedemptionsBatchCreateDialog(
       )
       return
     }
+    const parsedRevision = Number(revision)
+    if (
+      !productID.trim() ||
+      !name.trim() ||
+      !Number.isSafeInteger(parsedRevision) ||
+      parsedRevision < 1
+    ) {
+      setErrorMessage(
+        t(
+          'Use the catalog product ID and current revision, not a legacy product number or approval record ID.'
+        )
+      )
+      return
+    }
     const expiredTime = expiredDate
       ? Math.floor(new Date(`${expiredDate}T23:59:59`).getTime() / 1000)
       : 0
 
     try {
+      submitPending.current = true
       setSubmitting(true)
       const response = await createRedemptionBatch({
         name: name.trim(),
@@ -100,7 +120,7 @@ export function RedemptionsBatchCreateDialog(
         expired_time: expiredTime,
         note: note.trim(),
         product_id: productID.trim(),
-        product_revision: Number(revision),
+        product_revision: parsedRevision,
         evidence_only: evidenceOnly,
       })
       if (response.success && response.data) {
@@ -113,11 +133,18 @@ export function RedemptionsBatchCreateDialog(
         reset()
         props.onCreated(response.data.batch.id, response.data.keys.length)
       } else {
-        handleServerError(response, t('Failed to create batch'))
+        const message = t(response.message || 'Failed to create batch')
+        setErrorMessage(message)
+        handleServerError(response, undefined, { title: message })
       }
     } catch (error) {
-      handleServerError(error, t('Failed to create batch'))
+      const message = t(
+        getServerErrorMessage(error, t('Failed to create batch'))
+      )
+      setErrorMessage(message)
+      handleServerError(error, undefined, { title: message })
     } finally {
+      submitPending.current = false
       setSubmitting(false)
     }
   }
@@ -125,7 +152,12 @@ export function RedemptionsBatchCreateDialog(
   return (
     <Dialog
       open={props.open}
-      onOpenChange={props.onOpenChange}
+      onOpenChange={(open) => {
+        if (!submitPending.current) {
+          setErrorMessage('')
+          props.onOpenChange(open)
+        }
+      }}
       title={t('Create Store Batch')}
       contentClassName='sm:max-w-md'
       bodyClassName='space-y-4'
@@ -144,6 +176,16 @@ export function RedemptionsBatchCreateDialog(
         </div>
       }
     >
+      {errorMessage ? (
+        <p role='alert' className='text-destructive text-sm'>
+          {errorMessage}
+        </p>
+      ) : null}
+      <p className='text-muted-foreground text-xs'>
+        {t(
+          'Use the catalog product ID and current revision, not a legacy product number or approval record ID.'
+        )}
+      </p>
       <Label>
         {t('Product ID')}
         <Input

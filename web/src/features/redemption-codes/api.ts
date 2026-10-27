@@ -28,6 +28,7 @@ import type {
   GetRedemptionBatchesResponse,
   CreateRedemptionBatchRequest,
   CreateRedemptionBatchResponse,
+  RedemptionBatchDeletion,
 } from './types'
 
 // ============================================================================
@@ -117,7 +118,9 @@ export async function getRedemptionBatches(
   p: number,
   page_size: number
 ): Promise<GetRedemptionBatchesResponse> {
-  const res = await api.get(`/api/redemption/batches?p=${p}&page_size=${page_size}`)
+  const res = await api.get(
+    `/api/redemption/batches?p=${p}&page_size=${page_size}`
+  )
   return res.data
 }
 
@@ -139,5 +142,19 @@ export async function disableRedemptionBatch(
   id: number
 ): Promise<ApiResponse<number>> {
   const res = await api.post(`/api/redemption/batches/${id}/disable`)
+  return res.data
+}
+
+export async function inspectRedemptionBatchDeletion(
+  id: number
+): Promise<ApiResponse<RedemptionBatchDeletion>> {
+  const res = await api.get(`/api/redemption/batches/${id}/deletion`)
+  return res.data
+}
+
+export async function archiveRedemptionBatch(
+  id: number
+): Promise<ApiResponse<RedemptionBatchDeletion>> {
+  const res = await api.delete(`/api/redemption/batches/${id}`)
   return res.data
 }
