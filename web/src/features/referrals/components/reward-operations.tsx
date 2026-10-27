@@ -71,7 +71,7 @@ export function RewardOperations() {
       <h3 className='font-semibold'>{t('Paid code reward qualification')}</h3>
       <p className='text-muted-foreground text-sm'>
         {t(
-          'Only mark verified paid Legacy codes. Historical, free, test and compensation codes are excluded by default. Used codes cannot be requalified.'
+          'New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.'
         )}
       </p>
       <form

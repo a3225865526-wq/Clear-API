@@ -223,10 +223,31 @@ func CalculateReferralReward(quota int64, cfg ReferralConfig) (int64, error) {
 	return amount, nil
 }
 
-// Called only from the successful Legacy redemption transaction. No history scan.
+// Store eligibility uses frozen issuance facts, not the current product revision.
+// Evidence samples and orphaned/mismatched codes can never earn sale rewards.
+func storeCodeAllowsReferral(tx *gorm.DB, code *Redemption) (bool, error) {
+	if code.BatchId <= 0 || code.FaceValueCents <= 0 || code.Quota <= 0 || code.Type != RedemptionTypeBalance {
+		return false, nil
+	}
+	var count int64
+	err := tx.Model(&RedemptionBatch{}).Where("id = ? AND source = ? AND type = ? AND evidence_only = ? AND face_value_cents = ? AND quota = ?",
+		code.BatchId, RedemptionSourceStore, RedemptionTypeBalance, false, code.FaceValueCents, code.Quota).Count(&count).Error
+	return count == 1, err
+}
+
+// Called only inside a successful redemption transaction. No history scan.
 func queueReferralReward(tx *gorm.DB, code *Redemption, userID int, cfg ReferralConfig) error {
-	if !cfg.RewardsEnabled || code.ReferralKind != "paid" || code.Quota <= 0 ||
-		(code.Source != RedemptionSourceLegacy && code.Source != RedemptionSourceAdmin) {
+	if !cfg.RewardsEnabled || code.ReferralKind != "paid" || code.Quota <= 0 {
+		return nil
+	}
+	switch code.Source {
+	case RedemptionSourceStore:
+		eligible, err := storeCodeAllowsReferral(tx, code)
+		if err != nil || !eligible {
+			return err
+		}
+	case RedemptionSourceLegacy, RedemptionSourceAdmin:
+	default:
 		return nil
 	}
 	var invitee, inviter User
@@ -398,9 +419,26 @@ func SetRedemptionReferralKind(ids []int, kind, reason string, actor int) error 
 			return errors.New("code not found")
 		}
 		for _, code := range codes {
-			if code.Status == common.RedemptionCodeStatusUsed || code.Type != RedemptionTypeBalance ||
-				(code.Source != RedemptionSourceLegacy && code.Source != RedemptionSourceAdmin) {
-				return errors.New("only unused Legacy balance codes can be qualified")
+			if code.Status == common.RedemptionCodeStatusUsed || code.Type != RedemptionTypeBalance {
+				return errors.New("only unused balance codes can be qualified")
+			}
+			switch code.Source {
+			case RedemptionSourceStore:
+				if code.Status != common.RedemptionCodeStatusEnabled || (code.ExpiredTime != 0 && code.ExpiredTime < common.GetTimestamp()) {
+					return errors.New("only active unused store codes can be qualified")
+				}
+				if kind == "paid" {
+					eligible, err := storeCodeAllowsReferral(tx, &code)
+					if err != nil {
+						return err
+					}
+					if !eligible {
+						return errors.New("store evidence samples and mismatched codes cannot earn rewards")
+					}
+				}
+			case RedemptionSourceLegacy, RedemptionSourceAdmin:
+			default:
+				return errors.New("unsupported code source for reward qualification")
 			}
 		}
 		if err := tx.Model(&Redemption{}).Where("id IN ?", ids).Update("referral_kind", kind).Error; err != nil {

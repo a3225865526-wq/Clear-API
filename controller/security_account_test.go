@@ -1057,6 +1057,7 @@ func TestVerifiedRegistrationConcurrentProofHasOneWinner(t *testing.T) {
 
 func TestVerifiedRegistrationReferralBindingRequiresProofAndCannotBeReplaced(t *testing.T) {
 	engine := setupVerifiedRegistrationTest(t)
+	model.InitColumnQuotingForTest()
 	require.NoError(t, model.DB.AutoMigrate(&model.Option{}, &model.ReferralReward{}, &model.ReferralLedger{}, &model.ReferralAudit{}))
 	require.NoError(t, model.InitReferralConfig())
 	inviter := model.User{Username: "referral-owner", AffCode: "stable-referral-code", Status: common.UserStatusEnabled}

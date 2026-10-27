@@ -76,7 +76,7 @@ func computeVipBonusQuota(baseQuota int, bonusBasisPoints int) (int, error) {
 
 // RedeemStoreCode 商城卡密兑换：锁码 → 校验 → 锁用户 → 充值前 VIP →
 // 一次 creditTopUpQuota(base+bonus) → CAS 翻码 → 累计充值(仅面额) →
-// 写账本 → 提交。锁顺序固定为 Redemption → User，与其它路径不得反转。
+// 写账本及邀请奖励队列 → 提交。锁顺序固定为 ReferralConfig → Redemption → User。
 func RedeemStoreCode(key string, userId int) (result *StoreRedeemResult, err error) {
 	if key == "" {
 		return nil, errors.New("未提供兑换码")
@@ -95,6 +95,10 @@ func RedeemStoreCode(key string, userId int) (result *StoreRedeemResult, err err
 	}
 	common.RandomSleep()
 	err = DB.Transaction(func(tx *gorm.DB) error {
+		cfg, err := readReferralConfig(tx, true)
+		if err != nil {
+			return err
+		}
 		if err := lockForUpdate(tx).Where(keyCol+" = ?", key).First(redemption).Error; err != nil {
 			return errors.New("兑换码无效")
 		}
@@ -226,7 +230,7 @@ func RedeemStoreCode(key string, userId int) (result *StoreRedeemResult, err err
 			VIPBonusBasisPoints: bonusBasisPoints,
 			NewVIPName:          newVIPName,
 		}
-		return nil
+		return queueReferralReward(tx, redemption, userId, cfg)
 	})
 	if err != nil {
 		if errors.Is(err, ErrStoreRechargeDisabled) {

@@ -1,5 +1,6 @@
 {
   "translation": {
+    "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "Новые коды товарного запаса автоматически помечаются как платные. Образцы поставки, бесплатные, тестовые и компенсационные коды не приносят наград. Перед назначением статуса существующим кодам подтвердите их назначение для платной продажи. Использованные коды нельзя переквалифицировать.",
     "The product catalog changed. Reload the page and try again.": "Каталог изменился. Обновите страницу и повторите попытку.",
     "Activation cancelled. The saved draft is retained.": "Активация отменена. Сохранённый черновик сохранён.",
     "Advanced settings": "Расширенные настройки",

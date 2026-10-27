@@ -1,5 +1,6 @@
 {
   "translation": {
+    "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "新產生的正式商城庫存自動標記為付費碼。交付樣碼、免費碼、測試碼與補償碼不發獎勵。既有庫存須核實付費銷售用途後設定資格，已兌換碼不可重新設定。",
     "The product catalog changed. Reload the page and try again.": "商品設定已更新，請重新整理頁面後再試。",
     "Activation cancelled. The saved draft is retained.": "已取消啟用，保留已儲存的草稿。",
     "Advanced settings": "進階設定",

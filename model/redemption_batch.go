@@ -243,6 +243,10 @@ func createRedemptionBatch(db *gorm.DB, input CreateRedemptionBatchInput) (*Rede
 				return err
 			}
 		}
+		referralKind := "paid" // Formal storefront inventory is issued for sale.
+		if batch.EvidenceOnly {
+			referralKind = "test"
+		}
 		for range input.Count {
 			code := &Redemption{
 				UserId:         input.AdminUserID,
@@ -256,6 +260,7 @@ func createRedemptionBatch(db *gorm.DB, input CreateRedemptionBatchInput) (*Rede
 				FaceValueCents: input.FaceValueCents,
 				Type:           RedemptionTypeBalance,
 				Source:         RedemptionSourceStore,
+				ReferralKind:   referralKind,
 			}
 			// SQL traces and driver errors can contain the newly issued key.
 			if err := tx.Session(&gorm.Session{Logger: tx.Logger.LogMode(logger.Silent)}).Create(code).Error; err != nil {

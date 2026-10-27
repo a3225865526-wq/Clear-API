@@ -166,7 +166,7 @@ it('loads eight persisted products and saves sorting and descriptions through th
       currency: 'CNY',
       revision: 1,
       state: 'draft',
-      base_quota: 0,
+      base_quota: 500000,
       evidence_batch_id: 0,
     })),
   }
@@ -181,7 +181,7 @@ it('loads eight persisted products and saves sorting and descriptions through th
   const description = screen.getAllByLabelText('Description')[0]
   await userEvent.clear(description)
   await userEvent.type(description, 'Verified description')
-  await userEvent.click(screen.getByRole('button', { name: 'Save products' }))
+  await userEvent.click(screen.getByRole('button', { name: 'Save drafts' }))
   await waitFor(() =>
     expect(put).toHaveBeenCalledWith(
       '/api/clearapi/credit-catalog',
@@ -191,7 +191,7 @@ it('loads eight persisted products and saves sorting and descriptions through th
             description: 'Verified description',
             revision: 1,
             state: 'draft',
-            base_quota: 0,
+            base_quota: 500000,
             evidence_batch_id: 0,
             published: false,
             delivery_verified: false,
@@ -217,7 +217,7 @@ it('saves a new product as a draft with exact quota and no approval', async () =
   const quota = screen.getByLabelText('Base API quota')
   await user.clear(quota)
   await user.type(quota, '500001')
-  await user.click(screen.getByRole('button', { name: 'Save products' }))
+  await user.click(screen.getByRole('button', { name: 'Save drafts' }))
   await waitFor(() =>
     expect(put).toHaveBeenCalledWith(
       '/api/clearapi/credit-catalog',

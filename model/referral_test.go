@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -55,11 +56,11 @@ func referralFixture(t *testing.T) (int, int) {
 		initCol()
 	})
 	// Dedicated, disposable database only, never a caller's production DSN.
-	for _, table := range []any{&CreditApprovalEvent{}, &RedemptionBatch{}, &StoreProduct{}, &ReferralLedger{}, &ReferralReward{}, &ReferralAudit{}, &Option{}, &Redemption{}, &User{}, &Log{}} {
+	for _, table := range []any{&BalanceTransaction{}, &VIPLevel{}, &CreditApprovalEvent{}, &RedemptionBatch{}, &StoreProduct{}, &ReferralLedger{}, &ReferralReward{}, &ReferralAudit{}, &Option{}, &Redemption{}, &User{}, &Log{}} {
 		require.NoError(t, db.Migrator().DropTable(table))
 	}
 	for range 2 {
-		require.NoError(t, db.AutoMigrate(&User{}, &Redemption{}, &Option{}, &ReferralReward{}, &ReferralLedger{}, &ReferralAudit{}, &Log{}))
+		require.NoError(t, db.AutoMigrate(&User{}, &Redemption{}, &Option{}, &ReferralReward{}, &ReferralLedger{}, &ReferralAudit{}, &Log{}, &BalanceTransaction{}, &VIPLevel{}, &RedemptionBatch{}, &CreditApprovalEvent{}, &StoreProduct{}))
 	}
 	require.NoError(t, InitReferralConfig())
 	require.NoError(t, InitCreditCatalog())
@@ -390,4 +391,205 @@ func TestReferralCatalogValidationAndImmutableRelations(t *testing.T) {
 	_, err = Redeem(c.Key, b)
 	require.NoError(t, err)
 	require.Error(t, SetRedemptionReferralKind([]int{c.Id}, "paid", "cannot rewrite used code", a))
+}
+
+func referralStoreCode(t *testing.T, name, kind string, evidence bool) Redemption {
+	t.Helper()
+	batch := RedemptionBatch{Name: name, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, FaceValueCents: 1000, Quota: 5000000, Count: 1, Status: RedemptionBatchStatusEnabled, EvidenceOnly: evidence}
+	require.NoError(t, DB.Create(&batch).Error)
+	code := Redemption{Name: name, Key: name, Source: RedemptionSourceStore, Type: RedemptionTypeBalance, Status: common.RedemptionCodeStatusEnabled, FaceValueCents: batch.FaceValueCents, Quota: batch.Quota, BatchId: batch.Id, ReferralKind: kind}
+	require.NoError(t, DB.Create(&code).Error)
+	return code
+}
+
+func TestReferralStoreIssuanceAndQualification(t *testing.T) {
+	a, _ := referralFixture(t)
+	require.NoError(t, PrepareCreditCatalog())
+	product := creditApprovalProduct(t, "referral-store", 100)
+	var sample Redemption
+	require.NoError(t, DB.Where("batch_id = ?", product.EvidenceBatchID).First(&sample).Error)
+	assert.Equal(t, "test", sample.ReferralKind)
+	require.Error(t, SetRedemptionReferralKind([]int{sample.Id}, "paid", "exclude actual delivery sample", a))
+	creditApprovalAction(t, product.ID, "submit")
+	creditApprovalAction(t, product.ID, "approve")
+	creditApprovalAction(t, product.ID, "publish")
+	batch, keys, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "formal-sale", FaceValueCents: 100, Count: 2, AdminUserID: 7, ProductID: product.ID, ProductRevision: product.Revision})
+	require.NoError(t, err)
+	require.Len(t, keys, 2)
+	var codes []Redemption
+	require.NoError(t, DB.Where("batch_id = ?", batch.Id).Order("id").Find(&codes).Error)
+	require.Len(t, codes, 2)
+	for _, code := range codes {
+		assert.Equal(t, "paid", code.ReferralKind)
+	}
+	// Existing inventory needs explicit audited qualification. A mixed request
+	// containing evidence must leave every code unchanged.
+	require.NoError(t, DB.Model(&codes[0]).Update("referral_kind", "").Error)
+	require.Error(t, SetRedemptionReferralKind([]int{codes[0].Id, sample.Id}, "paid", "user confirmed paid-sale purpose", a))
+	require.NoError(t, DB.First(&codes[0], codes[0].Id).Error)
+	assert.Empty(t, codes[0].ReferralKind)
+	require.NoError(t, SetRedemptionReferralKind([]int{codes[0].Id}, "paid", "user confirmed paid-sale purpose", a))
+	require.NoError(t, SetRedemptionReferralKind([]int{codes[0].Id}, "paid", "safe retry of paid qualification", a))
+	require.NoError(t, DB.First(&codes[0], codes[0].Id).Error)
+	assert.Equal(t, "paid", codes[0].ReferralKind)
+	var audit ReferralAudit
+	require.NoError(t, DB.Where("action = ?", "qualification").First(&audit).Error)
+	assert.Contains(t, audit.Details, "user confirmed paid-sale purpose")
+	assert.NotContains(t, audit.Details, codes[0].Key)
+	require.NoError(t, DB.Model(&codes[0]).Update("status", common.RedemptionCodeStatusUsed).Error)
+	require.Error(t, SetRedemptionReferralKind([]int{codes[0].Id}, "paid", "must not requalify redeemed code", a))
+	for _, change := range []map[string]any{
+		{"status": common.RedemptionCodeStatusDisabled},
+		{"status": common.RedemptionCodeStatusEnabled, "expired_time": common.GetTimestamp() - 60},
+		{"expired_time": 0, "quota": batch.Quota + 1},
+	} {
+		require.NoError(t, DB.Model(&codes[1]).Updates(change).Error)
+		require.Error(t, SetRedemptionReferralKind([]int{codes[1].Id}, "paid", "invalid store inventory rejected", a))
+	}
+}
+
+func TestReferralStoreRedemptionAndPayoutAreIdempotent(t *testing.T) {
+	a, b := referralFixture(t)
+	priorFlag := operation_setting.StoreRechargeEnabled
+	operation_setting.StoreRechargeEnabled = true
+	t.Cleanup(func() { operation_setting.StoreRechargeEnabled = priorFlag })
+	seedStoreVIPLevels(t)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", b).Update("total_recharge_cents", 60000).Error)
+	cfg, err := GetReferralConfig()
+	require.NoError(t, err)
+	cfg.RewardsEnabled = true
+	require.NoError(t, SaveReferralConfig(cfg, a))
+	code := referralStoreCode(t, "paid-store-duplicate", "paid", false)
+	var wg sync.WaitGroup
+	results := make(chan error, 4)
+	for range 4 {
+		wg.Go(func() { _, err := RedeemStoreCode(code.Key, b); results <- err })
+	}
+	wg.Wait()
+	close(results)
+	successes := 0
+	for err := range results {
+		if err == nil {
+			successes++
+		}
+	}
+	assert.Equal(t, 1, successes)
+	var reward ReferralReward
+	require.NoError(t, DB.Where("redemption_id = ?", code.Id).First(&reward).Error)
+	assert.EqualValues(t, 5000000, reward.SourceQuota)
+	assert.EqualValues(t, 500000, reward.RewardQuota, "VIP bonus is excluded")
+	for range 2 {
+		wg.Go(func() { _ = PayReferralReward(reward.ID) })
+	}
+	wg.Wait()
+	require.NoError(t, PayReferralReward(reward.ID))
+	var inviter, buyer User
+	require.NoError(t, DB.First(&inviter, a).Error)
+	require.NoError(t, DB.First(&buyer, b).Error)
+	assert.Equal(t, 500000, inviter.Quota)
+	assert.EqualValues(t, 500000, inviter.ReferralPaidQuota)
+	assert.Equal(t, 5100000, buyer.Quota)
+	assert.EqualValues(t, 61000, buyer.TotalRechargeCents)
+	for _, table := range []any{&ReferralReward{}, &ReferralLedger{}} {
+		var count int64
+		require.NoError(t, DB.Model(table).Count(&count).Error)
+		assert.EqualValues(t, 1, count)
+	}
+	var entries []BalanceTransaction
+	require.NoError(t, DB.Where("user_id = ?", b).Order("id").Find(&entries).Error)
+	require.Len(t, entries, 2)
+	assert.Equal(t, 5000000, entries[0].AmountQuota)
+	assert.Equal(t, 100000, entries[1].AmountQuota)
+}
+
+func TestReferralStoreEligibilityAndAtomicQueue(t *testing.T) {
+	a, b := referralFixture(t)
+	priorFlag := operation_setting.StoreRechargeEnabled
+	operation_setting.StoreRechargeEnabled = true
+	t.Cleanup(func() { operation_setting.StoreRechargeEnabled = priorFlag })
+	cfg, err := GetReferralConfig()
+	require.NoError(t, err)
+	cfg.RewardsEnabled = true
+	require.NoError(t, SaveReferralConfig(cfg, a))
+	for _, tc := range []struct {
+		name     string
+		kind     string
+		evidence bool
+		inviter  int
+		change   func(*Redemption)
+	}{
+		{"unqualified", "", false, a, nil},
+		{"free", "free", false, a, nil},
+		{"test", "test", false, a, nil},
+		{"compensation", "compensation", false, a, nil},
+		{"sample-even-if-paid", "paid", true, a, nil},
+		{"unbound", "paid", false, a, func(c *Redemption) { c.BatchId = 0 }},
+		{"mismatch", "paid", false, a, func(c *Redemption) { c.Quota++ }},
+		{"no-inviter", "paid", false, 0, nil},
+		{"self-invite", "paid", false, b, nil},
+		{"missing-inviter", "paid", false, 99999, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code := referralStoreCode(t, tc.name, tc.kind, tc.evidence)
+			if tc.change != nil {
+				tc.change(&code)
+				require.NoError(t, DB.Save(&code).Error)
+			}
+			require.NoError(t, DB.Model(&User{}).Where("id = ?", b).Update("inviter_id", tc.inviter).Error)
+			_, err := RedeemStoreCode(code.Key, b)
+			require.NoError(t, err, "ineligible rewards must not prevent normal redemption")
+			var count int64
+			require.NoError(t, DB.Model(&ReferralReward{}).Count(&count).Error)
+			assert.Zero(t, count)
+		})
+	}
+	code := referralStoreCode(t, "disabled-inviter", "paid", false)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", b).Update("inviter_id", a).Error)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", a).Update("status", common.UserStatusDisabled).Error)
+	_, err = RedeemStoreCode(code.Key, b)
+	require.NoError(t, err)
+	var rewardCount int64
+	require.NoError(t, DB.Model(&ReferralReward{}).Count(&rewardCount).Error)
+	assert.Zero(t, rewardCount)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", a).Update("status", common.UserStatusEnabled).Error)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", b).Updates(map[string]any{"inviter_id": a, "quota": 0, "total_recharge_cents": 0}).Error)
+	require.NoError(t, DB.Where("user_id = ?", b).Delete(&BalanceTransaction{}).Error)
+	code = referralStoreCode(t, "queue-rollback", "paid", false)
+	require.NoError(t, DB.Callback().Create().Before("gorm:create").Register("store-referral-queue-failure", func(tx *gorm.DB) {
+		if tx.Statement.Table == "referral_rewards" {
+			tx.AddError(fmt.Errorf("isolated reward queue failure"))
+		}
+	}))
+	t.Cleanup(func() { _ = DB.Callback().Create().Remove("store-referral-queue-failure") })
+	_, err = RedeemStoreCode(code.Key, b)
+	require.Error(t, err)
+	require.NoError(t, DB.Callback().Create().Remove("store-referral-queue-failure"))
+	var buyer User
+	require.NoError(t, DB.First(&buyer, b).Error)
+	assert.Zero(t, buyer.Quota)
+	assert.Zero(t, buyer.TotalRechargeCents)
+	require.NoError(t, DB.First(&code, code.Id).Error)
+	assert.Equal(t, common.RedemptionCodeStatusEnabled, code.Status)
+	var count int64
+	require.NoError(t, DB.Model(&BalanceTransaction{}).Where("user_id = ?", b).Count(&count).Error)
+	assert.Zero(t, count)
+	require.NoError(t, DB.Model(&ReferralReward{}).Count(&count).Error)
+	assert.Zero(t, count)
+	// A disabled gate still accepts the recharge, without backfilling on enable.
+	cfg, err = GetReferralConfig()
+	require.NoError(t, err)
+	cfg.RewardsEnabled = false
+	require.NoError(t, SaveReferralConfig(cfg, a))
+	_, err = RedeemStoreCode(code.Key, b)
+	require.NoError(t, err)
+	require.NoError(t, DB.Model(&ReferralReward{}).Count(&count).Error)
+	assert.Zero(t, count)
+	cfg, err = GetReferralConfig()
+	require.NoError(t, err)
+	cfg.RewardsEnabled = true
+	require.NoError(t, SaveReferralConfig(cfg, a))
+	_, err = RedeemStoreCode(code.Key, b)
+	require.Error(t, err)
+	require.NoError(t, DB.Model(&ReferralReward{}).Count(&count).Error)
+	assert.Zero(t, count)
 }
