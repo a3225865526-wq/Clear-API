@@ -377,6 +377,7 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.GET("/", controller.GetAllRedemptions)
 			redemptionRoute.GET("/search", controller.SearchRedemptions)
 			redemptionRoute.GET("/batches", controller.GetAllRedemptionBatches)
+			redemptionRoute.GET("/batches/products", controller.GetRedemptionBatchProducts)
 			redemptionRoute.POST("/batches", controller.AddRedemptionBatch)
 			redemptionRoute.GET("/batches/:id/codes", controller.GetRedemptionBatchCodes)
 			redemptionRoute.POST("/batches/:id/disable", controller.DisableRedemptionBatch)

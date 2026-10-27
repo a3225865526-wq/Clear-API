@@ -24,6 +24,7 @@ export interface CreditProduct {
   credit_cents: number
   purchase_url: string
   published: boolean
+  archived?: boolean
   delivery_verified: boolean
   sort: number
   currency?: 'CNY'

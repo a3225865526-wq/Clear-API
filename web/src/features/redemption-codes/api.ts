@@ -29,6 +29,7 @@ import type {
   CreateRedemptionBatchRequest,
   CreateRedemptionBatchResponse,
   RedemptionBatchDeletion,
+  RedemptionBatchProduct,
 } from './types'
 
 // ============================================================================
@@ -121,6 +122,13 @@ export async function getRedemptionBatches(
   const res = await api.get(
     `/api/redemption/batches?p=${p}&page_size=${page_size}`
   )
+  return res.data
+}
+
+export async function getRedemptionBatchProducts(): Promise<
+  ApiResponse<RedemptionBatchProduct[]>
+> {
+  const res = await api.get('/api/redemption/batches/products')
   return res.data
 }
 

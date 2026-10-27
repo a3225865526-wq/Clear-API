@@ -33,6 +33,18 @@ export type ProductReview = {
   product: CreditProduct
   digest: string
   confirmation: string
+  deletion?: {
+    batches: number
+    codes: number
+    used_codes: number
+    orders: number
+    balance_entries: number
+    finance_events: number
+    cash_receipts: number
+    rewards: number
+    events: number
+    can_delete: boolean
+  }
   events: {
     id: number
     actor_id: number

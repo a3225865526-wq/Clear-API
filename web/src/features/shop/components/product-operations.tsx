@@ -31,6 +31,7 @@ import { formatCnyCents } from '@/features/wallet/lib/money'
 import { toIntlLocale } from '@/i18n/languages'
 import { formatNumber } from '@/lib/format'
 import { ROLE } from '@/lib/roles'
+import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import {
@@ -111,6 +112,7 @@ export function ProductOperations(props: {
     ? `${decision.toUpperCase()} ${review.confirmation}${mappingSuffix}`
     : ''
   const disabled = !root || props.disabled || mutation.isPending
+  const contractDisabled = disabled || !!product.archived
   if (!root) return null
   return (
     <div className='space-y-3 sm:col-span-2'>
@@ -128,7 +130,7 @@ export function ProductOperations(props: {
           type='button'
           variant='outline'
           disabled={
-            disabled ||
+            contractDisabled ||
             !['draft', 'rejected', 'revoked'].includes(product.state ?? 'draft')
           }
           onClick={() => mutation.mutate('submit')}
@@ -148,7 +150,7 @@ export function ProductOperations(props: {
         </Button>
         <Button
           type='button'
-          disabled={disabled || product.state !== 'approved'}
+          disabled={contractDisabled || product.state !== 'approved'}
           onClick={() => {
             setDecision('publish')
             inspect.mutate(product.id)
@@ -159,7 +161,7 @@ export function ProductOperations(props: {
         <Button
           type='button'
           variant='outline'
-          disabled={disabled || product.state !== 'published'}
+          disabled={contractDisabled || product.state !== 'published'}
           onClick={() => {
             setDecision('unpublish')
             inspect.mutate(product.id)
@@ -171,7 +173,8 @@ export function ProductOperations(props: {
           type='button'
           variant='destructive'
           disabled={
-            disabled || !['approved', 'published'].includes(product.state ?? '')
+            contractDisabled ||
+            !['approved', 'published'].includes(product.state ?? '')
           }
           onClick={() => {
             setDecision('revoke')
@@ -179,6 +182,28 @@ export function ProductOperations(props: {
           }}
         >
           {t('Revoke approval')}
+        </Button>
+        <Button
+          type='button'
+          variant='outline'
+          disabled={disabled}
+          onClick={() => {
+            setDecision(product.archived ? 'restore' : 'archive')
+            inspect.mutate(product.id)
+          }}
+        >
+          {product.archived ? t('Restore product') : t('Archive product')}
+        </Button>
+        <Button
+          type='button'
+          variant='destructive'
+          disabled={disabled}
+          onClick={() => {
+            setDecision('inspect')
+            inspect.mutate(product.id)
+          }}
+        >
+          {t('Delete permanently')}
         </Button>
       </div>
       <Label className='block'>
@@ -193,7 +218,7 @@ export function ProductOperations(props: {
         type='button'
         variant='outline'
         disabled={
-          disabled ||
+          contractDisabled ||
           !Number.isSafeInteger(Number(legacyID)) ||
           Number(legacyID) <= 0
         }
@@ -204,7 +229,13 @@ export function ProductOperations(props: {
       >
         {t('Map legacy product')}
       </Button>
-      {mutation.isError || inspect.isError ? <ErrorState /> : null}
+      {mutation.isError || inspect.isError ? (
+        <ErrorState
+          description={t(
+            getServerErrorMessage(mutation.error || inspect.error)
+          )}
+        />
+      ) : null}
       <SecureVerificationDialog {...verification.dialogProps} />
       <RiskAcknowledgementDialog
         open={
@@ -235,6 +266,47 @@ export function ProductOperations(props: {
                 {review.product.delivery_evidence} · {t('Evidence batch ID')}:{' '}
                 {review.product.evidence_batch_id}
               </p>
+              {['archive', 'restore'].includes(decision) ? (
+                <p>
+                  {t(
+                    'Archiving stops public sales and preserves history. Restoring does not publish the product or bypass approval.'
+                  )}
+                </p>
+              ) : null}
+              {review.deletion ? (
+                <div className='space-y-2'>
+                  <p>
+                    {t(
+                      'Product history: {{batches}} batches, {{codes}} codes, {{orders}} orders, {{balance}} balance entries, {{events}} revision and approval events',
+                      {
+                        batches: formatNumber(review.deletion.batches, locale),
+                        codes: formatNumber(review.deletion.codes, locale),
+                        orders: formatNumber(review.deletion.orders, locale),
+                        balance: formatNumber(
+                          review.deletion.balance_entries,
+                          locale
+                        ),
+                        events: formatNumber(review.deletion.events, locale),
+                      }
+                    )}
+                  </p>
+                  <p>
+                    {t(
+                      'Only an unpublished initial draft without revision, approval, evidence, inventory or financial history can be permanently deleted.'
+                    )}
+                  </p>
+                  {decision === 'inspect' ? (
+                    <Button
+                      type='button'
+                      variant='destructive'
+                      disabled={!review.deletion.can_delete}
+                      onClick={() => setDecision('delete')}
+                    >
+                      {t('Permanently delete this product')}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
               <p>
                 {t(stateLabels[review.product.state ?? 'draft'])} →{' '}
                 {decision === 'inspect'

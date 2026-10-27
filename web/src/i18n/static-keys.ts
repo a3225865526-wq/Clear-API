@@ -19,6 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 // Static translation keys that don't get picked up by the t('...') regex.
 // These cover dynamic labels (e.g. constants, configs) that are passed into t at runtime.
 export const STATIC_I18N_KEYS = [
+  'archive',
+  'restore',
+  'delete',
+  'Restore the archived product before editing it.',
+  'This product ID was permanently deleted. Choose a new ID.',
+  'This product has revision, approval, evidence or financial history. Archive it instead.',
   'Invalid batch fields. Check the product ID, revision, amount, quantity and expiry.',
   'Failed to create batch. Please contact an administrator with the request time.',
   'Product not found. Use the approved catalog product ID, not the legacy product number.',

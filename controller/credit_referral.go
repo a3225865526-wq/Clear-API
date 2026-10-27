@@ -114,7 +114,7 @@ func ResolveCreditPurchase(c *gin.Context) {
 func ChangeCreditProductState(c *gin.Context) {
 	permission := authz.StoreReview
 	switch c.Param("action") {
-	case "map":
+	case "map", "archive", "restore", "delete":
 		permission = authz.StoreEdit
 	case "publish", "unpublish":
 		permission = authz.StorePublish
@@ -168,6 +168,9 @@ func ChangeCreditProductState(c *gin.Context) {
 	if err != nil {
 		common.ApiError(c, err)
 		return
+	}
+	if action := c.Param("action"); action == "archive" || action == "restore" || action == "delete" {
+		recordManageAudit(c, "store.product_"+action, map[string]any{"id": c.Param("id"), "revision": req.Revision})
 	}
 	common.ApiSuccess(c, nil)
 }

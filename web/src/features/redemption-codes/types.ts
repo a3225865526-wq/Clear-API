@@ -103,9 +103,25 @@ export interface RedemptionBatch {
   created_by: number
   created_time: number
   updated_time: number
+  product_id?: string
+  product_revision?: number
+  approval_id?: number
   used_count: number
   unused_count: number
   disabled_count: number
+}
+
+export interface RedemptionBatchProduct {
+  id: string
+  name: string
+  revision: number
+  price_cents: number
+  base_quota: number
+  evidence_batch_id: number
+  delivery_binding: string
+  state: string
+  stock_ready: boolean
+  sample_ready: boolean
 }
 
 export interface GetRedemptionBatchesResponse {

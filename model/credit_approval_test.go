@@ -3,6 +3,7 @@ package model
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -63,7 +64,7 @@ func creditApprovalFixture(t *testing.T) {
 	}
 	require.NoError(t, db.Raw(query).Scan(&version).Error)
 	t.Logf("%s %s", db.Dialector.Name(), version)
-	for _, table := range []any{&OfflineOrderCode{}, &OfflineOrder{}, &BalanceTransaction{}, &FinanceSyncEvent{}, &ReferralReward{}, &Log{}, &User{}, &CreditApprovalEvent{}, &Option{}, &StoreProduct{}, &RedemptionBatch{}, &Redemption{}} {
+	for _, table := range []any{&FinanceCashReceipt{}, &OfflineOrderCode{}, &OfflineOrder{}, &BalanceTransaction{}, &FinanceSyncEvent{}, &ReferralReward{}, &Log{}, &User{}, &CreditApprovalEvent{}, &Option{}, &StoreProduct{}, &RedemptionBatch{}, &Redemption{}} {
 		require.NoError(t, db.Migrator().DropTable(table))
 	}
 	for range 2 {
@@ -568,6 +569,134 @@ func TestCreditDeliveryEvidenceRecovery(t *testing.T) {
 	assert.Equal(t, "approve", approval.Decision)
 	assert.Equal(t, product.Revision, approval.Revision)
 	assert.Equal(t, product.EvidenceBatchID, approval.EvidenceBatchID)
+}
+
+func TestCreditProductMultipleBatchesAndArchive(t *testing.T) {
+	creditApprovalFixture(t)
+	p := creditApprovalProduct(t, "lifecycle", 100)
+	creditApprovalAction(t, p.ID, "submit")
+	creditApprovalAction(t, p.ID, "approve")
+	creditApprovalAction(t, p.ID, "publish")
+	before, err := GetCreditCatalog()
+	require.NoError(t, err)
+	review, err := GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	p = review.Product
+	choices, err := GetRedemptionBatchProducts()
+	require.NoError(t, err)
+	for _, choice := range choices {
+		if choice.ID == p.ID {
+			assert.True(t, choice.StockReady)
+			assert.False(t, choice.SampleReady)
+			assert.Equal(t, p.BaseQuota, choice.BaseQuota)
+		}
+	}
+	var issued []RedemptionBatch
+	for i, count := range []int{2, 3} {
+		batch, keys, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: fmt.Sprintf("independent-%d", i), FaceValueCents: p.PriceCents, Count: count, ExpiredTime: int64(i) * (common.GetTimestamp() + 86400), ProductID: p.ID, ProductRevision: p.Revision, AdminUserID: 7})
+		require.NoError(t, err)
+		assert.Len(t, keys, count)
+		assert.Equal(t, p.ApprovalID, batch.ApprovalID)
+		assert.Equal(t, p.DeliveryBinding, batch.DeliveryBinding)
+		assert.Equal(t, p.Revision, batch.ProductRevision)
+		assert.Equal(t, p.BaseQuota, batch.Quota)
+		issued = append(issued, *batch)
+	}
+	after, err := GetCreditCatalog()
+	require.NoError(t, err)
+	assert.Equal(t, before, after, "stock issuance must not create a new revision or approval")
+	require.NoError(t, DB.AutoMigrate(&OfflineOrder{}, &OfflineOrderCode{}, &BalanceTransaction{}, &FinanceSyncEvent{}, &FinanceCashReceipt{}))
+	var code Redemption
+	require.NoError(t, DB.Where("batch_id = ?", issued[0].Id).First(&code).Error)
+	require.NoError(t, DB.Model(&code).Updates(map[string]any{"status": common.RedemptionCodeStatusUsed, "used_user_id": 99, "redeemed_time": common.GetTimestamp()}).Error)
+	order := OfflineOrder{OrderNo: "retained-product-order", Status: OfflineOrderPaid}
+	require.NoError(t, DB.Create(&order).Error)
+	require.NoError(t, DB.Create(&OfflineOrderCode{OrderID: order.Id, RedemptionID: code.Id}).Error)
+	require.NoError(t, DB.Create(&BalanceTransaction{ReferenceType: BalanceTxReferenceRedemption, ReferenceId: code.Id, AmountQuota: code.Quota}).Error)
+	require.NoError(t, DB.Create(&FinanceSyncEvent{EventKey: "lifecycle-finance", Topic: "offline_redemption", RefID: int64(code.Id)}).Error)
+	require.NoError(t, DB.Create(&FinanceCashReceipt{OrderID: order.Id, AmountCNY: "1"}).Error)
+	review, err = GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	assert.False(t, review.Deletion.CanDelete)
+	assert.EqualValues(t, 1, review.Deletion.UsedCodes)
+	assert.EqualValues(t, 1, review.Deletion.Orders)
+	assert.EqualValues(t, 1, review.Deletion.BalanceEntries)
+	assert.EqualValues(t, 1, review.Deletion.CashReceipts)
+	assert.EqualValues(t, 1, review.Deletion.FinanceEvents)
+	creditApprovalAction(t, p.ID, "archive")
+	review, err = GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	assert.True(t, review.Product.Archived)
+	choices, err = GetRedemptionBatchProducts()
+	require.NoError(t, err)
+	for _, choice := range choices {
+		assert.NotEqual(t, p.ID, choice.ID)
+	}
+	assert.EqualValues(t, 1, review.Deletion.Orders)
+	assert.EqualValues(t, 1, review.Deletion.BalanceEntries)
+	assert.EqualValues(t, 1, review.Deletion.UsedCodes)
+	assert.EqualValues(t, 1, review.Deletion.CashReceipts)
+	assert.False(t, review.Product.Published)
+	assert.Equal(t, p.Revision, review.Product.Revision)
+	assert.Equal(t, p.ApprovalID, review.Product.ApprovalID)
+	assert.Equal(t, p.BaseQuota, review.Product.BaseQuota)
+	assert.Equal(t, p.PriceCents, review.Product.PriceCents)
+	current, err := GetCreditCatalog()
+	require.NoError(t, err)
+	for i := range current.Products {
+		if current.Products[i].ID == p.ID {
+			current.Products[i].Archived = false
+		}
+	}
+	require.ErrorContains(t, SaveCreditCatalog(current, 7), "dedicated approval")
+	err = ChangeCreditProductState(p.ID, current.Version, p.Revision, "delete", "DELETE "+review.Confirmation, 7)
+	require.ErrorContains(t, err, "Archive it instead")
+	public, err := GetPublicCreditCatalog()
+	require.NoError(t, err)
+	for _, item := range public.Products {
+		assert.NotEqual(t, p.ID, item.ID)
+	}
+	_, _, err = CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "archived-stock", FaceValueCents: p.PriceCents, Count: 1, ProductID: p.ID, ProductRevision: p.Revision, AdminUserID: 7})
+	require.ErrorContains(t, err, "archived")
+	creditApprovalAction(t, p.ID, "restore")
+	review, err = GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	assert.False(t, review.Product.Archived)
+	assert.False(t, review.Product.Published, "restore must not resume sales")
+	creditApprovalAction(t, p.ID, "publish")
+	creditApprovalAction(t, p.ID, "archive")
+	_, err = DisableRedemptionBatchById(p.EvidenceBatchID)
+	require.NoError(t, err)
+	creditApprovalAction(t, p.ID, "restore")
+	current, err = GetCreditCatalog()
+	require.NoError(t, err)
+	review, err = GetCreditProductReview(p.ID)
+	require.NoError(t, err)
+	require.Error(t, ChangeCreditProductState(p.ID, current.Version, p.Revision, "publish", "PUBLISH "+review.Confirmation, 7))
+	assert.False(t, review.Product.Published)
+	require.NoError(t, DB.First(&order, order.Id).Error)
+	var retained Redemption
+	require.NoError(t, DB.First(&retained, code.Id).Error)
+	assert.Equal(t, common.RedemptionCodeStatusUsed, retained.Status)
+	assert.Equal(t, 99, retained.UsedUserId)
+}
+
+func TestCreditProductPermanentDeleteInitialDraft(t *testing.T) {
+	creditApprovalFixture(t)
+	review, err := GetCreditProductReview("credit-5")
+	require.NoError(t, err)
+	require.True(t, review.Deletion.CanDelete)
+	catalog, err := GetCreditCatalog()
+	require.NoError(t, err)
+	require.NoError(t, ChangeCreditProductState("credit-5", catalog.Version, review.Product.Revision, "delete", "DELETE "+review.Confirmation, 7))
+	_, err = GetCreditProductReview("credit-5")
+	require.Error(t, err)
+	var audit CreditApprovalEvent
+	require.NoError(t, DB.Where("product_id = ? AND decision = ?", "credit-5", "delete").First(&audit).Error)
+	catalog, err = GetCreditCatalog()
+	require.NoError(t, err)
+	catalog.Products = append(catalog.Products, review.Product)
+	require.ErrorContains(t, SaveCreditCatalog(catalog, 7), "permanently deleted")
 }
 
 func TestCreditApprovalSampleLifetimeAndConcurrency(t *testing.T) {

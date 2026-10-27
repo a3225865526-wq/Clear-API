@@ -152,6 +152,9 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 					if product.ID != input.ProductID {
 						continue
 					}
+					if product.Archived {
+						return errors.New("Restore the archived product before editing it.")
+					}
 					if product.Revision != input.ProductRevision || product.PriceCents != input.FaceValueCents {
 						return errors.New("product revision or price mismatch")
 					}

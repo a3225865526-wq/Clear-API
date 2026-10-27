@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -25,13 +25,17 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { formatCnyCents, parseCnyToCents } from '@/features/wallet/lib/money'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { formatCnyCents } from '@/features/wallet/lib/money'
+import { toIntlLocale } from '@/i18n/languages'
+import { formatNumber } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { ROLE } from '@/lib/roles'
 import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
-import { createRedemptionBatch } from '../api'
+import { createRedemptionBatch, getRedemptionBatchProducts } from '../api'
+import type { RedemptionBatchProduct } from '../types'
 
 interface RedemptionsBatchCreateDialogProps {
   open: boolean
@@ -48,28 +52,61 @@ interface RedemptionsBatchCreateDialogProps {
 export function RedemptionsBatchCreateDialog(
   props: RedemptionsBatchCreateDialogProps
 ) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   const [name, setName] = useState('')
-  const [faceValue, setFaceValue] = useState('')
   const [count, setCount] = useState('100')
   const [expiredDate, setExpiredDate] = useState('')
   const [note, setNote] = useState('')
   const [productID, setProductID] = useState('')
-  const [revision, setRevision] = useState('')
+  const [products, setProducts] = useState<RedemptionBatchProduct[]>([])
+  const [loadingProducts, setLoadingProducts] = useState(false)
   const [evidenceOnly, setEvidenceOnly] = useState(false)
   const root = useAuthStore((s) => s.auth.user?.role === ROLE.SUPER_ADMIN)
   const [submitting, setSubmitting] = useState(false)
   const submitPending = useRef(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const selectedProduct = products.find((p) => p.id === productID)
+  const eligibleProduct =
+    selectedProduct &&
+    (evidenceOnly ? selectedProduct.sample_ready : selectedProduct.stock_ready)
+
+  useEffect(() => {
+    if (!props.open) return
+    let active = true
+    setLoadingProducts(true)
+    void getRedemptionBatchProducts()
+      .then((response) => {
+        if (!active) return
+        if (!response.success || !response.data) {
+          setProducts([])
+          setErrorMessage(
+            t(response.message || 'Failed to load batch products')
+          )
+          return
+        }
+        setProducts(response.data)
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        setProducts([])
+        setErrorMessage(t('Failed to load batch products'))
+        handleServerError(error)
+      })
+      .finally(() => {
+        if (active) setLoadingProducts(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [props.open, t])
 
   const reset = () => {
     setName('')
-    setFaceValue('')
     setCount('100')
     setExpiredDate('')
     setNote('')
     setProductID('')
-    setRevision('')
     setEvidenceOnly(false)
   }
 
@@ -86,9 +123,12 @@ export function RedemptionsBatchCreateDialog(
       )
       return
     }
-    const faceValueCents = parseCnyToCents(faceValue)
-    if (faceValueCents === null) {
-      toast.error(t('Enter a valid CNY amount with up to 2 decimals'))
+    if (!eligibleProduct || !selectedProduct) {
+      setErrorMessage(
+        t(
+          'Select a product revision with valid approval and delivery evidence.'
+        )
+      )
       return
     }
     const parsedCount = Number(count)
@@ -102,19 +142,6 @@ export function RedemptionsBatchCreateDialog(
       )
       return
     }
-    const parsedRevision = Number(revision)
-    if (
-      !productID.trim() ||
-      !Number.isSafeInteger(parsedRevision) ||
-      parsedRevision < 1
-    ) {
-      setErrorMessage(
-        t(
-          'Use the catalog product ID and current revision, not a legacy product number or approval record ID.'
-        )
-      )
-      return
-    }
     const expiredTime = expiredDate
       ? Math.floor(new Date(`${expiredDate}T23:59:59`).getTime() / 1000)
       : 0
@@ -124,12 +151,12 @@ export function RedemptionsBatchCreateDialog(
       setSubmitting(true)
       const response = await createRedemptionBatch({
         name: name.trim(),
-        face_value_cents: faceValueCents,
+        face_value_cents: selectedProduct.price_cents,
         count: parsedCount,
         expired_time: expiredTime,
         note: note.trim(),
-        product_id: productID.trim(),
-        product_revision: parsedRevision,
+        product_id: selectedProduct.id,
+        product_revision: selectedProduct.revision,
         evidence_only: evidenceOnly,
       })
       if (response.success && response.data) {
@@ -179,7 +206,10 @@ export function RedemptionsBatchCreateDialog(
           >
             {t('Cancel')}
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={submitting || loadingProducts || !eligibleProduct}
+          >
             {submitting ? t('Creating...') : t('Create')}
           </Button>
         </div>
@@ -192,23 +222,45 @@ export function RedemptionsBatchCreateDialog(
       ) : null}
       <p className='text-muted-foreground text-xs'>
         {t(
-          'Use the catalog product ID and current revision, not a legacy product number or approval record ID.'
+          'An approved revision can supply multiple batches. Face value and quota remain fixed; batch name, quantity and expiry are independent.'
         )}
       </p>
       <Label>
         {t('Product ID')}
-        <Input
+        <NativeSelect
+          aria-label={t('Product ID')}
           value={productID}
           onChange={(e) => setProductID(e.target.value)}
-        />
+          disabled={loadingProducts || submitting}
+        >
+          <NativeSelectOption value=''>
+            {t('Select a product')}
+          </NativeSelectOption>
+          {products.map((p) => (
+            <NativeSelectOption
+              key={p.id}
+              value={p.id}
+              disabled={evidenceOnly ? !p.sample_ready : !p.stock_ready}
+            >
+              {p.name} · {p.id} @ {p.revision}
+              {(evidenceOnly ? !p.sample_ready : !p.stock_ready)
+                ? ` · ${t('Unavailable')}`
+                : ''}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
       </Label>
+      {!loadingProducts &&
+      !products.some((p) => (evidenceOnly ? p.sample_ready : p.stock_ready)) ? (
+        <p role='status' className='text-muted-foreground text-sm'>
+          {t(
+            'No eligible product revisions. Review the product and its delivery evidence.'
+          )}
+        </p>
+      ) : null}
       <Label>
         {t('Approved product revision')}
-        <Input
-          inputMode='numeric'
-          value={revision}
-          onChange={(e) => setRevision(e.target.value)}
-        />
+        <Input value={selectedProduct?.revision ?? ''} readOnly />
       </Label>
       {root ? (
         <Label>
@@ -216,6 +268,7 @@ export function RedemptionsBatchCreateDialog(
             checked={evidenceOnly}
             onCheckedChange={(value) => {
               setEvidenceOnly(value === true)
+              setProductID('')
               if (value) setCount('1')
             }}
           />
@@ -237,22 +290,31 @@ export function RedemptionsBatchCreateDialog(
           <Label htmlFor='batch-face'>{t('Face Value (CNY)')}</Label>
           <Input
             id='batch-face'
-            value={faceValue}
-            onChange={(event) => setFaceValue(event.target.value)}
-            placeholder='100.00'
-            inputMode='decimal'
+            value={
+              selectedProduct ? formatCnyCents(selectedProduct.price_cents) : ''
+            }
+            readOnly
           />
         </div>
         <div className='space-y-1.5'>
           <Label htmlFor='batch-count'>{t('Count')}</Label>
           <Input
             id='batch-count'
+            disabled={evidenceOnly || submitting}
             value={count}
             onChange={(event) => setCount(event.target.value)}
             inputMode='numeric'
           />
         </div>
       </div>
+      {selectedProduct ? (
+        <p className='text-muted-foreground text-xs'>
+          {t('Base API quota')}:{' '}
+          {formatNumber(selectedProduct.base_quota, locale)} ·{' '}
+          {t('Evidence batch ID')}: {selectedProduct.evidence_batch_id} ·{' '}
+          {selectedProduct.delivery_binding}
+        </p>
+      ) : null}
       <div className='space-y-1.5'>
         <Label htmlFor='batch-expiry'>{t('Expires At')}</Label>
         <Input

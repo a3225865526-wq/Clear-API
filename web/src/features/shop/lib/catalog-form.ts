@@ -29,6 +29,7 @@ export const productSchema = z
     credit_cents: z.number().int().nonnegative().max(1000000000),
     purchase_url: z.string(),
     published: z.boolean(),
+    archived: z.boolean().optional(),
     delivery_verified: z.boolean(),
     sort: z.number().int(),
     currency: z.literal('CNY').optional(),

@@ -25,6 +25,16 @@ func GetAllRedemptionBatches(c *gin.Context) {
 	common.ApiSuccess(c, pageInfo)
 }
 
+func GetRedemptionBatchProducts(c *gin.Context) {
+	products, err := model.GetRedemptionBatchProducts()
+	if err != nil {
+		common.SysError("failed to load batch products: " + err.Error())
+		common.ApiErrorMsg(c, "Failed to load batch products")
+		return
+	}
+	common.ApiSuccess(c, products)
+}
+
 // AddRedemptionBatch 创建商城批次并一次性生成全部码（单事务）。审计只记录
 // 数量与面额，绝不记录兑换码原文。
 func AddRedemptionBatch(c *gin.Context) {
@@ -79,6 +89,8 @@ func AddRedemptionBatch(c *gin.Context) {
 			message = "Product delivery evidence is unavailable, disabled, expired or inconsistent. Review the delivery evidence before creating stock."
 		case "batch name already exists for this product":
 			message = "A batch with this name already exists for this product. Refresh the list before retrying."
+		case "Restore the archived product before editing it.":
+			message = err.Error()
 		case "evidence sample requires one code bound to a draft revision", "delivery evidence sample requires a draft in preparation mode", "sample already issued for this product revision", "sample batch already exists for this product revision":
 			message = "A delivery sample requires one code for a draft revision in preparation mode, and may only be issued once per revision."
 		}

@@ -35,10 +35,11 @@ type CreditApprovalEvent struct {
 }
 
 type CreditProductReview struct {
-	Product      CreditProduct         `json:"product"`
-	Digest       string                `json:"digest"`
-	Confirmation string                `json:"confirmation"`
-	Events       []CreditApprovalEvent `json:"events"`
+	Product      CreditProduct          `json:"product"`
+	Digest       string                 `json:"digest"`
+	Confirmation string                 `json:"confirmation"`
+	Events       []CreditApprovalEvent  `json:"events"`
+	Deletion     *CreditProductDeletion `json:"deletion,omitempty"`
 }
 
 func validCreditProductState(state string) bool {
@@ -224,15 +225,22 @@ func SaveCreditProductDrafts(in CreditCatalog, actor int) error {
 			}
 			old, exists := previous[p.ID]
 			if !exists {
-				if p.Published || p.DeliveryVerified || p.ApprovalID != 0 || p.LegacyStoreID != 0 || p.LegacyWithdrawn || (p.State != "" && p.State != "draft") {
+				if p.Archived || p.Published || p.DeliveryVerified || p.ApprovalID != 0 || p.LegacyStoreID != 0 || p.LegacyWithdrawn || (p.State != "" && p.State != "draft") {
 					return errors.New("use dedicated approval operations")
+				}
+				var deleted int64
+				if err := tx.Model(&CreditApprovalEvent{}).Where("product_id = ? AND decision = ?", p.ID, "delete").Count(&deleted).Error; err != nil {
+					return err
+				}
+				if deleted != 0 {
+					return errors.New("This product ID was permanently deleted. Choose a new ID.")
 				}
 				p.Currency, p.Revision, p.State, p.EditedBy = "CNY", 1, "draft", actor
 			} else {
 				if p.Revision != old.Revision {
 					return errors.New("product revision changed")
 				}
-				if p.Published != old.Published || p.DeliveryVerified != old.DeliveryVerified || p.State != old.State || p.ApprovalID != old.ApprovalID || p.LegacyStoreID != old.LegacyStoreID || p.LegacyWithdrawn != old.LegacyWithdrawn {
+				if p.Archived != old.Archived || p.Published != old.Published || p.DeliveryVerified != old.DeliveryVerified || p.State != old.State || p.ApprovalID != old.ApprovalID || p.LegacyStoreID != old.LegacyStoreID || p.LegacyWithdrawn != old.LegacyWithdrawn {
 					return errors.New("use dedicated approval operations")
 				}
 				p.EditedBy = old.EditedBy
@@ -245,6 +253,9 @@ func SaveCreditProductDrafts(in CreditCatalog, actor int) error {
 					return err
 				}
 				if a != b {
+					if old.Archived {
+						return errors.New("Restore the archived product before editing it.")
+					}
 					p.Revision, p.State, p.EditedBy = old.Revision+1, "draft", actor
 					p.ApprovalID, p.Published, p.DeliveryVerified = 0, false, false
 				}
@@ -381,6 +392,9 @@ func GetCreditProductReview(id string) (*CreditProductReview, error) {
 		}
 		review := &CreditProductReview{Product: p, Digest: digest, Confirmation: fmt.Sprintf("%s@%d:%s", p.ID, p.Revision, digest), Events: []CreditApprovalEvent{}}
 		err = DB.Where("product_id = ?", id).Order("id").Find(&review.Events).Error
+		if err == nil {
+			review.Deletion, err = inspectCreditProductDeletion(DB, c, p)
+		}
 		return review, err
 	}
 	return nil, errors.New("product not found")
@@ -407,6 +421,12 @@ func ChangeCreditProductState(id string, version, revision int64, action, confir
 			if p.Revision != revision {
 				return errors.New("product revision changed")
 			}
+			if p.Archived && action != "restore" && action != "delete" && action != "archive" {
+				return errors.New("Restore the archived product before editing it.")
+			}
+			if (action == "archive" && p.Archived) || (action == "restore" && !p.Archived) {
+				return nil
+			}
 			if action != "submit" {
 				digest, err := CreditProductDigest(*p)
 				if err != nil {
@@ -417,6 +437,26 @@ func ChangeCreditProductState(id string, version, revision int64, action, confir
 				}
 			}
 			switch action {
+			case "archive":
+				p.Archived, p.Published, p.LegacyWithdrawn = true, false, true
+				if p.State == "published" {
+					p.State = "approved"
+				}
+			case "restore":
+				p.Archived = false
+			case "delete":
+				deletion, err := inspectCreditProductDeletion(tx, c, *p)
+				if err != nil {
+					return err
+				}
+				if !deletion.CanDelete {
+					return errors.New("This product has revision, approval, evidence or financial history. Archive it instead.")
+				}
+				if _, err := appendCreditEvent(tx, *p, actor, action); err != nil {
+					return err
+				}
+				c.Products = slices.Delete(c.Products, i, i+1)
+				return persistCreditCatalog(tx, row, c)
 			case "submit":
 				if p.State != "draft" && p.State != "rejected" && p.State != "revoked" {
 					return errors.New("cannot submit this state")
@@ -519,6 +559,9 @@ func MapLegacyCreditProduct(id string, version, revision int64, legacyID int, ac
 			if p.ID != id {
 				continue
 			}
+			if p.Archived {
+				return errors.New("Restore the archived product before editing it.")
+			}
 			if p.Revision != revision || p.PriceCents != legacy.FaceValueCents || p.PurchaseURL != legacy.StoreUrl {
 				return errors.New("explicit mapping fields or revision mismatch")
 			}
@@ -544,6 +587,9 @@ func effectiveCreditProducts(tx *gorm.DB, c CreditCatalog) ([]CreditProduct, err
 		return nil, errors.New("credit approvals not prepared")
 	}
 	for _, p := range c.Products {
+		if p.Archived {
+			continue
+		}
 		if p.State == "approved" {
 			if err := validateCreditApprovalRecord(tx, p); err != nil {
 				return nil, err

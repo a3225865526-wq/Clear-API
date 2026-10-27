@@ -33,6 +33,9 @@ func TestStoreProductProofBindsReviewAndRejectsOtherActions(t *testing.T) {
 	_, err = verifySecurityProof(proof, identity, binding)
 	require.NoError(t, err)
 	for _, changed := range []StoreProductOperationContext{
+		{ProductID: "one", Revision: 2, Version: 4, Action: "archive", Digest: context.Digest},
+		{ProductID: "one", Revision: 2, Version: 4, Action: "restore", Digest: context.Digest},
+		{ProductID: "one", Revision: 2, Version: 4, Action: "delete", Digest: context.Digest},
 		{ProductID: "two", Revision: 2, Version: 4, Action: "approve", Digest: context.Digest},
 		{ProductID: "one", Revision: 3, Version: 4, Action: "approve", Digest: context.Digest},
 		{ProductID: "one", Revision: 2, Version: 5, Action: "approve", Digest: context.Digest},

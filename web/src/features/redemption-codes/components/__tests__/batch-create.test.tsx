@@ -23,9 +23,30 @@ import { describe, expect, it, vi } from 'vitest'
 import { RedemptionsBatchCreateDialog } from '../redemptions-batch-create-dialog'
 
 const create = vi.hoisted(() => vi.fn())
-vi.mock('../../api', () => ({ createRedemptionBatch: create }))
+const products = vi.hoisted(() => vi.fn())
+vi.mock('../../api', () => ({
+  createRedemptionBatch: create,
+  getRedemptionBatchProducts: products,
+}))
 
 async function fill(count = '100') {
+  products.mockResolvedValue({
+    success: true,
+    data: [
+      {
+        id: 'credit-1',
+        name: 'API credit',
+        revision: 4,
+        price_cents: 100,
+        base_quota: 500000,
+        evidence_batch_id: 3,
+        delivery_binding: 'qmcse2',
+        state: 'published',
+        stock_ready: true,
+        sample_ready: false,
+      },
+    ],
+  })
   const user = userEvent.setup()
   render(
     <RedemptionsBatchCreateDialog
@@ -35,10 +56,18 @@ async function fill(count = '100') {
       onCreated={vi.fn()}
     />
   )
-  await user.type(screen.getByLabelText('Product ID'), 'credit-1')
-  await user.type(screen.getByLabelText('Approved product revision'), '4')
+  await screen.findByRole('option', { name: /API credit/ })
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Product ID' }),
+    'credit-1'
+  )
+  expect(screen.getByLabelText('Approved product revision')).toHaveValue('4')
+  expect(screen.getByLabelText('Approved product revision')).toHaveAttribute(
+    'readonly'
+  )
   await user.type(screen.getByLabelText('Batch Name'), 'stock')
-  await user.type(screen.getByLabelText('Face Value (CNY)'), '1')
+  expect(screen.getByLabelText('Face Value (CNY)')).toHaveValue('¥1.00')
+  expect(screen.getByLabelText('Face Value (CNY)')).toHaveAttribute('readonly')
   const quantity = screen.getByLabelText('Count')
   await user.clear(quantity)
   await user.type(quantity, count)
@@ -46,6 +75,38 @@ async function fill(count = '100') {
 }
 
 describe('batch creation', () => {
+  it('keeps draft revisions unavailable for normal stock creation', async () => {
+    products.mockResolvedValue({
+      success: true,
+      data: [
+        {
+          id: 'credit-1',
+          name: 'Draft credit',
+          revision: 5,
+          price_cents: 100,
+          base_quota: 500000,
+          evidence_batch_id: 4,
+          delivery_binding: 'qmcse2',
+          state: 'draft',
+          stock_ready: false,
+          sample_ready: true,
+        },
+      ],
+    })
+    render(
+      <RedemptionsBatchCreateDialog
+        open
+        onOpenChange={vi.fn()}
+        maxCount={100}
+        onCreated={vi.fn()}
+      />
+    )
+    expect(
+      await screen.findByRole('option', { name: /Draft credit/ })
+    ).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled()
+    expect(create).not.toHaveBeenCalled()
+  })
   it('explains the name length error before submitting an empty name', async () => {
     const user = await fill()
     await user.clear(screen.getByLabelText('Batch Name'))

@@ -24,6 +24,7 @@ type CreditProduct struct {
 	CreditCents      int64  `json:"credit_cents"`
 	PurchaseURL      string `json:"purchase_url"`
 	Published        bool   `json:"published"`
+	Archived         bool   `json:"archived,omitempty"`
 	DeliveryVerified bool   `json:"delivery_verified"`
 	Sort             int    `json:"sort"`
 	Currency         string `json:"currency"`
@@ -92,6 +93,9 @@ func (c CreditCatalog) Validate() error {
 			return errors.New("invalid product revision or currency")
 		}
 		if c.ApprovalSchema == 1 {
+			if p.Archived && p.Published {
+				return errors.New("archived products cannot be published")
+			}
 			if p.State == "approved" || p.State == "published" {
 				if p.ApprovalID <= 0 || !p.DeliveryVerified || p.Published != (p.State == "published") {
 					return errors.New("invalid approved product declaration")

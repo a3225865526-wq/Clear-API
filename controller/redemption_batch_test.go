@@ -110,9 +110,31 @@ func TestDeleteRedemptionBatch(t *testing.T) {
 			router.GET("/api/redemption/batches/:id/deletion", middleware.AdminAuth(), InspectRedemptionBatchDeletion)
 			router.DELETE("/api/redemption/batches/:id", middleware.AdminAuth(), ArchiveRedemptionBatch)
 			router.POST("/api/redemption/batches", middleware.AdminAuth(), AddRedemptionBatch)
+			router.POST("/api/clearapi/credit-catalog/products/:id/:action", middleware.RootAuth(), ChangeCreditProductState)
 			ordinaryToken := "batch-permission-ordinary-fixture"
 			ordinary := model.User{Username: "batch-ordinary", AffCode: "batch-ordinary", Role: common.RoleCommonUser, Status: common.UserStatusEnabled, AccessToken: &ordinaryToken}
 			require.NoError(t, db.Create(&ordinary).Error)
+			rootToken := "product-root-permission-fixture"
+			root := model.User{Username: "product-root", AffCode: "product-root", Role: common.RoleRootUser, Status: common.UserStatusEnabled, AccessToken: &rootToken}
+			require.NoError(t, db.Create(&root).Error)
+			for _, action := range []string{"archive", "restore", "delete"} {
+				for _, credential := range []string{"", ordinaryToken, token, rootToken} {
+					request := httptest.NewRequest(http.MethodPost, "/api/clearapi/credit-catalog/products/one/"+action, bytes.NewBufferString("{}"))
+					if credential != "" {
+						request.Header.Set("Authorization", "Bearer "+credential)
+					}
+					response := httptest.NewRecorder()
+					router.ServeHTTP(response, request)
+					if credential == "" {
+						assert.Equal(t, http.StatusUnauthorized, response.Code)
+					} else {
+						assert.Equal(t, http.StatusForbidden, response.Code)
+					}
+					if credential == rootToken {
+						assert.Contains(t, response.Body.String(), "live dashboard session")
+					}
+				}
+			}
 			for _, route := range []struct{ method, path string }{
 				{http.MethodGet, "/api/redemption/batches/1/deletion"},
 				{http.MethodDelete, "/api/redemption/batches/1"},
