@@ -1,3 +1,16 @@
+## 2026-10-27 Asia/Shanghai — 商品启用表单提交串扰修复已部署，等待用户刷新重试
+
+- **生产版本：** 92fd2d6a7a241b9aab3bbf244563b6ff558f826b，2026-10-27 23:46:43 +08:00；前驱 821da2bbc。按既有 Windows 本地构建 → SSH → VPS helper，一次构建/部署，SUCCESS、health=PASS、rollback=false，仅更新 new-api；未推送或走 GitHub Actions/RC。
+- **根因：** 真实身份验证弹窗的 submit 经 React Portal 冒泡到商品表单，意外保存草稿并递增目录版本，使启用请求被后端并发保护拒绝。生产日志明确 catalog changed；证据批次4有效。上一版测试使用验证替身，遗漏此交互。本次只让商品表单处理自己的 submit，保留原验证、版本/摘要、权限与证据校验；不通过刷新版本重试绕过保护。
+- **错误提示：** 后端区分 STORE_CATALOG_CHANGED 和 STORE_AUTOMATIC_VALIDATION_FAILED，前端按稳定代码本地化，中文版本冲突提示准确且不泄露内部细节。七语言只新增一项文案。
+- **实测：** 真实验证 hook＋真实弹窗、仅mock HTTP的点击/Enter两例在修复前复现额外PUT，修复后额外PUT=0，身份验证和启用请求各一次。商品16项＋错误提示6项（含真实中文资源）共22项通过，正常保存草稿、controller SQLite权限回归、tsgo/lint/格式/差异检查通过。模型/SQL/事务/Schema没有变化，复用已通过三库验证，不重复矩阵。
+- **备份和产物：** 备份20261027T154422Z；OCI config ID sha256:df63125ed4549915a21ce092ff7dd388e175e49313eebb7f860c8e3cdaeb3289；包SHA256 66c911b8839c274e191de14dc8f5475750978da834b51cbb205eceee3eae1365。helper已核验备份、身份与回退条件，没有额外迁移。
+- **独立线上检查：** source_revision/镜像与候选相同，preflight healthy=true；公网状态与页面HTTP200，匿名选品HTTP401。credit-1@5部署前后相同，目录版本29、pending、未发布、approval_id=0、证据批次4；没有代点启用、发码、付款或兑换。PG03运行环境false；邀请奖励/D生图/历史账务未修改。
+- **用户后续：** Ctrl+F5强制刷新旧管理页，再点“保存并启用”并完成原身份验证。无需重建credit-1证据；实际生产启用是否成功仍待用户重试，不把部署健康写成业务验收。旧标签页在刷新前仍可能运行旧前端代码。
+- **证据：** D:/AI/API/runtime/product-activation-failure-20261027/RESULT.md、reproduce-form-submit.log、frontend-final.log、error-messages-final.log、controller.log、deployment.log、postflight.json。本节另作状态记录提交，不当作再次部署；应用版本固定92fd2d6a7。
+
+---
+
 ## 2026-10-27 Asia/Shanghai — “保存并启用”失败已复现并修复，准备部署补丁
 
 - 生产 Docker 日志明确记录 23:05:25、23:10:14、23:11:24 的 `catalog changed; reload before saving`；不是证据校验拒绝。23:12:57 只读快照为目录版本 29，credit-1@5=pending、证据批次 4 启用，售价/Quota/绑定未变。每次失败前出现内容未变的全目录 edit 审计；没有 auto_validate 或 activate 成功记录。
