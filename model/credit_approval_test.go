@@ -426,13 +426,24 @@ func TestCreditApprovalEvidenceIsolation(t *testing.T) {
 		{"null sample flag", map[string]any{"evidence_only": nil}},
 		{"null approval", map[string]any{"approval_id": nil}},
 		{"disabled batch", map[string]any{"status": RedemptionBatchStatusDisabled}},
+		{"expired batch", map[string]any{"expired_time": common.GetTimestamp() - 1}},
+		{"missing batch", map[string]any{"id": 999999}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			creditApprovalFixture(t)
 			p := creditApprovalProduct(t, "isolation", 100)
+			creditApprovalAction(t, p.ID, "submit")
+			creditApprovalAction(t, p.ID, "approve")
 			require.NoError(t, validateCreditDelivery(DB, p))
 			require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Updates(tc.changes).Error)
 			require.Error(t, validateCreditDelivery(DB, p))
+			batch, keys, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "rejected evidence stock", FaceValueCents: p.PriceCents, Count: 1, AdminUserID: 7, ProductID: p.ID, ProductRevision: p.Revision})
+			require.Error(t, err)
+			assert.Nil(t, batch)
+			assert.Nil(t, keys)
+			var issued int64
+			require.NoError(t, DB.Model(&RedemptionBatch{}).Where("name = ?", "rejected evidence stock").Count(&issued).Error)
+			assert.Zero(t, issued)
 		})
 	}
 	t.Run("revoked sales approval", func(t *testing.T) {
@@ -474,6 +485,89 @@ func TestCreditApprovalEvidenceIsolation(t *testing.T) {
 		p.ID = "another"
 		require.Error(t, validateCreditDelivery(DB, p))
 	})
+}
+
+func TestCreditDeliveryEvidenceRecovery(t *testing.T) {
+	creditApprovalFixture(t)
+	catalog, err := GetCreditCatalog()
+	require.NoError(t, err)
+	for i := range catalog.Products {
+		if catalog.Products[i].ID == "credit-1" {
+			catalog.Products[i].BaseQuota = 500000
+			catalog.Products[i].DeliveryBinding = "qmcse2"
+			catalog.Products[i].DeliveryEvidence = "isolated-delivery-fixture"
+			catalog.Products[i].PurchaseURL = LegacyCreditPurchaseURL
+		}
+	}
+	require.NoError(t, SaveCreditCatalog(catalog, 7))
+	product := creditApprovalSample(t, "credit-1")
+	creditApprovalAction(t, product.ID, "submit")
+	creditApprovalAction(t, product.ID, "approve")
+	creditApprovalAction(t, product.ID, "publish")
+	review, err := GetCreditProductReview(product.ID)
+	require.NoError(t, err)
+	product = review.Product
+	oldApproval := product.ApprovalID
+	// The compatibility projection deliberately has no current evidence.
+	var row Option
+	require.NoError(t, DB.Where(&Option{Key: CreditCatalogOptionKey}).First(&row).Error)
+	var stored CreditCatalog
+	require.NoError(t, common.UnmarshalJsonStr(row.Value, &stored))
+	assert.Zero(t, stored.Products[0].EvidenceBatchID)
+	assert.Equal(t, product.EvidenceBatchID, review.Product.EvidenceBatchID)
+	assert.Positive(t, review.Product.EvidenceBatchID)
+
+	_, err = DisableRedemptionBatchById(product.EvidenceBatchID)
+	require.NoError(t, err)
+	var frozenEvidence RedemptionBatch
+	require.NoError(t, DB.First(&frozenEvidence, product.EvidenceBatchID).Error)
+	input := CreateRedemptionBatchInput{Name: "recovery stock", FaceValueCents: product.PriceCents, Count: 1, AdminUserID: 7, ProductID: product.ID, ProductRevision: product.Revision}
+	_, _, err = CreateRedemptionBatch(input)
+	require.EqualError(t, err, "evidence batch does not match product promise")
+
+	// Existing draft save creates a new revision and invalidates its approval.
+	// This is an isolated rehearsal; no production evidence is written.
+	catalog, err = GetCreditCatalog()
+	require.NoError(t, err)
+	for i := range catalog.Products {
+		if catalog.Products[i].ID == product.ID {
+			catalog.Products[i].EvidenceBatchID = 0
+		}
+	}
+	require.NoError(t, SaveCreditCatalog(catalog, 7))
+	review, err = GetCreditProductReview(product.ID)
+	require.NoError(t, err)
+	assert.Equal(t, product.Revision+1, review.Product.Revision)
+	assert.Equal(t, "draft", review.Product.State)
+	assert.Zero(t, review.Product.ApprovalID)
+	assert.False(t, review.Product.Published)
+	assert.False(t, review.Product.DeliveryVerified)
+	require.EqualError(t, validateCreditDelivery(DB, review.Product), "verified batch and delivery references are required")
+	input.ProductRevision = review.Product.Revision
+	_, _, err = CreateRedemptionBatch(input)
+	require.EqualError(t, err, "invalid product approval state")
+	replacement := creditApprovalSample(t, product.ID)
+	assert.NotEqual(t, product.EvidenceBatchID, replacement.EvidenceBatchID)
+	require.NoError(t, validateCreditDelivery(DB, replacement))
+	_, _, err = CreateRedemptionBatch(input)
+	require.EqualError(t, err, "invalid product approval state", "a new sample cannot bypass approval")
+	creditApprovalAction(t, product.ID, "submit")
+	creditApprovalAction(t, product.ID, "approve")
+	creditApprovalAction(t, product.ID, "publish")
+	batch, keys, err := CreateRedemptionBatch(input)
+	require.NoError(t, err)
+	require.Len(t, keys, 1)
+	assert.Equal(t, product.BaseQuota, batch.Quota)
+	assert.Equal(t, product.DeliveryBinding, batch.DeliveryBinding)
+	assert.NotEqual(t, oldApproval, batch.ApprovalID)
+	var retained RedemptionBatch
+	require.NoError(t, DB.First(&retained, frozenEvidence.Id).Error)
+	assert.Equal(t, frozenEvidence, retained)
+	var approval CreditApprovalEvent
+	require.NoError(t, DB.First(&approval, oldApproval).Error)
+	assert.Equal(t, "approve", approval.Decision)
+	assert.Equal(t, product.Revision, approval.Revision)
+	assert.Equal(t, product.EvidenceBatchID, approval.EvidenceBatchID)
 }
 
 func TestCreditApprovalSampleLifetimeAndConcurrency(t *testing.T) {
