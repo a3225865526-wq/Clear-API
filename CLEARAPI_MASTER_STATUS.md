@@ -1,3 +1,13 @@
+## 2026-10-28 Asia/Shanghai — 10%邀请奖励开关已真实启用，旧库存资格待简化补录
+
+- 用户已保存并启用，独立生产只读核验production-after-user-enable.json确认invites_enabled=true、rewards_enabled=true、mode=percentage、basis_points=1000、version=2、epoch=1；单笔50000000/终身500000000 Quota上限保持，Root设置审计id4与该规则一致。开关启用已核验，不再列为未启用。
+- 资格分开核验：290张未用正式STORE码referral_kind仍为空，没有qualification审计；6张未用交付样码及3张已用样码未更改。invited_users/reward/ledger仍0，因此旧库存尚不参与返奖，真实返奖仍未生产验收。
+- 已部署源码确认新正式库存自动paid、EvidenceOnly样码test。逐码ID表单用于旧库存一次性补录及特殊分类，不是每次日常生成所需步骤。
+- 用户提出减少手工补录。建议旧正式库存自动核查、展示合格批次/数量、Root一次确认并保留审计；排除样码/免费/测试/补偿/已用/失效或不匹配数据，保留手工高级入口。已询问“一键处理全部合格旧库存”与“按商品/批次勾选”偏好，尚未实施该新界面或生产资格写入。
+- 当前应用78566eb495441f4e49344976dff176ef2bef4d91，PG03=false。仅只读核验和状态记录，没有新构建/部署、余额/资格写入或真实兑换。证据D:/AI/API/runtime/referral-settings-500-20261028/production-after-user-enable.json。
+
+---
+
 ## 2026-10-28 Asia/Shanghai — 用户确认邀请奖励管理员页面恢复，待资格与开关保存
 
 - 用户刷新生产78566eb49后明确回复“页面已恢复，能看到开关和保存按钮”。设置页渲染恢复已获真实用户验收；前条“页面待验收”状态据此更新。
