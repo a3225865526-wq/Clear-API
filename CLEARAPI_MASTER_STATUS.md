@@ -1,3 +1,13 @@
+## 2026-10-28 Asia/Shanghai — 邀请奖励设置空列表500补丁已部署，待Root页面与配置验收
+
+- 应用78566eb495441f4e49344976dff176ef2bef4d91，前驱37b844baf。既有Windows本地构建→SSH→VPS helper，最终success、health=PASS、rollback=false，仅更新new-api。备份20261027T234011Z，OCI config sha256:5306263d351b6084c10afab505275dcdcba4973c3ec87e1460f3bbdc96a4513c，包SHA256 47e84ec2c09ec404565d9e846030d0fbe039f066e22eb8c9e0a9b163d7d1f675；独立preflight/source/image匹配且healthy=true。
+- 根因不是管理员URL错误：空奖励汇总真实响应summary=null，前端map崩溃显示通用500。后端初始化空slice修正为[]，保持既有SQL、权限和资金逻辑。真实SQLite控制器先红后绿、Root权限2项PASS，前端7项PASS（空数据、取消不保存、确认后一次启用请求），类型/lint/format/gofmt/diff通过；无schema或计费变化，不重复上一版三库/资金验证。
+- 首次SSH传输被重置，生产保持健康前驱。残留接收进程在pipe_read且产物25分钟无增长，经精确PID/启动身份/候选/包hash/未完成大小/旧版健康核对，仅结束本任务中断接收进程，锁正常释放，残包保留；原helper曾正确拒绝持锁重试。复用同一产物重新传输且原备份/身份/健康流程全部执行，未重建/重测、未删锁/绕过保护或改变发布系统。
+- 部署后配置独立核对：rewards_enabled=false/version1，290张正式码资格空白，6张未用样码排除，invited_users/reward/ledger为0；PG03=false，无业务写入。已请Root在/system-settings/site/referral-rewards Ctrl+F5确认页面恢复并保存三组资格、原10%奖励开关及确认“继续”。当前不宣称页面已真实验收、奖励启用或真实返奖通过。
+- 全部复现、恢复回执、只读快照与实际验证见D:/AI/API/runtime/referral-settings-500-20261028/RESULT.md；现有库存三组ID清单仍为D:/AI/API/runtime/referral-store-20261028/ROOT_STEPS.md。无历史删除、磁盘清理、真实兑换、PG03或D功能变更。
+
+---
+
 ## 2026-10-28 Asia/Shanghai — 邀请奖励设置500根因复现并修复，本地通过待部署
 
 - 用户截图明确位于/system-settings/site/referral-rewards管理员地址。此前只检查接口GET200，遗漏了前端渲染异常；不能将200或用户页推测当作设置页面正常的证明。
