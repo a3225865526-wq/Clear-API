@@ -1,3 +1,12 @@
+## 2026-10-28 Asia/Shanghai — 用户确认邀请奖励管理员页面恢复，待资格与开关保存
+
+- 用户刷新生产78566eb49后明确回复“页面已恢复，能看到开关和保存按钮”。设置页渲染恢复已获真实用户验收；前条“页面待验收”状态据此更新。
+- 这次反馈仅确认页面恢复，没有声称保存三组库存资格或开启10%奖励。最近只读快照仍为奖励false/version1、290张正式码未设置资格、6张未用样码排除；本轮未重复无变化查询或执行生产写入。
+- 下一步沿用D:/AI/API/runtime/referral-store-20261028/ROOT_STEPS.md：Root保存三组paid资格（100/100/90），开启原10%奖励并“保存奖励设置→继续”；随后独立只读核实资格、开关和审计。真实邀请注册、付费兑换与返奖仍未验收。
+- 仅补充验收记录，不重复构建、测试或部署。应用部署版本保持78566eb495441f4e49344976dff176ef2bef4d91。
+
+---
+
 ## 2026-10-28 Asia/Shanghai — 邀请奖励设置空列表500补丁已部署，待Root页面与配置验收
 
 - 应用78566eb495441f4e49344976dff176ef2bef4d91，前驱37b844baf。既有Windows本地构建→SSH→VPS helper，最终success、health=PASS、rollback=false，仅更新new-api。备份20261027T234011Z，OCI config sha256:5306263d351b6084c10afab505275dcdcba4973c3ec87e1460f3bbdc96a4513c，包SHA256 47e84ec2c09ec404565d9e846030d0fbe039f066e22eb8c9e0a9b163d7d1f675；独立preflight/source/image匹配且healthy=true。
