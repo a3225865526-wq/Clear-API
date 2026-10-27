@@ -46,6 +46,15 @@ async function fill(count = '100') {
 }
 
 describe('batch creation', () => {
+  it('explains the name length error before submitting an empty name', async () => {
+    const user = await fill()
+    await user.clear(screen.getByLabelText('Batch Name'))
+    await user.click(screen.getByRole('button', { name: 'Create' }))
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Name must be between 1 and 64 characters'
+    )
+    expect(create).not.toHaveBeenCalled()
+  })
   it('disables repeated creation while a request is pending', async () => {
     let finish!: (value: unknown) => void
     create.mockReturnValue(

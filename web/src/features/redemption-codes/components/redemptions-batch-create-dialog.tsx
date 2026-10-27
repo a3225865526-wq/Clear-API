@@ -76,6 +76,16 @@ export function RedemptionsBatchCreateDialog(
   const handleSubmit = async () => {
     if (submitPending.current) return
     setErrorMessage('')
+    const nameLength = [...name.trim()].length
+    if (nameLength < 1 || nameLength > 64) {
+      setErrorMessage(
+        t('Name must be between {{min}} and {{max}} characters', {
+          min: 1,
+          max: 64,
+        })
+      )
+      return
+    }
     const faceValueCents = parseCnyToCents(faceValue)
     if (faceValueCents === null) {
       toast.error(t('Enter a valid CNY amount with up to 2 decimals'))
@@ -95,7 +105,6 @@ export function RedemptionsBatchCreateDialog(
     const parsedRevision = Number(revision)
     if (
       !productID.trim() ||
-      !name.trim() ||
       !Number.isSafeInteger(parsedRevision) ||
       parsedRevision < 1
     ) {
