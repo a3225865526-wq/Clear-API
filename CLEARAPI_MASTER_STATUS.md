@@ -1,3 +1,14 @@
+## 2026-10-28 Asia/Shanghai — 邀请奖励设置500根因复现并修复，本地通过待部署
+
+- 用户截图明确位于/system-settings/site/referral-rewards管理员地址。此前只检查接口GET200，遗漏了前端渲染异常；不能将200或用户页推测当作设置页面正常的证明。
+- 真实根因：奖励为0时ListReferralRewards的GORM分组Scan不填充nil slice，实际HTTP200响应summary=null。RewardOperations直接summary.map，抛出TypeError，路由通用错误页显示500。隔离真实SQLite控制器复现输出{audits:[],items:[],summary:null,total:0}，新增回归按正确数组契约失败；此前前端夹具始终使用[]，没有覆盖真实空值。
+- 最小修复：仅将controller/credit_referral.go的summary slice初始化为空数组，保证空查询响应summary=[]，既有查询、权限、奖励计算、事务、schema和生产配置保持。controller/access_token_audit_test.go补空数据API契约；原referrals前端测试扩展“空奖励正常渲染、取消不保存、确认后恰好一次PUT且保持原10%规则”。无UI新文案或i18n变更。
+- 实际验证：真实SQLite控制器空数据及Root权限2项PASS，前端7项PASS，tsgo/涉及文件oxlint/oxfmt、gofmt与diff通过。SQL/模型/数据库驱动/迁移/持久化未改，不重复37b844baf已通过的三库与资金测试。完整镜像构建与生产部署尚待既有Windows→SSH helper执行。
+- 生产只读：运行37b844baf，奖励仍false/version1；290张正式码未资格设置，6张未用交付样码排除，reward/ledger/invited_users=0，PG03=false。此修复不会启用奖励或产生真实余额；待页面恢复后须Root完成已授权资格/开关保存，再独立验收。
+- 证据：D:/AI/API/runtime/referral-settings-500-20261028/，包含reproduce.log的预期失败、controller-final.log和frontend.log的最终PASS。截图的500与本机Cloudflare1010探测拒绝为不同问题，未扩大修改Cloudflare或认证流程。
+
+---
+
 ## 2026-10-28 Asia/Shanghai — 商城邀请返奖代码已部署；奖励开关与库存资格仍待真实保存
 
 - 应用提交37b844baf92b74be4e7f972aaef80fad55458610，前驱92fd2d6a7。Windows本地构建→SSH→VPS既有helper，DryRun通过、正式SUCCESS、health=PASS、rollback=false，仅更新new-api；备份20261027T164535Z，OCI config sha256:38f9a7579de825d99f88c1a08c0043e8dddc2805611e11efecd094351e57ebc8，包SHA256 1a3844c3db91102de4a17a74257fcfb22bb33135f0fe78adace8d9b10dd2064f。独立preflight/source/image核对一致、healthy=true；PG03=false。

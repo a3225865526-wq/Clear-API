@@ -186,6 +186,33 @@ func TestReferralManagementRequiresRootPermission(t *testing.T) {
 	}
 }
 
+func TestReferralAdminEmptyRewardSummaryIsAnArray(t *testing.T) {
+	setupAccessTokenAudit(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.ReferralReward{}, &model.ReferralAudit{}))
+	router := gin.New()
+	router.GET("/rewards", ListReferralRewards)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/rewards", nil))
+	require.Equal(t, http.StatusOK, response.Code)
+	var body struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Items   []any `json:"items"`
+			Summary []any `json:"summary"`
+			Audits  []any `json:"audits"`
+			Total   int64 `json:"total"`
+		} `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(response.Body.Bytes(), &body))
+	require.True(t, body.Success)
+	t.Logf("empty referral response: %s", response.Body.String())
+	assert.NotNil(t, body.Data.Items)
+	assert.NotNil(t, body.Data.Summary, "the settings page maps this array even before the first reward")
+	assert.NotNil(t, body.Data.Audits)
+	assert.Empty(t, body.Data.Summary)
+	assert.Zero(t, body.Data.Total)
+}
+
 func TestAnnouncementOptionsRejectOrdinaryUsers(t *testing.T) {
 	user, pat := setupAccessTokenAudit(t)
 	require.NoError(t, model.DB.Model(user).Update("role", common.RoleCommonUser).Error)

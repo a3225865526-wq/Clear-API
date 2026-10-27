@@ -281,7 +281,7 @@ func ListReferralRewards(c *gin.Context) {
 		Count  int64  `json:"count"`
 		Quota  int64  `json:"quota"`
 	}
-	var sums []summary
+	sums := make([]summary, 0)
 	if err := model.DB.Model(&model.ReferralReward{}).Select("status, COUNT(*) AS count, SUM(reward_quota) AS quota").Group("status").Scan(&sums).Error; err != nil {
 		common.ApiError(c, err)
 		return

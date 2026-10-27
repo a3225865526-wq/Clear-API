@@ -133,7 +133,7 @@ it('switches to fixed rewards and submits exactly one reward mode', async () => 
   expect(screen.getByLabelText('Reward percentage')).toBeDisabled()
 })
 
-it('requires operational confirmation before submitting an enable change', async () => {
+it('loads empty rewards and only enables after operational confirmation', async () => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => ({
     data: {
       success: true,
@@ -156,6 +156,18 @@ it('requires operational confirmation before submitting an enable change', async
   expect(put).not.toHaveBeenCalled()
   await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
   expect(put).not.toHaveBeenCalled()
+  await userEvent.click(
+    screen.getByRole('button', { name: 'Save reward settings' })
+  )
+  expect(await screen.findByRole('alertdialog')).toBeVisible()
+  await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  await waitFor(() =>
+    expect(put).toHaveBeenCalledWith('/api/clearapi/referral/settings', {
+      ...rule,
+      rewards_enabled: true,
+    })
+  )
+  expect(put).toHaveBeenCalledTimes(1)
 })
 
 it('loads eight persisted products and saves sorting and descriptions through the root endpoint', async () => {
