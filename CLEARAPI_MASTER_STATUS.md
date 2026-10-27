@@ -1,3 +1,14 @@
+## 2026-10-28 Asia/Shanghai — 商城邀请返奖代码已部署；奖励开关与库存资格仍待真实保存
+
+- 应用提交37b844baf92b74be4e7f972aaef80fad55458610，前驱92fd2d6a7。Windows本地构建→SSH→VPS既有helper，DryRun通过、正式SUCCESS、health=PASS、rollback=false，仅更新new-api；备份20261027T164535Z，OCI config sha256:38f9a7579de825d99f88c1a08c0043e8dddc2805611e11efecd094351e57ebc8，包SHA256 1a3844c3db91102de4a17a74257fcfb22bb33135f0fe78adace8d9b10dd2064f。独立preflight/source/image核对一致、healthy=true；PG03=false。
+- 已部署行为/测试见下条。STORE基础额度按原10%入既有邀请队列，VIP加赠不参与；新正式库存paid、样码test，旧库存须Root资格审计。无迁移、历史补发、真实用户测试奖励或其他业务配置变更。
+- 独立生产配置验收：rewards_enabled=false/version1，290张正式库存未标资格，6张未用样码排除，reward/ledger/invited_users=0；无新增资格/设置审计。用户已授权并回复已操作，但服务仅收到设置/奖励列表GET200，没有保存PUT，故不写成已启用。Root最小操作与3组ID在D:/AI/API/runtime/referral-store-20261028/ROOT_STEPS.md；当前浏览器自动化native pipe不可用，没有伪造会话或直写生产数据库。
+- 后续用户确认仅见“已禁用”且无开关/保存按钮，实际处于用户邀请展示页。正确Root入口为 https://www.clear999.com/system-settings/site/referral-rewards ；需在该页按ROOT_STEPS.md保存3组资格并开启10%奖励、保存及点击确认“继续”。代码无新增变动或重复部署。
+- 本机Python公网探测遭Cloudflare403/error1010，未记作通过；VPS helper既有公网/本机健康检查及独立容器健康通过，真实Root浏览器GET200。未改变Cloudflare保护。真实邀请注册→付费兑换→唯一奖励发放仍未生产验收。
+- 完整回执、实际测试、只读配置及请求投影：D:/AI/API/runtime/referral-store-20261028/RESULT.md。代码部署、配置启用、真实返奖三个阶段分开记录。
+
+---
+
 ## 2026-10-28 Asia/Shanghai — 商城邀请返奖接入本地通过，进入既有 helper 部署
 
 - 用户明确授权沿用生产现有10%邀请人奖励规则，并确认未使用正式商城库存用于付费销售。独立只读核查：296张未使用STORE码中290张正式库存（批次5/7/9/11/13/15），6张交付样码（4/6/8/10/12/14）；正式库存冻结面额/Quota匹配，邀请关系、奖励和奖励账本均为0，开关false。无业务数据写入。
