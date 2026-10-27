@@ -23,7 +23,7 @@ func TestStoreProductProofBindsReviewAndRejectsOtherActions(t *testing.T) {
 	setupAuthSessionTestDB(t)
 	useTestSessionSecret(t)
 	identity := AuthIdentity{UserID: 42, SessionID: "store-review-session", UserAuthVersion: 1, SessionVersion: 1}
-	context := StoreProductOperationContext{ProductID: "one", Revision: 2, Version: 4, Action: "approve", Digest: strings.Repeat("a", 64)}
+	context := StoreProductOperationContext{ProductID: "one", Revision: 2, Version: 4, Action: "activate", Digest: strings.Repeat("a", 64)}
 	raw, err := common.Marshal(context)
 	require.NoError(t, err)
 	binding, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeStoreProductOperation, Context: raw})
@@ -33,14 +33,15 @@ func TestStoreProductProofBindsReviewAndRejectsOtherActions(t *testing.T) {
 	_, err = verifySecurityProof(proof, identity, binding)
 	require.NoError(t, err)
 	for _, changed := range []StoreProductOperationContext{
+		{ProductID: "one", Revision: 2, Version: 4, Action: "approve", Digest: context.Digest},
 		{ProductID: "one", Revision: 2, Version: 4, Action: "archive", Digest: context.Digest},
 		{ProductID: "one", Revision: 2, Version: 4, Action: "restore", Digest: context.Digest},
 		{ProductID: "one", Revision: 2, Version: 4, Action: "delete", Digest: context.Digest},
-		{ProductID: "two", Revision: 2, Version: 4, Action: "approve", Digest: context.Digest},
-		{ProductID: "one", Revision: 3, Version: 4, Action: "approve", Digest: context.Digest},
-		{ProductID: "one", Revision: 2, Version: 5, Action: "approve", Digest: context.Digest},
+		{ProductID: "two", Revision: 2, Version: 4, Action: "activate", Digest: context.Digest},
+		{ProductID: "one", Revision: 3, Version: 4, Action: "activate", Digest: context.Digest},
+		{ProductID: "one", Revision: 2, Version: 5, Action: "activate", Digest: context.Digest},
 		{ProductID: "one", Revision: 2, Version: 4, Action: "revoke", Digest: context.Digest},
-		{ProductID: "one", Revision: 2, Version: 4, Action: "approve", Digest: strings.Repeat("b", 64)},
+		{ProductID: "one", Revision: 2, Version: 4, Action: "activate", Digest: strings.Repeat("b", 64)},
 	} {
 		raw, err := common.Marshal(changed)
 		require.NoError(t, err)

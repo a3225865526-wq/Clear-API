@@ -68,11 +68,17 @@ type CreateRedemptionBatchInput struct {
 	ProductID       string
 	ProductRevision int64
 	EvidenceOnly    bool
+	RetrySafe       bool
 }
 
 // CreateRedemptionBatch 创建批次并一次性生成全部商城码（单事务，任一码插入
 // 失败整体回滚）。quota 按创建当时 Price 冻结。
 func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, []string, error) {
+	return createRedemptionBatch(DB, input)
+}
+
+// createRedemptionBatch also participates in the caller's activation transaction.
+func createRedemptionBatch(db *gorm.DB, input CreateRedemptionBatchInput) (*RedemptionBatch, []string, error) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.ProductID = strings.TrimSpace(input.ProductID)
 	if utf8.RuneCountInString(input.Note) > 255 {
@@ -120,7 +126,7 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 		UpdatedTime:    now,
 	}
 	keys := make([]string, 0, input.Count)
-	err = DB.Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		var sampleCatalog CreditCatalog
 		var sampleRow Option
 		var optionCount int64
@@ -140,10 +146,18 @@ func CreateRedemptionBatch(input CreateRedemptionBatchInput) (*RedemptionBatch, 
 			// The catalog lock serializes issuance across processes. A retry
 			// must never silently mint another batch with the same identity.
 			var duplicate []RedemptionBatch
-			if err := lockForUpdate(tx).Select("id").Where("product_id = ? AND name = ?", input.ProductID, input.Name).Limit(1).Find(&duplicate).Error; err != nil {
+			if err := lockForUpdate(tx).Where("product_id = ? AND name = ?", input.ProductID, input.Name).Limit(1).Find(&duplicate).Error; err != nil {
 				return err
 			}
 			if len(duplicate) != 0 && !input.EvidenceOnly {
+				existing := duplicate[0]
+				if input.RetrySafe && !existing.EvidenceOnly && existing.Status == RedemptionBatchStatusEnabled &&
+					existing.CreatedBy == input.AdminUserID && existing.ProductRevision == input.ProductRevision &&
+					existing.FaceValueCents == input.FaceValueCents && existing.Count == input.Count &&
+					existing.ExpiredTime == input.ExpiredTime && existing.Note == input.Note {
+					batch = &existing
+					return tx.Model(&Redemption{}).Where("batch_id = ? AND status = ?", batch.Id, common.RedemptionCodeStatusEnabled).Order("id").Pluck("key", &keys).Error
+				}
 				return errors.New("batch name already exists for this product")
 			}
 			if input.ProductID != "" {

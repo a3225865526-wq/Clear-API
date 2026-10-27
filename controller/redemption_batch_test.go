@@ -117,7 +117,7 @@ func TestDeleteRedemptionBatch(t *testing.T) {
 			rootToken := "product-root-permission-fixture"
 			root := model.User{Username: "product-root", AffCode: "product-root", Role: common.RoleRootUser, Status: common.UserStatusEnabled, AccessToken: &rootToken}
 			require.NoError(t, db.Create(&root).Error)
-			for _, action := range []string{"archive", "restore", "delete"} {
+			for _, action := range []string{"archive", "restore", "delete", "activate"} {
 				for _, credential := range []string{"", ordinaryToken, token, rootToken} {
 					request := httptest.NewRequest(http.MethodPost, "/api/clearapi/credit-catalog/products/one/"+action, bytes.NewBufferString("{}"))
 					if credential != "" {

@@ -47,6 +47,7 @@ func AddRedemptionBatch(c *gin.Context) {
 		ProductID       string `json:"product_id"`
 		ProductRevision int64  `json:"product_revision"`
 		EvidenceOnly    bool   `json:"evidence_only"`
+		RetrySafe       bool   `json:"retry_safe"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		common.ApiErrorMsg(c, "Invalid batch fields. Check the product ID, revision, amount, quantity and expiry.")
@@ -70,6 +71,7 @@ func AddRedemptionBatch(c *gin.Context) {
 		Note:           req.Note,
 		AdminUserID:    c.GetInt("id"),
 		ProductID:      req.ProductID, ProductRevision: req.ProductRevision, EvidenceOnly: req.EvidenceOnly,
+		RetrySafe: req.RetrySafe,
 	})
 	if err != nil {
 		common.SysError("failed to create redemption batch: " + err.Error())

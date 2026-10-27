@@ -1315,4 +1315,7 @@ export const STATIC_I18N_KEYS = [
   'Invalid upstream result',
   'Invalid date range',
   'Transport failed; upstream outcome remains unconfirmed',
+  'auto_validate',
+  'activate',
+  'Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying.',
 ] as const

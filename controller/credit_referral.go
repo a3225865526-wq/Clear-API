@@ -113,6 +113,14 @@ func ResolveCreditPurchase(c *gin.Context) {
 
 func ChangeCreditProductState(c *gin.Context) {
 	permission := authz.StoreReview
+	if c.Param("action") == "activate" {
+		for _, required := range []authz.Permission{authz.StoreEdit, authz.StoreReview, authz.StorePublish} {
+			if !authz.Can(c.GetInt("id"), c.GetInt("role"), required) {
+				c.AbortWithStatus(http.StatusForbidden)
+				return
+			}
+		}
+	}
 	switch c.Param("action") {
 	case "map", "archive", "restore", "delete":
 		permission = authz.StoreEdit
@@ -166,6 +174,11 @@ func ChangeCreditProductState(c *gin.Context) {
 		err = model.ChangeCreditProductState(c.Param("id"), req.Version, req.Revision, c.Param("action"), req.Confirmation, c.GetInt("id"))
 	}
 	if err != nil {
+		if c.Param("action") == "activate" {
+			common.SysError("product automatic validation failed: " + err.Error())
+			common.ApiErrorMsg(c, "Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying.")
+			return
+		}
 		common.ApiError(c, err)
 		return
 	}

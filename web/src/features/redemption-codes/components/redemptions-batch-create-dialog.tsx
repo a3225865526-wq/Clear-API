@@ -23,6 +23,11 @@ import { toast } from 'sonner'
 import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -35,13 +40,19 @@ import { getServerErrorMessage } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { createRedemptionBatch, getRedemptionBatchProducts } from '../api'
+import {
+  buildBatchExportContent,
+  buildBatchExportFilename,
+  downloadTextFile,
+} from '../lib/batch-export'
 import type { RedemptionBatchProduct } from '../types'
 
 interface RedemptionsBatchCreateDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   maxCount: number
-  onCreated: (batchId: number, count: number) => void
+  productID?: string
+  onCreated: (batchId: number, count: number, downloaded: boolean) => void
 }
 
 /**
@@ -73,6 +84,10 @@ export function RedemptionsBatchCreateDialog(
 
   useEffect(() => {
     if (!props.open) return
+    if (props.productID) {
+      setProductID(props.productID)
+      setName((value) => value || `stock-${crypto.randomUUID()}`)
+    }
     let active = true
     setLoadingProducts(true)
     void getRedemptionBatchProducts()
@@ -99,7 +114,7 @@ export function RedemptionsBatchCreateDialog(
     return () => {
       active = false
     }
-  }, [props.open, t])
+  }, [props.open, props.productID, t])
 
   const reset = () => {
     setName('')
@@ -158,6 +173,7 @@ export function RedemptionsBatchCreateDialog(
         product_id: selectedProduct.id,
         product_revision: selectedProduct.revision,
         evidence_only: evidenceOnly,
+        retry_safe: true,
       })
       if (response.success && response.data) {
         toast.success(
@@ -166,8 +182,27 @@ export function RedemptionsBatchCreateDialog(
             face: formatCnyCents(response.data.batch.face_value_cents),
           })
         )
+        let downloaded = false
+        try {
+          downloadTextFile(
+            buildBatchExportFilename(response.data.batch.id, 'txt'),
+            buildBatchExportContent(response.data.keys, 'txt'),
+            'text/plain;charset=utf-8'
+          )
+          downloaded = true
+        } catch {
+          toast.error(
+            t(
+              'Batch created. Download failed; export the existing batch without creating another.'
+            )
+          )
+        }
         reset()
-        props.onCreated(response.data.batch.id, response.data.keys.length)
+        props.onCreated(
+          response.data.batch.id,
+          response.data.keys.length,
+          downloaded
+        )
       } else {
         const message = t(response.message || 'Failed to create batch')
         setErrorMessage(message)
@@ -210,7 +245,7 @@ export function RedemptionsBatchCreateDialog(
             onClick={() => void handleSubmit()}
             disabled={submitting || loadingProducts || !eligibleProduct}
           >
-            {submitting ? t('Creating...') : t('Create')}
+            {submitting ? t('Creating...') : t('Generate and download')}
           </Button>
         </div>
       }
@@ -230,7 +265,10 @@ export function RedemptionsBatchCreateDialog(
         <NativeSelect
           aria-label={t('Product ID')}
           value={productID}
-          onChange={(e) => setProductID(e.target.value)}
+          onChange={(e) => {
+            setProductID(e.target.value)
+            if (!name) setName(`stock-${crypto.randomUUID()}`)
+          }}
           disabled={loadingProducts || submitting}
         >
           <NativeSelectOption value=''>
@@ -258,33 +296,6 @@ export function RedemptionsBatchCreateDialog(
           )}
         </p>
       ) : null}
-      <Label>
-        {t('Approved product revision')}
-        <Input value={selectedProduct?.revision ?? ''} readOnly />
-      </Label>
-      {root ? (
-        <Label>
-          <Checkbox
-            checked={evidenceOnly}
-            onCheckedChange={(value) => {
-              setEvidenceOnly(value === true)
-              setProductID('')
-              if (value) setCount('1')
-            }}
-          />
-          {t('Delivery evidence sample only (one code, preparation mode)')}
-        </Label>
-      ) : null}
-      <div className='space-y-1.5'>
-        <Label htmlFor='batch-name'>{t('Batch Name')}</Label>
-        <Input
-          id='batch-name'
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder='20261003-100YUAN'
-          maxLength={64}
-        />
-      </div>
       <div className='grid grid-cols-2 gap-3'>
         <div className='space-y-1.5'>
           <Label htmlFor='batch-face'>{t('Face Value (CNY)')}</Label>
@@ -307,36 +318,70 @@ export function RedemptionsBatchCreateDialog(
           />
         </div>
       </div>
-      {selectedProduct ? (
-        <p className='text-muted-foreground text-xs'>
-          {t('Base API quota')}:{' '}
-          {formatNumber(selectedProduct.base_quota, locale)} ·{' '}
-          {t('Evidence batch ID')}: {selectedProduct.evidence_batch_id} ·{' '}
-          {selectedProduct.delivery_binding}
-        </p>
-      ) : null}
-      <div className='space-y-1.5'>
-        <Label htmlFor='batch-expiry'>{t('Expires At')}</Label>
-        <Input
-          id='batch-expiry'
-          type='date'
-          value={expiredDate}
-          onChange={(event) => setExpiredDate(event.target.value)}
-        />
-        <p className='text-muted-foreground text-xs'>
-          {t('Leave empty for codes that never expire')}
-        </p>
-      </div>
-      <div className='space-y-1.5'>
-        <Label htmlFor='batch-note'>{t('Note')}</Label>
-        <Input
-          id='batch-note'
-          value={note}
-          onChange={(event) => setNote(event.target.value)}
-          placeholder={t('e.g. third-party store ¥100 stock')}
-          maxLength={255}
-        />
-      </div>
+      <Collapsible>
+        <CollapsibleTrigger render={<Button type='button' variant='ghost' />}>
+          {t('Advanced settings')}
+        </CollapsibleTrigger>
+        <CollapsibleContent keepMounted className='space-y-4'>
+          <Label>
+            {t('Approved product revision')}
+            <Input value={selectedProduct?.revision ?? ''} readOnly />
+          </Label>
+          {root ? (
+            <Label>
+              <Checkbox
+                checked={evidenceOnly}
+                onCheckedChange={(value) => {
+                  setEvidenceOnly(value === true)
+                  setProductID('')
+                  if (value) setCount('1')
+                }}
+              />
+              {t('Delivery evidence sample only (one code, preparation mode)')}
+            </Label>
+          ) : null}
+          <div className='space-y-1.5'>
+            <Label htmlFor='batch-name'>{t('Batch Name')}</Label>
+            <Input
+              id='batch-name'
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder='20261003-100YUAN'
+              maxLength={64}
+            />
+          </div>
+          {selectedProduct ? (
+            <p className='text-muted-foreground text-xs'>
+              {t('Base API quota')}:{' '}
+              {formatNumber(selectedProduct.base_quota, locale)} ·{' '}
+              {t('Evidence batch ID')}: {selectedProduct.evidence_batch_id} ·{' '}
+              {selectedProduct.delivery_binding}
+            </p>
+          ) : null}
+          <div className='space-y-1.5'>
+            <Label htmlFor='batch-expiry'>{t('Expires At')}</Label>
+            <Input
+              id='batch-expiry'
+              type='date'
+              value={expiredDate}
+              onChange={(event) => setExpiredDate(event.target.value)}
+            />
+            <p className='text-muted-foreground text-xs'>
+              {t('Leave empty for codes that never expire')}
+            </p>
+          </div>
+          <div className='space-y-1.5'>
+            <Label htmlFor='batch-note'>{t('Note')}</Label>
+            <Input
+              id='batch-note'
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder={t('e.g. third-party store ¥100 stock')}
+              maxLength={255}
+            />
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
     </Dialog>
   )
 }

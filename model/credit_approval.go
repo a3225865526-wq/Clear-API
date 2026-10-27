@@ -16,6 +16,8 @@ import (
 
 const CreditApprovalPolicy = "solo-operator-v1"
 
+const CreditAutomaticValidationPolicy = "automatic-validation-v1"
+
 // CreditApprovalEvent is the authoritative, transactional approval history.
 // It contains evidence references and batch metadata, never redemption keys.
 type CreditApprovalEvent struct {
@@ -192,6 +194,9 @@ func appendCreditEvent(tx *gorm.DB, p CreditProduct, actor int, decision string)
 		Policy: CreditApprovalPolicy, EditedBy: p.EditedBy, ActorID: actor, Decision: decision,
 		CreatedTime: common.GetTimestamp(), EvidenceBatchID: p.EvidenceBatchID,
 		DeliveryEvidence: p.DeliveryEvidence, SoloOperator: true, ReferenceApprovalID: p.ApprovalID}
+	if decision == "auto_validate" || decision == "activate" {
+		event.Policy, event.SoloOperator = CreditAutomaticValidationPolicy, false
+	}
 	return event, tx.Create(event).Error
 }
 
@@ -214,6 +219,14 @@ func SaveCreditProductDrafts(in CreditCatalog, actor int) error {
 		products := make([]CreditProduct, 0, len(in.Products))
 		for _, p := range in.Products {
 			p.BaseCredit, p.PurchasePath = "", ""
+			if TrustedCreditPurchaseURL(p.PurchaseURL) {
+				if p.DeliveryBinding == "" {
+					p.DeliveryBinding = p.PurchaseURL[strings.LastIndexByte(p.PurchaseURL, '/')+1:]
+				}
+				if p.DeliveryEvidence == "" {
+					p.DeliveryEvidence = p.PurchaseURL
+				}
+			}
 			if p.BaseQuota > 0 {
 				if err := common.ValidateWalletQuota(p.BaseQuota); err != nil {
 					return err
@@ -258,6 +271,11 @@ func SaveCreditProductDrafts(in CreditCatalog, actor int) error {
 					}
 					p.Revision, p.State, p.EditedBy = old.Revision+1, "draft", actor
 					p.ApprovalID, p.Published, p.DeliveryVerified = 0, false, false
+					// A new contract needs its own evidence; the old issuance and
+					// approval events keep the historical batch association.
+					if p.EvidenceBatchID == old.EvidenceBatchID {
+						p.EvidenceBatchID = 0
+					}
 				}
 				delete(previous, p.ID)
 			}
@@ -318,7 +336,9 @@ func validateCreditDelivery(tx *gorm.DB, p CreditProduct) error {
 			}
 		} else {
 			var approval CreditApprovalEvent
-			if err := tx.First(&approval, batch.ApprovalID).Error; err != nil || approval.Decision != "approve" || approval.ProductID != p.ID || approval.Revision != p.Revision || approval.Policy != CreditApprovalPolicy {
+			if err := tx.First(&approval, batch.ApprovalID).Error; err != nil || approval.ProductID != p.ID || approval.Revision != p.Revision ||
+				!((approval.Decision == "approve" && approval.Policy == CreditApprovalPolicy && approval.SoloOperator) ||
+					(approval.Decision == "auto_validate" && approval.Policy == CreditAutomaticValidationPolicy && !approval.SoloOperator)) {
 				return errors.New("evidence inventory lacks a matching approval")
 			}
 			var revoked int64
@@ -357,7 +377,9 @@ func validateCreditApprovalRecord(tx *gorm.DB, p CreditProduct) error {
 	if err != nil {
 		return err
 	}
-	if event.Decision != "approve" || event.ProductID != p.ID || event.Revision != p.Revision || event.Digest != digest || event.Policy != CreditApprovalPolicy || !event.SoloOperator || event.ActorID <= 0 || event.EditedBy != p.EditedBy {
+	manual := event.Decision == "approve" && event.Policy == CreditApprovalPolicy && event.SoloOperator
+	automatic := event.Decision == "auto_validate" && event.Policy == CreditAutomaticValidationPolicy && !event.SoloOperator
+	if (!manual && !automatic) || event.ProductID != p.ID || event.Revision != p.Revision || event.Digest != digest || event.ActorID <= 0 || event.EditedBy != p.EditedBy {
 		return errors.New("approval does not match current revision")
 	}
 	var count int64
@@ -437,6 +459,36 @@ func ChangeCreditProductState(id string, version, revision int64, action, confir
 				}
 			}
 			switch action {
+			case "activate":
+				if p.State == "published" {
+					return validateCreditApproval(tx, *p)
+				}
+				if p.State != "draft" && p.State != "pending" && p.State != "approved" {
+					return errors.New("Create a new draft revision before enabling a rejected or revoked product.")
+				}
+				if p.EvidenceBatchID == 0 {
+					_, _, err := createRedemptionBatch(tx, CreateRedemptionBatchInput{
+						Name: "evidence-" + common.GetUUID(), Count: 1, FaceValueCents: p.PriceCents,
+						AdminUserID: actor, ProductID: p.ID, ProductRevision: p.Revision, EvidenceOnly: true,
+					})
+					if err != nil {
+						return err
+					}
+					row, c, err = lockedCreditCatalog(tx)
+					if err != nil {
+						return err
+					}
+					p = &c.Products[i]
+				}
+				if err := validateCreditDelivery(tx, *p); err != nil {
+					return fmt.Errorf("Automatic validation failed: %w", err)
+				}
+				event, err := appendCreditEvent(tx, *p, actor, "auto_validate")
+				if err != nil {
+					return err
+				}
+				p.ApprovalID, p.State, p.Published, p.DeliveryVerified = event.ID, "published", true, true
+				p.LegacyWithdrawn = true
 			case "archive":
 				p.Archived, p.Published, p.LegacyWithdrawn = true, false, true
 				if p.State == "published" {

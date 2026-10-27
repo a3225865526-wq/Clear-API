@@ -144,6 +144,7 @@ export interface CreateRedemptionBatchRequest {
   product_id?: string
   product_revision?: number
   evidence_only?: boolean
+  retry_safe?: boolean
 }
 
 export interface CreateRedemptionBatchResponse {

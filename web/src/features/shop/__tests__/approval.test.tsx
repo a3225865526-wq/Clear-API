@@ -32,7 +32,7 @@ afterEach(() => {
   useAuthStore.getState().auth.reset()
 })
 
-function renderOperations(
+async function renderOperations(
   state: string,
   role = 100,
   archived = false,
@@ -68,16 +68,18 @@ function renderOperations(
       <ProductOperations product={product} version={4} disabled={false} />
     </QueryClientProvider>
   )
+  const more = screen.queryByRole('button', { name: 'More operations' })
+  if (more) await userEvent.click(more)
   return product
 }
 
-it.each([1, 10])('role %s has no review actions', (role) => {
-  renderOperations('pending', role)
+it.each([1, 10])('role %s has no review actions', async (role) => {
+  await renderOperations('pending', role)
   expect(screen.queryByRole('button')).not.toBeInTheDocument()
 })
 
 it('archives with the current revision proof and keeps restoration separate from publishing', async () => {
-  const product = renderOperations('published')
+  const product = await renderOperations('published')
   vi.spyOn(api, 'get').mockResolvedValue({
     data: {
       success: true,
@@ -130,7 +132,7 @@ it('archives with the current revision proof and keeps restoration separate from
 })
 
 it('requires deletion inspection and blocks hard deletion when history exists', async () => {
-  const product = renderOperations('draft')
+  const product = await renderOperations('draft')
   vi.spyOn(api, 'get').mockResolvedValue({
     data: {
       success: true,
@@ -167,10 +169,12 @@ it('requires deletion inspection and blocks hard deletion when history exists', 
   expect(post).not.toHaveBeenCalled()
 })
 
-it('offers restore for an archived product while publishing remains disabled', () => {
-  renderOperations('approved', 100, true)
+it('offers restore for an archived product without publishing it', async () => {
+  await renderOperations('approved', 100, true)
   expect(screen.getByRole('button', { name: 'Restore product' })).toBeEnabled()
-  expect(screen.getByRole('button', { name: 'Publish product' })).toBeDisabled()
+  expect(
+    screen.queryByRole('button', { name: 'Publish product' })
+  ).not.toBeInTheDocument()
 })
 
 it('hides archived products by default and reveals their disabled fields on request', async () => {
@@ -209,11 +213,12 @@ it('hides archived products by default and reveals their disabled fields on requ
   expect(screen.queryByDisplayValue('archived-item')).not.toBeInTheDocument()
   await userEvent.click(toggle)
   expect(screen.getByDisplayValue('archived-item')).toBeDisabled()
+  await userEvent.click(screen.getByRole('button', { name: 'More operations' }))
   expect(screen.getByRole('button', { name: 'Restore product' })).toBeEnabled()
 })
 
 it('requires explicit confirmation before permanently deleting an unrelated draft', async () => {
-  const product = renderOperations('draft', 100, false, {
+  const product = await renderOperations('draft', 100, false, {
     revision: 1,
     evidence_batch_id: 0,
     delivery_evidence: '',
@@ -288,75 +293,126 @@ it('discards an unsaved product locally after confirmation', async () => {
   )
   const user = userEvent.setup()
   await user.click(await screen.findByRole('button', { name: 'Add product' }))
-  expect(screen.getByDisplayValue('credit-new-1')).toBeInTheDocument()
+  const productID = (screen.getByLabelText('Product ID') as HTMLInputElement)
+    .value
+  expect(productID).toMatch(/^credit-/)
   await user.click(
     screen.getByRole('button', { name: 'Remove unsaved product' })
   )
   await user.click(screen.getByRole('button', { name: 'Continue' }))
-  expect(screen.queryByDisplayValue('credit-new-1')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Product ID')).not.toBeInTheDocument()
   expect(post).not.toHaveBeenCalled()
 })
 
-it.each(['draft', 'pending', 'approved', 'published', 'revoked'])(
-  'shows %s and only allows legal publish actions',
-  (state) => {
-    renderOperations(state)
-    const publish = screen.getByRole('button', { name: 'Publish product' })
-    if (state === 'approved') expect(publish).toBeEnabled()
-    else expect(publish).toBeDisabled()
-    expect(screen.getByRole('status')).toHaveTextContent('2')
-  }
-)
-
-it('requires typing the exact revision confirmation before sending a solo approval', async () => {
-  const product = renderOperations('pending')
-  const get = vi.spyOn(api, 'get').mockResolvedValue({
+it('shows revision history without offering a manual approval action', async () => {
+  const product = await renderOperations('pending')
+  vi.spyOn(api, 'get').mockResolvedValue({
     data: {
       success: true,
       data: {
         product,
-        confirmation: 'one@2:review-digest',
-        digest: 'review-digest',
+        digest: 'digest',
+        confirmation: 'one@2:digest',
         events: [],
       },
     },
   })
-  const post = vi
-    .spyOn(api, 'post')
-    .mockResolvedValue({ data: { success: true } })
-  const user = userEvent.setup()
-  await user.click(
+  const post = vi.spyOn(api, 'post')
+  await userEvent.click(
     screen.getByRole('button', { name: 'Review product revision' })
   )
-  const confirm = await screen.findByRole('button', {
-    name: 'Confirm product operation',
-  })
-  expect(confirm).toBeDisabled()
+  expect(await screen.findByRole('button', { name: 'Close' })).toBeEnabled()
+  expect(
+    screen.queryByRole('button', { name: 'Submit for review' })
+  ).not.toBeInTheDocument()
   expect(post).not.toHaveBeenCalled()
-  await user.type(
-    screen.getByPlaceholderText('Type the confirmation text here'),
-    'APPROVE one@2:review-digest'
-  )
-  expect(confirm).toBeEnabled()
-  await user.click(confirm)
-  await waitFor(() =>
-    expect(post).toHaveBeenCalledWith(
-      '/api/clearapi/credit-catalog/products/one/approve',
-      expect.objectContaining({
-        version: 4,
-        revision: 2,
-        confirmation: 'APPROVE one@2:review-digest',
-      }),
-      { headers: { 'X-Security-Proof': 'test-operation-proof' } }
-    )
-  )
-  expect(get).toHaveBeenCalledWith(
-    '/api/clearapi/credit-catalog/products/one/review'
-  )
 })
 
+it.each([true, false])(
+  'activates with one verification and preserves failures after refreshing (success=%s)',
+  async (success) => {
+    useAuthStore.setState((s) => ({
+      auth: {
+        ...s.auth,
+        user: {
+          id: 7,
+          role: 100,
+          username: 'operator',
+          display_name: 'operator',
+        },
+      },
+    }))
+    const product = {
+      ...creditProducts[0],
+      id: 'automatic',
+      name: 'Automatic credit',
+      currency: 'CNY',
+      state: 'pending',
+      revision: 5,
+      base_quota: 500000,
+      evidence_batch_id: 4,
+      purchase_url: 'https://catfk.com/item/qmcse2',
+    }
+    vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+      data: {
+        success: true,
+        data: String(url).endsWith('/review')
+          ? {
+              product,
+              digest: 'bound-digest',
+              confirmation: 'automatic@5:bound-digest',
+              events: [],
+            }
+          : { version: 24, products: [product] },
+      },
+    }))
+    const put = vi.spyOn(api, 'put')
+    const post = vi.spyOn(api, 'post').mockResolvedValue({
+      data: {
+        success,
+        message: success ? undefined : 'Evidence unavailable',
+      },
+    })
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    })
+    render(
+      <QueryClientProvider client={client}>
+        <CatalogEditor />
+      </QueryClientProvider>
+    )
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Save and enable' })
+    )
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/api/clearapi/credit-catalog/products/automatic/activate',
+        expect.objectContaining({
+          version: 24,
+          revision: 5,
+          confirmation: 'ACTIVATE automatic@5:bound-digest',
+          digest: 'bound-digest',
+        }),
+        { headers: { 'X-Security-Proof': 'test-operation-proof' } }
+      )
+    )
+    if (!success) {
+      expect(
+        await screen.findByText('Evidence unavailable')
+      ).toBeInTheDocument()
+    }
+    expect(put).not.toHaveBeenCalled()
+    expect(
+      screen.queryByRole('button', { name: 'Confirm product operation' })
+    ).not.toBeInTheDocument()
+  }
+)
+
 it('revocation requires explicit confirmation and sends the current revision', async () => {
-  const product = renderOperations('published')
+  const product = await renderOperations('published')
   vi.spyOn(api, 'get').mockResolvedValue({
     data: {
       success: true,
@@ -389,4 +445,58 @@ it('revocation requires explicit confirmation and sends the current revision', a
       { headers: { 'X-Security-Proof': 'test-operation-proof' } }
     )
   )
+})
+
+it('opens batch generation with the published product already selected and does not issue stock on navigation', async () => {
+  useAuthStore.setState((s) => ({
+    auth: {
+      ...s.auth,
+      user: {
+        id: 7,
+        role: 100,
+        username: 'operator',
+        display_name: 'operator',
+      },
+    },
+  }))
+  const product = {
+    ...creditProducts[0],
+    id: 'automatic',
+    name: 'Automatic credit',
+    currency: 'CNY',
+    state: 'published',
+    published: true,
+    delivery_verified: true,
+    revision: 5,
+    base_quota: 500000,
+    evidence_batch_id: 4,
+    purchase_url: 'https://catfk.com/item/qmcse2',
+  }
+  vi.spyOn(api, 'get').mockImplementation(async (url) => ({
+    data: {
+      success: true,
+      data: String(url).includes('/batches/products')
+        ? [{ ...product, stock_ready: true, sample_ready: false }]
+        : { version: 24, products: [product] },
+    },
+  }))
+  const post = vi.spyOn(api, 'post')
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={client}>
+      <CatalogEditor />
+    </QueryClientProvider>
+  )
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Generate and download' })
+  )
+  const dialog = await screen.findByRole('dialog')
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Product ID' })
+    ).toHaveValue('automatic')
+  )
+  expect(post).not.toHaveBeenCalled()
 })

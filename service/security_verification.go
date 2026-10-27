@@ -102,7 +102,7 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 			return VerificationBinding{}, ErrVerificationContextInvalid
 		}
 		switch context.Action {
-		case "approve", "reject", "publish", "unpublish", "revoke", "map", "archive", "restore", "delete":
+		case "approve", "reject", "publish", "unpublish", "revoke", "map", "archive", "restore", "delete", "activate":
 		default:
 			return VerificationBinding{}, ErrVerificationContextInvalid
 		}

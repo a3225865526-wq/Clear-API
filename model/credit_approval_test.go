@@ -982,3 +982,147 @@ func TestCommercialBatchArchiveRollback(t *testing.T) {
 	require.NoError(t, DB.First(&batch, 77).Error)
 	assert.Equal(t, RedemptionBatchStatusEnabled, batch.Status)
 }
+
+func TestCreditAutomaticActivationAndRetrySafeStock(t *testing.T) {
+	creditApprovalFixture(t)
+	catalog, err := GetCreditCatalog()
+	require.NoError(t, err)
+	catalog.Products = append(catalog.Products, CreditProduct{ID: "automatic", Name: "Automatic credit", PriceCents: 100, BaseQuota: 500000, PurchaseURL: LegacyCreditPurchaseURL})
+	require.NoError(t, SaveCreditCatalog(catalog, 7))
+	creditApprovalAction(t, "automatic", "activate")
+	review, err := GetCreditProductReview("automatic")
+	require.NoError(t, err)
+	assert.Equal(t, "published", review.Product.State)
+	assert.Equal(t, "qmcse2", review.Product.DeliveryBinding)
+	assert.True(t, review.Product.Published)
+	require.Positive(t, review.Product.EvidenceBatchID)
+	require.NoError(t, validateCreditApproval(DB, review.Product))
+	var approval CreditApprovalEvent
+	require.NoError(t, DB.First(&approval, review.Product.ApprovalID).Error)
+	assert.Equal(t, "auto_validate", approval.Decision)
+	assert.Equal(t, CreditAutomaticValidationPolicy, approval.Policy)
+	assert.False(t, approval.SoloOperator)
+	eventCount := len(review.Events)
+	creditApprovalAction(t, "automatic", "activate")
+	again, err := GetCreditProductReview("automatic")
+	require.NoError(t, err)
+	assert.Len(t, again.Events, eventCount)
+	input := CreateRedemptionBatchInput{Name: "stable-download-request", FaceValueCents: 100, Count: 2, AdminUserID: 7, ProductID: "automatic", ProductRevision: review.Product.Revision, RetrySafe: true}
+	batch, keys, err := CreateRedemptionBatch(input)
+	require.NoError(t, err)
+	require.Len(t, keys, 2)
+	retried, repeatedKeys, err := CreateRedemptionBatch(input)
+	require.NoError(t, err)
+	assert.Equal(t, batch.Id, retried.Id)
+	assert.Equal(t, keys, repeatedKeys)
+	input.Count = 3
+	_, _, err = CreateRedemptionBatch(input)
+	require.ErrorContains(t, err, "already exists")
+	input.Count = 2
+	input.AdminUserID = 8
+	_, _, err = CreateRedemptionBatch(input)
+	require.ErrorContains(t, err, "already exists")
+	input.AdminUserID = 7
+	var firstCode Redemption
+	require.NoError(t, DB.Where("batch_id = ?", batch.Id).Order("id").First(&firstCode).Error)
+	require.NoError(t, DB.Model(&firstCode).Update("status", common.RedemptionCodeStatusUsed).Error)
+	_, remaining, err := CreateRedemptionBatch(input)
+	require.NoError(t, err)
+	assert.Equal(t, keys[1:], remaining)
+	catalog, err = GetCreditCatalog()
+	require.NoError(t, err)
+	for i := range catalog.Products {
+		if catalog.Products[i].ID == "automatic" {
+			catalog.Products[i].BaseQuota = 1000000
+		}
+	}
+	require.NoError(t, SaveCreditCatalog(catalog, 7))
+	draft, err := GetCreditProductReview("automatic")
+	require.NoError(t, err)
+	assert.Zero(t, draft.Product.EvidenceBatchID)
+	assert.Equal(t, review.Product.Revision+1, draft.Product.Revision)
+	creditApprovalAction(t, "automatic", "activate")
+	updated, err := GetCreditProductReview("automatic")
+	require.NoError(t, err)
+	assert.NotEqual(t, review.Product.EvidenceBatchID, updated.Product.EvidenceBatchID)
+	require.NoError(t, validateCreditApproval(DB, updated.Product))
+	var original RedemptionBatch
+	require.NoError(t, DB.First(&original, batch.Id).Error)
+	assert.Equal(t, 500000, original.Quota)
+	assert.Equal(t, review.Product.Revision, original.ProductRevision)
+}
+
+func TestCreditAutomaticActivationRejectsInvalidEvidence(t *testing.T) {
+	for _, issue := range []string{"missing", "disabled", "expired", "product", "revision", "binding", "quota", "withdrawn", "archived"} {
+		t.Run(issue, func(t *testing.T) {
+			creditApprovalFixture(t)
+			p := creditApprovalProduct(t, "invalid-auto", 100)
+			switch issue {
+			case "missing":
+				require.NoError(t, DB.Delete(&RedemptionBatch{}, p.EvidenceBatchID).Error)
+			case "disabled":
+				require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Update("status", RedemptionBatchStatusDisabled).Error)
+			case "expired":
+				require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Update("expired_time", common.GetTimestamp()-1).Error)
+			case "product":
+				require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Update("product_id", "other").Error)
+			case "revision":
+				require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Update("product_revision", p.Revision+1).Error)
+			case "binding":
+				require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Update("delivery_binding", "other").Error)
+			case "quota":
+				require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", p.EvidenceBatchID).Update("quota", 1).Error)
+			case "withdrawn":
+				_, err := appendCreditEvent(DB, p, 7, "revoke")
+				require.NoError(t, err)
+			case "archived":
+				creditApprovalAction(t, p.ID, "archive")
+			}
+			before, err := GetCreditProductReview(p.ID)
+			require.NoError(t, err)
+			catalog, err := GetCreditCatalog()
+			require.NoError(t, err)
+			var batchCount int64
+			require.NoError(t, DB.Model(&RedemptionBatch{}).Count(&batchCount).Error)
+			err = ChangeCreditProductState(p.ID, catalog.Version, p.Revision, "activate", "ACTIVATE "+before.Confirmation, 7)
+			require.Error(t, err)
+			after, err := GetCreditProductReview(p.ID)
+			require.NoError(t, err)
+			assert.Equal(t, before.Product, after.Product)
+			assert.Equal(t, before.Events, after.Events)
+			var remaining int64
+			require.NoError(t, DB.Model(&RedemptionBatch{}).Count(&remaining).Error)
+			assert.Equal(t, batchCount, remaining)
+		})
+	}
+}
+
+func TestCreditAutomaticActivationRollsBackSampleAndAudit(t *testing.T) {
+	creditApprovalFixture(t)
+	catalog, err := GetCreditCatalog()
+	require.NoError(t, err)
+	catalog.Products = append(catalog.Products, CreditProduct{ID: "atomic-auto", Name: "Atomic", PriceCents: 100, BaseQuota: 500000, PurchaseURL: LegacyCreditPurchaseURL})
+	require.NoError(t, SaveCreditCatalog(catalog, 7))
+	before, err := GetCreditProductReview("atomic-auto")
+	require.NoError(t, err)
+	catalog, err = GetCreditCatalog()
+	require.NoError(t, err)
+	var batches int64
+	require.NoError(t, DB.Model(&RedemptionBatch{}).Count(&batches).Error)
+	require.NoError(t, DB.Callback().Create().Before("gorm:create").Register("fail_auto_audit", func(tx *gorm.DB) {
+		if event, ok := tx.Statement.Dest.(*CreditApprovalEvent); ok && event.Decision == "auto_validate" {
+			tx.AddError(errors.New("fixture audit failure"))
+		}
+	}))
+	err = ChangeCreditProductState("atomic-auto", catalog.Version, before.Product.Revision, "activate", "ACTIVATE "+before.Confirmation, 7)
+	require.ErrorContains(t, err, "fixture audit failure")
+	require.NoError(t, DB.Callback().Create().Remove("fail_auto_audit"))
+	after, err := GetCreditProductReview("atomic-auto")
+	require.NoError(t, err)
+	assert.Equal(t, before.Product, after.Product)
+	assert.Equal(t, before.Events, after.Events)
+	var remaining int64
+	require.NoError(t, DB.Model(&RedemptionBatch{}).Count(&remaining).Error)
+	assert.Equal(t, batches, remaining)
+	creditApprovalAction(t, "atomic-auto", "activate")
+}

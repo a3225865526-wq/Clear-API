@@ -1,7 +1,7 @@
 # ClearAPI 商品自动校验发布与一键发码 — 实施设计
 
 日期：2026-10-27 Asia/Shanghai
-状态：用户已选择功能范围；本设计文件待确认，尚未开始代码实施。
+状态：用户已明确回复“按设计实施”，本设计已确认。
 工作区：D:/Codex/worktrees/clearapi-commercial-fixes/clearapi-controlled-launch-20261020
 基线：66a4d73af0f1b1a8c252cbc98572b516a53744ac
 

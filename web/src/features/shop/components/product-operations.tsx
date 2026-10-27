@@ -23,6 +23,11 @@ import { useTranslation } from 'react-i18next'
 import { ErrorState } from '@/components/error-state'
 import { RiskAcknowledgementDialog } from '@/components/risk-acknowledgement-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { SecureVerificationDialog } from '@/features/auth/secure-verification/components/secure-verification-dialog'
@@ -122,113 +127,100 @@ export function ProductOperations(props: {
       </p>
       <p className='text-muted-foreground text-sm'>
         {t(
-          'Solo operator review is recorded. Confirmation text prevents mistakes; it is not multi-factor authentication.'
+          'Internal validation and third-party delivery verification are separate. History is retained.'
         )}
       </p>
-      <div className='flex flex-wrap gap-2'>
-        <Button
-          type='button'
-          variant='outline'
-          disabled={
-            contractDisabled ||
-            !['draft', 'rejected', 'revoked'].includes(product.state ?? 'draft')
-          }
-          onClick={() => mutation.mutate('submit')}
-        >
-          {t('Submit for review')}
-        </Button>
-        <Button
-          type='button'
-          variant='outline'
-          disabled={disabled}
-          onClick={() => {
-            setDecision(product.state === 'pending' ? 'approve' : 'inspect')
-            inspect.mutate(product.id)
-          }}
-        >
-          {t('Review product revision')}
-        </Button>
-        <Button
-          type='button'
-          disabled={contractDisabled || product.state !== 'approved'}
-          onClick={() => {
-            setDecision('publish')
-            inspect.mutate(product.id)
-          }}
-        >
-          {t('Publish product')}
-        </Button>
-        <Button
-          type='button'
-          variant='outline'
-          disabled={contractDisabled || product.state !== 'published'}
-          onClick={() => {
-            setDecision('unpublish')
-            inspect.mutate(product.id)
-          }}
-        >
-          {t('Unpublish product')}
-        </Button>
-        <Button
-          type='button'
-          variant='destructive'
-          disabled={
-            contractDisabled ||
-            !['approved', 'published'].includes(product.state ?? '')
-          }
-          onClick={() => {
-            setDecision('revoke')
-            inspect.mutate(product.id)
-          }}
-        >
-          {t('Revoke approval')}
-        </Button>
-        <Button
-          type='button'
-          variant='outline'
-          disabled={disabled}
-          onClick={() => {
-            setDecision(product.archived ? 'restore' : 'archive')
-            inspect.mutate(product.id)
-          }}
-        >
-          {product.archived ? t('Restore product') : t('Archive product')}
-        </Button>
-        <Button
-          type='button'
-          variant='destructive'
-          disabled={disabled}
-          onClick={() => {
-            setDecision('inspect')
-            inspect.mutate(product.id)
-          }}
-        >
-          {t('Delete permanently')}
-        </Button>
-      </div>
-      <Label className='block'>
-        {t('Legacy store product ID')}
-        <Input
-          value={legacyID}
-          onChange={(e) => setLegacyID(e.target.value)}
-          inputMode='numeric'
-        />
-      </Label>
-      <Button
-        type='button'
-        variant='outline'
-        disabled={
-          contractDisabled ||
-          !Number.isSafeInteger(Number(legacyID)) ||
-          Number(legacyID) <= 0
-        }
-        onClick={() => {
-          setDecision('map')
-          inspect.mutate(product.id)
-        }}
-      >
-        {t('Map legacy product')}
-      </Button>
+      <Collapsible>
+        <CollapsibleTrigger render={<Button type='button' variant='outline' />}>
+          {t('More operations')}
+        </CollapsibleTrigger>
+        <CollapsibleContent keepMounted>
+          <div className='mt-3 flex flex-wrap gap-2'>
+            <Button
+              type='button'
+              variant='outline'
+              disabled={disabled}
+              onClick={() => {
+                setDecision('inspect')
+                inspect.mutate(product.id)
+              }}
+            >
+              {t('Review product revision')}
+            </Button>
+
+            <Button
+              type='button'
+              variant='outline'
+              disabled={contractDisabled || product.state !== 'published'}
+              onClick={() => {
+                setDecision('unpublish')
+                inspect.mutate(product.id)
+              }}
+            >
+              {t('Unpublish product')}
+            </Button>
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={
+                contractDisabled ||
+                !['approved', 'published'].includes(product.state ?? '')
+              }
+              onClick={() => {
+                setDecision('revoke')
+                inspect.mutate(product.id)
+              }}
+            >
+              {t('Revoke approval')}
+            </Button>
+            <Button
+              type='button'
+              variant='outline'
+              disabled={disabled}
+              onClick={() => {
+                setDecision(product.archived ? 'restore' : 'archive')
+                inspect.mutate(product.id)
+              }}
+            >
+              {product.archived ? t('Restore product') : t('Archive product')}
+            </Button>
+            <Button
+              type='button'
+              variant='destructive'
+              disabled={disabled}
+              onClick={() => {
+                setDecision('inspect')
+                inspect.mutate(product.id)
+              }}
+            >
+              {t('Delete permanently')}
+            </Button>
+          </div>
+          <Label className='block'>
+            {t('Legacy store product ID')}
+            <Input
+              value={legacyID}
+              onChange={(e) => setLegacyID(e.target.value)}
+              inputMode='numeric'
+            />
+          </Label>
+          <Button
+            type='button'
+            variant='outline'
+            disabled={
+              contractDisabled ||
+              !Number.isSafeInteger(Number(legacyID)) ||
+              Number(legacyID) <= 0
+            }
+            onClick={() => {
+              setDecision('map')
+              inspect.mutate(product.id)
+            }}
+          >
+            {t('Map legacy product')}
+          </Button>
+        </CollapsibleContent>
+      </Collapsible>
       {mutation.isError || inspect.isError ? (
         <ErrorState
           description={t(

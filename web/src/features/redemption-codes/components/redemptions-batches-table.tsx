@@ -310,10 +310,10 @@ export function RedemptionsBatchesTable() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         maxCount={MAX_BATCH_COUNT}
-        onCreated={(batchId) => {
+        onCreated={(batchId, _count, downloaded) => {
           setCreateOpen(false)
           void fetchBatches(1)
-          setExportBatchId(batchId)
+          if (!downloaded) setExportBatchId(batchId)
         }}
       />
 
