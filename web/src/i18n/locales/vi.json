@@ -1,5 +1,13 @@
 {
   "translation": {
+    "{{codes}} eligible codes in {{batches}} batches": "{{codes}} mã đủ điều kiện trong {{batches}} lô",
+    "Check existing store reward eligibility": "Kiểm tra thưởng cho mã tồn kho cũ",
+    "Confirm these codes are intended for paid sales. Samples, free, test, compensation and used codes are excluded. Past redemptions will not receive rewards.": "Xác nhận các mã này dùng để bán có thu phí. Mã mẫu, miễn phí, thử nghiệm, bồi thường và đã dùng đều bị loại trừ. Không thưởng hồi tố cho các lượt đổi trước.",
+    "Enable eligibility": "Bật điều kiện thưởng",
+    "Enable rewards for existing store inventory": "Bật điều kiện thưởng cho tồn kho hiện có",
+    "Inventory changed. Check again before confirming.": "Tồn kho đã thay đổi. Kiểm tra lại trước khi xác nhận.",
+    "No eligible unqualified store codes found.": "Không có mã đủ điều kiện đang chờ xác nhận.",
+    "Updated reward eligibility for {{codes}} codes.": "Đã đặt điều kiện nhận thưởng cho {{codes}} mã.",
     "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "Mã tồn kho bán hàng chính thức mới được tự động đánh dấu là mã trả phí. Mã mẫu giao hàng, miễn phí, thử nghiệm và bồi thường không được thưởng. Chỉ xác nhận mã hiện có sau khi kiểm tra mục đích bán có thu phí. Không thể đổi điều kiện của mã đã sử dụng.",
     "The product catalog changed. Reload the page and try again.": "Danh mục sản phẩm đã thay đổi. Tải lại trang rồi thử lại.",
     "Activation cancelled. The saved draft is retained.": "Đã hủy kích hoạt. Bản nháp đã lưu được giữ lại.",

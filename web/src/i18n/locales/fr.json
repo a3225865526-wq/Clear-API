@@ -1,5 +1,13 @@
 {
   "translation": {
+    "{{codes}} eligible codes in {{batches}} batches": "{{codes}} codes admissibles dans {{batches}} lots",
+    "Check existing store reward eligibility": "Vérifier les codes du stock existant",
+    "Confirm these codes are intended for paid sales. Samples, free, test, compensation and used codes are excluded. Past redemptions will not receive rewards.": "Confirmez que ces codes sont destinés à la vente payante. Les échantillons, les codes gratuits, de test, de compensation et déjà utilisés sont exclus. Aucune récompense rétroactive ne sera versée.",
+    "Enable eligibility": "Activer l’éligibilité",
+    "Enable rewards for existing store inventory": "Activer les récompenses du stock existant",
+    "Inventory changed. Check again before confirming.": "Le stock a changé. Vérifiez à nouveau avant de confirmer.",
+    "No eligible unqualified store codes found.": "Aucun code admissible en attente de qualification.",
+    "Updated reward eligibility for {{codes}} codes.": "Éligibilité aux récompenses définie pour {{codes}} codes.",
     "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "Les nouveaux codes du stock commercial sont automatiquement marqués payants. Les échantillons de livraison et les codes gratuits, de test ou de compensation ne donnent aucune récompense. Vérifiez la destination commerciale des codes existants avant de les qualifier. Les codes utilisés ne peuvent pas être requalifiés.",
     "The product catalog changed. Reload the page and try again.": "Le catalogue a changé. Rechargez la page et réessayez.",
     "Activation cancelled. The saved draft is retained.": "Activation annulée. Le brouillon enregistré est conservé.",

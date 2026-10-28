@@ -1,5 +1,13 @@
 {
   "translation": {
+    "{{codes}} eligible codes in {{batches}} batches": "符合条件的兑换码 {{codes}} 张，共 {{batches}} 个批次",
+    "Check existing store reward eligibility": "核查旧库存返奖资格",
+    "Confirm these codes are intended for paid sales. Samples, free, test, compensation and used codes are excluded. Past redemptions will not receive rewards.": "请确认这些兑换码用于付费销售。交付样码、免费码、测试码、补偿码及已使用码均被排除，历史兑换不会补发奖励。",
+    "Enable eligibility": "确认启用资格",
+    "Enable rewards for existing store inventory": "为旧正式库存启用返奖资格",
+    "Inventory changed. Check again before confirming.": "库存已变化，请重新核查后确认。",
+    "No eligible unqualified store codes found.": "未找到符合条件的待补录商城码。",
+    "Updated reward eligibility for {{codes}} codes.": "已为 {{codes}} 张兑换码设置返奖资格。",
     "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "新生成的正式商城库存自动标记为付费码。交付样码、免费码、测试码和补偿码不返奖。现有库存须核实付费销售用途后设置资格，已兑换码不可重新设置。",
     "The product catalog changed. Reload the page and try again.": "商品配置已更新，请刷新页面后重试。",
     "Activation cancelled. The saved draft is retained.": "已取消启用，已保存的草稿予以保留。",

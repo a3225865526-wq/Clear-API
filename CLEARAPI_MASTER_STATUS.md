@@ -1,3 +1,14 @@
+## 2026-10-28 Asia/Shanghai — 旧正式库存返奖资格一键补录：本地完成，进入既有部署
+
+- 用户已选“一键处理全部符合条件的旧正式库存”。设计提交062946e17，见evidence/referral-stock-bulk-20261028/DESIGN.md。Root按钮核查并展示合格批次、商品/修订和数量，确认一次批量设置，原逐ID表单折叠高级；复用ConfirmDialog、Collapsible、Button、ErrorState及既有格式化，8键补齐七语言。
+- 新GET/POST /api/clearapi/referral/qualification/store均Root校验，POST复用SessionCookieOriginGuard。仅未分类、有效未用正式STORE余额码，批次冻结面额/Quota与真实审批的商品/修订/策略关联匹配；样码、免费/测试/补偿/已用/禁用/过期/软删/孤立/不匹配记录排除。确认绑定预览摘要，配置门闩→批次→码锁序，锁定重读兼容MySQL RR，分块500参数而全量更新和审计单事务。重复完成请求0更新且不重复审计；集合变化重新核查。无新schema/配置字段。
+- 实际测试：SQLite3.50.4、MySQL8.0.46、PostgreSQL17.6各两项批量主测试最终PASS，覆盖501码分块、审计失败全回滚、过时预览、并发重复确认、排除及历史原样保留、补录后隔离真实兑换/原奖励账本发放。首次MySQL并发被RR旧快照误报变化，已通过锁定后资格判定幂等修复，再定向三库通过，原失败日志保留。
+- Root权限（匿名/普通用户/普通管理员拒绝）与空奖励API两项、既有Origin校验三项通过；前端实际执行1文件10项（预览/取消/重复点击/成功/空态/过期预览/高级操作），类型/涉及文件lint/format/gofmt/diff通过。翻译经技能脚本+bun i18n:sync，自动比较各语言仅新增8键且原文及占位符保持。不重复不受影响的全量测试/账务矩阵。
+- 新筛选条件只读核对生产：6个正式批次共290张，审批均automatic-validation-v1且商品/修订匹配；6张未用样码排除。生产奖励true/version2、10%及原上限不变，reward/ledger仍0，PG03=false；session secure=true、可信来源https://www.clear999.com与新POST来源校验兼容。未执行生产资格或余额写入，不发历史奖励。
+- 当前运行78566eb495441f4e49344976dff176ef2bef4d91；本次尚未部署。进入Windows本地构建→SSH→既有VPS helper预检/备份/身份/健康流程。代码部署、Root生产确认、实际返奖分别记录；不修改PG03/D/商品生命周期/价格/支付。原始测试和生产只读投影在D:/AI/API/runtime/referral-stock-bulk-20261028/。
+
+---
+
 ## 2026-10-28 Asia/Shanghai — 10%邀请奖励开关已真实启用，旧库存资格待简化补录
 
 - 用户已保存并启用，独立生产只读核验production-after-user-enable.json确认invites_enabled=true、rewards_enabled=true、mode=percentage、basis_points=1000、version=2、epoch=1；单笔50000000/终身500000000 Quota上限保持，Root设置审计id4与该规则一致。开关启用已核验，不再列为未启用。

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
@@ -592,4 +593,178 @@ func TestReferralStoreEligibilityAndAtomicQueue(t *testing.T) {
 	require.Error(t, err)
 	require.NoError(t, DB.Model(&ReferralReward{}).Count(&count).Error)
 	assert.Zero(t, count)
+}
+
+func TestReferralBulkQualificationAndRollback(t *testing.T) {
+	a, b := referralFixture(t)
+	require.NoError(t, PrepareCreditCatalog())
+	product := creditApprovalProduct(t, "bulk-stock", 100)
+	creditApprovalAction(t, product.ID, "submit")
+	creditApprovalAction(t, product.ID, "approve")
+	creditApprovalAction(t, product.ID, "publish")
+	// 501 valid historical codes exercise the 500-bind write boundary with
+	// real approved issuance (each batch remains within its 100-code limit).
+	const stockCount = 501
+	var firstKey string
+	for start := 0; start < stockCount; start += 100 {
+		batch, keys, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: fmt.Sprintf("bulk-%d", start), ProductID: product.ID, ProductRevision: product.Revision, FaceValueCents: 100, Count: min(100, stockCount-start), AdminUserID: a})
+		require.NoError(t, err)
+		if firstKey == "" {
+			firstKey = keys[0]
+		}
+		require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", batch.Id).Update("referral_kind", "").Error)
+	}
+	// Both NULL and empty legacy qualifications are supported.
+	require.NoError(t, DB.Model(&Redemption{}).Where(commonKeyCol+" = ?", firstKey).Update("referral_kind", nil).Error)
+	require.NoError(t, DB.Model(&User{}).Where("id = ?", a).Update("quota", 123).Error)
+	beforeRule, err := GetReferralConfig()
+	require.NoError(t, err)
+	preview, err := GetReferralStockPreview()
+	require.NoError(t, err)
+	assert.Equal(t, stockCount, preview.Count)
+	assert.Len(t, preview.Batches, 6)
+	var count int64
+	require.NoError(t, DB.Model(&ReferralAudit{}).Where("action = ?", "qualification").Count(&count).Error)
+	assert.Zero(t, count, "checking inventory is read-only")
+	// A real classification change invalidates the complete reviewed set.
+	require.NoError(t, DB.Model(&Redemption{}).Where(commonKeyCol+" = ?", firstKey).Update("referral_kind", "free").Error)
+	updated, err := QualifyReferralStock(preview.Digest, a)
+	require.ErrorIs(t, err, ErrReferralStockChanged)
+	assert.Zero(t, updated)
+	require.NoError(t, DB.Model(&Redemption{}).Where("referral_kind = ?", "paid").Count(&count).Error)
+	assert.Zero(t, count)
+	require.NoError(t, DB.Model(&Redemption{}).Where(commonKeyCol+" = ?", firstKey).Update("referral_kind", nil).Error)
+	// An audit failure after both write chunks must roll back every code.
+	require.NoError(t, DB.Callback().Create().Before("gorm:create").Register("bulk-referral-audit-failure", func(tx *gorm.DB) {
+		if audit, ok := tx.Statement.Dest.(*ReferralAudit); ok && audit.Action == "qualification" {
+			tx.AddError(fmt.Errorf("isolated audit failure"))
+		}
+	}))
+	updated, err = QualifyReferralStock(preview.Digest, a)
+	require.Error(t, err)
+	assert.Zero(t, updated)
+	require.NoError(t, DB.Callback().Create().Remove("bulk-referral-audit-failure"))
+	require.NoError(t, DB.Model(&Redemption{}).Where("referral_kind = ?", "paid").Count(&count).Error)
+	assert.Zero(t, count)
+	var wg sync.WaitGroup
+	results := make(chan int, 2)
+	errors := make(chan error, 2)
+	for range 2 {
+		wg.Go(func() { n, err := QualifyReferralStock(preview.Digest, a); results <- n; errors <- err })
+	}
+	wg.Wait()
+	close(results)
+	close(errors)
+	total := 0
+	for n := range results {
+		total += n
+	}
+	for err := range errors {
+		require.NoError(t, err)
+	}
+	assert.Equal(t, stockCount, total)
+	updated, err = QualifyReferralStock(preview.Digest, a)
+	require.NoError(t, err)
+	assert.Zero(t, updated)
+	var audits []ReferralAudit
+	require.NoError(t, DB.Where("action = ?", "qualification").Find(&audits).Error)
+	require.Len(t, audits, 1)
+	assert.Equal(t, a, audits[0].ActorID)
+	assert.NotContains(t, audits[0].Details, firstKey)
+	afterRule, err := GetReferralConfig()
+	require.NoError(t, err)
+	assert.Equal(t, beforeRule, afterRule)
+	var inviter, buyer User
+	require.NoError(t, DB.First(&inviter, a).Error)
+	require.NoError(t, DB.First(&buyer, b).Error)
+	assert.Equal(t, 123, inviter.Quota)
+	assert.Zero(t, buyer.Quota)
+	for _, table := range []any{&ReferralReward{}, &ReferralLedger{}, &BalanceTransaction{}} {
+		require.NoError(t, DB.Model(table).Count(&count).Error)
+		assert.Zero(t, count, "qualification never issues a reward or changes balances")
+	}
+	preview, err = GetReferralStockPreview()
+	require.NoError(t, err)
+	assert.Zero(t, preview.Count)
+	assert.NotNil(t, preview.Batches)
+	// A subsequent real redemption in the isolated database follows the
+	// existing reward queue and ledger, using base quota only.
+	beforeRule.RewardsEnabled = true
+	require.NoError(t, SaveReferralConfig(beforeRule, a))
+	previousFlag := operation_setting.StoreRechargeEnabled
+	operation_setting.StoreRechargeEnabled = true
+	t.Cleanup(func() { operation_setting.StoreRechargeEnabled = previousFlag })
+	_, err = RedeemStoreCode(firstKey, b)
+	require.NoError(t, err)
+	var reward ReferralReward
+	require.NoError(t, DB.First(&reward).Error)
+	assert.EqualValues(t, 50000, reward.RewardQuota)
+	require.NoError(t, PayReferralReward(reward.ID))
+	require.NoError(t, DB.First(&inviter, a).Error)
+	assert.Equal(t, 50123, inviter.Quota)
+}
+
+func TestReferralBulkQualificationExcludesProtectedInventory(t *testing.T) {
+	a, _ := referralFixture(t)
+	require.NoError(t, PrepareCreditCatalog())
+	product := creditApprovalProduct(t, "bulk-exclusions", 100)
+	creditApprovalAction(t, product.ID, "activate")
+	for _, tc := range []struct {
+		name  string
+		code  map[string]any
+		batch map[string]any
+	}{
+		{"free", map[string]any{"referral_kind": "free"}, nil},
+		{"test", map[string]any{"referral_kind": "test"}, nil},
+		{"compensation", map[string]any{"referral_kind": "compensation"}, nil},
+		{"already-qualified", map[string]any{"referral_kind": "paid"}, nil},
+		{"used", map[string]any{"status": common.RedemptionCodeStatusUsed, "used_user_id": a, "redeemed_time": 123}, nil},
+		{"disabled", map[string]any{"status": common.RedemptionCodeStatusDisabled}, nil},
+		{"expired", map[string]any{"expired_time": common.GetTimestamp() - 60}, nil},
+		{"source", map[string]any{"source": RedemptionSourceAdmin}, nil},
+		{"type", map[string]any{"type": "SUBSCRIPTION"}, nil},
+		{"soft-deleted", map[string]any{"deleted_at": time.Unix(1, 0)}, nil},
+		{"quota-mismatch", map[string]any{"quota": 1}, nil},
+		{"price-mismatch", map[string]any{"face_value_cents": 1}, nil},
+		{"missing-batch", map[string]any{"batch_id": 999999}, nil},
+		{"sample", nil, map[string]any{"evidence_only": true}},
+		{"disabled-batch", nil, map[string]any{"status": RedemptionBatchStatusDisabled}},
+		{"expired-batch", nil, map[string]any{"expired_time": common.GetTimestamp() - 60}},
+		{"missing-approval", nil, map[string]any{"approval_id": 999999}},
+		{"unapproved-batch", nil, map[string]any{"approval_id": 0}},
+		{"batch-source", nil, map[string]any{"source": RedemptionSourceAdmin}},
+		{"wrong-revision", nil, map[string]any{"product_revision": 99}},
+	} {
+		batch, _, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: tc.name, ProductID: product.ID, ProductRevision: product.Revision, FaceValueCents: 100, Count: 1, AdminUserID: a})
+		require.NoError(t, err)
+		require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", batch.Id).Update("referral_kind", "").Error)
+		if tc.code != nil {
+			require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", batch.Id).Updates(tc.code).Error)
+		}
+		if tc.batch != nil {
+			require.NoError(t, DB.Model(&RedemptionBatch{}).Where("id = ?", batch.Id).Updates(tc.batch).Error)
+		}
+	}
+	// One eligible code from automatic approval demonstrates that every
+	// exclusion still applies to that policy's OR branch as well.
+	batch, _, err := CreateRedemptionBatch(CreateRedemptionBatchInput{Name: "eligible-auto", ProductID: product.ID, ProductRevision: product.Revision, FaceValueCents: 100, Count: 1, AdminUserID: a})
+	require.NoError(t, err)
+	require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", batch.Id).Update("referral_kind", "").Error)
+	preview, err := GetReferralStockPreview()
+	require.NoError(t, err)
+	require.Equal(t, 1, preview.Count)
+	require.Len(t, preview.Batches, 1)
+	assert.Equal(t, batch.Id, preview.Batches[0].ID)
+	var protectedBefore []Redemption
+	require.NoError(t, DB.Unscoped().Where("batch_id <> ?", batch.Id).Order("id").Find(&protectedBefore).Error)
+	updated, err := QualifyReferralStock(preview.Digest, a)
+	require.NoError(t, err)
+	assert.Equal(t, 1, updated)
+	require.NoError(t, DB.Model(&Redemption{}).Where("batch_id = ?", batch.Id).Update("status", common.RedemptionCodeStatusUsed).Error)
+	updated, err = QualifyReferralStock(preview.Digest, a)
+	require.NoError(t, err)
+	assert.Zero(t, updated)
+	var protectedAfter []Redemption
+	require.NoError(t, DB.Unscoped().Where("batch_id <> ?", batch.Id).Order("id").Find(&protectedAfter).Error)
+	assert.Equal(t, protectedBefore, protectedAfter)
 }

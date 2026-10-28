@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -334,4 +335,33 @@ func SetRedemptionReferralKind(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func GetReferralStockPreview(c *gin.Context) {
+	preview, err := model.GetReferralStockPreview()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": preview})
+}
+
+func QualifyReferralStock(c *gin.Context) {
+	var input struct {
+		Digest string `json:"digest"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	count, err := model.QualifyReferralStock(input.Digest, c.GetInt("id"))
+	if errors.Is(err, model.ErrReferralStockChanged) {
+		c.JSON(http.StatusConflict, gin.H{"success": false, "code": "REFERRAL_STOCK_CHANGED", "message": err.Error()})
+		return
+	}
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"updated_count": count}})
 }

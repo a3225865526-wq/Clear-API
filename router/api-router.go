@@ -36,6 +36,8 @@ func SetApiRouter(router *gin.Engine) {
 	apiRouter.GET("/clearapi/referral/rewards", middleware.RootAuth(), controller.ListReferralRewards)
 	apiRouter.POST("/clearapi/referral/rewards/:id/resume", middleware.RootAuth(), controller.ResumeReferralReward)
 	apiRouter.PUT("/clearapi/referral/qualification", middleware.RootAuth(), controller.SetRedemptionReferralKind)
+	apiRouter.GET("/clearapi/referral/qualification/store", middleware.DisableCache(), middleware.RootAuth(), controller.GetReferralStockPreview)
+	apiRouter.POST("/clearapi/referral/qualification/store", middleware.RootAuth(), middleware.SessionCookieOriginGuard(), controller.QualifyReferralStock)
 	RegisterUpstreamPoolRoutes(apiRouter)
 	apiRouter.GET("/console/dashboard", middleware.UserAuth(), controller.GetConsoleDashboard)
 	apiRouter.GET("/console/channel-status", middleware.UserAuth(), controller.GetConsoleMonitoring)

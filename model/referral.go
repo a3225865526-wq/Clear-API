@@ -1,9 +1,11 @@
 package model
 
 import (
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -450,4 +452,181 @@ func SetRedemptionReferralKind(ids []int, kind, reason string, actor int) error 
 		}
 		return tx.Create(&ReferralAudit{ActorID: actor, Action: "qualification", Details: string(raw), CreatedTime: common.GetTimestamp()}).Error
 	})
+}
+
+var ErrReferralStockChanged = errors.New("Inventory changed. Check again before confirming.")
+
+type ReferralStockBatch struct {
+	ID              int    `json:"id"`
+	Name            string `json:"name"`
+	ProductID       string `json:"product_id"`
+	ProductRevision int64  `json:"product_revision"`
+	Count           int    `json:"count"`
+}
+
+type ReferralStockPreview struct {
+	Count   int                  `json:"count"`
+	Batches []ReferralStockBatch `json:"batches"`
+	Digest  string               `json:"digest"`
+}
+
+type referralStockCandidate struct {
+	ID              int
+	BatchID         int
+	Name            string
+	ProductID       string
+	ProductRevision int64
+	ApprovalID      int
+	DeliveryBinding string
+	FaceValueCents  int64
+	Quota           int
+}
+
+// Only unclassified formal inventory is eligible. Explicit exclusions and
+// historical redemptions are never reclassified by the bulk operation.
+func referralStockCandidates(tx *gorm.DB, locking bool) ([]referralStockCandidate, error) {
+	if locking {
+		tx = lockForUpdate(tx)
+	}
+	rows := make([]referralStockCandidate, 0)
+	now := common.GetTimestamp()
+	err := tx.Model(&Redemption{}).
+		Select("redemptions.id, redemptions.batch_id, redemption_batches.name, redemption_batches.product_id, redemption_batches.product_revision, redemption_batches.approval_id, redemption_batches.delivery_binding, redemptions.face_value_cents, redemptions.quota").
+		Joins("JOIN redemption_batches ON redemption_batches.id = redemptions.batch_id").
+		Joins("JOIN credit_approval_events ON credit_approval_events.id = redemption_batches.approval_id AND credit_approval_events.product_id = redemption_batches.product_id AND credit_approval_events.revision = redemption_batches.product_revision").
+		Where("((credit_approval_events.decision = ? AND credit_approval_events.policy = ?) OR (credit_approval_events.decision = ? AND credit_approval_events.policy = ?))", "approve", CreditApprovalPolicy, "auto_validate", CreditAutomaticValidationPolicy).
+		Where("redemptions.source = ? AND redemptions.type = ? AND redemptions.status = ?", RedemptionSourceStore, RedemptionTypeBalance, common.RedemptionCodeStatusEnabled).
+		Where("(redemptions.referral_kind IS NULL OR redemptions.referral_kind = ?)", "").
+		Where("(redemptions.expired_time = 0 OR redemptions.expired_time >= ?)", now).
+		Where("redemption_batches.source = ? AND redemption_batches.type = ? AND redemption_batches.status = ? AND redemption_batches.evidence_only = ?", RedemptionSourceStore, RedemptionTypeBalance, RedemptionBatchStatusEnabled, false).
+		Where("redemption_batches.product_id <> ? AND redemption_batches.product_revision > 0 AND redemption_batches.approval_id > 0", "").
+		Where("(redemption_batches.expired_time = 0 OR redemption_batches.expired_time >= ?)", now).
+		Where("redemptions.face_value_cents > 0 AND redemptions.quota > 0 AND redemptions.face_value_cents = redemption_batches.face_value_cents AND redemptions.quota = redemption_batches.quota").
+		Order("redemptions.id").Find(&rows).Error
+	return rows, err
+}
+
+func referralStockPreview(rows []referralStockCandidate) (*ReferralStockPreview, error) {
+	raw, err := common.Marshal(rows)
+	if err != nil {
+		return nil, err
+	}
+	preview := &ReferralStockPreview{Count: len(rows), Batches: make([]ReferralStockBatch, 0), Digest: fmt.Sprintf("%x", sha256.Sum256(raw))}
+	indexes := make(map[int]int)
+	for _, row := range rows {
+		i, exists := indexes[row.BatchID]
+		if !exists {
+			i = len(preview.Batches)
+			indexes[row.BatchID] = i
+			preview.Batches = append(preview.Batches, ReferralStockBatch{ID: row.BatchID, Name: row.Name, ProductID: row.ProductID, ProductRevision: row.ProductRevision})
+		}
+		preview.Batches[i].Count++
+	}
+	return preview, nil
+}
+
+func GetReferralStockPreview() (*ReferralStockPreview, error) {
+	rows, err := referralStockCandidates(DB, false)
+	if err != nil {
+		return nil, err
+	}
+	return referralStockPreview(rows)
+}
+
+func QualifyReferralStock(digest string, actor int) (int, error) {
+	if len(digest) != 64 || actor <= 0 {
+		return 0, errors.New("invalid inventory confirmation")
+	}
+	updated := 0
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		if _, err := readReferralConfig(tx, true); err != nil {
+			return err
+		}
+		rows, err := referralStockCandidates(tx, false)
+		if err != nil || len(rows) == 0 {
+			return err // A repeated successful request is a no-op.
+		}
+		preview, err := referralStockPreview(rows)
+		if err != nil {
+			return err
+		}
+		if preview.Digest != digest {
+			return ErrReferralStockChanged
+		}
+		batchIDs := make([]int, 0, len(preview.Batches))
+		for _, batch := range preview.Batches {
+			batchIDs = append(batchIDs, batch.ID)
+		}
+		slices.Sort(batchIDs)
+		lockedKinds := make(map[int]string)
+		// Match batch management's Batch -> Redemption lock order. The shared
+		// referral gate also serializes this operation against redemption/payout.
+		for _, id := range batchIDs {
+			var batch RedemptionBatch
+			if err := lockForUpdate(tx).First(&batch, id).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return ErrReferralStockChanged
+				}
+				return err
+			}
+			var codes []Redemption
+			if err := lockForUpdate(tx).Select("id", "referral_kind").Where("batch_id = ?", id).Order("id").Find(&codes).Error; err != nil {
+				return err
+			}
+			for _, code := range codes {
+				lockedKinds[code.Id] = code.ReferralKind
+			}
+		}
+		// A locking read sees current rows on MySQL REPEATABLE READ as well.
+		reviewedRows := rows
+		rows, err = referralStockCandidates(tx, true)
+		if err != nil {
+			return err
+		}
+		current, err := referralStockPreview(rows)
+		if err != nil {
+			return err
+		}
+		if current.Count == 0 {
+			for _, row := range reviewedRows {
+				if lockedKinds[row.ID] != "paid" {
+					return ErrReferralStockChanged
+				}
+			}
+			return nil
+		}
+		if current.Digest != digest {
+			return ErrReferralStockChanged
+		}
+		ids := make([]int, 0, len(rows))
+		for _, row := range rows {
+			ids = append(ids, row.ID)
+		}
+		// Bound bind parameters for every supported database, while committing
+		// the entire confirmation and its audit in one transaction.
+		for start := 0; start < len(ids); start += 500 {
+			part := ids[start:min(start+500, len(ids))]
+			result := tx.Model(&Redemption{}).Where("id IN ?", part).
+				Where("status = ? AND (referral_kind IS NULL OR referral_kind = ?)", common.RedemptionCodeStatusEnabled, "").Update("referral_kind", "paid")
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected != int64(len(part)) {
+				return ErrReferralStockChanged
+			}
+		}
+		raw, err := common.Marshal(map[string]any{"ids": ids, "kind": "paid", "reason": "operator confirmed paid-sale purpose of reviewed formal inventory", "digest": digest, "batches": current.Batches})
+		if err != nil {
+			return err
+		}
+		if err := tx.Create(&ReferralAudit{ActorID: actor, Action: "qualification", Details: string(raw), CreatedTime: common.GetTimestamp()}).Error; err != nil {
+			return err
+		}
+		updated = len(ids)
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	return updated, nil
 }

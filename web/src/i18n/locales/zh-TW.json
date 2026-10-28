@@ -1,5 +1,13 @@
 {
   "translation": {
+    "{{codes}} eligible codes in {{batches}} batches": "符合條件的兌換碼 {{codes}} 張，共 {{batches}} 個批次",
+    "Check existing store reward eligibility": "核查舊庫存獎勵資格",
+    "Confirm these codes are intended for paid sales. Samples, free, test, compensation and used codes are excluded. Past redemptions will not receive rewards.": "請確認這些兌換碼用於付費銷售。交付樣碼、免費碼、測試碼、補償碼及已使用碼均已排除，歷史兌換不會補發獎勵。",
+    "Enable eligibility": "確認啟用資格",
+    "Enable rewards for existing store inventory": "為舊正式庫存啟用獎勵資格",
+    "Inventory changed. Check again before confirming.": "庫存已變更，請重新核查後確認。",
+    "No eligible unqualified store codes found.": "未找到符合條件且待補登的商城碼。",
+    "Updated reward eligibility for {{codes}} codes.": "已為 {{codes}} 張兌換碼設定獎勵資格。",
     "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "新產生的正式商城庫存自動標記為付費碼。交付樣碼、免費碼、測試碼與補償碼不發獎勵。既有庫存須核實付費銷售用途後設定資格，已兌換碼不可重新設定。",
     "The product catalog changed. Reload the page and try again.": "商品設定已更新，請重新整理頁面後再試。",
     "Activation cancelled. The saved draft is retained.": "已取消啟用，保留已儲存的草稿。",

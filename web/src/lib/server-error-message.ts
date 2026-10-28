@@ -23,6 +23,7 @@ import i18next from 'i18next'
 export const safeServerErrorMessage = Symbol('safeServerErrorMessage')
 
 const serverErrorMessageKeys = {
+  REFERRAL_STOCK_CHANGED: 'Inventory changed. Check again before confirming.',
   STORE_CATALOG_CHANGED:
     'The product catalog changed. Reload the page and try again.',
   STORE_AUTOMATIC_VALIDATION_FAILED:

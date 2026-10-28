@@ -82,6 +82,29 @@ export async function qualifyCodes(input: {
   const r = await api.put('/api/clearapi/referral/qualification', input)
   requireServerSuccess(r.data)
 }
+export type ReferralStockPreview = {
+  count: number
+  digest: string
+  batches: {
+    id: number
+    name: string
+    product_id: string
+    product_revision: number
+    count: number
+  }[]
+}
+export async function getReferralStockPreview(): Promise<ReferralStockPreview> {
+  const r = await api.get('/api/clearapi/referral/qualification/store')
+  return requireServerSuccess(r.data).data
+}
+export async function qualifyReferralStock(digest: string): Promise<{
+  updated_count: number
+}> {
+  const r = await api.post('/api/clearapi/referral/qualification/store', {
+    digest,
+  })
+  return requireServerSuccess(r.data).data
+}
 export async function resumeReward(input: {
   id: number
   reason: string

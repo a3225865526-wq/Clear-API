@@ -26,6 +26,11 @@ import { z } from 'zod'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { ErrorState } from '@/components/error-state'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { toIntlLocale } from '@/i18n/languages'
@@ -33,6 +38,7 @@ import { formatNumber } from '@/lib/format'
 
 import { getReferralAdmin, qualifyCodes, resumeReward } from '../api'
 import { formatReferralCredit } from '../lib/format-credit'
+import { StoreQualification } from './store-qualification'
 
 const qualificationSchema = z.object({
   ids: z.string().regex(/^\d+(\s*,\s*\d+)*$/),
@@ -74,46 +80,58 @@ export function RewardOperations() {
           'New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.'
         )}
       </p>
-      <form
-        className='grid grid-cols-1 gap-3 sm:grid-cols-2'
-        onSubmit={form.handleSubmit((v) =>
-          qualify.mutate({ ...v, ids: v.ids.split(',').map(Number) })
-        )}
-      >
-        <label className='space-y-1'>
-          {t('Code IDs separated by commas')}
-          <Input {...form.register('ids')} />
-        </label>
-        <label className='space-y-1'>
-          {t('Code qualification')}
-          <NativeSelect {...form.register('kind')}>
-            <NativeSelectOption value='paid'>
-              {t('Paid and eligible')}
-            </NativeSelectOption>
-            <NativeSelectOption value='free'>{t('Free')}</NativeSelectOption>
-            <NativeSelectOption value='test'>{t('Test')}</NativeSelectOption>
-            <NativeSelectOption value='compensation'>
-              {t('Compensation')}
-            </NativeSelectOption>
-          </NativeSelect>
-        </label>
-        <label className='space-y-1 sm:col-span-2'>
-          {t('Verification reason')}
-          <Input {...form.register('reason')} />
-        </label>
-        <Button type='submit' disabled={qualify.isPending}>
-          {t('Save qualification')}
-        </Button>
-        {Object.entries(form.formState.errors).map(([key, error]) => (
-          <p role='alert' key={key}>
-            {t(error.message ?? 'Invalid qualification')}
-          </p>
-        ))}
-      </form>
-      {qualify.isSuccess ? (
-        <p role='status'>{t('Saved successfully')}</p>
-      ) : null}
-      {qualify.isError ? <ErrorState /> : null}
+      <StoreQualification />
+      <Collapsible>
+        <CollapsibleTrigger render={<Button type='button' variant='outline' />}>
+          {t('Advanced settings')}
+        </CollapsibleTrigger>
+        <CollapsibleContent className='space-y-3 pt-3'>
+          <form
+            className='grid grid-cols-1 gap-3 sm:grid-cols-2'
+            onSubmit={form.handleSubmit((v) =>
+              qualify.mutate({ ...v, ids: v.ids.split(',').map(Number) })
+            )}
+          >
+            <label className='space-y-1'>
+              {t('Code IDs separated by commas')}
+              <Input {...form.register('ids')} />
+            </label>
+            <label className='space-y-1'>
+              {t('Code qualification')}
+              <NativeSelect {...form.register('kind')}>
+                <NativeSelectOption value='paid'>
+                  {t('Paid and eligible')}
+                </NativeSelectOption>
+                <NativeSelectOption value='free'>
+                  {t('Free')}
+                </NativeSelectOption>
+                <NativeSelectOption value='test'>
+                  {t('Test')}
+                </NativeSelectOption>
+                <NativeSelectOption value='compensation'>
+                  {t('Compensation')}
+                </NativeSelectOption>
+              </NativeSelect>
+            </label>
+            <label className='space-y-1 sm:col-span-2'>
+              {t('Verification reason')}
+              <Input {...form.register('reason')} />
+            </label>
+            <Button type='submit' disabled={qualify.isPending}>
+              {t('Save qualification')}
+            </Button>
+            {Object.entries(form.formState.errors).map(([key, error]) => (
+              <p role='alert' key={key}>
+                {t(error.message ?? 'Invalid qualification')}
+              </p>
+            ))}
+          </form>
+          {qualify.isSuccess ? (
+            <p role='status'>{t('Saved successfully')}</p>
+          ) : null}
+          {qualify.isError ? <ErrorState /> : null}
+        </CollapsibleContent>
+      </Collapsible>
       <h3 className='font-semibold'>{t('Reward payout log and summary')}</h3>
       {query.isPending ? <p>{t('Loading...')}</p> : null}
       {query.isError ? <ErrorState onRetry={() => query.refetch()} /> : null}

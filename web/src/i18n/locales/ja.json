@@ -1,5 +1,13 @@
 {
   "translation": {
+    "{{codes}} eligible codes in {{batches}} batches": "{{batches}} バッチに対象コード {{codes}} 件",
+    "Check existing store reward eligibility": "既存在庫の報酬資格を確認",
+    "Confirm these codes are intended for paid sales. Samples, free, test, compensation and used codes are excluded. Past redemptions will not receive rewards.": "これらのコードが有料販売用であることを確認してください。納品サンプル、無料、テスト、補償、使用済みコードは対象外です。過去の交換への報酬は発行されません。",
+    "Enable eligibility": "資格を有効化",
+    "Enable rewards for existing store inventory": "既存在庫の報酬資格を有効化",
+    "Inventory changed. Check again before confirming.": "在庫が変更されました。再確認してから確定してください。",
+    "No eligible unqualified store codes found.": "条件を満たす未設定のストアコードはありません。",
+    "Updated reward eligibility for {{codes}} codes.": "{{codes}} 件のコードに報酬資格を設定しました。",
     "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "新規の正式な販売在庫は自動的に有料コードとして登録されます。納品サンプル、無料、テスト、補償コードは報酬対象外です。既存在庫は有料販売用であることを確認してから対象に設定してください。使用済みコードは再設定できません。",
     "The product catalog changed. Reload the page and try again.": "商品設定が更新されました。ページを再読み込みしてから再試行してください。",
     "Activation cancelled. The saved draft is retained.": "有効化を中止しました。保存済みの下書きは保持されます。",

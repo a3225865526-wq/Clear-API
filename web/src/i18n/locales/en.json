@@ -1,5 +1,13 @@
 {
   "translation": {
+    "{{codes}} eligible codes in {{batches}} batches": "{{codes}} eligible codes in {{batches}} batches",
+    "Check existing store reward eligibility": "Check existing store reward eligibility",
+    "Confirm these codes are intended for paid sales. Samples, free, test, compensation and used codes are excluded. Past redemptions will not receive rewards.": "Confirm these codes are intended for paid sales. Samples, free, test, compensation and used codes are excluded. Past redemptions will not receive rewards.",
+    "Enable eligibility": "Enable eligibility",
+    "Enable rewards for existing store inventory": "Enable rewards for existing store inventory",
+    "Inventory changed. Check again before confirming.": "Inventory changed. Check again before confirming.",
+    "No eligible unqualified store codes found.": "No eligible unqualified store codes found.",
+    "Updated reward eligibility for {{codes}} codes.": "Updated reward eligibility for {{codes}} codes.",
     "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.": "New formal store inventory is marked paid automatically. Delivery samples, free, test and compensation codes do not earn rewards. Qualify existing codes only after verifying their paid-sale purpose. Used codes cannot be requalified.",
     "The product catalog changed. Reload the page and try again.": "The product catalog changed. Reload the page and try again.",
     "Activation cancelled. The saved draft is retained.": "Activation cancelled. The saved draft is retained.",

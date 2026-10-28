@@ -172,17 +172,26 @@ func TestAccessTokenAuditsResultsAndExcludesBrowserSessions(t *testing.T) {
 }
 
 func TestReferralManagementRequiresRootPermission(t *testing.T) {
-	_, pat := setupAccessTokenAudit(t)
+	user, pat := setupAccessTokenAudit(t)
 	router := gin.New()
 	router.GET("/catalog", middleware.RootAuth(), GetAdminCreditCatalog)
 	router.PUT("/catalog", middleware.RootAuth(), SaveCreditCatalog)
 	router.GET("/settings", middleware.RootAuth(), GetReferralSettings)
 	router.PUT("/settings", middleware.RootAuth(), SaveReferralSettings)
 	router.PUT("/qualification", middleware.RootAuth(), SetRedemptionReferralKind)
+	router.GET("/qualification/store", middleware.RootAuth(), GetReferralStockPreview)
+	router.POST("/qualification/store", middleware.RootAuth(), middleware.SessionCookieOriginGuard(), QualifyReferralStock)
 	router.POST("/rewards/1/resume", middleware.RootAuth(), ResumeReferralReward)
-	for _, tc := range []struct{ method, path string }{{"GET", "/catalog"}, {"PUT", "/catalog"}, {"GET", "/settings"}, {"PUT", "/settings"}, {"PUT", "/qualification"}, {"POST", "/rewards/1/resume"}} {
+	for _, tc := range []struct{ method, path string }{{"GET", "/catalog"}, {"PUT", "/catalog"}, {"GET", "/settings"}, {"PUT", "/settings"}, {"PUT", "/qualification"}, {"GET", "/qualification/store"}, {"POST", "/qualification/store"}, {"POST", "/rewards/1/resume"}} {
 		response := auditRequest(router, tc.method, tc.path, pat)
 		assert.Equal(t, http.StatusForbidden, response.Code, tc.path)
+	}
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		assert.Equal(t, http.StatusUnauthorized, auditRequest(router, method, "/qualification/store", "").Code)
+	}
+	require.NoError(t, model.DB.Model(user).Update("role", common.RoleCommonUser).Error)
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		assert.Equal(t, http.StatusForbidden, auditRequest(router, method, "/qualification/store", pat).Code)
 	}
 }
 

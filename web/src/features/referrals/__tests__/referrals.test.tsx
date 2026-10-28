@@ -265,3 +265,131 @@ it('rejects missing delivery proof and parses fractional amounts without floatin
   expect(decimalUnits('1e9', 100)).toBeNaN()
   expect(formatReferralCredit(1, 'zh-CN')).toBe('$0.000002')
 })
+
+const stockPreview = {
+  count: 290,
+  digest: 'a'.repeat(64),
+  batches: [100, 100, 50, 20, 10, 10].map((count, i) => ({
+    id: i + 1,
+    name: `stock-${i + 1}`,
+    product_id: `credit-${i + 1}`,
+    product_revision: 1,
+    count,
+  })),
+}
+
+function referralSettingsResponse(url: string, inventory = stockPreview) {
+  if (url.endsWith('/qualification/store')) {
+    return { data: { success: true, data: inventory } }
+  }
+  if (url.includes('/settings')) {
+    return { data: { success: true, data: rule } }
+  }
+  return {
+    data: {
+      success: true,
+      data: { items: [], total: 0, summary: [], audits: [] },
+    },
+  }
+}
+
+it('checks all old inventory, previews batches and submits one confirmed request without manual IDs', async () => {
+  vi.spyOn(api, 'get').mockImplementation(async (url) =>
+    referralSettingsResponse(String(url))
+  )
+  let finish!: (value: {
+    data: { success: boolean; data: { updated_count: number } }
+  }) => void
+  const post = vi.spyOn(api, 'post').mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve
+      })
+  )
+  renderQuery(<RewardSettings />)
+  const user = userEvent.setup()
+  expect(
+    screen.queryByLabelText('Code IDs separated by commas')
+  ).not.toBeInTheDocument()
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Check existing store reward eligibility',
+    })
+  )
+  expect(
+    await screen.findByText('290 eligible codes in 6 batches')
+  ).toBeVisible()
+  expect(screen.getByText(/stock-6/)).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Cancel' }))
+  expect(post).not.toHaveBeenCalled()
+  await user.click(
+    screen.getByRole('button', {
+      name: 'Check existing store reward eligibility',
+    })
+  )
+  const confirm = await screen.findByRole('button', {
+    name: 'Enable eligibility',
+  })
+  await user.dblClick(confirm)
+  expect(post).toHaveBeenCalledTimes(1)
+  expect(post).toHaveBeenCalledWith(
+    '/api/clearapi/referral/qualification/store',
+    { digest: stockPreview.digest }
+  )
+  finish({ data: { success: true, data: { updated_count: 290 } } })
+  expect(
+    await screen.findByText('Updated reward eligibility for 290 codes.')
+  ).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Advanced settings' }))
+  expect(
+    await screen.findByLabelText('Code IDs separated by commas')
+  ).toBeVisible()
+})
+
+it('shows an empty old-inventory check without submitting a qualification', async () => {
+  vi.spyOn(api, 'get').mockImplementation(async (url) =>
+    referralSettingsResponse(String(url), {
+      count: 0,
+      digest: 'b'.repeat(64),
+      batches: [],
+    })
+  )
+  const post = vi.spyOn(api, 'post')
+  renderQuery(<RewardSettings />)
+  await userEvent.click(
+    screen.getByRole('button', {
+      name: 'Check existing store reward eligibility',
+    })
+  )
+  expect(
+    await screen.findByText('No eligible unqualified store codes found.')
+  ).toBeVisible()
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  expect(post).not.toHaveBeenCalled()
+})
+
+it('rejects an outdated inventory confirmation and requires another check', async () => {
+  vi.spyOn(api, 'get').mockImplementation(async (url) =>
+    referralSettingsResponse(String(url))
+  )
+  const post = vi.spyOn(api, 'post').mockRejectedValue({
+    response: {
+      status: 409,
+      data: { success: false, code: 'REFERRAL_STOCK_CHANGED' },
+    },
+  })
+  renderQuery(<RewardSettings />)
+  await userEvent.click(
+    screen.getByRole('button', {
+      name: 'Check existing store reward eligibility',
+    })
+  )
+  await userEvent.click(
+    await screen.findByRole('button', { name: 'Enable eligibility' })
+  )
+  expect(
+    await screen.findByText('Inventory changed. Check again before confirming.')
+  ).toBeVisible()
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  expect(post).toHaveBeenCalledTimes(1)
+})
