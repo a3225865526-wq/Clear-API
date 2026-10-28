@@ -70,6 +70,7 @@ const TIME_DOMAINS: Record<TimeFunction, [number, number]> = {
   weekday: [0, 6],
   month: [1, 12],
   day: [1, 31],
+  cn_holiday: [0, 1],
 }
 let nextId = 0
 export function visualNodeId(): string {
@@ -295,6 +296,12 @@ function writeVisualCondition(
     issues.push({ id: node.id, message: 'Enter a valid condition value.' })
   }
   const isTime = (TIME_FUNCTIONS as readonly string[]).includes(node.probe)
+  if (node.probe === 'cn_holiday' && node.timezone.trim() !== 'Asia/Shanghai') {
+    issues.push({
+      id: node.id,
+      message: 'Chinese holiday conditions require Asia/Shanghai timezone.',
+    })
+  }
   if (isTime) {
     const originalProbe =
       node.origin?.kind === 'binary' ? node.origin.left : null

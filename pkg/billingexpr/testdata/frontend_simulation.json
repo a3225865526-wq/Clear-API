@@ -419,5 +419,93 @@
         "conditionText": "Text-only requests"
       }
     ]
+  },
+  {
+    "name": "Chinese holiday on a weekday",
+    "expression": "cn_holiday(\"Asia/Shanghai\") == 0 && weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18)) ? tier(\"peak\", p * 0.30 + cr * 0.006 + c * 1.20) : tier(\"off_peak\", p * 0.15 + cr * 0.003 + c * 0.60)",
+    "now": "2026-09-25T10:00:00+08:00",
+    "tokens": {
+      "p": 800,
+      "cr": 100,
+      "c": 0
+    },
+    "tier": "off_peak",
+    "cost": 120.3
+  },
+  {
+    "name": "ordinary Chinese weekday peak",
+    "expression": "cn_holiday(\"Asia/Shanghai\") == 0 && weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18)) ? tier(\"peak\", p * 0.30 + cr * 0.006 + c * 1.20) : tier(\"off_peak\", p * 0.15 + cr * 0.003 + c * 0.60)",
+    "now": "2026-09-24T10:00:00+08:00",
+    "tokens": {
+      "p": 800,
+      "cr": 100,
+      "c": 0
+    },
+    "tier": "peak",
+    "cost": 240.6
+  },
+  {
+    "name": "Chinese makeup Saturday stays off peak",
+    "expression": "cn_holiday(\"Asia/Shanghai\") == 0 && weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18)) ? tier(\"peak\", p * 0.30 + cr * 0.006 + c * 1.20) : tier(\"off_peak\", p * 0.15 + cr * 0.003 + c * 0.60)",
+    "now": "2026-10-10T10:00:00+08:00",
+    "tokens": {
+      "p": 800,
+      "cr": 100,
+      "c": 0
+    },
+    "tier": "off_peak",
+    "cost": 120.3
+  },
+  {
+    "name": "Chinese holiday starts at Beijing midnight",
+    "expression": "cn_holiday(\"Asia/Shanghai\") == 0 && weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18)) ? tier(\"peak\", p * 0.30 + cr * 0.006 + c * 1.20) : tier(\"off_peak\", p * 0.15 + cr * 0.003 + c * 0.60)",
+    "now": "2026-09-24T16:00:00Z",
+    "tokens": {
+      "p": 800,
+      "cr": 100,
+      "c": 0
+    },
+    "tier": "off_peak",
+    "cost": 120.3
+  },
+  {
+    "name": "previous Chinese calendar year",
+    "expression": "cn_holiday(\"Asia/Shanghai\") == 0 && weekday(\"Asia/Shanghai\") >= 1 && weekday(\"Asia/Shanghai\") <= 5 && ((hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12) || (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18)) ? tier(\"peak\", p * 0.30 + cr * 0.006 + c * 1.20) : tier(\"off_peak\", p * 0.15 + cr * 0.003 + c * 0.60)",
+    "now": "2025-06-02T10:00:00+08:00",
+    "tokens": {
+      "p": 800,
+      "cr": 100,
+      "c": 0
+    },
+    "tier": "off_peak",
+    "cost": 120.3
+  },
+  {
+    "name": "missing Chinese holiday year rejects skipped condition",
+    "expression": "weekday(\"Asia/Shanghai\") <= 5 && cn_holiday(\"Asia/Shanghai\") == 0 ? tier(\"peak\", p) : tier(\"off\", p * 0.5)",
+    "now": "2027-01-03T10:00:00+08:00",
+    "tokens": {
+      "p": 100
+    },
+    "error": "Chinese holiday calendar unavailable for 2027"
+  },
+  {
+    "name": "missing Chinese holiday year rejects optimized branch",
+    "expression": "false && cn_holiday(\"Asia/Shanghai\") == 0 ? tier(\"peak\", p) : tier(\"off\", p * 0.5)",
+    "now": "2027-01-03T10:00:00+08:00",
+    "tokens": {
+      "p": 100
+    },
+    "error": "Chinese holiday calendar unavailable for 2027"
+  },
+  {
+    "name": "Chinese holiday rejects non Beijing timezone",
+    "expression": "cn_holiday(\"UTC\") == 0 ? tier(\"peak\", p) : tier(\"off\", p * 0.5)",
+    "now": "2026-10-01T10:00:00+08:00",
+    "tokens": {
+      "p": 100
+    },
+    "error": "cn_holiday requires Asia/Shanghai timezone",
+    "errorStatus": "invalid"
   }
 ]

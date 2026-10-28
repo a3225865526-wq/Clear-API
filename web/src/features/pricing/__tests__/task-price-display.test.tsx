@@ -661,6 +661,6 @@ it('shows provider count, price range and missing-price status in both list and 
   expect(screen.getAllByText(/Not configured for some providers/)).toHaveLength(
     2
   )
-  expect(screen.getByText('0.4 – 0.8/s')).toBeVisible()
+  expect(screen.getAllByText('0.4 – 0.8/s')).toHaveLength(2)
   expect(screen.getByText('$0.4 – $0.8')).toBeVisible()
 })

@@ -172,6 +172,7 @@ OpenAI 已于 2026-05-12 下线 DALL·E 2/3；其校验、默认值和倍率保�
 | `weekday` | `weekday(tz) → int` | Day of week (0=Sunday, 6=Saturday) |
 | `month` | `month(tz) → int` | Month (1-12) |
 | `day` | `day(tz) → int` | Day of month (1-31) |
+| `cn_holiday` | `cn_holiday("Asia/Shanghai") → int` | 1 during announced Chinese public holiday periods, 0 otherwise; rejects unsupported timezones and missing calendar years |
 | `max` | `max(a, b) → float64` | Math max |
 | `min` | `min(a, b) → float64` | Math min |
 | `abs` | `abs(x) → float64` | Absolute value |
@@ -179,6 +180,17 @@ OpenAI 已于 2026-05-12 下线 DALL·E 2/3；其校验、默认值和倍率保�
 | `floor` | `floor(x) → float64` | Floor |
 
 ### Expression Examples
+
+Chinese holiday data lives in `pkg/billingexpr/chinese_holidays.json`, embedded
+by Go and imported by the browser simulator. Its source links identify the
+official announcements; add each newly published year's complete dates there
+and release both components together. No calendar is inferred for missing years.
+The calendar covers announced days off, including days off in lieu, and excludes
+makeup workdays. For DeepSeek, combine `cn_holiday("Asia/Shanghai") == 0` with
+Monday–Friday and the peak hour windows: makeup weekends remain off-peak.
+HTTP pricing that references this function freezes the server evaluation time
+in the in-memory request context at pre-consume and reuses it for retries and
+settlement. It cannot be overridden through client JSON or headers.
 
 ```
 # Simple flat pricing

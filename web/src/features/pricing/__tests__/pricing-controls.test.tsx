@@ -157,14 +157,15 @@ describe('pricing controls', () => {
     const props = toolbarProps()
     const user = userEvent.setup()
     const { rerender } = render(<PricingToolbar {...props} />)
-    await user.click(screen.getByRole('button', { name: 'Recharge' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Recharge equivalent price' })
+    )
     expect(props.onRechargePriceChange).toHaveBeenCalledWith(true)
     rerender(<PricingToolbar {...props} showRechargePrice />)
-    expect(screen.getByRole('button', { name: 'Recharge' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
-    expect(screen.getByRole('button', { name: 'Standard' })).toHaveAttribute(
+    expect(
+      screen.getByRole('button', { name: 'Recharge equivalent price' })
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Final price' })).toHaveAttribute(
       'aria-pressed',
       'false'
     )

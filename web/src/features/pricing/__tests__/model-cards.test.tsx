@@ -357,7 +357,11 @@ describe('model cards', () => {
         tokenUnit='K'
       />
     )
-    expect(screen.getByText(/0.4.*0.8/)).toHaveTextContent(/0.4 – \$0.8/)
+    expect(
+      within(screen.getByRole('region', { name: 'Final price' })).getByText(
+        /0.4.*0.8/
+      )
+    ).toHaveTextContent(/0.4 – \$0.8/)
     expect(screen.getByText(/^\/\s*s$/)).toBeVisible()
     expect(screen.queryByText(/1K|1M/)).not.toBeInTheDocument()
   })

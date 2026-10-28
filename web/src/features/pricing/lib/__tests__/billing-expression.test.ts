@@ -58,6 +58,60 @@ const extras: ExtraTokenValues = {
   audioOutputTokens: 0,
 }
 
+const holidayExpression =
+  'cn_holiday("Asia/Shanghai") == 0 && weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") <= 5 && ((hour("Asia/Shanghai") >= 9 && hour("Asia/Shanghai") < 12) || (hour("Asia/Shanghai") >= 14 && hour("Asia/Shanghai") < 18)) ? tier("peak", p * 0.30 + cr * 0.006 + c * 1.20) : tier("off_peak", p * 0.15 + cr * 0.003 + c * 0.60)'
+
+describe('Chinese holiday pricing', () => {
+  test.each([
+    ['2026-09-24T08:59:59+08:00', 'off_peak', 120.3],
+    ['2026-09-24T09:00:00+08:00', 'peak', 240.6],
+    ['2026-09-24T12:00:00+08:00', 'off_peak', 120.3],
+    ['2026-09-24T14:00:00+08:00', 'peak', 240.6],
+    ['2026-09-24T18:00:00+08:00', 'off_peak', 120.3],
+    ['2026-09-25T10:00:00+08:00', 'off_peak', 120.3],
+    ['2026-10-01T10:00:00+08:00', 'off_peak', 120.3],
+    ['2026-10-08T10:00:00+08:00', 'peak', 240.6],
+    ['2026-10-10T10:00:00+08:00', 'off_peak', 120.3],
+    ['2025-06-02T10:00:00+08:00', 'off_peak', 120.3],
+    ['2026-09-24T16:00:00Z', 'off_peak', 120.3],
+  ])('uses the announced holiday calendar at %s', (now, tier, cost) => {
+    expect(
+      evaluateBillingExpression(holidayExpression, {
+        now: new Date(now),
+        tokens: { p: 800, cr: 100, c: 0 },
+      })
+    ).toMatchObject({ status: 'success', matchedTier: tier, cost })
+  })
+
+  test('reports a missing calendar year even when a weekend would short-circuit the holiday check', () => {
+    const result = evaluateBillingExpression(
+      'weekday("Asia/Shanghai") <= 5 && cn_holiday("Asia/Shanghai") == 0 ? tier("peak", p) : tier("off", p * 0.5)',
+      {
+        now: new Date('2027-01-03T10:00:00+08:00'),
+        tokens: { p: 100 },
+      }
+    )
+    expect(result).toMatchObject({
+      status: 'missing_context',
+      diagnostic: { detail: 'Chinese holiday calendar unavailable for 2027' },
+    })
+  })
+
+  test('keeps holiday conditions editable and explains their meaning', () => {
+    const document = parseVisualBillingDocument(holidayExpression)
+    assert(document)
+    expect(serializeVisualBillingDocument(document)).toEqual({
+      ok: true,
+      source: holidayExpression,
+    })
+    const t = createInstance()
+    t.init({ lng: 'en', resources: { en: { translation: {} } } })
+    expect(
+      formatBillingCondition('cn_holiday("Asia/Shanghai") == 0', t.t, 'en')
+    ).toBe('Outside Chinese public holidays (Asia/Shanghai)')
+  })
+})
+
 test('evaluates and round-trips separate image cache prices including an explicit zero', () => {
   const source =
     'tier("standard", p * 5 + cr * 1.25 + img * 8 + img_cr * 2 + c * 30)'
@@ -186,9 +240,18 @@ describe('local billing expression evaluation', () => {
         headers: fixture.headers as Record<string, string> | undefined,
       },
       usage: fixture.usage,
+      now: fixture.now ? new Date(fixture.now) : undefined,
     })
+    if (fixture.error) {
+      expect(result).toMatchObject({
+        status: fixture.errorStatus ?? 'missing_context',
+        diagnostic: { detail: fixture.error },
+      })
+      return
+    }
     expect(result.status).toBe('success')
     if (result.status !== 'success') return
+    assert(typeof fixture.cost === 'number')
     expect(result.cost).toBeCloseTo(fixture.cost, 9)
     expect(result.matchedTier).toBe(fixture.tier)
     if (fixture.billingUnit) {

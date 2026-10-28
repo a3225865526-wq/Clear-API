@@ -4,6 +4,7 @@ import (
 	"math"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
@@ -1171,13 +1172,25 @@ func TestFrontendSimulationContract(t *testing.T) {
 		BillingUnit billingexpr.BillingUnit
 		FixedPrice  *float64
 		ImageCount  *int
+		Now         string
+		Error       string
 	}
 	require.NoError(t, common.Unmarshal(data, &cases))
 	for _, tc := range cases {
 		t.Run(tc.Name, func(t *testing.T) {
 			body, err := common.Marshal(tc.Body)
 			require.NoError(t, err)
-			cost, trace, err := billingexpr.RunExprWithRequest(tc.Expression, tc.Tokens, billingexpr.RequestInput{Body: body, Headers: tc.Headers, Usage: tc.Usage, ImageCount: tc.ImageCount})
+			var now time.Time
+			if tc.Now != "" {
+				now, err = time.Parse(time.RFC3339, tc.Now)
+				require.NoError(t, err)
+			}
+			cost, trace, err := billingexpr.RunExprWithRequest(tc.Expression, tc.Tokens, billingexpr.RequestInput{Body: body, Headers: tc.Headers, Usage: tc.Usage, ImageCount: tc.ImageCount, EvaluationTime: now})
+			if tc.Error != "" {
+				require.ErrorContains(t, err, tc.Error)
+				assert.Zero(t, cost)
+				return
+			}
 			require.NoError(t, err)
 			assert.InDelta(t, tc.Cost, cost, 1e-9)
 			assert.Equal(t, tc.Tier, trace.MatchedTier)
@@ -1195,4 +1208,37 @@ func TestFrontendSimulationContract(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestChineseHolidaySettlement(t *testing.T) {
+	expression := `cn_holiday("Asia/Shanghai") == 0 && weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") <= 5 && hour("Asia/Shanghai") >= 9 && hour("Asia/Shanghai") < 12 ? tier("peak", p * 0.3 + cr * 0.006 + c * 1.2) : tier("off_peak", p * 0.15 + cr * 0.003 + c * 0.6)`
+	for _, tc := range []struct {
+		name, now, tier string
+		quota           int
+	}{
+		{"ordinary weekday", "2026-09-24T09:00:00+08:00", "peak", 15630},
+		{"Mid-Autumn holiday", "2026-09-25T09:00:00+08:00", "off_peak", 7815},
+		{"National Day", "2026-10-07T09:00:00+08:00", "off_peak", 7815},
+		{"makeup Saturday remains off peak", "2026-10-10T09:00:00+08:00", "off_peak", 7815},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now, err := time.Parse(time.RFC3339, tc.now)
+			require.NoError(t, err)
+			request := billingexpr.RequestInput{EvaluationTime: now}
+			_, trace, err := billingexpr.RunExprWithRequest(expression, billingexpr.TokenParams{P: 1000000, CR: 100000}, request)
+			require.NoError(t, err)
+			snapshot := &billingexpr.BillingSnapshot{ExprString: expression, ExprHash: billingexpr.ExprHashString(expression), ExprVersion: 1, QuotaPerUnit: 500000, GroupRatio: 0.1, EstimatedTier: trace.MatchedTier}
+			result, err := billingexpr.ComputeTieredQuotaWithRequest(snapshot, billingexpr.TokenParams{P: 1000000, CR: 100000, C: 10000}, request)
+			require.NoError(t, err)
+			assert.Equal(t, tc.quota, result.ActualQuotaAfterGroup)
+			assert.Equal(t, tc.tier, result.MatchedTier)
+			assert.False(t, result.CrossedTier)
+		})
+	}
+	// Calendar-independent expressions continue working outside the data range.
+	now, err := time.Parse(time.RFC3339, "2027-01-01T10:00:00+08:00")
+	require.NoError(t, err)
+	cost, _, err := billingexpr.RunExprWithRequest(`tier("base", hour("Asia/Shanghai") + p)`, billingexpr.TokenParams{P: 100}, billingexpr.RequestInput{EvaluationTime: now})
+	require.NoError(t, err)
+	assert.Equal(t, float64(110), cost)
 }

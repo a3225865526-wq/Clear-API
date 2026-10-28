@@ -35,6 +35,7 @@ import {
   type ParsedTaskTier,
   type ParsedTier,
 } from './billing-expr'
+import { chineseHoliday } from './billing-expression/chinese-holidays'
 import { compileBillingExpression } from './billing-expression/parser'
 import { getDisplayGroupRatio } from './model-helpers'
 import { withPluginPricing } from './plugin-pricing'
@@ -95,6 +96,7 @@ export type DynamicPricingSummary = {
   secondaryEntries: DynamicPriceEntry[]
   isTaskUsage: boolean
   isTimePricing?: boolean
+  calendarUnavailable?: boolean
   isMixedBilling?: boolean
   providerCount?: number
   hasUnconfiguredProviders?: boolean
@@ -484,6 +486,9 @@ export function getDynamicPricingSummary(
           entry.field !== 'modelPrice'
       ),
       isTaskUsage: true,
+      calendarUnavailable: summaries.some(
+        (summary) => summary.calendarUnavailable
+      ),
       providerCount: variants.length >= 2 ? variants.length : undefined,
       hasUnconfiguredProviders: variants.some((variant) =>
         variant.billing_mode === 'ratio'
@@ -499,6 +504,15 @@ export function getDynamicPricingSummary(
   const baseExpression = splitBillingExprAndRequestRules(
     model.billing_expr || ''
   ).billingExpr
+  const compiled = compileBillingExpression(baseExpression)
+  let calendarUnavailable = false
+  if (compiled.status === 'ready' && compiled.functions.has('cn_holiday')) {
+    try {
+      chineseHoliday(options.now ?? new Date())
+    } catch {
+      calendarUnavailable = true
+    }
+  }
   const timeTiers = isTaskUsage
     ? null
     : getCurrentTimePricingTiers(baseExpression, options.now ?? new Date())
@@ -588,6 +602,7 @@ export function getDynamicPricingSummary(
         ),
     isTaskUsage,
     isTimePricing: timeTiers !== null,
+    calendarUnavailable,
     ...(isMixedBilling ? { isMixedBilling } : {}),
   }
 }

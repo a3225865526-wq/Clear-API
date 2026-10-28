@@ -255,7 +255,10 @@ function ConditionFields(props: ConditionProps) {
           probe={comparison.probe}
           timezone={comparison.timezone}
           invalidTimezone={errors.some(
-            (issue) => issue.message === 'Choose a valid IANA timezone.'
+            (issue) =>
+              issue.message === 'Choose a valid IANA timezone.' ||
+              issue.message ===
+                'Chinese holiday conditions require Asia/Shanghai timezone.'
           )}
           onChange={(probe, timezone) => {
             if (node.kind === 'comparison') {

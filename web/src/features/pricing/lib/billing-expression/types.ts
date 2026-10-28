@@ -38,6 +38,7 @@ export const TIME_FUNCTIONS = [
   'weekday',
   'month',
   'day',
+  'cn_holiday',
 ] as const
 export type TimeFunction = (typeof TIME_FUNCTIONS)[number]
 export const BILLING_FUNCTIONS: Readonly<Record<string, number>> = {
@@ -52,6 +53,7 @@ export const BILLING_FUNCTIONS: Readonly<Record<string, number>> = {
   weekday: 1,
   month: 1,
   day: 1,
+  cn_holiday: 1,
   min: 2,
   max: 2,
   abs: 1,

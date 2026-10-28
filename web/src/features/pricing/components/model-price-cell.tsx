@@ -32,7 +32,7 @@ import {
 } from '../lib/dynamic-price'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
-import { taskUsageUnitLabel } from '../lib/task-price-display'
+import { taskPriceLabel, taskUsageUnitLabel } from '../lib/task-price-display'
 import type { PricingModel, TokenUnit } from '../types'
 
 export type ModelPriceCellOptions = {
@@ -47,6 +47,7 @@ export function ModelPriceCell(props: {
   model: PricingModel
   options?: ModelPriceCellOptions
   showExpression?: boolean
+  basePrice?: boolean
 }) {
   const { t, i18n } = useTranslation()
   const currency = useSystemConfigStore((state) => state.config.currency)
@@ -84,19 +85,37 @@ export function ModelPriceCell(props: {
     ]
   )
   let metrics: Array<{ label: string; value: string }>
-  const providerCaption = dynamic?.providerCount
-    ? t('{{count}} providers', { count: dynamic.providerCount })
-    : ''
-  const unconfiguredCaption = dynamic?.hasUnconfiguredProviders
-    ? t('Not configured for some providers')
-    : ''
+  const providerCaption =
+    !props.basePrice && dynamic?.providerCount
+      ? t('{{count}} providers', { count: dynamic.providerCount })
+      : ''
+  const unconfiguredCaption =
+    !props.basePrice && dynamic?.hasUnconfiguredProviders
+      ? t('Not configured for some providers')
+      : ''
   let caption = t('{{currency}} / {{unit}} tokens', {
     currency: currencyLabel,
     unit: tokenUnitLabel,
   })
 
   if (dynamic) {
+    if (dynamic.calendarUnavailable) {
+      return (
+        <span className='text-muted-foreground text-xs'>
+          {t(
+            'Holiday calendar unavailable; update it before using this price.'
+          )}
+        </span>
+      )
+    }
     if (dynamic.isSpecialExpression) {
+      if (props.basePrice) {
+        return (
+          <span className='text-muted-foreground text-xs'>
+            {t('Base price unavailable')}
+          </span>
+        )
+      }
       return (
         <span className='block max-w-full min-w-0'>
           <span className='text-muted-foreground block truncate text-sm'>
@@ -136,12 +155,23 @@ export function ModelPriceCell(props: {
         return {
           label:
             entry.labelKind === 'schema'
-              ? entry.shortLabel
+              ? taskPriceLabel(
+                  entry.description,
+                  entry.shortLabel,
+                  i18n.language
+                )
               : t(entry.shortLabel),
           value: `${entry.formattedRange ?? entry.formatted}${suffix}`,
         }
       })
     if (metrics.length === 0) {
+      if (props.basePrice) {
+        return (
+          <span className='text-muted-foreground text-xs'>
+            {t('Base price unavailable')}
+          </span>
+        )
+      }
       return (
         <span className='text-muted-foreground text-sm'>
           {dynamic.hasUnconfiguredProviders
@@ -171,7 +201,7 @@ export function ModelPriceCell(props: {
     if (isUnconfiguredTaskUsageModel(props.model)) {
       return (
         <span className='text-muted-foreground text-sm'>
-          {t('Not configured')}
+          {props.basePrice ? t('Base price unavailable') : t('Not configured')}
         </span>
       )
     }
@@ -183,7 +213,7 @@ export function ModelPriceCell(props: {
     ) {
       return (
         <span className='text-muted-foreground text-sm'>
-          {t('Unset price')}
+          {props.basePrice ? t('Base price unavailable') : t('Unset price')}
         </span>
       )
     }
@@ -247,7 +277,9 @@ export function ModelPriceCell(props: {
               className='text-muted-foreground min-w-0 truncate text-xs font-normal'
               title={metric.label}
             >
-              {metric.label}
+              {props.basePrice
+                ? t('Base {{label}}', { label: metric.label })
+                : metric.label}
             </span>
             <span
               className='min-w-0 font-mono text-sm break-words whitespace-normal tabular-nums'

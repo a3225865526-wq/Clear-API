@@ -56,6 +56,20 @@ func runProgram(prog *vm.Program, requestRules []RequestRuleTrace, usedVars map[
 		RequestRules: append([]RequestRuleTrace(nil), requestRules...),
 	}
 	headers := normalizeHeaders(request.Headers)
+	now := request.EvaluationTime
+	if now.IsZero() {
+		now = time.Now()
+	}
+	// Check coverage before short-circuiting can hide a missing year. This
+	// expression must not silently charge a normal-day rate with stale data.
+	holiday := 0
+	if usedVars["cn_holiday"] {
+		var err error
+		holiday, err = chineseHoliday(now)
+		if err != nil {
+			return 0, trace, err
+		}
+	}
 	imageCount := 1
 	if usedVars["image_count"] {
 		if request.ImageCount != nil {
@@ -134,16 +148,22 @@ func runProgram(prog *vm.Program, requestRules []RequestRuleTrace, usedVars map[
 			}
 			return strings.Contains(fmt.Sprint(source), substr)
 		},
-		"hour":    func(tz string) int { return timeInZone(tz).Hour() },
-		"minute":  func(tz string) int { return timeInZone(tz).Minute() },
-		"weekday": func(tz string) int { return int(timeInZone(tz).Weekday()) },
-		"month":   func(tz string) int { return int(timeInZone(tz).Month()) },
-		"day":     func(tz string) int { return timeInZone(tz).Day() },
-		"max":     math.Max,
-		"min":     math.Min,
-		"abs":     math.Abs,
-		"ceil":    math.Ceil,
-		"floor":   math.Floor,
+		"hour":    func(tz string) int { return timeInZone(now, tz).Hour() },
+		"minute":  func(tz string) int { return timeInZone(now, tz).Minute() },
+		"weekday": func(tz string) int { return int(timeInZone(now, tz).Weekday()) },
+		"month":   func(tz string) int { return int(timeInZone(now, tz).Month()) },
+		"day":     func(tz string) int { return timeInZone(now, tz).Day() },
+		"cn_holiday": func(tz string) (int, error) {
+			if strings.TrimSpace(tz) != "Asia/Shanghai" {
+				return 0, fmt.Errorf("cn_holiday requires Asia/Shanghai timezone")
+			}
+			return holiday, nil
+		},
+		"max":   math.Max,
+		"min":   math.Min,
+		"abs":   math.Abs,
+		"ceil":  math.Ceil,
+		"floor": math.Floor,
 	}
 
 	out, err := expr.Run(prog, env)
@@ -157,16 +177,16 @@ func runProgram(prog *vm.Program, requestRules []RequestRuleTrace, usedVars map[
 	return f, trace, nil
 }
 
-func timeInZone(tz string) time.Time {
+func timeInZone(now time.Time, tz string) time.Time {
 	tz = strings.TrimSpace(tz)
 	if tz == "" {
-		return time.Now().UTC()
+		return now.UTC()
 	}
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
-		return time.Now().UTC()
+		return now.UTC()
 	}
-	return time.Now().In(loc)
+	return now.In(loc)
 }
 
 func normalizeHeaders(headers map[string]string) map[string]string {

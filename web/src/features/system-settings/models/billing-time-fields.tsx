@@ -43,6 +43,7 @@ const PROBE_LABELS = {
   weekday: 'Weekday',
   month: 'Month number',
   day: 'Day of month',
+  cn_holiday: 'Chinese public holiday (0 or 1)',
   p: 'Billable input tokens',
   c: 'Billable output tokens',
   len: 'Full input length',
@@ -59,7 +60,9 @@ export function BillingTimeProbeFields(props: {
   const probes: VisualComparison['probe'][] = [...TIME_FUNCS]
   if (props.includeTokens) probes.push('len', 'p', 'c')
   const isTime = (TIME_FUNCS as readonly string[]).includes(props.probe)
-  const zones = COMMON_TIMEZONES.map((zone) => ({
+  const zones = COMMON_TIMEZONES.filter(
+    (zone) => props.probe !== 'cn_holiday' || zone.value === 'Asia/Shanghai'
+  ).map((zone) => ({
     value: zone.value,
     label: zone.value,
   }))
@@ -75,7 +78,11 @@ export function BillingTimeProbeFields(props: {
         }))}
         value={props.probe}
         onValueChange={(probe) =>
-          probe && props.onChange(probe, props.timezone || 'UTC')
+          probe &&
+          props.onChange(
+            probe,
+            probe === 'cn_holiday' ? 'Asia/Shanghai' : props.timezone || 'UTC'
+          )
         }
       >
         <SelectTrigger
@@ -122,6 +129,35 @@ export function BillingConditionValueInput(props: {
   probe?: VisualComparison['probe']
 }) {
   const { t, i18n } = useTranslation()
+  if (props.probe === 'cn_holiday') {
+    const days = [
+      { value: '0', label: t('Outside Chinese public holidays') },
+      { value: '1', label: t('Chinese public holidays') },
+    ]
+    return (
+      <Select
+        items={days}
+        value={props.value}
+        onValueChange={(value) => value !== null && props.onChange(value)}
+      >
+        <SelectTrigger
+          size='sm'
+          className='w-48'
+          aria-label={props.label ?? t('Condition value')}
+          aria-invalid={props.invalid || undefined}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent alignItemWithTrigger={false}>
+          {days.map((day) => (
+            <SelectItem key={day.value} value={day.value}>
+              {day.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    )
+  }
   if (
     props.probe === 'weekday' &&
     !props.normalizeNumberDrafts &&

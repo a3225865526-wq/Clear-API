@@ -43,6 +43,7 @@ import { taskPriceLabel, taskUsageUnitLabel } from '../lib/task-price-display'
 import type { PricingModel, PriceType, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { ModelPriceBreakdown } from './model-price-breakdown'
 import { OfficialPriceReference } from './official-price-reference'
 
 export interface ModelCardProps {
@@ -108,7 +109,13 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
     [props.model, dynamicPriceOptions, currency]
   )
   let priceSummary: ReactNode
-  if (dynamicSummary) {
+  if (dynamicSummary?.calendarUnavailable) {
+    priceSummary = (
+      <span className='text-muted-foreground col-span-full text-xs'>
+        {t('Holiday calendar unavailable; update it before using this price.')}
+      </span>
+    )
+  } else if (dynamicSummary) {
     if (dynamicSummary.isSpecialExpression) {
       priceSummary = (
         <div className='col-span-full min-w-0'>
@@ -319,9 +326,6 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
           className='mt-auto flex min-w-0 flex-col gap-1.5'
         >
           <ModelBillingModeBadge model={props.model} appearance='caption' />
-          <p className='text-muted-foreground text-xs font-medium'>
-            {t('Platform price')}
-          </p>
           {dynamicSummary?.providerCount && (
             <span className='text-muted-foreground text-xs break-words'>
               {t('{{count}} providers', {
@@ -331,14 +335,20 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                 ` · ${t('Not configured for some providers')}`}
             </span>
           )}
-          <div className='grid grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-x-3 gap-y-2'>
-            {priceSummary}
-          </div>
-          {(!props.selectedGroup || props.selectedGroup === 'all') && (
-            <p className='text-muted-foreground text-xs'>
-              {t('Lowest price across available groups')}
-            </p>
-          )}
+          <ModelPriceBreakdown
+            model={props.model}
+            options={{
+              tokenUnit,
+              priceRate,
+              usdExchangeRate,
+              showRechargePrice,
+              selectedGroup: props.selectedGroup,
+            }}
+          >
+            <div className='grid grid-cols-[repeat(auto-fit,minmax(88px,1fr))] gap-x-3 gap-y-2'>
+              {priceSummary}
+            </div>
+          </ModelPriceBreakdown>
           <OfficialPriceReference
             model={props.model}
             options={{

@@ -198,7 +198,14 @@ export const MATCH_LTE = 'lte'
 export const MATCH_EXISTS = 'exists'
 export const MATCH_RANGE = 'range'
 
-export const TIME_FUNCS = ['hour', 'minute', 'weekday', 'month', 'day'] as const
+export const TIME_FUNCS = [
+  'hour',
+  'minute',
+  'weekday',
+  'month',
+  'day',
+  'cn_holiday',
+] as const
 export type TimeFunc = (typeof TIME_FUNCS)[number]
 
 export const COMMON_TIMEZONES: { value: string; label: string }[] = [
@@ -376,6 +383,7 @@ const TIME_FUNC_RANGES: Record<TimeFunc, [number, number]> = {
   weekday: [0, 6],
   month: [1, 12],
   day: [1, 31],
+  cn_holiday: [0, 1],
 }
 
 function isTimeValueInRange(timeFunc: TimeFunc, text: string): boolean {
@@ -388,11 +396,11 @@ function isTimeValueInRange(timeFunc: TimeFunc, text: string): boolean {
 
 function tryParseTimeCondition(expr: string): RequestCondition | null {
   let m = expr.match(
-    /^(hour|minute|weekday|month|day)\("([^"]+)"\) >= ([\d.eE+-]+) (?:&&|\|\|) \1\("\2"\) < ([\d.eE+-]+)$/
+    /^(hour|minute|weekday|month|day|cn_holiday)\("([^"]+)"\) >= ([\d.eE+-]+) (?:&&|\|\|) \1\("\2"\) < ([\d.eE+-]+)$/
   )
   if (!m) {
     m = expr.match(
-      /^\((hour|minute|weekday|month|day)\("([^"]+)"\) >= ([\d.eE+-]+) (?:&&|\|\|) \1\("\2"\) < ([\d.eE+-]+)\)$/
+      /^\((hour|minute|weekday|month|day|cn_holiday)\("([^"]+)"\) >= ([\d.eE+-]+) (?:&&|\|\|) \1\("\2"\) < ([\d.eE+-]+)\)$/
     )
   }
   if (m) {
@@ -416,7 +424,7 @@ function tryParseTimeCondition(expr: string): RequestCondition | null {
     }
   }
   m = expr.match(
-    /^(hour|minute|weekday|month|day)\("([^"]+)"\) (==|>=|<) ([\d.eE+-]+)$/
+    /^(hour|minute|weekday|month|day|cn_holiday)\("([^"]+)"\) (==|>=|<) ([\d.eE+-]+)$/
   )
   if (m) {
     if (!isTimeValueInRange(m[1] as TimeFunc, m[4])) return null

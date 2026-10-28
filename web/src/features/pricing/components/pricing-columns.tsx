@@ -32,7 +32,8 @@ import { parseTags } from '../lib/filters'
 import type { PricingModel } from '../types'
 import { CachedPriceCell } from './cached-price-cell'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
-import { ModelPriceCell, type ModelPriceCellOptions } from './model-price-cell'
+import { ModelPriceBreakdown } from './model-price-breakdown'
+import type { ModelPriceCellOptions } from './model-price-cell'
 import { OfficialPriceReference } from './official-price-reference'
 
 // ----------------------------------------------------------------------------
@@ -91,15 +92,7 @@ export function usePricingColumns(
       ),
       cell: ({ row }) => (
         <div className='min-w-0 space-y-2'>
-          <p className='text-muted-foreground text-xs font-medium'>
-            {t('Platform price')}
-          </p>
-          <ModelPriceCell model={row.original} options={options} />
-          {(!options.selectedGroup || options.selectedGroup === 'all') && (
-            <p className='text-muted-foreground text-xs'>
-              {t('Lowest price across available groups')}
-            </p>
-          )}
+          <ModelPriceBreakdown model={row.original} options={options} />
           <OfficialPriceReference model={row.original} options={options} />
         </div>
       ),

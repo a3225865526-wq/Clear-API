@@ -61,6 +61,19 @@ function scalarTimeGroup(
 }
 
 describe('time range expression generation', () => {
+  test('round-trips a Chinese holiday multiplier without dropping the holiday condition', () => {
+    const groups = [
+      {
+        conditions: [
+          timeCondition({ timeFunc: 'cn_holiday', mode: MATCH_EQ, value: '1' }),
+        ],
+        multiplier: '0.5',
+      },
+    ]
+    const source = buildRequestRuleExpr(groups)
+    expect(source).toBe('(cn_holiday("Asia/Shanghai") == 1 ? 0.5 : 1)')
+    expect(tryParseRequestRuleExpr(source)).toEqual(groups)
+  })
   test('within-day range (start < end) builds an && condition', () => {
     // Regression test for #6923: the || form is a tautology that applies the
     // multiplier 24/7.

@@ -192,6 +192,11 @@ export function ModelPricingPanel(props: {
                     ? t('Stored configuration with effective defaults')
                     : t('Using built-in or default pricing')}
                 </p>
+                <p className='text-muted-foreground mt-1 text-xs'>
+                  {t(
+                    'Enter official prices as the base prices. Model Square applies the effective group multiplier. Do not enter discounted prices here.'
+                  )}
+                </p>
               </div>
               <Button
                 variant='outline'

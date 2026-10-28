@@ -4,6 +4,7 @@ WORKDIR /build/web
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY ./web ./
+COPY ./pkg/billingexpr/chinese_holidays.json /build/pkg/billingexpr/chinese_holidays.json
 COPY ./docs/clearapi /build/docs/clearapi
 COPY ./VERSION /build/VERSION
 RUN DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat /build/VERSION) bun run build

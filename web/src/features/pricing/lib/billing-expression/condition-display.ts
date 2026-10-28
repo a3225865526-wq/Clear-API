@@ -43,6 +43,7 @@ const DOMAINS: Record<TimeFunction, [number, number]> = {
   weekday: [0, 7],
   month: [1, 13],
   day: [1, 32],
+  cn_holiday: [0, 2],
 }
 
 function timeComparison(node: ExpressionNode): TimeComparison | null {
@@ -115,6 +116,10 @@ function describeTimeRange(
       start === end - 1
         ? from
         : t('{{start}}–{{end}}', { start: from, end: to })
+  } else if (first.name === 'cn_holiday') {
+    if (start === 0 && end === 1) text = t('Outside Chinese public holidays')
+    else if (start === 1 && end === 2) text = t('Chinese public holidays')
+    else return null
   } else {
     const labels: Record<string, string> = {
       minute: 'Minute',

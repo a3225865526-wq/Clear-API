@@ -101,7 +101,7 @@ func usesRequestProbe(node ast.Node) bool {
 			return false
 		}
 		switch identifier.Value {
-		case "param", "header", "hour", "minute", "weekday", "month", "day":
+		case "param", "header", "hour", "minute", "weekday", "month", "day", "cn_holiday":
 			return true
 		default:
 			return false
@@ -150,6 +150,7 @@ var compileEnvPrototypeV1 = map[string]any{
 	"weekday":     func(string) int { return 0 },
 	"month":       func(string) int { return 0 },
 	"day":         func(string) int { return 0 },
+	"cn_holiday":  func(string) (int, error) { return 0, nil },
 	"max":         math.Max,
 	"min":         math.Min,
 	"abs":         math.Abs,
@@ -224,6 +225,13 @@ func compileEntryFromCacheByHash(exprStr, hash string) (*cachedEntry, error) {
 		requestRules:  patcher.requestRules,
 		version:       version,
 		fixedPricing:  fixedPricing,
+	}
+	// Coverage must not depend on optimization removing an unselected branch.
+	if ast.Find(tree.Node, func(node ast.Node) bool {
+		identifier, ok := node.(*ast.IdentifierNode)
+		return ok && identifier.Value == "cn_holiday"
+	}) != nil {
+		entry.usedVars["cn_holiday"] = true
 	}
 	cacheMu.Lock()
 	if len(cache) >= maxCacheSize {

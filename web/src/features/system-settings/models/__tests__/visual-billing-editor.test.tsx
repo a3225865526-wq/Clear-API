@@ -25,7 +25,10 @@ import { assert, describe, expect, test, vi } from 'vitest'
 import { combineBillingExpr } from '@/features/pricing/lib/billing-expr'
 import { evaluateBillingExpression } from '@/features/pricing/lib/billing-expression/runtime'
 
-import { BillingConditionValueInput } from '../billing-time-fields'
+import {
+  BillingConditionValueInput,
+  BillingTimeProbeFields,
+} from '../billing-time-fields'
 import { TieredPricingEditor } from '../tiered-pricing-editor'
 
 const expression =
@@ -33,6 +36,90 @@ const expression =
 
 const chainedExpression =
   'len <= 32000 && c <= 200 ? tier("discount", p * 0.8 + c * 2 + cr * 0.16 + cc * 0.17) : len <= 32000 ? tier("short", p * 0.8 + c * 8 + cr * 0.16 + cc * 0.17) : len <= 128000 ? tier("mid", p * 1.2 + c * 16 + cr * 0.16 + cc * 0.17) : tier("long", p * 2.4 + c * 24 + cr * 0.16 + cc * 0.17)'
+
+test('selects Chinese holiday conditions in Beijing time with named values', async () => {
+  const user = userEvent.setup()
+  const onProbeChange = vi.fn()
+  const onValueChange = vi.fn()
+  const view = render(
+    <BillingTimeProbeFields
+      probe='hour'
+      timezone='UTC'
+      onChange={onProbeChange}
+    />
+  )
+  await user.click(screen.getByRole('combobox', { name: 'Condition input' }))
+  await user.click(
+    screen.getByRole('option', { name: 'Chinese public holiday (0 or 1)' })
+  )
+  expect(onProbeChange).toHaveBeenCalledWith('cn_holiday', 'Asia/Shanghai')
+  view.rerender(
+    <BillingConditionValueInput
+      probe='cn_holiday'
+      value='0'
+      onChange={onValueChange}
+    />
+  )
+  expect(
+    screen.getByRole('combobox', { name: 'Condition value' })
+  ).toHaveTextContent('Outside Chinese public holidays')
+  await user.click(screen.getByRole('combobox', { name: 'Condition value' }))
+  await user.click(
+    screen.getByRole('option', { name: /^Chinese public holidays$/ })
+  )
+  expect(onValueChange).toHaveBeenCalledWith('1')
+})
+
+test('marks unsupported holiday timezones invalid without saving the draft', () => {
+  const onBillingExprChange = vi.fn()
+  render(
+    <TieredPricingEditor
+      billingExpr='cn_holiday("Asia/Shanghai") == 0 ? tier("peak", p * 2) : tier("off", p * 1)'
+      requestRuleExpr=''
+      onBillingExprChange={onBillingExprChange}
+      onRequestRuleExprChange={vi.fn()}
+    />
+  )
+  const timezone = screen.getByRole('combobox', { name: 'Timezone' })
+  fireEvent.change(timezone, { target: { value: 'UTC' } })
+  expect(timezone).toHaveAttribute('aria-invalid', 'true')
+  expect(
+    screen.getByText(
+      'Chinese holiday conditions require Asia/Shanghai timezone.'
+    )
+  ).toBeVisible()
+  expect(onBillingExprChange).not.toHaveBeenCalled()
+})
+
+test('applies the DeepSeek calendar preset as an editable draft without saving settings', async () => {
+  const onBillingExprChange = vi.fn()
+  render(
+    <TieredPricingEditor
+      billingExpr='tier("base", p)'
+      requestRuleExpr=''
+      onBillingExprChange={onBillingExprChange}
+      onRequestRuleExprChange={vi.fn()}
+    />
+  )
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'More templates...' }))
+  await user.click(
+    screen.getByRole('button', {
+      name: 'DeepSeek Flash peak/off-peak (China holidays)',
+    })
+  )
+  const source = onBillingExprChange.mock.lastCall?.[0]
+  expect(source).toContain('cn_holiday("Asia/Shanghai") == 0')
+  expect(
+    screen.getByRole('combobox', { name: 'Condition value' })
+  ).toHaveTextContent('Outside Chinese public holidays')
+  expect(
+    evaluateBillingExpression(source, {
+      now: new Date('2026-10-01T10:00:00+08:00'),
+      tokens: { p: 1000000, cr: 0, c: 0 },
+    })
+  ).toMatchObject({ status: 'success', matchedTier: 'off_peak', cost: 150000 })
+})
 
 test.each([
   ['zhCN', '星期一'],

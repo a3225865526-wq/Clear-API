@@ -240,6 +240,14 @@ const PRESET_GROUPS: PresetGroup[] = [
     group: 'Time-based',
     presets: [
       {
+        key: 'deepseek-flash-calendar',
+        label: 'DeepSeek Flash peak/off-peak (China holidays)',
+        // Official USD/1M token rates checked 2026-10-28:
+        // https://api-docs.deepseek.com/quick_start/pricing/
+        expr: 'cn_holiday("Asia/Shanghai") == 0 && weekday("Asia/Shanghai") >= 1 && weekday("Asia/Shanghai") <= 5 && ((hour("Asia/Shanghai") >= 9 && hour("Asia/Shanghai") < 12) || (hour("Asia/Shanghai") >= 14 && hour("Asia/Shanghai") < 18)) ? tier("peak", p * 0.3 + cr * 0.006 + c * 1.2) : tier("off_peak", p * 0.15 + cr * 0.003 + c * 0.6)',
+        requestRules: [],
+      },
+      {
         key: 'night-discount',
         label: 'Night discount (50%)',
         expr: 'tier("base", p * 3 + c * 15)',
@@ -325,10 +333,17 @@ function RawExprEditor({ exprString, onChange }: RawExprEditorProps) {
             <code>ceil</code>, <code>floor</code>, <code>abs</code>,{' '}
             <code>header(name)</code>, <code>param(path)</code>,{' '}
             <code>has(source, text)</code>
+            {', '}
+            <code>cn_holiday("Asia/Shanghai")</code>
           </div>
           <div>
             {t(
               'Use tier(name, fixed(amount)) for a USD price per request. Group and request multipliers still apply.'
+            )}
+          </div>
+          <div>
+            {t(
+              'cn_holiday returns 1 for Chinese public holidays and 0 otherwise. Missing calendar years are rejected; update the calendar annually.'
             )}
           </div>
         </AlertDescription>
@@ -700,7 +715,7 @@ function PresetSection({ applyPreset }: PresetSectionProps) {
                 className='h-7 text-xs'
                 onClick={() => applyPreset(preset)}
               >
-                {preset.label}
+                {t(preset.label)}
               </Button>
             ))}
           </div>
@@ -928,6 +943,7 @@ Important: len is NOT affected by auto-exclusion. Tier conditions should use len
 - param(path) — reads a request body JSON path (gjson syntax)
 - has(source, substr) — substring check
 - hour(tz), minute(tz), weekday(tz), month(tz), day(tz) — time functions, tz is a timezone like "Asia/Shanghai"
+- cn_holiday("Asia/Shanghai") — 1 on announced Chinese public holidays, otherwise 0; missing years are rejected
 
 ### Price Coefficients
 

@@ -1320,4 +1320,7 @@ export const STATIC_I18N_KEYS = [
   'activate',
   'Automatic validation failed. Check the product configuration and delivery evidence, then reload before retrying.',
   'The product catalog changed. Reload the page and try again.',
+  'Chinese public holiday (0 or 1)',
+  'DeepSeek Flash peak/off-peak (China holidays)',
+  'Chinese holiday conditions require Asia/Shanghai timezone.',
 ] as const

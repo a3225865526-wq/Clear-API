@@ -3,14 +3,18 @@ package billingexpr
 import (
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 )
 
 type RequestInput struct {
-	Headers map[string]string
-	Body    []byte
-	Usage   map[string]any
+	// EvaluationTime is server-owned. HTTP calendar pricing freezes this at
+	// pre-consume so settlement and retries cannot switch dates or time slots.
+	EvaluationTime time.Time `json:"-"`
+	Headers        map[string]string
+	Body           []byte
+	Usage          map[string]any
 	// ImageCount is a validated billing quantity, separate from the frozen
 	// request's n. Settlement can replace it with the actual returned count.
 	ImageCount *int

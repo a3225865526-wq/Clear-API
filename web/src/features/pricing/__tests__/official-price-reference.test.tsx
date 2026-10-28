@@ -184,7 +184,7 @@ describe('official price reference display', () => {
   it('integrates both prices in a card and keeps source clicks independent of model details', () => {
     const onClick = vi.fn()
     render(<ModelCard model={model()} onClick={onClick} />)
-    expect(screen.getByText('Platform price')).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Final price' })).toBeVisible()
     expect(
       screen.getByText('Lowest price across available groups')
     ).toBeVisible()
@@ -201,7 +201,7 @@ describe('official price reference display', () => {
   it('integrates comparison in list rows and prevents source clicks from opening details', () => {
     const onModelClick = vi.fn()
     render(<PricingTable models={[model()]} onModelClick={onModelClick} />)
-    expect(screen.getByText('Platform price')).toBeVisible()
+    expect(screen.getByRole('region', { name: 'Final price' })).toBeVisible()
     expect(
       screen.getByRole('region', { name: 'Official reference price' })
     ).toBeVisible()

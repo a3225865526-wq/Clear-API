@@ -1,3 +1,4 @@
+import { chineseHoliday } from './chinese-holidays'
 /*
 Copyright (C) 2023-2026 QuantumNous
 
@@ -30,6 +31,7 @@ import {
 } from './types'
 
 type RuntimeValue = { value: unknown; integer?: boolean }
+type ClockFunction = Exclude<TimeFunction, 'cn_holiday'>
 
 /** The supported, deterministic subset of GJSON paths (not JavaScript property access). */
 export function readRequestPath(body: unknown, rawPath: string): unknown {
@@ -116,7 +118,7 @@ function billingString(value: unknown, depth = 0): string {
 export function timeInBillingZone(
   now: Date,
   zone: string
-): Record<TimeFunction, number> {
+): Record<ClockFunction, number> {
   if (!Number.isFinite(now.getTime())) {
     throw new BillingExpressionError({
       code: 'type',
@@ -183,7 +185,8 @@ class BillingRuntime {
   billingUnit: 'token' | 'request' = 'token'
   fixedPrice?: number
   private readonly now: Date
-  private readonly timeValues = new Map<string, Record<TimeFunction, number>>()
+  private readonly timeValues = new Map<string, Record<ClockFunction, number>>()
+  private readonly holiday: number
   private readonly headers = new Map<string, string>()
   private depth = 0
 
@@ -192,6 +195,10 @@ class BillingRuntime {
     private readonly context: BillingSimulationContext
   ) {
     this.now = context.now ?? new Date()
+    // Calendar coverage is required even when a condition short-circuits.
+    this.holiday = compiled.functions.has('cn_holiday')
+      ? chineseHoliday(this.now)
+      : 0
     this.requestRules = compiled.requestRules.map((rule) => ({
       cond: rule.cond,
       multiplier: rule.multiplier,
@@ -508,12 +515,21 @@ class BillingRuntime {
       })
     }
     const zone = this.string(args[0]).trim()
+    if (node.name === 'cn_holiday') {
+      if (zone !== 'Asia/Shanghai') {
+        throw new BillingExpressionError({
+          code: 'type',
+          detail: 'cn_holiday requires Asia/Shanghai timezone',
+        })
+      }
+      return { value: this.holiday, integer: true }
+    }
     let values = this.timeValues.get(zone)
     if (!values) {
       values = timeInBillingZone(this.now, zone)
       this.timeValues.set(zone, values)
     }
-    return { value: values[node.name as TimeFunction], integer: true }
+    return { value: values[node.name as ClockFunction], integer: true }
   }
 }
 

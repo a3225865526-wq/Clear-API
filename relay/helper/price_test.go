@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -65,8 +66,10 @@ func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	})
 
 	require.NoError(t, config.GlobalConfig.LoadFromDB(map[string]string{
-		"billing_setting.billing_mode": `{"tiered-test-model":"tiered_expr"}`,
-		"billing_setting.billing_expr": `{"tiered-test-model":"param(\"stream\") == true ? tier(\"stream\", p * 3) : tier(\"base\", p * 2)"}`,
+		"group_ratio_setting.group_ratio":      `{"default":1}`,
+		"quota_setting.pre_consume_multiplier": `1`,
+		"billing_setting.billing_mode":         `{"tiered-test-model":"tiered_expr","holiday-test-model":"tiered_expr"}`,
+		"billing_setting.billing_expr":         `{"tiered-test-model":"param(\"stream\") == true ? tier(\"stream\", p * 3) : tier(\"base\", p * 2)","holiday-test-model":"cn_holiday(\"Asia/Shanghai\") == 0 ? tier(\"peak\", p * 0.3) : tier(\"off_peak\", p * 0.15)"}`,
 	}))
 
 	recorder := httptest.NewRecorder()
@@ -78,26 +81,45 @@ func TestModelPriceHelperTieredUsesPreloadedRequestInput(t *testing.T) {
 	ctx.Request = req
 	ctx.Set("group", "default")
 
-	info := &relaycommon.RelayInfo{
-		OriginModelName: "tiered-test-model",
-		UserGroup:       "default",
-		UsingGroup:      "default",
-		RequestHeaders:  map[string]string{"Content-Type": "application/json"},
-		BillingRequestInput: &billingexpr.RequestInput{
-			Headers: map[string]string{"Content-Type": "application/json"},
-			Body:    []byte(`{"stream":true}`),
-		},
+	for _, tc := range []struct {
+		model, now, tier, error string
+		reserve                 int
+	}{
+		{model: "tiered-test-model", tier: "stream", reserve: 1500},
+		{model: "holiday-test-model", now: "2026-09-25T10:00:00+08:00", tier: "off_peak", reserve: 75},
+		{model: "holiday-test-model", now: "2027-01-01T10:00:00+08:00", error: "Chinese holiday calendar unavailable for 2027"},
+	} {
+		t.Run(tc.model+tc.now, func(t *testing.T) {
+			var now time.Time
+			if tc.now != "" {
+				var err error
+				now, err = time.Parse(time.RFC3339, tc.now)
+				require.NoError(t, err)
+			}
+			info := &relaycommon.RelayInfo{
+				OriginModelName: tc.model, UserGroup: "default", UsingGroup: "default",
+				RequestHeaders: map[string]string{"Content-Type": "application/json"},
+				BillingRequestInput: &billingexpr.RequestInput{
+					EvaluationTime: now,
+					Headers:        map[string]string{"Content-Type": "application/json"},
+					Body:           []byte(`{"stream":true}`),
+				},
+			}
+			priceData, err := ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{BillingRatios: map[string]float64{"n": 3}})
+			if tc.error != "" {
+				require.ErrorContains(t, err, tc.error)
+				assert.Nil(t, info.TieredBillingSnapshot)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.reserve, priceData.QuotaToPreConsume)
+			require.NotNil(t, info.TieredBillingSnapshot)
+			assert.Equal(t, tc.tier, info.TieredBillingSnapshot.EstimatedTier)
+			assert.Equal(t, billing_setting.BillingModeTieredExpr, info.TieredBillingSnapshot.BillingMode)
+			assert.Equal(t, common.QuotaPerUnit, info.TieredBillingSnapshot.QuotaPerUnit)
+			assert.Equal(t, now, info.BillingRequestInput.EvaluationTime)
+		})
 	}
-
-	priceData, err := ModelPriceHelper(ctx, info, 1000, &types.TokenCountMeta{
-		BillingRatios: map[string]float64{"n": 3},
-	})
-	require.NoError(t, err)
-	require.Equal(t, 1500, priceData.QuotaToPreConsume)
-	require.NotNil(t, info.TieredBillingSnapshot)
-	require.Equal(t, "stream", info.TieredBillingSnapshot.EstimatedTier)
-	require.Equal(t, billing_setting.BillingModeTieredExpr, info.TieredBillingSnapshot.BillingMode)
-	require.Equal(t, common.QuotaPerUnit, info.TieredBillingSnapshot.QuotaPerUnit)
 }
 
 func TestFixedPricePreConsumeAndRealtimeRejection(t *testing.T) {
