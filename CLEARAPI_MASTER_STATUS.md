@@ -1,3 +1,14 @@
+## 2026-10-28 Asia/Shanghai — 旧正式库存返奖资格一键补录已部署并真实验收
+
+- 应用83b2f41aff5b1b253503edd5cbed4aeba9ecc42a，设计062946e17，前驱78566eb49。既有Windows本地构建→SSH→VPS helper，一次构建/部署SUCCESS、health=PASS、rollback=false，仅更新new-api；备份20261028T045505Z，OCI config sha256:808c737ebaad4f6e1ca7a4aa4089a9cc4908698c57dcf60800b07c6f25e205b9，包SHA256 01c4ce774223bdab3608de36ebb2aa31942c6b72141308b5c94e9cad6ade4f6c。独立preflight/source/image匹配、healthy=true，新增GET/POST匿名401。
+- Root页面已实际完成“核查旧库存→预览→确认一次”，无需手填ID或原因；原表单折叠高级。用户反馈成功后只读核验：290张旧正式码全部paid，待补录集合0；6张未用样码、3张历史已用样码原样保留；仅一条批量资格审计id5/actor1/290码，绑定6批次与预览摘要。
+- 奖励配置前后完全相同：邀请/奖励true、10%、version2/epoch1及原单笔/终身上限保持；reward/ledger均0，没有自动补奖、真实测试奖励或直接余额修改。真实用户兑换后发奖仍未生产验收，隔离三库补录→兑换→原队列/账本链路已通过。
+- 必要测试：SQLite3.50.4 / MySQL8.0.46 / PostgreSQL17.6各两项批量主测试通过（501码分块、事务回滚、并发幂等、预览变化、各排除项及历史保留）；首次MySQL RR误判已修复并复核。Root权限/空列表API两项、Origin校验三项、前端实际1文件10项通过，类型/lint/format/gofmt/diff通过，8键七语言原翻译/占位符保留。无schema或迁移，不重复无关全量验证。
+- 无商品契约/审批/价格/支付变化，无生产用户/正式库存创建、真实兑换、历史删除或磁盘清理；PG03=false，D未改。没有直接SQL写生产；测试容器恢复停止且数据保留。
+- 完整文件、实际命令、测试与部署/确认快照：D:/AI/API/runtime/referral-stock-bulk-20261028/RESULT.md、production-confirmed.json和validation.json。当前最小操作说明ROOT_STEPS.md在同目录；旧三组ID清单保留为历史，已不需要使用。本轮完成并停止，应用部署版本83b2f41af，随后纯状态提交不重新部署。
+
+---
+
 ## 2026-10-28 Asia/Shanghai — 旧正式库存返奖资格一键补录：本地完成，进入既有部署
 
 - 用户已选“一键处理全部符合条件的旧正式库存”。设计提交062946e17，见evidence/referral-stock-bulk-20261028/DESIGN.md。Root按钮核查并展示合格批次、商品/修订和数量，确认一次批量设置，原逐ID表单折叠高级；复用ConfirmDialog、Collapsible、Button、ErrorState及既有格式化，8键补齐七语言。
