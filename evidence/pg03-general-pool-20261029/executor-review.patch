@@ -1,0 +1,833 @@
+diff --git a/internal/api/handlers/management/pool_models.go b/internal/api/handlers/management/pool_models.go
+index 5ea94102..4c24e314 100644
+--- a/internal/api/handlers/management/pool_models.go
++++ b/internal/api/handlers/management/pool_models.go
+@@ -43,6 +43,22 @@ func (h *Handler) GrantPoolModel(c *gin.Context) {
+ 	c.JSON(http.StatusOK, gin.H{"status": "granted"})
+ }
+ 
++func (h *Handler) SyncPoolModels(c *gin.Context) {
++	var command coreauth.PoolModelSync
++	if !decodePoolCommand(c, &command) {
++		return
++	}
++	if h.authManager == nil {
++		c.AbortWithStatus(http.StatusServiceUnavailable)
++		return
++	}
++	if err := h.authManager.SyncPoolAccountModels(c.Request.Context(), command); err != nil {
++		c.JSON(http.StatusConflict, gin.H{"error": "pool_model_sync_rejected"})
++		return
++	}
++	c.JSON(http.StatusOK, gin.H{"status": "synchronized"})
++}
++
+ func (h *Handler) RevokePoolModel(c *gin.Context) {
+ 	var command coreauth.PoolModelRevoke
+ 	if !decodePoolCommand(c, &command) {
+diff --git a/internal/api/pool_management_test.go b/internal/api/pool_management_test.go
+index dd89f47d..06dec2e1 100644
+--- a/internal/api/pool_management_test.go
++++ b/internal/api/pool_management_test.go
+@@ -6,6 +6,7 @@ import (
+ 	"fmt"
+ 	"net/http"
+ 	"net/http/httptest"
++	"strconv"
+ 	"strings"
+ 	"testing"
+ 
+@@ -59,6 +60,7 @@ func TestPoolGuardServiceManagementRejectsAuthorizationImportAndProxy(t *testing
+ 		{http.MethodGet, "/v0/management/pool/models"},
+ 		{http.MethodPost, "/v0/management/pool/preflight"},
+ 		{http.MethodPost, "/v0/management/pool/models/grant"},
++		{http.MethodPost, "/v0/management/pool/models/sync"},
+ 		{http.MethodPost, "/v0/management/pool/models/revoke"},
+ 		{http.MethodPost, "/v0/management/pool/import"},
+ 		{http.MethodPost, "/v0/management/auth-files/refresh"},
+@@ -89,10 +91,10 @@ func TestPoolServiceCredentialRoutesKeepManagementAuthentication(t *testing.T) {
+ 	server.managementRoutesEnabled.Store(true)
+ 	server.registerManagementRoutes()
+ 
+-	for _, path := range []string{"/v0/management/pool/import", "/v0/management/auth-files/refresh"} {
++	for index, path := range []string{"/v0/management/pool/import", "/v0/management/auth-files/refresh", "/v0/management/pool/models/sync"} {
+ 		for _, key := range []string{"", "incorrect-management-key"} {
+ 			request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`))
+-			request.RemoteAddr = "127.0.0.1:1234"
++			request.RemoteAddr = "127.0.0." + strconv.Itoa(index+1) + ":1234"
+ 			request.Header.Set("X-Management-Key", key)
+ 			response := httptest.NewRecorder()
+ 			server.engine.ServeHTTP(response, request)
+diff --git a/internal/api/server_management.go b/internal/api/server_management.go
+index 610635d1..0bb7f5da 100644
+--- a/internal/api/server_management.go
++++ b/internal/api/server_management.go
+@@ -35,6 +35,7 @@ func (s *Server) registerManagementRoutes() {
+ 		mgmt.GET("/pool/models", s.mgmt.GetPoolModels)
+ 		mgmt.POST("/pool/preflight", s.mgmt.PoolRequestPreflight)
+ 		mgmt.POST("/pool/models/grant", s.mgmt.GrantPoolModel)
++		mgmt.POST("/pool/models/sync", s.mgmt.SyncPoolModels)
+ 		mgmt.POST("/pool/models/revoke", s.mgmt.RevokePoolModel)
+ 		mgmt.GET("/pool/images/:request/attempts/:attempt", s.mgmt.GetPoolImagesExecution)
+ 		mgmt.GET("/pool/images/:request/attempts/:attempt/result", s.mgmt.GetPoolImagesResult)
+@@ -221,7 +222,7 @@ func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
+ 			role := s.handlers.AuthManager.PoolRole()
+ 			if role != "" && role != "staging" {
+ 				path, method := c.Request.URL.Path, c.Request.Method
+-				allowed := role == "service" && ((method == http.MethodGet && (path == "/v0/management/auth-files" || path == "/v0/management/pool/isolation" || path == "/v0/management/pool/trust" || path == "/v0/management/pool/models" || strings.HasPrefix(path, "/v0/management/pool/images/"))) || (method == http.MethodPost && (path == "/v0/management/pool/preflight" || path == "/v0/management/pool/trust/promote" || path == "/v0/management/pool/trust/revoke" || path == "/v0/management/pool/models/grant" || path == "/v0/management/pool/models/revoke" || path == "/v0/management/pool/import" || path == "/v0/management/auth-files/refresh")) || (method == http.MethodPatch && path == "/v0/management/auth-files/status") || (method == http.MethodDelete && path == "/v0/management/auth-files"))
++				allowed := role == "service" && ((method == http.MethodGet && (path == "/v0/management/auth-files" || path == "/v0/management/pool/isolation" || path == "/v0/management/pool/trust" || path == "/v0/management/pool/models" || strings.HasPrefix(path, "/v0/management/pool/images/"))) || (method == http.MethodPost && (path == "/v0/management/pool/preflight" || path == "/v0/management/pool/trust/promote" || path == "/v0/management/pool/trust/revoke" || path == "/v0/management/pool/models/grant" || path == "/v0/management/pool/models/sync" || path == "/v0/management/pool/models/revoke" || path == "/v0/management/pool/import" || path == "/v0/management/auth-files/refresh")) || (method == http.MethodPatch && path == "/v0/management/auth-files/status") || (method == http.MethodDelete && path == "/v0/management/auth-files"))
+ 				if !allowed {
+ 					c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "pool_service_management_restricted"})
+ 					return
+diff --git a/sdk/cliproxy/auth/pool_capability.go b/sdk/cliproxy/auth/pool_capability.go
+index a447f5b6..dfa331a3 100644
+--- a/sdk/cliproxy/auth/pool_capability.go
++++ b/sdk/cliproxy/auth/pool_capability.go
+@@ -42,6 +42,7 @@ type PoolModelCapability struct {
+ 	State            string `json:"state"`
+ 	Generation       uint64 `json:"generation"`
+ 	IdentityVersion  int    `json:"identity_version,omitempty"`
++	Source           string `json:"source,omitempty"`
+ }
+ 
+ type PoolModelGrant struct {
+@@ -80,6 +81,9 @@ func validPoolCapabilities(record *PoolGrantFile) bool {
+ 		if item.IdentityVersion != 0 && item.IdentityVersion != CredentialSecurityIdentityVersion {
+ 			return false
+ 		}
++		if item.Source != "" && item.Source != "provider_manifest" {
++			return false
++		}
+ 		if item.Model == "" || item.Model != canonicalPoolModel(item.Model) {
+ 			return false
+ 		}
+@@ -259,6 +263,7 @@ func (m *Manager) commitPoolModelCapabilityLocked(ctx context.Context, command P
+ 	for _, item := range record.Capabilities {
+ 		if item.AuthID == command.Identity.AuthID && item.Model == key {
+ 			item.State = state
++			item.Source = ""
+ 			item.Provider = command.Identity.Provider
+ 			item.CredentialDigest = command.Identity.CredentialDigest
+ 			item.IdentityVersion = CredentialSecurityIdentityVersion
+diff --git a/sdk/cliproxy/auth/pool_guard.go b/sdk/cliproxy/auth/pool_guard.go
+index 4eaf6c6b..fa723865 100644
+--- a/sdk/cliproxy/auth/pool_guard.go
++++ b/sdk/cliproxy/auth/pool_guard.go
+@@ -75,6 +75,7 @@ type PoolGrant struct {
+ 	Provider         string   `json:"provider"`
+ 	CredentialDigest string   `json:"credential_digest"`
+ 	Models           []string `json:"models"`
++	AutomaticModels  bool     `json:"automatic_models,omitempty"`
+ 	Capabilities     []string `json:"capabilities"`
+ 	NativeTools      bool     `json:"native_tools"`
+ 	SourceEvidence   []string `json:"source_evidence"`
+diff --git a/sdk/cliproxy/service_lifecycle.go b/sdk/cliproxy/service_lifecycle.go
+index 2492ba09..acd7b419 100644
+--- a/sdk/cliproxy/service_lifecycle.go
++++ b/sdk/cliproxy/service_lifecycle.go
+@@ -206,6 +206,22 @@ func (s *Service) Run(ctx context.Context) error {
+ 	}
+ 
+ 	s.registerModelRefreshCallback()
++	if s.coreManager != nil && s.coreManager.PoolRole() == "service" {
++		go func() {
++			ticker := time.NewTicker(5 * time.Minute)
++			defer ticker.Stop()
++			for {
++				if err := s.coreManager.RefreshAutomaticPoolModels(ctx); err != nil && ctx.Err() == nil {
++					log.Warnf("automatic pool models: %v", err)
++				}
++				select {
++				case <-ctx.Done():
++					return
++				case <-ticker.C:
++				}
++			}
++		}()
++	}
+ 
+ 	select {
+ 	case <-ctx.Done():
+diff --git a/sdk/cliproxy/service_models.go b/sdk/cliproxy/service_models.go
+index 4d9aba34..9af079b8 100644
+--- a/sdk/cliproxy/service_models.go
++++ b/sdk/cliproxy/service_models.go
+@@ -128,6 +128,17 @@ func (s *Service) registerModelsForAuthWithCache(ctx context.Context, a *coreaut
+ 		}
+ 		models = applyExcludedModels(models, excluded)
+ 	case "codex":
++		if ids, automatic := s.coreManager.AutomaticPoolModels(a); automatic {
++			for _, id := range ids {
++				info := registry.LookupStaticModelInfoByChannel(id, "codex")
++				if info == nil {
++					info = &ModelInfo{ID: id, Object: "model", OwnedBy: "openai", Type: "codex"}
++				}
++				models = append(models, info)
++			}
++			models = applyExcludedModels(models, excluded)
++			break
++		}
+ 		if authKind == "apikey" {
+ 			if entry := s.resolveConfigCodexKey(a); entry != nil {
+ 				models = buildCodexConfigModels(entry)
+diff --git a/sdk/cliproxy/service_pool_registry_test.go b/sdk/cliproxy/service_pool_registry_test.go
+index 183311fd..f7ce7b40 100644
+--- a/sdk/cliproxy/service_pool_registry_test.go
++++ b/sdk/cliproxy/service_pool_registry_test.go
+@@ -3,8 +3,14 @@ package cliproxy
+ import (
+ 	"context"
+ 	"encoding/json"
++	"errors"
++	runtimeexecutor "github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor"
++	"net/http"
++	"net/http/httptest"
+ 	"os"
+ 	"path/filepath"
++	"strings"
++	"sync"
+ 	"testing"
+ 	"time"
+ 
+@@ -100,3 +106,295 @@ func TestPoolServiceRegistryWatcherParity(t *testing.T) {
+ 		t.Fatal("duplicate event rebuilt registry")
+ 	}
+ }
++
++// Pool discovery is deliberately synthetic here; live manifests are recorded separately.
++type automaticModelExecutor struct {
++	syncTestExecutor
++	models  map[string][]string
++	failure error
++	ready   chan struct{}
++	permit  chan struct{}
++}
++
++func (*automaticModelExecutor) PoolDispatchFencing() bool { return true }
++func (e *automaticModelExecutor) Execute(ctx context.Context, a *coreauth.Auth, req ex.Request, opts ex.Options) (ex.Response, error) {
++	if e.ready != nil {
++		e.ready <- struct{}{}
++		select {
++		case <-e.permit:
++		case <-ctx.Done():
++			return ex.Response{}, ctx.Err()
++		}
++	}
++	if err := ex.BeforeUpstreamDispatch(ctx); err != nil {
++		return ex.Response{}, err
++	}
++	return ex.Response{Payload: []byte(a.ID)}, nil
++}
++
++func (e *automaticModelExecutor) DiscoverPoolModels(_ context.Context, a *coreauth.Auth) ([]string, error) {
++	if e.failure != nil {
++		return nil, e.failure
++	}
++	return append([]string(nil), e.models[a.ID]...), nil
++}
++
++func TestPoolAutomaticModels(t *testing.T) {
++	t.Setenv("CLEARAPI_PG02_HTTP_NON_STREAM", "true")
++	t.Setenv("CLEARAPI_PG02_RESPONSES_SSE", "")
++	ctx := context.Background()
++	root := t.TempDir()
++	dir := filepath.Join(root, "auths")
++	if err := os.Mkdir(dir, 0700); err != nil {
++		t.Fatal(err)
++	}
++	grants := filepath.Join(root, "grants.json")
++	checkpoint := filepath.Join(root, "checkpoint.jsonl")
++	t.Setenv("CLEARAPI_POOL_ROLE", "service")
++	t.Setenv("CLEARAPI_POOL_ADMISSION_FILE", grants)
++	t.Setenv("CLEARAPI_POOL_EXECUTOR_ID", "synthetic-automatic")
++	t.Setenv("CLEARAPI_POOL_CHECKPOINT_FILE", checkpoint)
++	if err := coreauth.ProvisionPoolCheckpoint(checkpoint, "synthetic-automatic"); err != nil {
++		t.Fatal(err)
++	}
++	cfg := &config.Config{AuthDir: dir}
++	m := coreauth.NewManager(nil, nil, nil)
++	m.SetConfig(cfg)
++	probe := &automaticModelExecutor{models: map[string][]string{"automatic-A": {"model-X", "model-Y", "model-Z"}, "automatic-B": {"model-X", "model-Y"}}}
++	m.RegisterExecutor(probe)
++	record := coreauth.PoolGrantFile{GuardVersion: coreauth.PoolGuardVersion, ExecutorID: "synthetic-automatic", Revision: 1}
++	auths := make([]*coreauth.Auth, 0, 2)
++	for _, id := range []string{"automatic-A", "automatic-B"} {
++		a := &coreauth.Auth{ID: id, Provider: "codex", FileName: id + ".json", Status: coreauth.StatusActive, Attributes: map[string]string{coreauth.AttributeAuthKind: coreauth.AuthKindOAuth}, Metadata: map[string]any{"access_token": "synthetic-unused", "account_id": id}}
++		auths = append(auths, a)
++		record.Grants = append(record.Grants, coreauth.PoolGrant{AuthID: id, Provider: "codex", CredentialDigest: coreauth.PoolCredentialDigest(a), AutomaticModels: true, Enabled: true, ExpiresAt: time.Now().Add(20 * time.Minute).Unix(), MaxConcurrency: 1, Capabilities: []string{"text_chat", "stream_text", "exact_usage"}, SourceEvidence: []string{"synthetic-source"}, TestEvidence: []string{"synthetic-test"}})
++	}
++	data, err := json.Marshal(record)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err = os.WriteFile(grants, data, 0600); err != nil {
++		t.Fatal(err)
++	}
++	for i, a := range auths {
++		auths[i], err = m.Register(ctx, a)
++		if err != nil {
++			t.Fatal(err)
++		}
++		id := a.ID
++		t.Cleanup(func() { registry.GetGlobalRegistry().UnregisterClient(id) })
++	}
++	s := &Service{cfg: cfg, coreManager: m}
++	m.SetPoolRegistrySync(s.syncPoolRegistry)
++	command := func(id string) coreauth.PoolModelSync {
++		rev, states, err := m.PoolTrustSnapshot()
++		if err != nil {
++			t.Fatal(err)
++		}
++		a, _ := m.GetByID(id)
++		identity := coreauth.PoolIdentityExpectation{AuthID: id, Provider: "codex", CredentialDigest: coreauth.PoolCredentialDigest(a), IdentityVersion: coreauth.CredentialSecurityIdentityVersion}
++		for _, state := range states {
++			if state.AuthID == id {
++				identity.Generation = state.Generation
++			}
++		}
++		return coreauth.PoolModelSync{ExpectedRevision: rev, Identity: identity}
++	}
++	// Bootstrap discovers models without promoting either identity.
++	for _, a := range auths {
++		if err = m.SyncPoolAccountModels(ctx, command(a.ID)); err != nil {
++			t.Fatal(err)
++		}
++	}
++	rev, caps, err := m.PoolModelSnapshot()
++	if err != nil || len(caps) != 0 {
++		t.Fatalf("bootstrap granted capability: %v %v", caps, err)
++	}
++	ids := []coreauth.PoolIdentityExpectation{command(auths[0].ID).Identity, command(auths[1].ID).Identity}
++	if err = m.PromotePoolIdentities(ctx, coreauth.PoolPromotion{ExpectedRevision: rev, Identities: ids}); err != nil {
++		t.Fatal(err)
++	}
++	if err = m.RefreshAutomaticPoolModels(ctx); err != nil {
++		t.Fatal(err)
++	}
++	for model, want := range map[string]int{"model-X": 2, "model-Y": 2, "model-Z": 1, "unsupported-model": 0} {
++		result, err := m.PoolRequestPreflight(ctx, model, ex.Options{OriginalRequest: []byte(`{"tools":[]}`)})
++		if err != nil || result.EligibleCount != want {
++			t.Fatalf("%s: eligible=%d want=%d err=%v", model, result.EligibleCount, want, err)
++		}
++	}
++
++	// A capability refresh must preserve an allocated, still-authorized lease.
++	probe.ready = make(chan struct{}, 1)
++	probe.permit = make(chan struct{})
++	completed := make(chan error, 1)
++	go func() {
++		_, err := m.Execute(ctx, []string{"codex"}, ex.Request{Model: "model-Z"}, ex.Options{})
++		completed <- err
++	}()
++	select {
++	case <-probe.ready:
++	case err := <-completed:
++		t.Fatalf("request ended before lease: %v", err)
++	case <-time.After(3 * time.Second):
++		t.Fatal("lease not acquired")
++	}
++	if len(m.PoolInFlightSnapshot()) != 1 {
++		t.Fatal("allocated lease missing")
++	}
++	if _, err = m.Execute(ctx, []string{"codex"}, ex.Request{Model: "model-Z"}, ex.Options{}); err == nil {
++		t.Fatal("concurrency exceeded")
++	}
++	if err = m.SyncPoolAccountModels(ctx, command(auths[0].ID)); err != nil {
++		t.Fatal(err)
++	}
++	close(probe.permit)
++	if err = <-completed; err != nil {
++		t.Fatalf("renewal canceled valid lease: %v", err)
++	}
++	if len(m.PoolInFlightSnapshot()) != 0 {
++		t.Fatal("lease leaked")
++	}
++	probe.ready = nil
++	probe.permit = nil
++
++	invalidIdentity := command(auths[0].ID)
++	invalidIdentity.Identity.Generation++
++	if err = m.SyncPoolAccountModels(ctx, invalidIdentity); err == nil {
++		t.Fatal("stale identity generation accepted")
++	}
++	stale := command(auths[0].ID)
++	if err = m.SyncPoolAccountModels(ctx, stale); err != nil {
++		t.Fatal(err)
++	}
++	if err = m.SyncPoolAccountModels(ctx, stale); err == nil {
++		t.Fatal("stale CAS accepted")
++	}
++	cmd := command(auths[0].ID)
++	if err = m.RevokePoolModelCapability(ctx, coreauth.PoolModelRevoke{ExpectedRevision: cmd.ExpectedRevision, Identity: cmd.Identity, Model: "model-X"}); err != nil {
++		t.Fatal(err)
++	}
++	if err = m.RefreshAutomaticPoolModels(ctx); err != nil {
++		t.Fatal(err)
++	}
++	result, err := m.PoolRequestPreflight(ctx, "model-X", ex.Options{})
++	if err != nil || result.EligibleCount != 1 {
++		t.Fatalf("explicit revoke restored: %+v %v", result, err)
++	}
++	probe.models[auths[0].ID] = []string{"model-Y", "new-model-without-code-change"}
++	if err = m.SyncPoolAccountModels(ctx, command(auths[0].ID)); err != nil {
++		t.Fatal(err)
++	}
++	for model, want := range map[string]int{"model-Z": 0, "new-model-without-code-change": 1} {
++		result, err = m.PoolRequestPreflight(ctx, model, ex.Options{})
++		if err != nil || result.EligibleCount != want {
++			t.Fatalf("catalog change %s: %+v %v", model, result, err)
++		}
++	}
++	before, _, _ := m.PoolModelSnapshot()
++	probe.failure = errors.New("synthetic provider unavailable")
++	if err = m.RefreshAutomaticPoolModels(ctx); err == nil {
++		t.Fatal("provider failure hidden")
++	}
++	after, _, _ := m.PoolModelSnapshot()
++	if before != after {
++		t.Fatal("failed discovery renewed grant")
++	}
++	probe.failure = nil
++	// Concurrent identical commands cannot both advance the same policy floor.
++	cmd = command(auths[0].ID)
++	results := make(chan error, 2)
++	var wg sync.WaitGroup
++	for range 2 {
++		wg.Add(1)
++		go func() { defer wg.Done(); results <- m.SyncPoolAccountModels(ctx, cmd) }()
++	}
++	wg.Wait()
++	close(results)
++	successes := 0
++	for err := range results {
++		if err == nil {
++			successes++
++		}
++	}
++	if successes != 1 {
++		t.Fatalf("CAS successes=%d", successes)
++	}
++	// Identity revocation cannot be undone by automatic refresh.
++	cmd = command(auths[0].ID)
++	if err = m.RevokePoolIdentity(ctx, coreauth.PoolRevocation{ExpectedRevision: cmd.ExpectedRevision, Identity: cmd.Identity}); err != nil {
++		t.Fatal(err)
++	}
++	if err = m.RefreshAutomaticPoolModels(ctx); err != nil {
++		t.Fatal(err)
++	}
++	result, err = m.PoolRequestPreflight(ctx, "new-model-without-code-change", ex.Options{})
++	if err != nil || result.EligibleCount != 0 {
++		t.Fatalf("revoked identity restored: %+v %v", result, err)
++	}
++	// An expired operator floor cannot be renewed or silently reauthorized.
++	raw, err := os.ReadFile(grants)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var expired coreauth.PoolGrantFile
++	if err = json.Unmarshal(raw, &expired); err != nil {
++		t.Fatal(err)
++	}
++	expired.Revision++
++	for i := range expired.Grants {
++		if expired.Grants[i].AuthID == auths[1].ID {
++			expired.Grants[i].ExpiresAt = time.Now().Add(-time.Minute).Unix()
++		}
++	}
++	raw, err = json.Marshal(expired)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err = os.WriteFile(grants, raw, 0600); err != nil {
++		t.Fatal(err)
++	}
++	expiredCommand := command(auths[1].ID)
++	if err = m.SyncPoolAccountModels(ctx, expiredCommand); err == nil {
++		t.Fatal("expired grant renewed")
++	}
++	finalRevision, _, err := m.PoolModelSnapshot()
++	if err != nil || finalRevision != expiredCommand.ExpectedRevision {
++		t.Fatal("expired floor changed")
++	}
++
++}
++
++func TestPoolProviderModelDiscovery(t *testing.T) {
++	for _, tc := range []struct {
++		name, body string
++		status     int
++		valid      bool
++	}{
++		{"new-model", `{"models":[{"slug":"new-model"}]}`, 200, true},
++		{"empty", `{"models":[]}`, 200, false}, {"malformed", `{`, 200, false},
++		{"duplicate", `{"models":[{"slug":"a"},{"slug":"a"}]}`, 200, false},
++		{"wildcard", `{"models":[{"slug":"*"}]}`, 200, false},
++		{"denied", `{"error":"synthetic-secret-sentinel"}`, 403, false},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++				if r.Method != "GET" || r.URL.Path != "/models" || r.URL.Query().Get("client_version") == "" || r.Header.Get("Authorization") != "Bearer synthetic" || r.Header.Get("ChatGPT-Account-ID") != "synthetic-account" {
++					t.Error("discovery request contract")
++				}
++				w.WriteHeader(tc.status)
++				_, _ = w.Write([]byte(tc.body))
++			}))
++			defer server.Close()
++			a := &coreauth.Auth{Provider: "codex", Attributes: map[string]string{coreauth.AttributeAuthKind: coreauth.AuthKindOAuth}, Metadata: map[string]any{"access_token": "synthetic", "account_id": "synthetic-account", "base_url": server.URL}}
++			models, err := runtimeexecutor.NewCodexAutoExecutor(&config.Config{}).DiscoverPoolModels(context.Background(), a)
++			if tc.valid {
++				if err != nil || len(models) != 1 || models[0] != "new-model" {
++					t.Fatalf("%v %v", models, err)
++				}
++			} else if err == nil || strings.Contains(err.Error(), "secret-sentinel") {
++				t.Fatalf("failure not sanitized: %v", err)
++			}
++		})
++	}
++}
+diff --git a/internal/runtime/executor/codex_pool_models.go b/internal/runtime/executor/codex_pool_models.go
+new file mode 100644
+index 00000000..79adf15d
+--- /dev/null
++++ b/internal/runtime/executor/codex_pool_models.go
+@@ -0,0 +1,72 @@
++package executor
++
++import (
++	"context"
++	"encoding/json"
++	"fmt"
++	"io"
++	"net/http"
++	"strings"
++
++	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
++	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
++)
++
++func (e *CodexAutoExecutor) DiscoverPoolModels(ctx context.Context, auth *cliproxyauth.Auth) ([]string, error) {
++	return e.httpExec.DiscoverPoolModels(ctx, auth)
++}
++
++// DiscoverPoolModels reads the account-scoped provider manifest using the same
++// credentials, proxy and TLS transport as execution. A shared/static catalog is
++// never evidence that an individual account can use a model.
++func (e *CodexExecutor) DiscoverPoolModels(ctx context.Context, auth *cliproxyauth.Auth) ([]string, error) {
++	if auth == nil || auth.AuthKind() != cliproxyauth.AuthKindOAuth {
++		return nil, fmt.Errorf("pool model discovery requires OAuth")
++	}
++	token, baseURL := codexCreds(auth)
++	if token == "" {
++		return nil, fmt.Errorf("pool model discovery credential unavailable")
++	}
++	if baseURL == "" {
++		baseURL = "https://chatgpt.com/backend-api/codex"
++	}
++	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(baseURL, "/")+"/models?client_version=0.154.0", nil)
++	if err != nil {
++		return nil, fmt.Errorf("pool model discovery request invalid")
++	}
++	applyCodexHeadersFromSources(req, auth, token, false, e.cfg, nil)
++	req.Header.Set("Version", "0.154.0")
++	client := helps.NewUtlsHTTPClient(ctx, e.cfg, auth, 0)
++	// Provider redirects must not send account credentials to another origin.
++	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
++	response, err := client.Do(req)
++	if err != nil {
++		return nil, fmt.Errorf("pool model discovery transport failed")
++	}
++	defer func() { _ = response.Body.Close() }()
++	if response.StatusCode != http.StatusOK {
++		return nil, fmt.Errorf("pool model discovery HTTP %d", response.StatusCode)
++	}
++	body, err := io.ReadAll(io.LimitReader(response.Body, 2*1024*1024+1))
++	if err != nil || len(body) > 2*1024*1024 {
++		return nil, fmt.Errorf("pool model discovery response invalid")
++	}
++	var manifest struct {
++		Models []struct {
++			Slug string `json:"slug"`
++		} `json:"models"`
++	}
++	if json.Unmarshal(body, &manifest) != nil || len(manifest.Models) == 0 || len(manifest.Models) > 4096 {
++		return nil, fmt.Errorf("pool model discovery manifest invalid")
++	}
++	models := make([]string, 0, len(manifest.Models))
++	seen := make(map[string]bool, len(manifest.Models))
++	for _, item := range manifest.Models {
++		if item.Slug == "" || len(item.Slug) > 128 || strings.ContainsAny(item.Slug, " *\t\r\n\x00") || seen[item.Slug] {
++			return nil, fmt.Errorf("pool model discovery model invalid")
++		}
++		seen[item.Slug] = true
++		models = append(models, item.Slug)
++	}
++	return models, nil
++}
+diff --git a/sdk/cliproxy/auth/pool_model_sync.go b/sdk/cliproxy/auth/pool_model_sync.go
+new file mode 100644
+index 00000000..662bb7dc
+--- /dev/null
++++ b/sdk/cliproxy/auth/pool_model_sync.go
+@@ -0,0 +1,262 @@
++package auth
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"math"
++	"slices"
++	"time"
++)
++
++// PoolModelSync never accepts a client-supplied model list. The operator opts
++// an identity into automatic models in its existing, protected grant floor.
++type PoolModelSync struct {
++	ExpectedRevision uint64                  `json:"expected_revision"`
++	Identity         PoolIdentityExpectation `json:"identity"`
++}
++
++type poolModelDiscoverer interface {
++	DiscoverPoolModels(context.Context, *Auth) ([]string, error)
++}
++
++// SyncPoolAccountModels reconciles provider support and renews only an enabled,
++// unexpired operator grant. It cannot promote trust or restore an expired,
++// disabled, replaced, or explicitly revoked identity/model.
++func (m *Manager) SyncPoolAccountModels(ctx context.Context, command PoolModelSync) error {
++	if m == nil || m.poolGuard == nil || m.poolGuard.role != "service" {
++		return ErrPoolGuard
++	}
++	if command.Identity.IdentityVersion != CredentialSecurityIdentityVersion {
++		return ErrPoolGuard
++	}
++	m.mu.RLock()
++	a := m.auths[command.Identity.AuthID]
++	if a == nil {
++		m.mu.RUnlock()
++		return ErrPoolGuard
++	}
++	snapshot := a.Clone()
++	executor, ok := m.executorLocked(executorKeyFromAuth(a))
++	m.mu.RUnlock()
++	if wrapped, pool := executor.(*poolExecutor); pool {
++		executor = wrapped.ProviderExecutor
++	}
++	discoverer, supported := executor.(poolModelDiscoverer)
++	if !ok || !supported || snapshot.Provider != command.Identity.Provider || PoolCredentialDigest(snapshot) != command.Identity.CredentialDigest {
++		return ErrPoolGuard
++	}
++	guard := m.poolGuard
++	guard.mu.Lock()
++	record, readErr := m.poolGrants()
++	permitted := false
++	if readErr == nil && record.Revision == command.ExpectedRevision {
++		now := time.Now().Unix()
++		if guard.now != nil {
++			now = guard.now().Unix()
++		}
++		for _, grant := range record.Grants {
++			if grant.AuthID == snapshot.ID && grant.AutomaticModels && grant.Enabled && grant.Provider == snapshot.Provider && grant.CredentialDigest == command.Identity.CredentialDigest && grant.ExpiresAt > now && grant.ExpiresAt <= now+1800 {
++				permitted = true
++			}
++		}
++		guard.journalMu.Lock()
++		trust := guard.trust[snapshot.ID]
++		permitted = permitted && trust.Generation == command.Identity.Generation && trust.State != PoolTrustRevoked && (trust.AuthID == "" || trust.CredentialDigest == command.Identity.CredentialDigest && trust.Provider == snapshot.Provider)
++		guard.journalMu.Unlock()
++	}
++	guard.mu.Unlock()
++	if !permitted {
++		return ErrPoolGuard
++	}
++	models, err := discoverer.DiscoverPoolModels(ctx, snapshot)
++	if err != nil {
++		return err
++	}
++	if len(models) == 0 || len(models) > 4096 {
++		return ErrPoolGuard
++	}
++	slices.Sort(models)
++	for i, model := range models {
++		if model != canonicalPoolModel(model) || i > 0 && models[i-1] == model {
++			return ErrPoolGuard
++		}
++	}
++	err = m.commitAutomaticPoolModels(ctx, command, snapshot, models)
++	if err != nil {
++		return err
++	}
++	return m.syncPoolRegistry(ctx)
++}
++
++func (m *Manager) commitAutomaticPoolModels(ctx context.Context, command PoolModelSync, snapshot *Auth, models []string) (resultErr error) {
++	guard := m.poolGuard
++	guard.mu.Lock()
++	defer guard.mu.Unlock()
++	if _, err := m.poolGrants(); err != nil {
++		return err
++	}
++	m.mu.Lock()
++	defer m.mu.Unlock()
++	a := m.auths[snapshot.ID]
++	if a == nil || a.Generation != snapshot.Generation || a.AuthKind() != AuthKindOAuth || PoolCredentialDigest(a) != command.Identity.CredentialDigest {
++		return ErrPoolGuard
++	}
++	guard.journalMu.Lock()
++	file, err := guard.openPoolCheckpoint()
++	if err != nil {
++		guard.journalMu.Unlock()
++		return err
++	}
++	defer func() {
++		unlockPoolCheckpoint(file)
++		if file.Close() != nil {
++			guard.faulted.Store(true)
++			resultErr = ErrPoolGuard
++		}
++	}()
++	floor, size, err := guard.readPoolCheckpoint(file)
++	record, policyErr := guard.grants()
++	if err != nil || policyErr != nil || command.ExpectedRevision == 0 || command.ExpectedRevision == math.MaxUint64 || floor.Revision != command.ExpectedRevision || record.Revision != floor.Revision || poolRecordDigest(record) != floor.Digest {
++		guard.journalMu.Unlock()
++		return ErrPoolGuard
++	}
++	var trust PoolTrustRecord
++	for _, item := range floor.Trust {
++		if item.AuthID == a.ID {
++			trust = item
++			break
++		}
++	}
++	if trust.Generation != command.Identity.Generation || trust.State == PoolTrustRevoked || trust.AuthID != "" && (trust.CredentialDigest != command.Identity.CredentialDigest || trust.Provider != a.Provider) {
++		guard.journalMu.Unlock()
++		return ErrPoolGuard
++	}
++	now := time.Now().Unix()
++	if guard.now != nil {
++		now = guard.now().Unix()
++	}
++	var grant *PoolGrant
++	for i := range record.Grants {
++		if record.Grants[i].AuthID == a.ID {
++			if grant != nil {
++				guard.journalMu.Unlock()
++				return ErrPoolGuard
++			}
++			grant = &record.Grants[i]
++		}
++	}
++	if grant == nil || !grant.AutomaticModels || !grant.Enabled || grant.Provider != a.Provider || grant.CredentialDigest != command.Identity.CredentialDigest || grant.ExpiresAt <= now || grant.ExpiresAt > now+1800 {
++		guard.journalMu.Unlock()
++		return ErrPoolGuard
++	}
++	grant.Models = slices.Clone(models)
++	grant.ExpiresAt = now + 1800
++	nextCaps := make([]PoolModelCapability, 0, len(record.Capabilities)+len(models))
++	explicit := make(map[string]bool)
++	for _, item := range record.Capabilities {
++		if item.AuthID == a.ID && item.Source == "provider_manifest" {
++			continue
++		}
++		nextCaps = append(nextCaps, item)
++		if item.AuthID == a.ID {
++			explicit[item.Model] = true
++		}
++	}
++	if trust.State == PoolTrustTrusted {
++		for _, model := range models {
++			if !explicit[model] {
++				nextCaps = append(nextCaps, PoolModelCapability{AuthID: a.ID, Provider: a.Provider, CredentialDigest: command.Identity.CredentialDigest, Model: model, State: PoolCapabilityVerified, Generation: trust.Generation, IdentityVersion: CredentialSecurityIdentityVersion, Source: "provider_manifest"})
++			}
++		}
++	}
++	record.Capabilities = nextCaps
++	record.Revision++
++	nextTrust := slices.Clone(floor.Trust)
++	for i := range nextTrust {
++		if nextTrust[i].State == PoolTrustTrusted {
++			nextTrust[i].AuthorizationVersion = record.Revision
++		}
++	}
++	next := poolCheckpoint{GuardVersion: PoolGuardVersion, ExecutorID: guard.executorID, Revision: record.Revision, Digest: poolRecordDigest(record), Trust: nextTrust}
++	if !validPoolTrust(next) || !validPoolCapabilities(record) {
++		guard.journalMu.Unlock()
++		return ErrPoolGuard
++	}
++	if err = writePoolPolicy(guard.file, record); err == nil {
++		err = guard.appendPoolCheckpoint(file, size, next)
++	}
++	if err != nil {
++		guard.journalMu.Unlock()
++		guard.faulted.Store(true)
++		guard.cancelPoolLeases(ErrPoolGuard)
++		return err
++	}
++	guard.installPoolCheckpoint(next)
++	guard.journalMu.Unlock()
++	// Pure renewal and additions preserve current leases. Removed/revoked model
++	// authority cancels locally; it never creates a new execution attempt.
++	for _, lease := range guard.leases {
++		currentTrust, trusted := guard.trusted(lease.auth, record.Revision)
++		if !trusted || currentTrust.Generation != lease.Generation || m.poolModelCheck(record, lease.auth, lease.req.Model, lease.caps) != nil {
++			lease.cancel(ErrPoolGuard)
++			continue
++		}
++		lease.AuthorizationVersion = record.Revision
++	}
++	return nil
++}
++
++// AutomaticPoolModels feeds the existing registry; it does not create a second
++// scheduler or bypass the dispatch-time trust/capability checks.
++func (m *Manager) AutomaticPoolModels(a *Auth) ([]string, bool) {
++	if m == nil || m.poolGuard == nil || a == nil {
++		return nil, false
++	}
++	m.poolGuard.mu.Lock()
++	defer m.poolGuard.mu.Unlock()
++	record, err := m.poolGrants()
++	if err != nil {
++		return nil, true
++	}
++	for _, grant := range record.Grants {
++		if grant.AuthID == a.ID && grant.AutomaticModels {
++			if grant.CredentialDigest != PoolCredentialDigest(a) {
++				return nil, true
++			}
++			return slices.Clone(grant.Models), true
++		}
++	}
++	return nil, false
++}
++
++// RefreshAutomaticPoolModels uses one provider read per opted-in, trusted
++// identity. Failure leaves the last floor to expire; no retry or trust repair.
++func (m *Manager) RefreshAutomaticPoolModels(ctx context.Context) error {
++	_, identities, err := m.PoolTrustSnapshot()
++	if err != nil {
++		return err
++	}
++	var failures []error
++	for _, identity := range identities {
++		if identity.State != PoolTrustTrusted {
++			continue
++		}
++		a, ok := m.GetByID(identity.AuthID)
++		if !ok || a.Disabled || ManagementIsolation(a) {
++			continue
++		}
++		if _, automatic := m.AutomaticPoolModels(a); !automatic {
++			continue
++		}
++		revision, _, err := m.PoolTrustSnapshot()
++		if err != nil {
++			return err
++		}
++		err = m.SyncPoolAccountModels(ctx, PoolModelSync{ExpectedRevision: revision, Identity: PoolIdentityExpectation{AuthID: identity.AuthID, Provider: identity.Provider, CredentialDigest: identity.CredentialDigest, Generation: identity.Generation, IdentityVersion: CredentialSecurityIdentityVersion}})
++		if err != nil {
++			failures = append(failures, fmt.Errorf("automatic pool model refresh failed: %w", err))
++		}
++	}
++	return errors.Join(failures...)
++}

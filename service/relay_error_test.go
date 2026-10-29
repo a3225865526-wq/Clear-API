@@ -164,6 +164,28 @@ func TestDecideRelayRetryReasons(t *testing.T) {
 	}
 }
 
+func TestPoolAccountFailureDoesNotDisableSharedChannel(t *testing.T) {
+	previous := common.AutomaticDisableChannelEnabled
+	common.AutomaticDisableChannelEnabled = true
+	t.Cleanup(func() { common.AutomaticDisableChannelEnabled = previous })
+	t.Setenv("CLEARAPI_POOL_CLIPROXY_URL", "http://executor.invalid:8317")
+	apiErr := types.NewOpenAIError(errors.New("invalid account credential"), types.ErrorCodeBadResponseStatusCode, http.StatusUnauthorized)
+	for _, pool := range []bool{false, true} {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+		c.Set("auto_ban", true)
+		if pool {
+			common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, "http://executor.invalid:8317")
+		}
+		assert.Equal(t, !pool, ShouldDisableRelayChannel(c, apiErr))
+		RequestPolicy(c).BeginAttempt(&model.Channel{Id: 1}, "default")
+		RecordPolicyFailure(c, 1, apiErr, DecideRelayRetry(c, apiErr, 0))
+		if pool {
+			assert.Equal(t, "unchanged", RequestPolicy(c).Events()[2].Health)
+		}
+	}
+}
+
 func TestRequestPolicyEventsReachLogAdminInfo(t *testing.T) {
 	previousAutoDisable := common.AutomaticDisableChannelEnabled
 	common.AutomaticDisableChannelEnabled = true

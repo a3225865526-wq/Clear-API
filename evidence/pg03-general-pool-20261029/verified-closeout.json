@@ -1,0 +1,149 @@
+{
+  "real_model_dispatches": 4,
+  "successful_sse_responses": 4,
+  "accounts_used": [
+    "test-A.json",
+    "test-B.json"
+  ],
+  "consume_log_count": 4,
+  "site_charge_units": 112,
+  "site_charge_usd_equivalent": "0.000224",
+  "durable_ledger_rows": [
+    {
+      "request_id": "202610282332301592916878268d9d62u3AxVIS",
+      "reserved": 7,
+      "target": 7,
+      "applied": 7,
+      "state": "settled"
+    },
+    {
+      "request_id": "202610282343092028399268268d9d6vpNM7kT9",
+      "reserved": 7,
+      "target": 7,
+      "applied": 7,
+      "state": "settled"
+    }
+  ],
+  "outbox_rows": [
+    {
+      "request_id": "202610282332301592916878268d9d62u3AxVIS",
+      "state": "delivered",
+      "attempts": 0
+    },
+    {
+      "request_id": "202610282343092028399268268d9d6vpNM7kT9",
+      "state": "delivered",
+      "attempts": 0
+    }
+  ],
+  "delivery_receipts": [
+    {
+      "request_id": "202610282332301592916878268d9d62u3AxVIS"
+    },
+    {
+      "request_id": "202610282343092028399268268d9d6vpNM7kT9"
+    }
+  ],
+  "executor_receipts": [
+    {
+      "account": "test-A.json",
+      "request_id": "202610282332301592916878268d9d62u3AxVIS",
+      "attempt_id": "202610282332301592916878268d9d62u3AxVIS-attempt",
+      "receipt_id": "0a9a3215177b16ec44fea5c0f6fca6a1099abb86df912c401f49fef2a75bfcf8",
+      "model": "gpt-5.6-luna",
+      "usage": {
+        "cache_write_tokens": 0,
+        "final": true,
+        "status": "exact",
+        "source": "codex_upstream",
+        "input_tokens": 17,
+        "cached_input_tokens": 0,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "total_tokens": 25,
+        "total_derived": false,
+        "attempt_id": "202610282332301592916878268d9d62u3AxVIS-attempt",
+        "account_ref": "017747c22743580353d7ce1ab30afa78019cad8ce3697a36b88ded156bff9c2a",
+        "model": "gpt-5.6-luna",
+        "response_id": "resp_06d6736b438afb7b016ae2860f194881919ea1bf6576b6d2fd"
+      },
+      "result_state": "COMPLETED"
+    },
+    {
+      "account": "test-B.json",
+      "request_id": "202610282329014805795728268d9d6pSU5pcer",
+      "attempt_id": "202610282329014805795728268d9d6pSU5pcer-attempt",
+      "receipt_id": "6531ef18c8902898d7641c8f986e50ae779f11593ccfadba0c832825a6937159",
+      "model": "gpt-5.6-terra",
+      "usage": {
+        "cache_write_tokens": 0,
+        "final": true,
+        "status": "exact",
+        "source": "codex_upstream",
+        "input_tokens": 17,
+        "cached_input_tokens": 0,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "total_tokens": 25,
+        "total_derived": false,
+        "attempt_id": "202610282329014805795728268d9d6pSU5pcer-attempt",
+        "account_ref": "ca1f63b86d45ef06fb582027323093a1360de118f844e6591f86009f9c175649",
+        "model": "gpt-5.6-terra",
+        "response_id": "resp_07e545ca9fbadaba016ae2853e64cc81919519757da4cbd2af"
+      },
+      "result_state": "COMPLETED"
+    },
+    {
+      "account": "test-A.json",
+      "request_id": "202610282343092028399268268d9d6vpNM7kT9",
+      "attempt_id": "202610282343092028399268268d9d6vpNM7kT9-attempt",
+      "receipt_id": "7377ffb580df94ac8239393efc9f6465f215693465a5fff3e958d15b9ca092e6",
+      "model": "gpt-5.6-luna",
+      "usage": {
+        "cache_write_tokens": 0,
+        "final": true,
+        "status": "exact",
+        "source": "codex_upstream",
+        "input_tokens": 17,
+        "cached_input_tokens": 0,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "total_tokens": 25,
+        "total_derived": false,
+        "attempt_id": "202610282343092028399268268d9d6vpNM7kT9-attempt",
+        "account_ref": "017747c22743580353d7ce1ab30afa78019cad8ce3697a36b88ded156bff9c2a",
+        "model": "gpt-5.6-luna",
+        "response_id": "resp_0c9fabbc4f4b38c4016ae2888dedc48191a225a36e8440c1d9"
+      },
+      "result_state": "COMPLETED"
+    },
+    {
+      "account": "test-A.json",
+      "request_id": "ba06f6aa25fa5874e5fd1a3f829ceb07",
+      "attempt_id": "ba06f6aa25fa5874e5fd1a3f829ceb07-attempt",
+      "receipt_id": "d3182fe02573565af85d0cb131bfd4814c6afda8e6ff6ebcb085c9e756db23a9",
+      "model": "gpt-5.6-luna",
+      "usage": {
+        "cache_write_tokens": 0,
+        "final": true,
+        "status": "exact",
+        "source": "codex_upstream",
+        "input_tokens": 17,
+        "cached_input_tokens": 0,
+        "output_tokens": 8,
+        "reasoning_tokens": 0,
+        "total_tokens": 25,
+        "total_derived": false,
+        "attempt_id": "ba06f6aa25fa5874e5fd1a3f829ceb07-attempt",
+        "account_ref": "017747c22743580353d7ce1ab30afa78019cad8ce3697a36b88ded156bff9c2a",
+        "model": "gpt-5.6-luna",
+        "response_id": "resp_0a3257703d1da621016ae284129af08191b904cd81e15063fe"
+      },
+      "result_state": "COMPLETED"
+    }
+  ],
+  "all_balances_and_logs_match": true,
+  "in_flight_at_closeout": 0,
+  "production_dispatches": 0,
+  "production_changes": false
+}

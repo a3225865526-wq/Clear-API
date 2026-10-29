@@ -1,0 +1,439 @@
+diff --git a/model/pool_gate_step4_test.go b/model/pool_gate_step4_test.go
+index e4b75b9ba..c8ebad1d5 100644
+--- a/model/pool_gate_step4_test.go
++++ b/model/pool_gate_step4_test.go
+@@ -107,10 +107,17 @@ func TestPoolGateMatrix(t *testing.T) {
+ 
+ 	t.Run("unconfigured-model", func(t *testing.T) {
+ 		setPoolMasterOption(t, "true")
+-		require.ErrorIs(t, pool.CheckPoolModelRoute("unpublished-model"), ErrPoolModelNotPublished)
+-		require.ErrorIs(t, pool.CheckPoolChannelPoolAdmission("unpublished-model"), ErrPoolModelNotPublished)
++		require.NoError(t, pool.CheckPoolModelRoute("unpublished-model"))
++		require.NoError(t, pool.CheckPoolChannelPoolAdmission("unpublished-model"))
++		require.True(t, channelPoolCanonicalPublished(pool, "unpublished-model"))
+ 		require.NoError(t, ordinary.CheckPoolModelRoute("unpublished-model"))
+ 		require.NoError(t, ordinary.CheckPoolChannelPoolAdmission("unpublished-model"))
++		setPoolMasterOption(t, "false")
++		require.ErrorIs(t, pool.CheckPoolModelRoute("unpublished-model"), ErrPoolGloballyDisabled)
++		require.False(t, channelPoolCanonicalPublished(pool, "unpublished-model"))
++		setPoolMasterOption(t, "true")
++		closed := &Channel{OtherSettings: `{"upstream_pool":{}}`}
++		require.ErrorIs(t, closed.CheckPoolModelRoute("unpublished-model"), ErrPoolChannelRoutingOff)
+ 	})
+ 	t.Run("published-but-paused", func(t *testing.T) {
+ 		setPoolMasterOption(t, "true")
+@@ -144,38 +151,31 @@ func TestPoolGateMatrix(t *testing.T) {
+ 		require.Error(t, pool.CheckPoolModelRoute("synthetic-pool-model"))
+ 		require.NoError(t, ordinary.CheckPoolModelRoute("synthetic-pool-model"))
+ 	})
+-	t.Run("unpublish-x-denies-x-only", func(t *testing.T) {
++	t.Run("pause-x-denies-x-only", func(t *testing.T) {
+ 		installPoolRoute(t, "synthetic-pool-model", "pool", true, 1)
+ 		setPoolMasterOption(t, "true")
+-		// Remove the route again: the same channel loses only model X.
+-		common.OptionMapRWMutex.Lock()
+-		delete(common.OptionMap, PoolRoutingOptionPrefix+"synthetic-pool-model")
+-		common.OptionMapRWMutex.Unlock()
+-		require.ErrorIs(t, pool.CheckPoolModelRoute("synthetic-pool-model"), ErrPoolModelNotPublished)
++		installPoolRoute(t, "synthetic-pool-model", "pool", false, 2)
++		require.Error(t, pool.CheckPoolModelRoute("synthetic-pool-model"))
+ 		installPoolRoute(t, "synthetic-other-model", "pool", true, 1)
+ 		require.NoError(t, pool.CheckPoolModelRoute("synthetic-other-model"))
+ 	})
+ }
+ 
+-// E. Alias safety: admission is anchored on the resolved canonical model.
+-// The requested alias is an input/mapping-layer identity — an unpublished
+-// alias may reach a published canonical — but a published alias can never
+-// admit an unpublished canonical, and an explicit api/paused decision about
+-// the requested name still wins over the canonical.
++// Alias and canonical overrides both remain effective with automatic routing.
+ func TestPoolGateCanonicalAlias(t *testing.T) {
+ 	channel := &Channel{
+-		Id:           42,
++		Id:            42,
+ 		OtherSettings: `{"upstream_pool":{},"pool_routing_enabled":true}`,
+-		Models:       "synthetic-pool-alias,synthetic-pool-model",
+-		ModelMapping: func() *string { s := `{"synthetic-pool-alias":"synthetic-pool-model"}`; return &s }(),
++		Models:        "synthetic-pool-alias,synthetic-pool-model",
++		ModelMapping:  func() *string { s := `{"synthetic-pool-alias":"synthetic-pool-model"}`; return &s }(),
+ 	}
+ 	setPoolMasterOption(t, "true")
+ 	t.Run("alias-published-canonical-not", func(t *testing.T) {
+ 		installPoolRoute(t, "synthetic-pool-alias", "pool", true, 1)
+ 		require.NoError(t, channel.CheckPoolModelRoute("synthetic-pool-alias"))
+-		// The canonical model is the authorization anchor: without its own
+-		// publication the alias alone never admits.
+-		require.ErrorIs(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"), ErrPoolModelNotPublished)
++		// An absent canonical override uses ordinary channel routing. Executor
++		// admission still checks the resolved upstream model for this account.
++		require.NoError(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
+ 	})
+ 	t.Run("canonical-published-alias-not", func(t *testing.T) {
+ 		common.OptionMapRWMutex.Lock()
+@@ -192,9 +192,9 @@ func TestPoolGateCanonicalAlias(t *testing.T) {
+ 		require.NoError(t, channel.CheckPoolChannelPoolAdmission("synthetic-pool-alias"))
+ 	})
+ 	t.Run("requested-name-cannot-bypass", func(t *testing.T) {
+-		// An unknown requested name resolves to itself: the unpublished
+-		// canonical denies.
+-		require.Error(t, channel.CheckPoolChannelPoolAdmission("synthetic-unknown-alias"))
++		// Channel abilities/token permissions own model access; this gate adds
++		// no separate model whitelist when there is no explicit override.
++		require.NoError(t, channel.CheckPoolChannelPoolAdmission("synthetic-unknown-alias"))
+ 	})
+ 	t.Run("explicit-alias-api-source-wins", func(t *testing.T) {
+ 		// An operator decision that pins the requested name away from the
+@@ -234,9 +234,9 @@ func TestPoolFilterModelSource(t *testing.T) {
+ 	poolOff := &Channel{Id: 8, OtherSettings: `{"upstream_pool":{}}`}
+ 	ordinary := &Channel{Id: 7}
+ 	alias := &Channel{
+-		Id:           43,
++		Id:            43,
+ 		OtherSettings: `{"upstream_pool":{},"pool_routing_enabled":true}`,
+-		ModelMapping: func() *string { s := `{"alias":"canonical-published"}`; return &s }(),
++		ModelMapping:  func() *string { s := `{"alias":"canonical-published"}`; return &s }(),
+ 	}
+ 	poolFilter := dtoPoolFilter("pool")
+ 	apiFilter := dtoPoolFilter("api")
+@@ -251,11 +251,11 @@ func TestPoolFilterModelSource(t *testing.T) {
+ 		require.False(t, channelMatchesFilter(poolOff, "m", apiFilter))
+ 		require.True(t, channelMatchesFilter(ordinary, "m", apiFilter))
+ 	})
+-	t.Run("unpublished-canonical-excluded-from-pool-filter", func(t *testing.T) {
++	t.Run("unconfigured-canonical-uses-channel-routing", func(t *testing.T) {
+ 		common.OptionMapRWMutex.Lock()
+ 		delete(common.OptionMap, PoolRoutingOptionPrefix+"m")
+ 		common.OptionMapRWMutex.Unlock()
+-		require.False(t, channelMatchesFilter(poolOn, "m", poolFilter))
++		require.True(t, channelMatchesFilter(poolOn, "m", poolFilter))
+ 	})
+ 	t.Run("alias-reaches-published-canonical", func(t *testing.T) {
+ 		installPoolRoute(t, "canonical-published", "pool", true, 1)
+diff --git a/model/pool_gate_step6_gemini_grok_test.go b/model/pool_gate_step6_gemini_grok_test.go
+index 3f1a63265..9bbe8797c 100644
+--- a/model/pool_gate_step6_gemini_grok_test.go
++++ b/model/pool_gate_step6_gemini_grok_test.go
+@@ -13,9 +13,9 @@ import (
+ // executor-side provider deny is proven separately (CLIProxyAPI
+ // pool_gemini_xai_isolation_test.go); this file proves the gateway side.
+ 
+-// Unpublished provider names (the normal case for gemini-*/grok-* channels)
+-// keep pool channels out of the candidate list and ordinary channels in.
+-func TestPoolGateUnpublishedGeminiGrokNamesExcludePoolChannels(t *testing.T) {
++// Model routing does not infer provider support from names. Channel abilities
++// select candidates and the executor validates actual account support.
++func TestPoolGateUnconfiguredNamesUseChannelRouting(t *testing.T) {
+ 	setPoolMasterOption(t, "true")
+ 	pool := boundPoolChannel()
+ 	ordinary := &Channel{Id: 7, Name: "synthetic-gemini-channel", Models: "gemini-2.5-pro,grok-4"}
+@@ -25,11 +25,11 @@ func TestPoolGateUnpublishedGeminiGrokNamesExcludePoolChannels(t *testing.T) {
+ 	canonicalFilter := dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "api", AllowCanonicalPool: true}
+ 	poolFilter := dtoPoolFilter("pool")
+ 	for _, name := range []string{"gemini-2.5-pro", "gemini-3-flash-preview", "grok-4", "grok-3-mini"} {
+-		require.ErrorIs(t, pool.CheckPoolModelRoute(name), ErrPoolModelNotPublished)
+-		require.ErrorIs(t, pool.CheckPoolChannelPoolAdmission(name), ErrPoolModelNotPublished)
+-		require.False(t, channelMatchesFilter(pool, name, canonicalFilter),
+-			"unpublished %q must never admit a pool channel", name)
+-		require.False(t, channelMatchesFilter(pool, name, poolFilter))
++		require.NoError(t, pool.CheckPoolModelRoute(name))
++		require.NoError(t, pool.CheckPoolChannelPoolAdmission(name))
++		require.True(t, channelMatchesFilter(pool, name, canonicalFilter),
++			"unconfigured %q uses channel routing and executor capability checks", name)
++		require.True(t, channelMatchesFilter(pool, name, poolFilter))
+ 		require.True(t, channelMatchesFilter(ordinary, name, canonicalFilter),
+ 			"unpublished %q must keep ordinary channels eligible", name)
+ 	}
+diff --git a/model/pool_routing.go b/model/pool_routing.go
+index 2da412f56..c5f01f47b 100644
+--- a/model/pool_routing.go
++++ b/model/pool_routing.go
+@@ -209,7 +209,7 @@ func channelPoolCanonicalPublished(channel *Channel, requestedModel string) bool
+ 	}
+ 	canonical := ResolveChannelUpstreamModel(channel, requestedModel)
+ 	route, err := GetPoolModelRoute(canonical)
+-	if err != nil || route == nil || !route.Enabled || route.Source != "pool" {
++	if err != nil || route != nil && (!route.Enabled || route.Source != "pool") {
+ 		return false
+ 	}
+ 	return PoolMasterEnabled()
+@@ -231,8 +231,8 @@ type PoolRouteDecisions struct {
+ //
+ // Fail-closed semantics:
+ //   - corrupt route state: error (never serve)
+-//   - unconfigured model: non-pool channels keep existing routing; pool-bound
+-//     channels are denied (an empty publication set never serves)
++//   - unconfigured model: use the existing channel/group/model routing; pool
++//     channels still require master, channel permission and executor admission
+ //   - paused route: denied for both sources
+ //   - api source: pool-bound channels are excluded, others pass
+ //   - pool source: the master switch must be on, the channel must be
+@@ -245,7 +245,12 @@ func (channel *Channel) CheckPoolModelRoute(modelName string) error {
+ 			return err
+ 		}
+ 		if channel != nil && channel.PoolChannelBound() {
+-			return ErrPoolModelNotPublished
++			if !PoolMasterEnabled() {
++				return ErrPoolGloballyDisabled
++			}
++			if !channel.PoolRoutingEnabled() {
++				return ErrPoolChannelRoutingOff
++			}
+ 		}
+ 		return nil
+ 	}
+diff --git a/relaykit/dto/channel_settings.go b/relaykit/dto/channel_settings.go
+index 68a87be41..3a69c158c 100644
+--- a/relaykit/dto/channel_settings.go
++++ b/relaykit/dto/channel_settings.go
+@@ -1,6 +1,7 @@
+ package dto
+ 
+ import (
++	"encoding/json"
+ 	"fmt"
+ 	"net/url"
+ 	"regexp"
+@@ -100,6 +101,10 @@ const (
+ )
+ 
+ type ChannelOtherSettings struct {
++	// Pool bindings share this settings document with model discovery. Preserve
++	// both legacy string and object bindings during typed settings updates.
++	UpstreamPool                          json.RawMessage       `json:"upstream_pool,omitempty"`
++	PoolRoutingEnabled                    bool                  `json:"pool_routing_enabled,omitempty"`
+ 	AzureResponsesVersion                 string                `json:"azure_responses_version,omitempty"`
+ 	VertexKeyType                         VertexKeyType         `json:"vertex_key_type,omitempty"` // "json" or "api_key"
+ 	OpenRouterEnterprise                  *bool                 `json:"openrouter_enterprise,omitempty"`
+diff --git a/relaykit/dto/channel_settings_test.go b/relaykit/dto/channel_settings_test.go
+index 3690cb523..51a439a1b 100644
+--- a/relaykit/dto/channel_settings_test.go
++++ b/relaykit/dto/channel_settings_test.go
+@@ -5,11 +5,31 @@ import (
+ 	"regexp"
+ 	"testing"
+ 
++	"github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
+ 	"github.com/QuantumNous/new-api/relaykit/types"
+ 	"github.com/stretchr/testify/assert"
+ 	"github.com/stretchr/testify/require"
+ )
+ 
++func TestPoolBindingSurvivesModelSyncSettingsRoundTrip(t *testing.T) {
++	for _, binding := range []string{`"pool-A"`, `{"pool_id":"pool-A"}`, `null`} {
++		t.Run(binding, func(t *testing.T) {
++			var settings ChannelOtherSettings
++			require.NoError(t, kitutil.Unmarshal([]byte(`{"upstream_pool":`+binding+`,"pool_routing_enabled":true}`), &settings))
++			settings.UpstreamModelUpdateCheckEnabled = true
++			settings.UpstreamModelUpdateAutoSyncEnabled = true
++			settings.UpstreamModelUpdateLastCheckTime = 123
++			encoded, err := kitutil.Marshal(settings)
++			require.NoError(t, err)
++			var result ChannelOtherSettings
++			require.NoError(t, kitutil.Unmarshal(encoded, &result))
++			assert.JSONEq(t, binding, string(result.UpstreamPool))
++			assert.True(t, result.PoolRoutingEnabled)
++			assert.True(t, result.UpstreamModelUpdateAutoSyncEnabled)
++		})
++	}
++}
++
+ func TestAdvancedCustomValidateResponsesToChatConverterPath(t *testing.T) {
+ 	valid := &AdvancedCustomConfig{
+ 		Routes: []AdvancedCustomRoute{
+diff --git a/service/accountpool/policy_snapshot.go b/service/accountpool/policy_snapshot.go
+index 3c8b60a39..48dd24d75 100644
+--- a/service/accountpool/policy_snapshot.go
++++ b/service/accountpool/policy_snapshot.go
+@@ -98,7 +98,20 @@ func freezePG03Policy(c *gin.Context, state *pg03RequestSnapshot) error {
+ 	if err != nil {
+ 		return err
+ 	}
++	requestID := c.GetString(common.RequestIdKey)
++	if requestID == "" {
++		var nonce [16]byte
++		if _, err := rand.Read(nonce[:]); err != nil {
++			return err
++		}
++		requestID = hex.EncodeToString(nonce[:])
++	}
+ 	if policy == nil || !policy.Enabled {
++		// Automatic account selection uses the executor's existing scheduler.
++		// It still requires the independent Gateway proof and one frozen request
++		// identity, even when no per-model fallback policy was configured.
++		state.policy = pg03PolicySnapshot{PoolID: poolID, ModelName: state.model, RequestID: requestID, IssuedAt: time.Now().Unix()}
++		state.active = true
+ 		return nil
+ 	}
+ 	if policy.MaxFallbackCount < 0 || policy.MaxFallbackCount > 3 {
+@@ -129,11 +142,7 @@ func freezePG03Policy(c *gin.Context, state *pg03RequestSnapshot) error {
+ 	if len(order) == 0 || len(order) > 4 {
+ 		return ErrPoolInvalid
+ 	}
+-	var nonce [16]byte
+-	if _, err := rand.Read(nonce[:]); err != nil {
+-		return err
+-	}
+-	state.policy = pg03PolicySnapshot{PolicyID: policy.Id, PoolID: poolID, ModelName: state.model, AccountOrder: order, MaxFallbackCount: policy.MaxFallbackCount, RequestID: hex.EncodeToString(nonce[:]), IssuedAt: time.Now().Unix()}
++	state.policy = pg03PolicySnapshot{PolicyID: policy.Id, PoolID: poolID, ModelName: state.model, AccountOrder: order, MaxFallbackCount: policy.MaxFallbackCount, RequestID: requestID, IssuedAt: time.Now().Unix()}
+ 	state.active = true
+ 	return nil
+ }
+@@ -182,9 +191,11 @@ func ApplyPG03Policy(c *gin.Context, req *http.Request) error {
+ 	mac := hmac.New(sha256.New, []byte(key))
+ 	mac.Write([]byte("clearapi-pg03-policy-v1\n"))
+ 	mac.Write(payload)
+-	req.Header.Set(PG03PolicyHeader, base64.RawURLEncoding.EncodeToString(payload))
+-	req.Header.Set(PG03SignatureHeader, hex.EncodeToString(mac.Sum(nil)))
+-	req.Header.Set(PG03RequestHeader, policy.RequestID)
++	if policy.PolicyID > 0 {
++		req.Header.Set(PG03PolicyHeader, base64.RawURLEncoding.EncodeToString(payload))
++		req.Header.Set(PG03SignatureHeader, hex.EncodeToString(mac.Sum(nil)))
++		req.Header.Set(PG03RequestHeader, policy.RequestID)
++	}
+ 	// Preserve C5's independent Gateway proof and durable receipt identity.
+ 	proofKey := os.Getenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY")
+ 	if proofKey == "" {
+diff --git a/service/channel.go b/service/channel.go
+index 81d558169..89389b127 100644
+--- a/service/channel.go
++++ b/service/channel.go
+@@ -5,10 +5,12 @@ import (
+ 	"strings"
+ 
+ 	"github.com/QuantumNous/new-api/common"
++	"github.com/QuantumNous/new-api/constant"
+ 	"github.com/QuantumNous/new-api/model"
+ 	"github.com/QuantumNous/new-api/relaykit/dto"
+ 	"github.com/QuantumNous/new-api/relaykit/types"
+ 	"github.com/QuantumNous/new-api/setting/operation_setting"
++	"github.com/gin-gonic/gin"
+ )
+ 
+ func formatNotifyType(channelId int, status int) string {
+@@ -54,6 +56,19 @@ func EnableChannel(channelId int, usingKey string, channelName string) {
+ 	}
+ }
+ 
++// Pool account failures belong to the executor's account health/cooldown
++// state. A single account error must not permanently disable the shared pool.
++func ShouldDisableRelayChannel(c *gin.Context, err *types.NewAPIError) bool {
++	if c != nil {
++		settings, _ := common.GetContextKeyType[dto.ChannelOtherSettings](c, constant.ContextKeyChannelOtherSetting)
++		baseURL := common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl)
++		if len(settings.UpstreamPool) > 0 || (&model.Channel{BaseURL: &baseURL}).PoolChannelBound() {
++			return false
++		}
++	}
++	return ShouldDisableChannel(err)
++}
++
+ func ShouldDisableChannel(err *types.NewAPIError) bool {
+ 	if !common.AutomaticDisableChannelEnabled {
+ 		return false
+diff --git a/service/relay_error.go b/service/relay_error.go
+index ebf49b1ad..29da52ea5 100644
+--- a/service/relay_error.go
++++ b/service/relay_error.go
+@@ -94,7 +94,7 @@ func ProcessChannelError(c *gin.Context, channelError types.ChannelError, err *t
+ 		return
+ 	}
+ 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.MaskSensitiveErrorWithStatusCode())))
+-	if ShouldDisableChannel(err) && channelError.AutoBan {
++	if ShouldDisableRelayChannel(c, err) && channelError.AutoBan {
+ 		reason := err.MaskSensitiveErrorWithStatusCode()
+ 		gopool.Go(func() {
+ 			DisableChannel(channelError, reason)
+diff --git a/service/relay_error_test.go b/service/relay_error_test.go
+index ee20ec6b4..822c17dfa 100644
+--- a/service/relay_error_test.go
++++ b/service/relay_error_test.go
+@@ -164,6 +164,28 @@ func TestDecideRelayRetryReasons(t *testing.T) {
+ 	}
+ }
+ 
++func TestPoolAccountFailureDoesNotDisableSharedChannel(t *testing.T) {
++	previous := common.AutomaticDisableChannelEnabled
++	common.AutomaticDisableChannelEnabled = true
++	t.Cleanup(func() { common.AutomaticDisableChannelEnabled = previous })
++	t.Setenv("CLEARAPI_POOL_CLIPROXY_URL", "http://executor.invalid:8317")
++	apiErr := types.NewOpenAIError(errors.New("invalid account credential"), types.ErrorCodeBadResponseStatusCode, http.StatusUnauthorized)
++	for _, pool := range []bool{false, true} {
++		c, _ := gin.CreateTestContext(httptest.NewRecorder())
++		c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
++		c.Set("auto_ban", true)
++		if pool {
++			common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, "http://executor.invalid:8317")
++		}
++		assert.Equal(t, !pool, ShouldDisableRelayChannel(c, apiErr))
++		RequestPolicy(c).BeginAttempt(&model.Channel{Id: 1}, "default")
++		RecordPolicyFailure(c, 1, apiErr, DecideRelayRetry(c, apiErr, 0))
++		if pool {
++			assert.Equal(t, "unchanged", RequestPolicy(c).Events()[2].Health)
++		}
++	}
++}
++
+ func TestRequestPolicyEventsReachLogAdminInfo(t *testing.T) {
+ 	previousAutoDisable := common.AutomaticDisableChannelEnabled
+ 	common.AutomaticDisableChannelEnabled = true
+diff --git a/service/request_policy.go b/service/request_policy.go
+index d73ab45db..8f2d4dc26 100644
+--- a/service/request_policy.go
++++ b/service/request_policy.go
+@@ -117,7 +117,7 @@ func RecordPolicyFailure(c *gin.Context, channelID int, err *types.NewAPIError,
+ 	}
+ 	state.AddEvent(event)
+ 	event.Decision, event.Health = decision, "unchanged"
+-	if source != "local" && c.GetBool("auto_ban") && ShouldDisableChannel(err) {
++	if source != "local" && c.GetBool("auto_ban") && ShouldDisableRelayChannel(c, err) {
+ 		event.Health = "channel_disable_requested"
+ 		if common.GetContextKeyBool(c, constant.ContextKeyChannelIsMultiKey) {
+ 			event.Health = "key_disable_requested"
+diff --git a/service/accountpool/policy_snapshot_test.go b/service/accountpool/policy_snapshot_test.go
+new file mode 100644
+index 000000000..504a2ed2f
+--- /dev/null
++++ b/service/accountpool/policy_snapshot_test.go
+@@ -0,0 +1,41 @@
++package accountpool
++
++import (
++	"bytes"
++	"crypto/hmac"
++	"crypto/sha256"
++	"encoding/hex"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"testing"
++
++	"github.com/gin-gonic/gin"
++	"github.com/stretchr/testify/assert"
++	"github.com/stretchr/testify/require"
++)
++
++func TestAutomaticPoolGatewayProof(t *testing.T) {
++	key := strings.Repeat("synthetic-proof-key-", 2)
++	t.Setenv("CLEARAPI_PG03_POLICY_KEY", strings.Repeat("p", 32))
++	t.Setenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY", key)
++	c, _ := gin.CreateTestContext(httptest.NewRecorder())
++	c.Set(pg03SnapshotContext, &pg03RequestSnapshot{active: true, policy: pg03PolicySnapshot{PoolID: "synthetic-pool", ModelName: "new-model", RequestID: "gateway-request-id", IssuedAt: 123}})
++	body := []byte(`{"model":"new-model","stream":true}`)
++	req, err := http.NewRequest(http.MethodPost, "http://executor.invalid/v1/responses", bytes.NewReader(body))
++	require.NoError(t, err)
++	req.Header.Set(PG03PolicyHeader, "client-supplied")
++	req.Header.Set("X-ClearAPI-PG02-Gateway-Proof", "client-supplied")
++	require.NoError(t, ApplyPG03Policy(c, req))
++	assert.Empty(t, req.Header.Get(PG03PolicyHeader))
++	assert.Equal(t, "gateway-request-id", req.Header.Get("X-ClearAPI-PG02-Request"))
++	assert.Equal(t, "gateway-request-id-attempt", req.Header.Get("X-ClearAPI-PG02-Attempt"))
++	mac := hmac.New(sha256.New, []byte(key))
++	mac.Write([]byte("gateway-request-id\ngateway-request-id-attempt\nPOST\n/v1/responses\n"))
++	mac.Write(body)
++	assert.Equal(t, hex.EncodeToString(mac.Sum(nil)), req.Header.Get("X-ClearAPI-PG02-Gateway-Proof"))
++	// The frozen binding cannot be reused with changed outbound bytes.
++	changed, err := http.NewRequest(http.MethodPost, "http://executor.invalid/v1/responses", bytes.NewReader([]byte(`{"model":"other-model"}`)))
++	require.NoError(t, err)
++	require.Error(t, ApplyPG03Policy(c, changed))
++}

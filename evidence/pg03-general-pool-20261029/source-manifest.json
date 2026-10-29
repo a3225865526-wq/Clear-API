@@ -1,0 +1,37 @@
+{
+  "gateway": {
+    "repository": "D:\\AI\\API\\worktrees\\pg03-general-pool-gateway-20261029",
+    "base_commit": "732a2d5162c15604aa7ec7bbba12bb5c9d356031",
+    "files": {
+      "model/pool_routing.go": "0ea55848f7f78eb368d2bf8d7ffa119a378b22cdaf40b7740909fbda7a2cd747",
+      "model/pool_gate_step4_test.go": "87eda6dbe4fbccca6262a05fc7d0fb645552449ea8b58cae80bcca3d77c16292",
+      "model/pool_gate_step6_gemini_grok_test.go": "e661339c1f3d2463fb208b13ef48304e948b143d2abc9e546915131e2ee52130",
+      "service/accountpool/policy_snapshot.go": "3efb0394f72902de8e74a0de669a3ff64a7c59311669e121cf42e569f2af482a",
+      "service/accountpool/policy_snapshot_test.go": "e1e48ad5399f24d7d00e1445c11599ec799bd51a2fe28c035eef78c66171801c",
+      "relaykit/dto/channel_settings.go": "602f95726e3299f8bc8a3eb84337a8b76fccc4cdbe0190dc743dd8c02f2828b2",
+      "relaykit/dto/channel_settings_test.go": "c75a0acf1aa84c2aa324d56f32b0003c8c3771d3189c05d066064901eef81e04",
+      "service/channel.go": "75ddd5a0ce2f8dfcdf013c953af61df42c37256e05f2e695a14aaba102367d02",
+      "service/relay_error.go": "1c60c6247abae6ed874cc3496a9c5b19b5d0582fafd7b43249d8bf42efe1d982",
+      "service/request_policy.go": "61d8e0c7d951deb8d3bb581971881c30ff42de96568e6298abe27f17975f4560",
+      "service/relay_error_test.go": "548dcef0536f6058150fb2a20e2cd5f98b465dc51821ec2848548bc863b8fa8f"
+    },
+    "review_patch_sha256": "299e5f08df61dd647f5dc2cdceef4743c36615af3dd7672583ab7276241398c7"
+  },
+  "executor": {
+    "repository": "D:\\AI\\API\\worktrees\\pg03-general-pool-executor-20261029",
+    "base_commit": "201ce387c12750f545009295636375786af98204",
+    "files": {
+      "internal/runtime/executor/codex_pool_models.go": "50559c1cf6dfc370517bad0d02fe68973b1f4268bd214f0c7cf05b4750e2d10c",
+      "sdk/cliproxy/auth/pool_model_sync.go": "3c24a71d0714f344fc8852182b04c0cfd889bb30400135858eeab63bc20166e4",
+      "sdk/cliproxy/auth/pool_capability.go": "47ad730cfc897d051c3b969812666ca4f025b1efe6fa4ec0b94b941690de594e",
+      "sdk/cliproxy/auth/pool_guard.go": "3a5632dc8dc980f50fb2bbb6f5e6c5ae366fe1d65787968b3036dd3537551902",
+      "sdk/cliproxy/service_lifecycle.go": "1c99f71d1cece1aba77763edd1048e36c1f66547ac8c504c1933f212c1d696d2",
+      "sdk/cliproxy/service_models.go": "9db6943e2bf38bd76012c84f80e77be7066dc05874134a60c6da8d18bd4a9b7a",
+      "sdk/cliproxy/service_pool_registry_test.go": "99fd6585b9c118657d7a2f35c30ef7c1afad4b972cc13b9745769e6e2087171a",
+      "internal/api/handlers/management/pool_models.go": "42a97ab21262c9f96e9b189d0e6a90db702d1f6e58b4380d79dd6e7a007eb551",
+      "internal/api/pool_management_test.go": "90d45896b40dcd1e041e8c89e19df026c7e27e1ecdce19b13dc8be0c057b1a8a",
+      "internal/api/server_management.go": "08e850a0ee9c36bf0b764adf4dfaad7a78d9d069d15c2b6bda456e2bfeb85df5"
+    },
+    "review_patch_sha256": "606fa620b04ac7ec00e161d810d1b73166c35617a26e94969351ee5522fc6439"
+  }
+}

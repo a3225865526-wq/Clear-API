@@ -1,0 +1,22 @@
+{
+  "utc": "2026-10-28T17:57:37.159297+00:00",
+  "executor_transport_discovery": [
+    {
+      "account_id": 3,
+      "exit_code": 1,
+      "models": [],
+      "error": "pool model discovery HTTP 403",
+      "stderr_bytes": 0
+    },
+    {
+      "account_id": 4,
+      "exit_code": 1,
+      "models": [],
+      "error": "pool model discovery HTTP 403",
+      "stderr_bytes": 0
+    }
+  ],
+  "binary_sha256": "d2d25096b9667cba761f7b845ed949e47cc2d78646423c38541473411a2ecadb",
+  "real_model_requests": 0,
+  "production_configuration_writes": 0
+}

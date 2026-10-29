@@ -1,0 +1,51 @@
+{
+  "schema": "clearapi.pg03-general-pool-closeout/v1",
+  "utc": "2026-10-28T23:51:43.077556+00:00",
+  "route_selected": "A: minimal PG03 repair",
+  "reference_sub2api_commit": "a3298b46ebe239fb0720b068a1eb3383955bdac2",
+  "code_complete_for_verified_codex_responses_sse_scope": true,
+  "directed_tests_passed": true,
+  "real_model_calls_passed": "ISOLATED_LOCAL_ONLY",
+  "real_model_dispatches": 4,
+  "automatically_discovered_models": [
+    "gpt-reserve",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "codex-auto-review"
+  ],
+  "real_verified_models": [
+    "gpt-5.6-luna",
+    "gpt-5.6-terra"
+  ],
+  "manual_per_model_capability_grant_required": false,
+  "normal_channel_auto_sync_verified": true,
+  "site_charge_units": 112,
+  "all_local_balances_logs_match": true,
+  "durable_ledger_settled_rows": 2,
+  "durable_outbox_delivered_rows": 2,
+  "in_flight_at_closeout": 0,
+  "local_components_stopped": true,
+  "production_gateway_commit": "732a2d5162c15604aa7ec7bbba12bb5c9d356031",
+  "production_executor_commit": "201ce387c12750f545009295636375786af98204",
+  "production_master_enabled": false,
+  "production_deployed": false,
+  "production_model_dispatches": 0,
+  "production_acceptance_passed": false,
+  "production_blocker": "VPS account-scoped Codex model manifest HTTP 403 using Executor transport; same credentials/transport succeed locally",
+  "cancelled_old_requirements": [
+    "128 output tokens",
+    "USD 0.05 per-request hard cap",
+    "one real dispatch",
+    "fixed model",
+    "dedicated group rollout"
+  ],
+  "source_manifest_sha256": "4646f0fcba2c8d68dd1b7672470418eb31a368140fce1c8101d3389e3e15e8f9",
+  "evidence_files": [
+    "verified-closeout.json",
+    "existing-autosync-fixed.json",
+    "production-closeout.stdout.json",
+    "verification.json",
+    "source-manifest.json"
+  ],
+  "updated_utc": "2026-10-28T23:55:59.047832+00:00"
+}

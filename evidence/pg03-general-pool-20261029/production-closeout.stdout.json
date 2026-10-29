@@ -1,0 +1,76 @@
+{
+  "utc": "2026-10-28T23:50:08.454572+00:00",
+  "containers": [
+    {
+      "name": "/clearapi-new-api-1",
+      "id": "292a2987d54c3f6ad89f716d4b08bbf51837698b908453b1f0ceee27f607bf6c",
+      "image_id": "sha256:3da62d984e98d0cddd6fbc1c04fe7cc502268cc23efacfa0c64286ef2f9da960",
+      "revision": "732a2d5162c15604aa7ec7bbba12bb5c9d356031",
+      "started_at": "2026-10-28T13:26:54.959186679Z",
+      "health": null,
+      "running": true
+    },
+    {
+      "name": "/clearapi-pool-executor-1",
+      "id": "4fbe58b3cad53f2a068d6426023201ddafa3ba07c3b95ec362d97fc1d5c84d24",
+      "image_id": "sha256:23c05fb2eae11464f2d7796055d775b5ed1808b4520d46ade4883f5dfcad0e90",
+      "revision": "201ce387c12750f545009295636375786af98204",
+      "started_at": "2026-10-28T10:06:58.544917175Z",
+      "health": "healthy",
+      "running": true
+    },
+    {
+      "name": "/clearapi-postgres-1",
+      "id": "99299db0bed7ea3afdd0d3319369a68294032d2dec16c4f2231b1048fef044eb",
+      "image_id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "revision": null,
+      "started_at": "2026-10-20T00:46:43.870944528Z",
+      "health": "healthy",
+      "running": true
+    }
+  ],
+  "deployment_state_sha256": "045c133e4f99ad52379c927892aa9a0227d5f885ce211d949f169647a3f440d2",
+  "helper_installed": true,
+  "runtime_flags": {
+    "CLEARAPI_POOL_ENABLED": "true",
+    "CLEARAPI_POOL_CLIPROXY_DEDICATED": "true"
+  },
+  "master": "false",
+  "accounts": [
+    {
+      "id": 3,
+      "version": 4,
+      "platform": "codex",
+      "executor_id": "cliproxyapi",
+      "admin_status": "enabled",
+      "run_status": "not_admitted"
+    },
+    {
+      "id": 4,
+      "version": 4,
+      "platform": "codex",
+      "executor_id": "cliproxyapi",
+      "admin_status": "enabled",
+      "run_status": "not_admitted"
+    }
+  ],
+  "model_routes": [],
+  "capabilities": 0,
+  "grants": 0,
+  "trust_states": [],
+  "in_flight": [],
+  "test_state": {
+    "requests": 0,
+    "user_used": 0,
+    "token_used": 0,
+    "user_quota": 25000,
+    "channel_used": 0,
+    "token_remain": 25000,
+    "token_status": 2,
+    "channel_status": 2,
+    "token_unlimited": false
+  },
+  "executor_public_ports": {},
+  "real_model_requests": 0,
+  "production_configuration_writes": 0
+}

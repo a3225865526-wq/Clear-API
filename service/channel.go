@@ -5,10 +5,12 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/gin-gonic/gin"
 )
 
 func formatNotifyType(channelId int, status int) string {
@@ -52,6 +54,19 @@ func EnableChannel(channelId int, usingKey string, channelName string) {
 		content := fmt.Sprintf("通道「%s」（#%d）已被启用", channelName, channelId)
 		NotifyRootUser(formatNotifyType(channelId, common.ChannelStatusEnabled), subject, content)
 	}
+}
+
+// Pool account failures belong to the executor's account health/cooldown
+// state. A single account error must not permanently disable the shared pool.
+func ShouldDisableRelayChannel(c *gin.Context, err *types.NewAPIError) bool {
+	if c != nil {
+		settings, _ := common.GetContextKeyType[dto.ChannelOtherSettings](c, constant.ContextKeyChannelOtherSetting)
+		baseURL := common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl)
+		if len(settings.UpstreamPool) > 0 || (&model.Channel{BaseURL: &baseURL}).PoolChannelBound() {
+			return false
+		}
+	}
+	return ShouldDisableChannel(err)
 }
 
 func ShouldDisableChannel(err *types.NewAPIError) bool {

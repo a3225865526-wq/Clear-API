@@ -5,10 +5,30 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestPoolBindingSurvivesModelSyncSettingsRoundTrip(t *testing.T) {
+	for _, binding := range []string{`"pool-A"`, `{"pool_id":"pool-A"}`, `null`} {
+		t.Run(binding, func(t *testing.T) {
+			var settings ChannelOtherSettings
+			require.NoError(t, kitutil.Unmarshal([]byte(`{"upstream_pool":`+binding+`,"pool_routing_enabled":true}`), &settings))
+			settings.UpstreamModelUpdateCheckEnabled = true
+			settings.UpstreamModelUpdateAutoSyncEnabled = true
+			settings.UpstreamModelUpdateLastCheckTime = 123
+			encoded, err := kitutil.Marshal(settings)
+			require.NoError(t, err)
+			var result ChannelOtherSettings
+			require.NoError(t, kitutil.Unmarshal(encoded, &result))
+			assert.JSONEq(t, binding, string(result.UpstreamPool))
+			assert.True(t, result.PoolRoutingEnabled)
+			assert.True(t, result.UpstreamModelUpdateAutoSyncEnabled)
+		})
+	}
+}
 
 func TestAdvancedCustomValidateResponsesToChatConverterPath(t *testing.T) {
 	valid := &AdvancedCustomConfig{

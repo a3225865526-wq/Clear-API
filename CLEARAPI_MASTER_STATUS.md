@@ -1683,3 +1683,20 @@ Status: **BLOCKED**（首次生产切换尚未完成）
 - 根Go模块及独立relaykit构建、前端生产构建、typecheck、所改TS文件lint/format通过。HTTP矩阵首轮被loopback夹具拒绝，切换隔离实例127.0.0.1网络后通过；Bun测试运行器的Zod导入失败由Node运行器复验通过。实际命令、数据库版本、结果和未验证事项见 `validation.json`。普通CI及正式DryRun/部署待后续回执，不把本段当成已部署证明。
 - D三个提交均不是候选祖先，专属前端/路由/下载代码不存在；未改PG03、迁移入口或旧生产workflow。当前生产Compose/容器/进程三层POOL_ENABLED和DEDICATED均false，PG03能力入口404；注册/登录开启、普通API维持认证边界、共享Executor保留运行。
 - 候选完整SHA、CI、实际镜像、备份回执及部署验收在后续节追加；保留所有既有主线历史。此前工具差异为零的只读结论不作为本次已有真实应用变化的发布停止理由。
+
+
+---
+
+## 2026-10-29 07:55:59 Asia/Shanghai — PG03 通用账号池收尾：隔离4次真实调用通过，生产仍关闭
+
+- 本次用户指令已取消128输出tokens、0.05 USD硬费用上限、一次派发、固定模型和强制专组灰度。未恢复转换器限制、预算门禁或第二套Billing；旧报告这些阻断不再适用。
+- 选择继续PG03最小修复。账号级上游manifest自动同步capability/grant，保留身份/CAS/generation/撤销/到期约束，5分钟正常同步续期；无需逐模型手工准入。空model-routes沿用现有渠道/分组/模型路由，并复用原渠道模型自动同步任务。
+- 修复了无手工fallback-policy时缺少Gateway proof、Gateway与receipt请求ID不一致、typed渠道设置自动同步丢弃池绑定/开关，以及单账号错误可触发共享池渠道auto-ban的问题。未替换Scheduler/Lease/计费核心。Gateway源码已带回本工作区；原dirty relay-error改动保留。
+- 定向Go测试、Executor相关-race、Gateway/Executor构建及relaykit GOWORK=off独立构建通过；命令/日志见verification.json。未重跑全量CI/E2E/三库矩阵，未修改生产DB/schema或历史账务。
+- 相同测试凭据本机真实发现4模型：gpt-reserve、gpt-5.6-terra、gpt-5.6-luna、codex-auto-review；不含旧gpt-6-luna。隔离Gateway→Executor→真实上游共4次完成，实际使用A/B两账号和luna/terra两模型。消费日志4条，用户/Token/渠道共扣112 units；两条durable ledger均settled、两条outbox均delivered，无重复扣费，租约归零。正常自动任务从2模型增至4模型后绑定/路由仍保留，随后真实请求通过。隔离组件已停，local master关闭。
+- **生产07:50:08现场**仍Gateway732a2d51/Executor201ce387、原容器/state不变；helper已安装，两环境开关true；master=false，账号3/4 version4/not_admitted，capability/grant0，model-routes空，Token8/渠道6禁用且用量0。本轮生产模型派发0，无新应用发布/生产启用。
+- **实际剩余阻断**：VPS账号模型manifest在实际Executor传输下403（Python响应为Cloudflare HTML），相同凭据和传输在本机成功；没有伪造已确认模型或擅建长期代理。需要可用VPS上游出口，再按原发布/备份/身份准入流程部署并做生产验收。不能把隔离验收写成生产正式可用；其他Provider/协议未新增或实测。
+- Sub2API已实际克隆并固定a3298b46；账号模型清单实现有参考价值，但移植其账号库/Redis槽位/分组/调度结构比现有修复范围大，故未移植、未长期保留双调度架构。
+- 交付：`evidence/pg03-general-pool-20261029/RESULT.md`、receipt.json、verified-closeout.json、existing-autosync-fixed.json、production-closeout.stdout.json、source-manifest.json与两份review.patch。独立候选：`D:/AI/API/worktrees/pg03-general-pool-gateway-20261029`（732a2d51基线）及`D:/AI/API/worktrees/pg03-general-pool-executor-20261029`（201ce387基线）；未提交/推送/创建PR。代码完成、定向测试通过、隔离真实调用通过；生产部署/PG03生产启用/完整生产验收均未完成。
+
+- Git 后续交付：已按用户指令提交本轮独立候选，Executor `1264c6c1`；Gateway 分支 `codex/pg03-general-pool-gateway-20261029`。原工作区其他修改保留，未推送、未部署。

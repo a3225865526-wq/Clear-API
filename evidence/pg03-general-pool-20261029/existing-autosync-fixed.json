@@ -1,0 +1,23 @@
+{
+  "models": [
+    "gpt-5.6-luna",
+    "gpt-5.6-terra",
+    "codex-auto-review",
+    "gpt-reserve"
+  ],
+  "settings": {
+    "upstream_pool": {
+      "pool_id": "pg03-general-local"
+    },
+    "pool_routing_enabled": true,
+    "upstream_model_update_check_enabled": true,
+    "upstream_model_update_auto_sync_enabled": true,
+    "upstream_model_update_last_check_time": 1793230929
+  },
+  "task": null,
+  "local_master": {
+    "enabled": false
+  },
+  "user_request_count": 3,
+  "production_changes": false
+}

@@ -1,0 +1,30 @@
+{
+  "local_executor_transport_discovery": [
+    {
+      "account_id": 3,
+      "exit_code": 0,
+      "models": [
+        "gpt-reserve",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "codex-auto-review"
+      ],
+      "error": null,
+      "stderr_bytes": 0
+    },
+    {
+      "account_id": 4,
+      "exit_code": 0,
+      "models": [
+        "gpt-reserve",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+        "codex-auto-review"
+      ],
+      "error": null,
+      "stderr_bytes": 0
+    }
+  ],
+  "real_model_requests": 0,
+  "production_configuration_writes": 0
+}

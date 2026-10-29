@@ -1,0 +1,80 @@
+{
+  "runtime_image": "sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c",
+  "network_during_go_checks": "none",
+  "checks": [
+    {
+      "command": "go test ./model -run \"TestPool(Gate|FilterModelSource|RoutingOptionSync)\" -count=1 -timeout=90s",
+      "scope": "Gateway pinned 732a2d51 candidate",
+      "log": "gateway-route-tests.log",
+      "result": "PASS",
+      "log_sha256": "31f0a18fd6316b043766f57b9b862a0d548dac224980bf2331efac987323f3a3"
+    },
+    {
+      "command": "go test ./service/accountpool -run TestAutomaticPoolGatewayProof -count=1",
+      "scope": "Gateway",
+      "log": "gateway-proof-tests.log",
+      "result": "PASS",
+      "log_sha256": "3dbe619316b8dbebd4f63a6675b1e1740bc71f5bf225ac0e5db904a82835a4fc"
+    },
+    {
+      "command": "go test ./dto -run TestPoolBindingSurvivesModelSyncSettingsRoundTrip -count=1",
+      "scope": "relaykit GOWORK=off",
+      "log": "channel-settings-tests.log",
+      "result": "PASS",
+      "log_sha256": "da7bfacf0f8efc5c181e5d4994caf281db4ee9e4de4772367d5d90d8a85a6fdf"
+    },
+    {
+      "command": "cd relaykit; GOWORK=off go build ./...",
+      "scope": "independent relaykit module",
+      "result": "PASS"
+    },
+    {
+      "command": "go test ./service -run \"Test(PoolAccountFailureDoesNotDisableSharedChannel|RequestPolicyEventsReachLogAdminInfo|ProcessChannelErrorMasksDisableReasonAndNotification)$\" -count=1 -timeout=90s",
+      "scope": "Gateway",
+      "log": "pool-channel-failure-tests.log",
+      "result": "PASS",
+      "log_sha256": "723e1769a54b2d2cc0f9144e491ad40df861a73f06f60bdcd92a6a39e0a7b488"
+    },
+    {
+      "command": "go test -race ./sdk/cliproxy -run \"TestPool(AutomaticModels|ProviderModelDiscovery|ServiceRegistryWatcherParity)$\" -count=1 -timeout=90s",
+      "scope": "Executor pinned 201ce387 candidate",
+      "log": "executor-model-tests-final.log",
+      "result": "PASS",
+      "log_sha256": "963fe4bed047495e4462ef6a5b9cfffb94190f4812ec41621093133d9c277acf"
+    },
+    {
+      "command": "go test -race ./sdk/cliproxy -run TestPoolAutomaticModels$ -count=1 -timeout=90s",
+      "scope": "added identity-generation and expiry regressions",
+      "log": "executor-identity-expiry-tests.log",
+      "result": "PASS",
+      "log_sha256": "c55d026d7f5028f26b9f375f9a2552a1c32285c0620daec58c8123f217bf5ff0"
+    },
+    {
+      "command": "go test -race ./internal/api -run \"TestPool(GuardServiceManagementRejectsAuthorizationImportAndProxy|ServiceCredentialRoutesKeepManagementAuthentication)$\" -count=1 -timeout=90s",
+      "scope": "Executor management boundary",
+      "log": "executor-management-tests.log",
+      "result": "PASS",
+      "log_sha256": "59f3caf4de75ced315195469896b94554026d474f670d764cf94d33533ec905c"
+    },
+    {
+      "command": "go test -race ./sdk/cliproxy/auth -run \"Test(PG03SSEFallbackChain|PG02CapacityDurableProofAndReplay)$\" -count=1 -timeout=90s",
+      "scope": "existing zero-dispatch/fallback/replay contracts",
+      "log": "executor-fallback-tests.log",
+      "result": "PASS",
+      "log_sha256": "7fc6b4deb18a07dfc8ffd65931995211cd981beccf8aa6b80deddd807cf6360b"
+    },
+    {
+      "command": "go build -buildvcs=false -o /out/pg03-gateway .",
+      "scope": "Gateway final candidate",
+      "result": "PASS"
+    },
+    {
+      "command": "go build -buildvcs=false -o /out/pg03-executor ./cmd/server",
+      "scope": "Executor final production-code candidate",
+      "result": "PASS"
+    }
+  ],
+  "full_ci_run": false,
+  "database_matrix_run": false,
+  "production_schema_changed": false
+}

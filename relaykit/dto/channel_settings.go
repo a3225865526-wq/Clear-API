@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -100,6 +101,10 @@ const (
 )
 
 type ChannelOtherSettings struct {
+	// Pool bindings share this settings document with model discovery. Preserve
+	// both legacy string and object bindings during typed settings updates.
+	UpstreamPool                          json.RawMessage       `json:"upstream_pool,omitempty"`
+	PoolRoutingEnabled                    bool                  `json:"pool_routing_enabled,omitempty"`
 	AzureResponsesVersion                 string                `json:"azure_responses_version,omitempty"`
 	VertexKeyType                         VertexKeyType         `json:"vertex_key_type,omitempty"` // "json" or "api_key"
 	OpenRouterEnterprise                  *bool                 `json:"openrouter_enterprise,omitempty"`
