@@ -1,0 +1,22 @@
+{
+  "clearapi_baseline": "ed461d35ec8087c53265fdadb85617d5b44fae91",
+  "implementation_commit": "871bdf75ba22d6482c7d7633be4a8360ca0a4db6",
+  "sub2api_head": "d851a38477597157e78450d30af2d8504764d085",
+  "sub2api_dirty": "",
+  "sub2api_source_sha256": {
+    "Dockerfile": "8d9add88aab078840b48a5a056611a348bd2e17b91b3f35ff1a2827946b9fe6a",
+    "backend/internal/service/admin_compliance.go": "39c1a81fb46fd10562fff33bb84ccb15a483a21d1512c4bd91eb489d44b5a545",
+    "backend/internal/server/middleware/admin_compliance.go": "3420c027413fa7627e16328c08297e896ae2fb779fc5244c688610fdbc0c6728",
+    "backend/internal/handler/admin/compliance_handler.go": "06f0c9403bb7befe700bde22ec7d21b196d3872799385b96e2cd6c27e906a75e",
+    "docs/legal/admin-compliance.zh.md": "6f1264892678e2da3e42e40c94a0dc9857ce1eeb53bb58fa53faa958310f622f",
+    "docs/legal/admin-compliance.en.md": "864eac8970d8ec1a0fac0b104d7619d78261e609091794935d0218aaa31030bc",
+    "frontend/src/components/admin/AdminComplianceDialog.vue": "b8225eb802be256589570883c47b925470245b5a94f30f0c63830bcd7b9ba0bb",
+    "backend/internal/service/scheduler_snapshot_service.go": "090e540cdcfd831d17b63e9492c508a23107e2c4648850c0e8f60fb31c110a18",
+    "backend/internal/service/gateway_group_isolation_test.go": "30774c49faf7c31b5d505daad06c6ebbb98e4547acf20940578c9de4fd554a77",
+    "backend/internal/service/gateway_usage_billing.go": "ad5e6de0c2a1165757c6fc5a43e1588ab57fea2044cbdaa336ddb5c0c868c723",
+    "backend/internal/service/gateway_usage_billing_simple_mode_test.go": "01ba3328c4b038e462dc6e49d8120a9466325b2b122ede2fb4b7dd89a334c5dd",
+    "backend/internal/server/middleware/api_key_auth.go": "71e180a0703d5e2caf6fe6832a3717affbd9866e2ad65278fde718277a822616",
+    "backend/internal/service/openai_gateway_service_session_isolation_test.go": "4e6678ada471a194242110a19a40ff436271053db00ad5b2dc249cbe9575b75f",
+    "backend/internal/handler/openai_gateway_handler.go": "3771bd42a673b562809b86df6848c9e1e14846e8fe388ea21f4e922de9f0879b"
+  }
+}

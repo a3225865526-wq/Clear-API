@@ -1,0 +1,97 @@
+{
+  "time_utc": "2026-10-30T12:34:29.849011+00:00",
+  "containers": [
+    {
+      "name": "/clearapi-sub2api-isolated-20261030-sub2api-1",
+      "image_id": "sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a",
+      "state": "running",
+      "health": "healthy",
+      "restart_policy": {
+        "Name": "unless-stopped",
+        "MaximumRetryCount": 0
+      },
+      "port_bindings": {
+        "8080/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "18882"
+          }
+        ]
+      },
+      "networks": [
+        "clearapi-sub2api-isolated-20261030_pool"
+      ],
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "clearapi-sub2api-isolated-20261030_sub2api",
+          "destination": "/app/data"
+        }
+      ],
+      "non_secret_config": {
+        "DATABASE_DBNAME": "sub2test",
+        "REDIS_HOST": "redis",
+        "RUN_MODE": "simple",
+        "SIMPLE_MODE_KEY_RATE_LIMIT_ENABLED": "false",
+        "REDIS_DB": "0",
+        "DATABASE_HOST": "postgres"
+      }
+    },
+    {
+      "name": "/clearapi-sub2api-isolated-20261030-postgres-1",
+      "image_id": "sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+      "state": "running",
+      "health": "healthy",
+      "restart_policy": {
+        "Name": "unless-stopped",
+        "MaximumRetryCount": 0
+      },
+      "port_bindings": {},
+      "networks": [
+        "clearapi-sub2api-isolated-20261030_pool"
+      ],
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "clearapi-sub2api-isolated-20261030_postgres",
+          "destination": "/var/lib/postgresql/data"
+        }
+      ],
+      "non_secret_config": {}
+    },
+    {
+      "name": "/clearapi-sub2api-isolated-20261030-redis-1",
+      "image_id": "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+      "state": "running",
+      "health": "healthy",
+      "restart_policy": {
+        "Name": "unless-stopped",
+        "MaximumRetryCount": 0
+      },
+      "port_bindings": {},
+      "networks": [
+        "clearapi-sub2api-isolated-20261030_pool"
+      ],
+      "mounts": [
+        {
+          "type": "volume",
+          "name": "clearapi-sub2api-isolated-20261030_redis",
+          "destination": "/data"
+        }
+      ],
+      "non_secret_config": {}
+    }
+  ],
+  "binary_version": "2026-10-30T12:34:29.281Z\tINFO\tstdlog\tSub2API 0.2.19 (commit: d851a38477597157e78450d30af2d8504764d085, built: 2026-10-30T12:21:54Z)\t{\"service\": \"sub2api\", \"env\": \"bootstrap\", \"legacy_stdlog\": true}\n",
+  "empty_pool_readonly_counts": "BEGIN\naccounts=0\napi_keys=0\nusage_logs=0\nCOMMIT",
+  "network": {
+    "name": "clearapi-sub2api-isolated-20261030_pool",
+    "driver": "bridge",
+    "internal": false,
+    "members": [
+      "clearapi-sub2api-isolated-20261030-postgres-1",
+      "clearapi-sub2api-isolated-20261030-redis-1",
+      "clearapi-sub2api-isolated-20261030-sub2api-1"
+    ]
+  }
+}

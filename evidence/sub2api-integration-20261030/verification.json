@@ -1,0 +1,109 @@
+{
+  "time_utc": "2026-10-30T12:39:20.613695+00:00",
+  "implementation_commit": "871bdf75ba22d6482c7d7633be4a8360ca0a4db6",
+  "checks": [
+    {
+      "command": "docker build --build-arg COMMIT=d851a38477597157e78450d30af2d8504764d085 --build-arg POSTGRES_IMAGE=postgres:17-alpine -t clearapi/sub2api-isolated:d851a384 -f Dockerfile .",
+      "cwd": "D:/AI/API/references/sub2api",
+      "log": "official-build.log",
+      "result": "PASS",
+      "frontend": "embedded; pnpm frozen lock build, Go tags embed"
+    },
+    {
+      "command": "python scripts/sub2api-isolated-verify.py --runtime D:/AI/API/runtime/sub2api-integration-20261030",
+      "log": "isolation.json",
+      "result": "ISOLATION_PASS_MANAGEMENT_BLOCKED"
+    },
+    {
+      "command": "docker run --rm --network none -e GOWORK=off -v D:/AI/API/worktrees/clearapi-sub2api-integration-20261030:/src:ro -v codex-go-mod-cache:/go/pkg/mod -v clearapi-go-build:/root/.cache/go-build -w /src sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c go test ./relay/channel/sub2api ./service -run TestSub2API -count=1 -v -timeout=90s",
+      "log": "clearapi-protocol-final.log",
+      "result": "PASS",
+      "note": "6 protocol subcases plus wallet test; wallet fixture start timestamp subsequently initialized; final wallet rerun below"
+    },
+    {
+      "command": "docker run --rm --network none -e GOWORK=off -v D:/AI/API/worktrees/clearapi-sub2api-integration-20261030:/src:ro -v codex-go-mod-cache:/go/pkg/mod -v clearapi-go-build:/root/.cache/go-build -w /src sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c go test ./service -run ^TestSub2APIMockUsageWalletAndConsumeLog$ -count=1 -v -timeout=90s",
+      "log": "clearapi-wallet-mock-final.log",
+      "result": "PASS",
+      "database": "temporary real SQLite, existing fixture; no production DSN",
+      "observed": {
+        "dispatches": 1,
+        "input_tokens": 1000,
+        "output_tokens": 20,
+        "cache_read_tokens": 200,
+        "user_final_balance": 9991,
+        "token_final_balance": 9991,
+        "used_quota_user_token_reservation_channel_log": 9,
+        "consume_logs": 1,
+        "wallet_operations_replayed": "Settle, Refund, RecoverBillingCompletions; no additional charge"
+      }
+    },
+    {
+      "command": "docker run --rm --network none -e GOWORK=off -v D:/AI/API/worktrees/clearapi-sub2api-integration-20261030:/src:ro -v codex-go-mod-cache:/go/pkg/mod -v clearapi-go-build:/root/.cache/go-build -w /src sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c go test ./service -run 'Test(Stage72LegacyFinalizationOnce|BasicBillingSettlement|InterruptedStream.*|CompletedStreamEstimateSettlesEstimate|R7UndispatchedUnknownUsageDoesNotRetain|R7InterruptedExactZeroSettlesZero|UsageRetry.*|ResponsesUsageAccumulatorTerminalAccounting)$' -count=1 -v -timeout=120s",
+      "log": "clearapi-billing-tests.log",
+      "result": "PASS",
+      "top_level_tests": 11
+    },
+    {
+      "command": "docker run --rm --network none -e GOWORK=off -v D:/AI/API/worktrees/clearapi-sub2api-integration-20261030:/src:ro -v codex-go-mod-cache:/go/pkg/mod -v clearapi-go-build:/root/.cache/go-build -w /src sha256:d9c68c2c51161e12fd77e4c6320687c9cd86e1af1e3ad6e6cd63ff970641453c go test ./relay/channel ./relay/channel/openai ./relay/channel/claude ./service -run 'Test(RelayRequestsStopUpstreamWhenClientCancels|DoRequestReturnsUpstreamRedirectWithoutFollowing|OaiResponsesHandlerEstimatesMissingUsageFromOutput|OaiStreamHandlerMarksMissingDoneAsIncomplete|ClaudeHandlerEstimatesMissingUsageFromOutput|ClaudeCodeStreamMalformedEventFailsClosed|ClaudeCodeStreamErrorEventSurfacesClaudeError|ClaudeCodeStreamClientCancelStopsWrites|DecideRelayRetryReasons|ShouldRetryRelayErrorHonorsChannelPinOnChannelError)$' -count=1 -v -timeout=90s",
+      "log": "clearapi-failure-cancel-tests.log",
+      "result": "PASS",
+      "top_level_tests": 10
+    },
+    {
+      "command": "docker run --rm --network none -e GOWORK=off -e GOTOOLCHAIN=auto -v D:/AI/API/references/sub2api:/src:ro -v pool-strategy-sub2-mod:/go/pkg/mod -v pool-strategy-sub2-cache:/root/.cache/go-build -w /src/backend golang:1.26-bookworm go test -tags unit ./internal/service -run 'Test(BuildUsageBillingCommandSimpleModeOnlyChargesAPIKeyWindows|ApplyUsageBillingSimpleModeDeduplicatesWithoutBalanceEffects|ApplyUsageBillingSimpleModeRejectsLegacyFallback|FinalizeSimpleModePreservesLastUsedWithoutFinancialCacheWrites|GroupIsolation_SimpleMode_.*|GatewayServiceRecordUsage_PreservesRequestedAndUpstreamModels|GatewayServiceRecordUsage_PreservesChannelMappedUpstreamModel)$' -count=1 -v -timeout=120s",
+      "log": "sub2api-simple-tests.log",
+      "result": "PASS",
+      "top_level_tests": 8,
+      "note": "Cached Go1.27.3 toolchain; these are service stubs/contracts, not a two-service financial result"
+    },
+    {
+      "command": "gofmt -w relay/channel/sub2api/adaptor_test.go service/reserve_hardening_integration_test.go",
+      "result": "PASS",
+      "environment": "same verification container"
+    },
+    {
+      "command": "python -c \"import ast,pathlib; ast.parse(pathlib.Path('scripts/sub2api-isolated-verify.py').read_text())\"",
+      "result": "PASS"
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS"
+    }
+  ],
+  "failed_attempts": [
+    "First ClearAPI test invocation omitted cached module volume: network-none dependency downloads failed; no tests counted. Correct cache mount supplied.",
+    "Initial new table used string instead of types.RelayFormat: compilation failed; corrected and tests passed.",
+    "internal:true Docker Desktop network did not publish host loopback; replaced by dedicated bridge with only 127.0.0.1 app port; no volume deletion.",
+    "First simultaneous stack restart: app failed PG migration-lock connection while PG starting; restored upstream unless-stopped restart policies and bounded startup connection handling; full restart/recreation then passed.",
+    "Agent-reach Jina OWASP fetches returned401; web tool connection failed; official OWASP pages fetched directly without disabling TLS validation."
+  ],
+  "reused_evidence": [
+    "../pool-strategy-20261030/verification.json: unchanged fixed-source Sub2API cancellation/drain tests",
+    "CLEARAPI_POOL_STRATEGY_FINAL.md and separate client integration/compatibility reports; no repeated full frontend/PG03 checks"
+  ],
+  "unverified": [
+    "ClearAPI -> real Sub2API -> mock successful relay on all three protocols",
+    "cross-service SSE, Usage reconciliation, cancellation terminal Usage and exactly-once final accounting",
+    "actual two-layer retries and upstream attempt costs",
+    "live internal keys/groups/channels/session affinity and administrator account operations",
+    "real upstream inference, request performance comparison, backup restore, production"
+  ],
+  "not_required_this_change": [
+    "ClearAPI three-database matrix: no production database behavior changed",
+    "relaykit standalone build: no relaykit/public API changes",
+    "frontend/full CI: no frontend/production application changes"
+  ],
+  "file_hashes": {
+    "clearapi-billing-tests.log": "3bf26c0411294e501c947f43e8dd92d13ef4fb9a97a2432da862922b1945fd02",
+    "clearapi-failure-cancel-tests.log": "d90ca89a857fceae44bf95c50de24f8228ee865315c1cc96520841cde4238052",
+    "clearapi-protocol-final.log": "5d37255a0091eacd736d0c4134cf5123d2c5ef72886087df591c213d7d9dbc87",
+    "clearapi-wallet-mock-final.log": "4ab0e2f69f01fd281542430d2ed0e785e97bb70772dfe4b35544fff395a9d248",
+    "history-sync.json": "a97276eaec3b743855bea5b3a88176474bd53fec0594fc4a8966131c4abafc16",
+    "isolation.json": "8c2946850c69ccdba0682f3253cc84ef4ed29afd6963b9a03c0a144218e7bdd5",
+    "official-build.log": "bb1e9ff0adc757e6d669af3d897b18a5b87420ff5f351c3916e697d1f0fbca6e",
+    "runtime-boundary.json": "c039be8118f48145f67a286964a60b09ec7a15dbc759235639e3a641ae57d1e9",
+    "source-manifest.json": "4e758daed8c712055ba39bec77ccc6a357c7396c1f4dc8a4fa03670365aa08ce",
+    "sub2api-simple-tests.log": "dd0c2a522d667a7e21896444b9988fe5cc2769488fdf40ec9bd24eb886a6b6de",
+    "workspace-inventory.json": "1aded16283baa7c8a1ad76f1116589d557cbe786f92531bcd16e6fbd91ad4daa"
+  }
+}

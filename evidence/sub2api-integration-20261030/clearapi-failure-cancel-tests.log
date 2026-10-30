@@ -1,0 +1,133 @@
+=== RUN   TestDoRequestReturnsUpstreamRedirectWithoutFollowing
+=== RUN   TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Moved_Permanently
+=== RUN   TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Found
+=== RUN   TestDoRequestReturnsUpstreamRedirectWithoutFollowing/See_Other
+=== RUN   TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Temporary_Redirect
+=== RUN   TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Permanent_Redirect
+--- PASS: TestDoRequestReturnsUpstreamRedirectWithoutFollowing (0.00s)
+    --- PASS: TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Moved_Permanently (0.00s)
+    --- PASS: TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Found (0.00s)
+    --- PASS: TestDoRequestReturnsUpstreamRedirectWithoutFollowing/See_Other (0.00s)
+    --- PASS: TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Temporary_Redirect (0.00s)
+    --- PASS: TestDoRequestReturnsUpstreamRedirectWithoutFollowing/Permanent_Redirect (0.00s)
+=== RUN   TestRelayRequestsStopUpstreamWhenClientCancels
+=== RUN   TestRelayRequestsStopUpstreamWhenClientCancels/json
+[ERR] 2026/10/30 - 12:31:15 | SYSTEM | upstream transport failed 
+=== RUN   TestRelayRequestsStopUpstreamWhenClientCancels/form
+[ERR] 2026/10/30 - 12:31:15 | SYSTEM | upstream transport failed 
+--- PASS: TestRelayRequestsStopUpstreamWhenClientCancels (0.00s)
+    --- PASS: TestRelayRequestsStopUpstreamWhenClientCancels/json (0.00s)
+    --- PASS: TestRelayRequestsStopUpstreamWhenClientCancels/form (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/relay/channel	0.023s
+=== RUN   TestOaiResponsesHandlerEstimatesMissingUsageFromOutput
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+--- PASS: TestOaiResponsesHandlerEstimatesMissingUsageFromOutput (0.00s)
+=== RUN   TestOaiStreamHandlerMarksMissingDoneAsIncomplete
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/30 - 12:31:15 | SYSTEM | stream ended: reason=eof 
+[ERR] 2026/10/30 - 12:31:15 | SYSTEM | upstream stream ended before the terminal event 
+--- PASS: TestOaiStreamHandlerMarksMissingDoneAsIncomplete (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/relay/channel/openai	0.021s
+=== RUN   TestClaudeCodeStreamMalformedEventFailsClosed
+[SYS] 2026/10/30 - 12:31:15 | error unmarshalling stream response: invalid character 'n' looking for beginning of object key string 
+--- PASS: TestClaudeCodeStreamMalformedEventFailsClosed (0.00s)
+=== RUN   TestClaudeCodeStreamErrorEventSurfacesClaudeError
+--- PASS: TestClaudeCodeStreamErrorEventSurfacesClaudeError (0.00s)
+=== RUN   TestClaudeCodeStreamClientCancelStopsWrites
+--- PASS: TestClaudeCodeStreamClientCancelStopsWrites (0.00s)
+=== RUN   TestClaudeHandlerEstimatesMissingUsageFromOutput
+--- PASS: TestClaudeHandlerEstimatesMissingUsageFromOutput (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/relay/channel/claude	0.020s
+=== RUN   TestShouldRetryRelayErrorHonorsChannelPinOnChannelError
+=== RUN   TestShouldRetryRelayErrorHonorsChannelPinOnChannelError/unrestricted_channel_error
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestShouldRetryRelayErrorHonorsChannelPinOnChannelError/single_attempt_pin_suppresses_channel_error_retry
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestShouldRetryRelayErrorHonorsChannelPinOnChannelError/origin_task_pin_permits_retry_on_the_same_channel
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+--- PASS: TestShouldRetryRelayErrorHonorsChannelPinOnChannelError (0.00s)
+    --- PASS: TestShouldRetryRelayErrorHonorsChannelPinOnChannelError/unrestricted_channel_error (0.00s)
+    --- PASS: TestShouldRetryRelayErrorHonorsChannelPinOnChannelError/single_attempt_pin_suppresses_channel_error_retry (0.00s)
+    --- PASS: TestShouldRetryRelayErrorHonorsChannelPinOnChannelError/origin_task_pin_permits_retry_on_the_same_channel (0.00s)
+=== RUN   TestDecideRelayRetryReasons
+=== RUN   TestDecideRelayRetryReasons/rate_limited_stops_immediate_retry
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/status_outside_retry_rules
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/rate_limited_regardless_of_retry_budget
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/always_skipped_status
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/success_status_never_retries
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/skip_retry_error
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/channel_error_retries_without_budget
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/single_attempt_pin
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/strict_session
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestDecideRelayRetryReasons/nil_error
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+--- PASS: TestDecideRelayRetryReasons (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/rate_limited_stops_immediate_retry (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/status_outside_retry_rules (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/rate_limited_regardless_of_retry_budget (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/always_skipped_status (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/success_status_never_retries (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/skip_retry_error (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/channel_error_retries_without_budget (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/single_attempt_pin (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/strict_session (0.00s)
+    --- PASS: TestDecideRelayRetryReasons/nil_error (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/service	0.066s

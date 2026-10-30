@@ -1,0 +1,713 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 6.50kB 0.0s done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#2 ...
+
+#3 [auth] docker/dockerfile:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#2 DONE 8.8s
+
+#4 docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#4 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e 0.0s done
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 0B / 11.98MB 0.2s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 1.05MB / 11.98MB 2.1s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 2.10MB / 11.98MB 2.4s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 3.15MB / 11.98MB 2.7s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 4.19MB / 11.98MB 3.0s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 6.29MB / 11.98MB 3.2s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 7.34MB / 11.98MB 3.3s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 8.39MB / 11.98MB 3.5s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 9.44MB / 11.98MB 3.6s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 10.49MB / 11.98MB 3.8s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 11.53MB / 11.98MB 3.9s
+#4 sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 11.98MB / 11.98MB 3.9s done
+#4 extracting sha256:96918c57e42509b97f10c074d80672ecdbd3bb7dcd38c1bd95960cf291207416 0.1s done
+#4 DONE 4.1s
+
+#5 [internal] load metadata for docker.io/library/postgres:17-alpine
+#5 ...
+
+#6 [auth] library/alpine:pull token for registry-1.docker.io
+#6 DONE 0.0s
+
+#7 [auth] library/postgres:pull token for registry-1.docker.io
+#7 DONE 0.0s
+
+#8 [auth] library/node:pull token for registry-1.docker.io
+#8 DONE 0.0s
+
+#9 [auth] library/golang:pull token for registry-1.docker.io
+#9 DONE 0.0s
+
+#10 [internal] load metadata for docker.io/library/node:24-alpine
+#10 DONE 3.8s
+
+#11 [internal] load metadata for docker.io/library/golang:1.27.3-alpine
+#11 ...
+
+#5 [internal] load metadata for docker.io/library/postgres:17-alpine
+#5 DONE 3.9s
+
+#12 [internal] load metadata for docker.io/library/alpine:3.21
+#12 DONE 4.0s
+
+#11 [internal] load metadata for docker.io/library/golang:1.27.3-alpine
+#11 DONE 4.2s
+
+#13 [internal] load .dockerignore
+#13 transferring context: 1.46kB 0.0s done
+#13 DONE 0.0s
+
+#14 [internal] load build context
+#14 DONE 0.0s
+
+#15 [backend-builder 1/8] FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+#15 resolve docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb 0.0s done
+#15 DONE 0.0s
+
+#16 [stage-3  1/12] FROM docker.io/library/alpine:3.21@sha256:ee16d92f96db08d9d2d07da48555a27f3a69d8f0759021dbc601195ed0d2b5bd
+#16 resolve docker.io/library/alpine:3.21@sha256:ee16d92f96db08d9d2d07da48555a27f3a69d8f0759021dbc601195ed0d2b5bd
+#16 resolve docker.io/library/alpine:3.21@sha256:ee16d92f96db08d9d2d07da48555a27f3a69d8f0759021dbc601195ed0d2b5bd 0.0s done
+#16 sha256:759efa4719c9a44e7f2561a03bff2434dd66e99c916d2e4d50b055bedf554144 0B / 3.63MB 0.2s
+#16 sha256:759efa4719c9a44e7f2561a03bff2434dd66e99c916d2e4d50b055bedf554144 1.05MB / 3.63MB 1.5s
+#16 sha256:759efa4719c9a44e7f2561a03bff2434dd66e99c916d2e4d50b055bedf554144 2.10MB / 3.63MB 1.8s
+#16 sha256:759efa4719c9a44e7f2561a03bff2434dd66e99c916d2e4d50b055bedf554144 3.63MB / 3.63MB 2.0s done
+#16 extracting sha256:759efa4719c9a44e7f2561a03bff2434dd66e99c916d2e4d50b055bedf554144
+#16 extracting sha256:759efa4719c9a44e7f2561a03bff2434dd66e99c916d2e4d50b055bedf554144 0.1s done
+#16 DONE 2.2s
+
+#17 [frontend-builder 1/8] FROM docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+#17 resolve docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 0.0s done
+#17 sha256:c728384fb906e639c501cc4eb9e531aadf108c420d32d36ed322a512050855cb 441B / 441B 0.5s done
+#17 sha256:ef0ad2fdf0fde194f8e7968d73408f7b374c2dc59e5ad0757772f1e11c450894 1.26MB / 1.26MB 1.9s done
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 0B / 57.38MB 2.0s
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 3.15MB / 57.38MB 3.5s
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 6.29MB / 57.38MB 4.5s
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 9.44MB / 57.38MB 5.9s
+#17 ...
+
+#14 [internal] load build context
+#14 transferring context: 46.87MB 6.7s
+#14 ...
+
+#17 [frontend-builder 1/8] FROM docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 12.58MB / 57.38MB 6.9s
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 15.73MB / 57.38MB 8.0s
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 18.87MB / 57.38MB 8.9s
+#17 ...
+
+#14 [internal] load build context
+#14 transferring context: 54.78MB 9.6s done
+#14 DONE 9.7s
+
+#17 [frontend-builder 1/8] FROM docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 22.02MB / 57.38MB 9.8s
+#17 ...
+
+#15 [backend-builder 1/8] FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+#15 sha256:c8e3100880d834be60a9562375f4c5018b2cb26d64591bd0060aa3a80b935f43 126B / 126B 0.5s done
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 32.51MB / 71.15MB 8.9s
+#15 sha256:c012d78a862fe59ae6789c91f982ea68a882c9c44bbde97013914458dcdd9c4c 244.47kB / 244.47kB 2.9s done
+#15 extracting sha256:c012d78a862fe59ae6789c91f982ea68a882c9c44bbde97013914458dcdd9c4c 0.1s done
+#15 ...
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 resolve docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b 0.0s done
+#18 sha256:d5bf1ad711f76c3f7ba71d3bc71bd9f7535692290948731b61e44b6d96b23c4e 186B / 186B 0.5s done
+#18 sha256:f5e975d661d7f5f28eed5fb0d019fad8adf14789168c029a65c9da779e518835 6.11kB / 6.11kB 0.7s done
+#18 sha256:e018eb860c5e472edb8e38c5ed9bb5ddd5b9d979da4dd2b31729d167b56d4b03 169B / 169B 1.1s done
+#18 sha256:d6e09b1bfe5f8e510b39401758b39f0772bfd98fa267bc7064f99dce925d7535 129B / 129B 1.3s done
+#18 sha256:7a82a00c713d2e6c6d07e73d5d08f852985a3a3fe4a2be1a32049b122ba5c40f 10.00kB / 10.00kB 1.2s done
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 0B / 112.42MB 4.4s
+#18 sha256:fa5e490e3893d7bb6a7df997363332968f49564a1611dababd7167839c3e9dc3 116B / 116B 2.2s done
+#18 sha256:dddde5442af41c3b2874cdc2863276d1f33277da66d1975001cb5fb390de9a7d 0B / 900.01kB 1.8s
+#18 ...
+
+#15 [backend-builder 1/8] FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 36.70MB / 71.15MB 9.9s
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 40.89MB / 71.15MB 10.8s
+#15 ...
+
+#19 [stage-3  2/12] RUN apk add --no-cache     ca-certificates     tzdata     su-exec     libpq     zstd-libs     lz4-libs     krb5-libs     libldap     libedit     && rm -rf /var/cache/apk/*
+#19 0.274 fetch https://dl-cdn.alpinelinux.org/alpine/v3.21/main/x86_64/APKINDEX.tar.gz
+#19 5.230 fetch https://dl-cdn.alpinelinux.org/alpine/v3.21/community/x86_64/APKINDEX.tar.gz
+#19 8.127 (1/17) Installing ca-certificates (20261020-r0)
+#19 8.433 (2/17) Installing krb5-conf (1.0-r2)
+#19 8.774 (3/17) Installing libcom_err (1.47.1-r1)
+#19 9.180 (4/17) Installing keyutils-libs (1.6.3-r4)
+#19 9.592 (5/17) Installing libverto (0.3.2-r2)
+#19 9.944 (6/17) Installing krb5-libs (1.21.3-r0)
+#19 ...
+
+#15 [backend-builder 1/8] FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 45.09MB / 71.15MB 11.5s
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 49.28MB / 71.15MB 12.4s
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 53.48MB / 71.15MB 13.3s
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 58.72MB / 71.15MB 14.4s
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 62.91MB / 71.15MB 15.3s
+#15 ...
+
+#19 [stage-3  2/12] RUN apk add --no-cache     ca-certificates     tzdata     su-exec     libpq     zstd-libs     lz4-libs     krb5-libs     libldap     libedit     && rm -rf /var/cache/apk/*
+#19 10.48 (7/17) Installing ncurses-terminfo-base (6.5_p20241006-r3)
+#19 10.89 (8/17) Installing libncursesw (6.5_p20241006-r3)
+#19 11.37 (9/17) Installing libedit (20240808.3.1-r0)
+#19 11.73 (10/17) Installing gdbm (1.24-r0)
+#19 12.10 (11/17) Installing libsasl (2.1.28-r8)
+#19 12.42 (12/17) Installing libldap (2.6.8-r0)
+#19 12.83 (13/17) Installing libpq (17.11-r0)
+#19 13.27 (14/17) Installing lz4-libs (1.10.0-r0)
+#19 13.60 (15/17) Installing su-exec (0.2-r3)
+#19 13.90 (16/17) Installing tzdata (2026e-r0)
+#19 14.41 (17/17) Installing zstd-libs (1.5.6-r2)
+#19 14.91 Executing busybox-1.37.0-r14.trigger
+#19 14.93 Executing ca-certificates-20261020-r0.trigger
+#19 14.98 OK: 12 MiB in 32 packages
+#19 DONE 15.1s
+
+#15 [backend-builder 1/8] FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 67.11MB / 71.15MB 16.2s
+#15 sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 71.15MB / 71.15MB 16.9s done
+#15 extracting sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b
+#15 ...
+
+#17 [frontend-builder 1/8] FROM docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+#17 sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 57.38MB / 57.38MB 19.1s done
+#17 extracting sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16
+#17 ...
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 2.10MB / 112.42MB 14.4s
+#18 sha256:dddde5442af41c3b2874cdc2863276d1f33277da66d1975001cb5fb390de9a7d 900.01kB / 900.01kB 2.6s done
+#18 sha256:9098654d337792c4c42bd3a73896b70a6c248259ccfc5f684857a3fa19fd93cb 0B / 968B 0.8s
+#18 extracting sha256:9098654d337792c4c42bd3a73896b70a6c248259ccfc5f684857a3fa19fd93cb 0.0s done
+#18 extracting sha256:dddde5442af41c3b2874cdc2863276d1f33277da66d1975001cb5fb390de9a7d 0.0s done
+#18 extracting sha256:fa5e490e3893d7bb6a7df997363332968f49564a1611dababd7167839c3e9dc3 0.0s done
+#18 ...
+
+#17 [frontend-builder 1/8] FROM docker.io/library/node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
+#17 extracting sha256:522ca12b284b13dae3ba08b8844e02c8249c122f46e85fbedfce81c653309b16 0.8s done
+#17 extracting sha256:ef0ad2fdf0fde194f8e7968d73408f7b374c2dc59e5ad0757772f1e11c450894 0.0s done
+#17 extracting sha256:c728384fb906e639c501cc4eb9e531aadf108c420d32d36ed322a512050855cb 0.0s done
+#17 DONE 20.3s
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 ...
+
+#20 [frontend-builder 2/8] WORKDIR /app/frontend
+#20 ...
+
+#15 [backend-builder 1/8] FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+#15 extracting sha256:82e0bb27ae78502103ed383ed33346f88a83943fb7bd93977850d5890ee8fb3b 6.0s done
+#15 extracting sha256:c8e3100880d834be60a9562375f4c5018b2cb26d64591bd0060aa3a80b935f43 0.1s done
+#15 DONE 24.2s
+
+#20 [frontend-builder 2/8] WORKDIR /app/frontend
+#20 DONE 4.0s
+
+#15 [backend-builder 1/8] FROM docker.io/library/golang:1.27.3-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb
+#15 extracting sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1 0.0s done
+#15 DONE 24.2s
+
+#21 [backend-builder 2/8] RUN apk add --no-cache git ca-certificates tzdata
+#21 2.668 ( 1/13) Installing brotli-libs (1.2.1-r0)
+#21 2.870 ( 2/13) Installing c-ares (1.34.9-r0)
+#21 3.078 ( 3/13) Installing libunistring (1.4.2-r0)
+#21 3.331 ( 4/13) Installing libidn2 (2.3.8-r0)
+#21 3.510 ( 5/13) Installing nghttp2-libs (1.70.0-r0)
+#21 3.671 ( 6/13) Installing libpsl (0.21.5-r3)
+#21 3.832 ( 7/13) Installing zstd-libs (1.5.7-r2)
+#21 4.065 ( 8/13) Installing libcurl (8.23.0-r0)
+#21 4.422 ( 9/13) Installing libexpat (2.9.0-r0)
+#21 4.630 (10/13) Installing pcre2 (10.49-r0)
+#21 4.835 (11/13) Installing git (2.54.0-r0)
+#21 ...
+
+#22 [frontend-builder 3/8] RUN corepack enable && corepack prepare pnpm@9 --activate
+#22 3.445 Preparing pnpm@9 for immediate activation...
+#22 DONE 5.1s
+
+#23 [frontend-builder 4/8] COPY frontend/package.json frontend/pnpm-lock.yaml ./
+#23 DONE 0.1s
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 7.34MB / 112.42MB 23.6s
+#18 ...
+
+#21 [backend-builder 2/8] RUN apk add --no-cache git ca-certificates tzdata
+#21 5.424 (12/13) Installing git-init-template (2.54.0-r0)
+#21 5.594 (13/13) Installing tzdata (2026e-r0)
+#21 5.824 Executing busybox-1.37.0-r31.trigger
+#21 5.844 OK: 21.1 MiB in 30 packages
+#21 DONE 5.9s
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 ...
+
+#24 [backend-builder 3/8] WORKDIR /app/backend
+#24 DONE 0.0s
+
+#25 [backend-builder 4/8] COPY backend/go.mod backend/go.sum ./
+#25 DONE 0.0s
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 12.58MB / 112.42MB 28.6s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 18.87MB / 112.42MB 32.5s
+#18 ...
+
+#26 [frontend-builder 5/8] RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/store     if [ -n "" ]; then pnpm config set registry ""; fi &&     pnpm install --frozen-lockfile --prefer-offline
+#26 0.710 (node:1) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+#26 0.710 (Use `node --trace-deprecation ...` to show where the warning was created)
+#26 0.755 Lockfile is up to date, resolution step is skipped
+#26 0.818 Progress: resolved 1, reused 0, downloaded 0, added 0
+#26 0.950 Packages: +984
+#26 0.950 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#26 1.820 Progress: resolved 984, reused 0, downloaded 0, added 0
+#26 2.820 Progress: resolved 984, reused 0, downloaded 20, added 20
+#26 3.820 Progress: resolved 984, reused 0, downloaded 56, added 53
+#26 4.822 Progress: resolved 984, reused 0, downloaded 108, added 108
+#26 5.823 Progress: resolved 984, reused 0, downloaded 133, added 132
+#26 6.824 Progress: resolved 984, reused 0, downloaded 160, added 159
+#26 7.826 Progress: resolved 984, reused 0, downloaded 195, added 195
+#26 8.827 Progress: resolved 984, reused 0, downloaded 246, added 246
+#26 9.827 Progress: resolved 984, reused 0, downloaded 287, added 287
+#26 ...
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 ...
+
+#27 [backend-builder 5/8] RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod     go mod download
+#27 ...
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 25.17MB / 112.42MB 36.3s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 31.46MB / 112.42MB 39.6s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 37.75MB / 112.42MB 42.9s
+#18 ...
+
+#26 [frontend-builder 5/8] RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/store     if [ -n "" ]; then pnpm config set registry ""; fi &&     pnpm install --frozen-lockfile --prefer-offline
+#26 10.83 Progress: resolved 984, reused 0, downloaded 339, added 340
+#26 11.83 Progress: resolved 984, reused 0, downloaded 362, added 363
+#26 12.83 Progress: resolved 984, reused 0, downloaded 393, added 394
+#26 13.83 Progress: resolved 984, reused 0, downloaded 411, added 412
+#26 14.83 Progress: resolved 984, reused 0, downloaded 434, added 435
+#26 15.83 Progress: resolved 984, reused 0, downloaded 460, added 461
+#26 16.83 Progress: resolved 984, reused 0, downloaded 504, added 505
+#26 17.83 Progress: resolved 984, reused 0, downloaded 536, added 535
+#26 18.83 Progress: resolved 984, reused 0, downloaded 568, added 569
+#26 19.83 Progress: resolved 984, reused 0, downloaded 605, added 606
+#26 20.83 Progress: resolved 984, reused 0, downloaded 642, added 643
+#26 ...
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 44.04MB / 112.42MB 45.3s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 50.33MB / 112.42MB 47.1s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 56.62MB / 112.42MB 48.9s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 62.91MB / 112.42MB 50.4s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 69.21MB / 112.42MB 52.0s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 75.50MB / 112.42MB 54.1s
+#18 ...
+
+#26 [frontend-builder 5/8] RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/store     if [ -n "" ]; then pnpm config set registry ""; fi &&     pnpm install --frozen-lockfile --prefer-offline
+#26 21.83 Progress: resolved 984, reused 0, downloaded 680, added 681
+#26 22.83 Progress: resolved 984, reused 0, downloaded 723, added 724
+#26 23.83 Progress: resolved 984, reused 0, downloaded 758, added 759
+#26 24.83 Progress: resolved 984, reused 0, downloaded 795, added 796
+#26 25.83 Progress: resolved 984, reused 0, downloaded 839, added 840
+#26 26.83 Progress: resolved 984, reused 0, downloaded 873, added 874
+#26 27.83 Progress: resolved 984, reused 0, downloaded 906, added 907
+#26 28.83 Progress: resolved 984, reused 0, downloaded 940, added 941
+#26 29.83 Progress: resolved 984, reused 0, downloaded 970, added 971
+#26 30.83 Progress: resolved 984, reused 0, downloaded 982, added 983
+#26 31.73 Progress: resolved 984, reused 0, downloaded 983, added 984, done
+#26 ...
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 81.79MB / 112.42MB 55.6s
+#18 ...
+
+#26 [frontend-builder 5/8] RUN --mount=type=cache,id=sub2api-pnpm-store,target=/root/.local/share/pnpm/store     if [ -n "" ]; then pnpm config set registry ""; fi &&     pnpm install --frozen-lockfile --prefer-offline
+#26 32.01 .../node_modules/vue-demi postinstall$ node -e "try{require('./scripts/postinstall.js')}catch(e){}"
+#26 32.01 .../esbuild@0.21.5/node_modules/esbuild postinstall$ node install.js
+#26 32.09 .../esbuild@0.21.5/node_modules/esbuild postinstall: Done
+#26 32.12 .../node_modules/vue-demi postinstall: Done
+#26 32.23 
+#26 32.23 dependencies:
+#26 32.23 + @airwallex/components-sdk 1.30.2
+#26 32.23 + @lobehub/icons 4.0.2
+#26 32.23 + @stripe/stripe-js 9.0.1
+#26 32.23 + @tanstack/vue-virtual 3.13.23
+#26 32.23 + @vueuse/core 10.11.1
+#26 32.23 + axios 1.20.0
+#26 32.23 + chart.js 4.5.1
+#26 32.23 + dompurify 3.4.17
+#26 32.23 + driver.js 1.4.0
+#26 32.23 + file-saver 2.0.5
+#26 32.23 + marked 17.0.1
+#26 32.23 + pinia 2.3.1
+#26 32.23 + qrcode 1.5.4
+#26 32.23 + vue 3.5.43
+#26 32.23 + vue-chartjs 5.3.3
+#26 32.23 + vue-draggable-plus 0.6.1
+#26 32.23 + vue-i18n 11.4.16
+#26 32.23 + vue-router 4.6.4
+#26 32.23 + xlsx 0.18.5
+#26 32.23 
+#26 32.23 devDependencies:
+#26 32.23 + @intlify/message-compiler 11.4.16
+#26 32.23 + @types/dompurify 3.2.0
+#26 32.23 + @types/file-saver 2.0.7
+#26 32.23 + @types/mdx 2.0.13
+#26 32.23 + @types/node 20.19.27
+#26 32.23 + @types/qrcode 1.5.6
+#26 32.23 + @typescript-eslint/eslint-plugin 7.18.0
+#26 32.23 + @typescript-eslint/parser 7.18.0
+#26 32.23 + @vitejs/plugin-vue 5.2.4
+#26 32.23 + @vitest/coverage-v8 2.1.9
+#26 32.23 + @vue/test-utils 2.4.6
+#26 32.23 + autoprefixer 10.4.23
+#26 32.23 + eslint 8.57.1
+#26 32.23 + eslint-plugin-vue 9.33.0
+#26 32.23 + jsdom 24.1.3
+#26 32.23 + postcss 8.5.23
+#26 32.23 + tailwindcss 3.4.19
+#26 32.23 + typescript 5.6.3
+#26 32.23 + vite 5.4.21
+#26 32.23 + vite-plugin-checker 0.9.3
+#26 32.23 + vitest 2.1.9
+#26 32.23 + vue-tsc 2.2.12
+#26 32.23 
+#26 32.27 Done in 31.9s using pnpm v9.15.9
+#26 DONE 33.2s
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 91.23MB / 112.42MB 57.3s
+#18 ...
+
+#28 [frontend-builder 6/8] COPY frontend/ ./
+#28 DONE 0.6s
+
+#29 [frontend-builder 7/8] COPY docs/legal/ /app/docs/legal/
+#29 DONE 0.0s
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 99.61MB / 112.42MB 58.3s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 105.91MB / 112.42MB 59.3s
+#18 sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 112.42MB / 112.42MB 60.6s done
+#18 extracting sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169
+#18 extracting sha256:694a01b64034f0992326512adbafc93dd0b318fde13b91ba7b59f3af999cb169 2.0s done
+#18 DONE 68.3s
+
+#30 [frontend-builder 8/8] RUN pnpm run build
+#30 0.640 
+#30 0.640 > sub2api-frontend@1.0.0 build /app/frontend
+#30 0.640 > pnpm run check:i18n && vue-tsc -b && vite build
+#30 0.640 
+#30 1.063 
+#30 1.063 > sub2api-frontend@1.0.0 check:i18n /app/frontend
+#30 1.063 > vitest run src/i18n/__tests__/localeKeyCompleteness.spec.ts
+#30 1.063 
+#30 1.614 
+#30 1.614  RUN  v2.1.9 /app/frontend
+#30 1.614 
+#30 ...
+
+#18 [pg-client 1/1] FROM docker.io/library/postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+#18 extracting sha256:7a82a00c713d2e6c6d07e73d5d08f852985a3a3fe4a2be1a32049b122ba5c40f 0.0s done
+#18 extracting sha256:d6e09b1bfe5f8e510b39401758b39f0772bfd98fa267bc7064f99dce925d7535 0.0s done
+#18 extracting sha256:e018eb860c5e472edb8e38c5ed9bb5ddd5b9d979da4dd2b31729d167b56d4b03 0.0s done
+#18 extracting sha256:f5e975d661d7f5f28eed5fb0d019fad8adf14789168c029a65c9da779e518835 0.0s done
+#18 extracting sha256:d5bf1ad711f76c3f7ba71d3bc71bd9f7535692290948731b61e44b6d96b23c4e 0.0s done
+#18 DONE 68.5s
+
+#31 [stage-3  3/12] COPY --from=pg-client /usr/local/bin/pg_dump /usr/local/bin/pg_dump
+#31 DONE 0.4s
+
+#30 [frontend-builder 8/8] RUN pnpm run build
+#30 ...
+
+#32 [stage-3  4/12] COPY --from=pg-client /usr/local/bin/psql /usr/local/bin/psql
+#32 DONE 0.1s
+
+#33 [stage-3  5/12] COPY --from=pg-client /usr/local/lib/libpq.so.5* /usr/local/lib/
+#33 DONE 0.1s
+
+#34 [stage-3  6/12] RUN addgroup -g 1000 sub2api &&     adduser -u 1000 -G sub2api -s /bin/sh -D sub2api
+#34 DONE 0.3s
+
+#27 [backend-builder 5/8] RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod     go mod download
+#27 ...
+
+#35 [stage-3  7/12] WORKDIR /app
+#35 DONE 0.0s
+
+#27 [backend-builder 5/8] RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod     go mod download
+#27 ...
+
+#30 [frontend-builder 8/8] RUN pnpm run build
+#30 12.09  ✓ src/i18n/__tests__/localeKeyCompleteness.spec.ts (3 tests) 28ms
+#30 12.11 
+#30 12.11  Test Files  1 passed (1)
+#30 12.11       Tests  3 passed (3)
+#30 12.11    Start at  12:20:29
+#30 12.11    Duration  10.50s (transform 5.75s, setup 92ms, collect 9.26s, tests 28ms, environment 468ms, prepare 311ms)
+#30 12.11 
+#30 ...
+
+#27 [backend-builder 5/8] RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod     go mod download
+#27 DONE 71.4s
+
+#36 [backend-builder 6/8] COPY backend/ ./
+#36 DONE 0.6s
+
+#30 [frontend-builder 8/8] RUN pnpm run build
+#30 49.45 vite v5.4.21 building for production...
+#30 49.53 (node:18) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+#30 49.53 (Use `node --trace-deprecation ...` to show where the warning was created)
+#30 49.56 transforming...
+#30 49.89 Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+#30 49.89   npx update-browserslist-db@latest
+#30 49.89   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+#30 72.62 ✓ 1089 modules transformed.
+#30 84.30 rendering chunks...
+#30 84.51 [plugin:vite:reporter] [plugin vite:reporter] 
+#30 84.51 (!) /app/frontend/src/stores/app.ts is dynamically imported by /app/frontend/src/i18n/index.ts but also statically imported by /app/frontend/src/components/account/BulkEditAccountModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/CreateAccountModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/EditAccountModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/HeaderOverrideJsonTools.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/ModelWhitelistSelector.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/OllamaCloudUsageSettings.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/ReAuthAccountModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/SyncFromCrsModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/account/TempUnschedStatusModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/ErrorPassthroughRulesModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/TLSFingerprintProfilesModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/account/ImportDataModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/account/ReAuthAccountModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/account/ScheduledTestsPanel.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/announcements/AnnouncementReadStatusDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/group/GroupRPMOverridesModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/group/GroupRateMultipliersModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/monitor/MonitorFormDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/monitor/MonitorTemplateApplyPickerDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/monitor/MonitorTemplateManagerDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/proxy/ImportDataModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/usage/UsageCleanupDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/usage/UsageTable.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/BulkEditUserModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/GroupReplaceModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/UserAllowedGroupsModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/UserApiKeysModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/UserBalanceModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/UserCreateModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/UserEditModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/admin/user/UserPlatformQuotaModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/channels/AvailableChannelsTable.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/common/AnnouncementBell.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/common/GroupBadge.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/common/GroupOptionItem.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/common/Toast.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/keys/BulkEditKeysModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/modelPlaza/PlazaGroupSection.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/modelPlaza/PlazaNavBar.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/payment/SubscriptionPlanCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/MonitorDetailDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/UserAttributesConfigModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfileAvatarCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfileBalanceNotifyCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfileEditForm.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfilePasskeyCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfilePasswordForm.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/TotpDisableDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/TotpSetupModal.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/composables/useAccountOAuth.ts, /app/frontend/src/composables/useAntigravityOAuth.ts, /app/frontend/src/composables/useClipboard.ts, /app/frontend/src/composables/useGeminiOAuth.ts, /app/frontend/src/composables/useGrokOAuth.ts, /app/frontend/src/composables/useOpenAIOAuth.ts, /app/frontend/src/features/channel-monitor-v2/MonitorSettingsPanel.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/features/prompt-audit/PromptAuditView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/main.ts, /app/frontend/src/router/index.ts, /app/frontend/src/stores/index.ts, /app/frontend/src/utils/featureFlags.ts, /app/frontend/src/views/ModelPlazaView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/AccountsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/AnnouncementsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/ChannelMonitorView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/ChannelsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/DashboardView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/GroupsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/PromoCodesView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/ProxiesView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/RedeemView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/RiskControlView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/SubscriptionsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/UsageView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/UsersView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/affiliates/AdminAffiliateRecordsTable.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/affiliates/AffiliateOfflineWithdrawDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/ops/components/OpsAlertEventsCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/ops/components/OpsAlertRulesCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/ops/components/OpsSettingsDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/orders/AdminOrdersView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/orders/AdminPaymentDashboardView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/orders/AdminPaymentPlansView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/orders/PlanEditDialog.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/public/LegalDocumentView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/AffiliateView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/AvailableChannelsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/BatchImageGuideView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/ChannelStatusV1View.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/ChannelStatusV2View.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/KeysView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/MCPView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/ProfileView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/RedeemView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/SubscriptionsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/UsageView.vue?vue&type=script&setup=true&lang.ts, dynamic import will not move module into another chunk.
+#30 84.51 
+#30 84.51 [plugin:vite:reporter] [plugin vite:reporter] 
+#30 84.51 (!) /app/frontend/src/stores/auth.ts is dynamically imported by /app/frontend/src/i18n/index.ts but also statically imported by /app/frontend/src/components/layout/AppLayout.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/modelPlaza/ModelPlazaContent.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/modelPlaza/PlazaNavBar.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfileAvatarCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfileBalanceNotifyCard.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/user/profile/ProfileEditForm.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/composables/useBatchImageAccess.ts, /app/frontend/src/composables/useOnboardingTour.ts, /app/frontend/src/router/index.ts, /app/frontend/src/stores/index.ts, /app/frontend/src/views/ModelPlazaView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/AccountsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/admin/GroupsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/auth/MCPOAuthAuthorizeView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/AffiliateView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/ChannelStatusV2View.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/CustomPageView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/DashboardView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/PaymentResultView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/PaymentView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/ProfileView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/RedeemView.vue?vue&type=script&setup=true&lang.ts, dynamic import will not move module into another chunk.
+#30 84.51 
+#30 84.51 [plugin:vite:reporter] [plugin vite:reporter] 
+#30 84.51 (!) /app/frontend/src/stores/adminSettings.ts is dynamically imported by /app/frontend/src/i18n/index.ts but also statically imported by /app/frontend/src/components/layout/AppHeader.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/router/index.ts, /app/frontend/src/stores/index.ts, /app/frontend/src/views/admin/SettingsView.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/views/user/CustomPageView.vue?vue&type=script&setup=true&lang.ts, dynamic import will not move module into another chunk.
+#30 84.51 
+#30 84.51 [plugin:vite:reporter] [plugin vite:reporter] 
+#30 84.51 (!) /app/frontend/src/router/title.ts is dynamically imported by /app/frontend/src/i18n/index.ts but also statically imported by /app/frontend/src/App.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/components/layout/AppHeader.vue?vue&type=script&setup=true&lang.ts, /app/frontend/src/router/index.ts, dynamic import will not move module into another chunk.
+#30 84.51 
+#30 84.51 [plugin:vite:reporter] [plugin vite:reporter] 
+#30 84.51 (!) /app/frontend/src/router/index.ts is dynamically imported by /app/frontend/src/i18n/index.ts but also statically imported by /app/frontend/src/main.ts, dynamic import will not move module into another chunk.
+#30 84.51 
+#30 84.63 computing gzip size...
+#30 84.70 ../backend/internal/web/dist/index.html                                                                           0.81 kB │ gzip:   0.40 kB
+#30 84.70 ../backend/internal/web/dist/assets/GroupOptionItem-EDVK0Prz.css                                                  0.07 kB │ gzip:   0.09 kB
+#30 84.70 ../backend/internal/web/dist/assets/Pagination-CtuvddY-.css                                                       0.11 kB │ gzip:   0.12 kB
+#30 84.70 ../backend/internal/web/dist/assets/RegisterView-IrISxH3x.css                                                     0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/EmailVerifyView-CCbXb7Sd.css                                                  0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/LinuxDoCallbackView-DQ7xRnW6.css                                              0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/WechatCallbackView-BRJlNRB0.css                                               0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/DingTalkCallbackView-2-yiQGEP.css                                             0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/OidcCallbackView-Buxp4n1p.css                                                 0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/PendingOAuthCreateAccountForm-BCeYCja5.css                                    0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/ForgotPasswordView-D5q6IfTR.css                                               0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/ResetPasswordView-Bthzu-nm.css                                                0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/RedeemView-BVFPKVLJ.css                                                       0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/LoginView-mYEDiWCN.css                                                        0.20 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/UsersView-MqRRHQdy.css                                                        0.21 kB │ gzip:   0.13 kB
+#30 84.70 ../backend/internal/web/dist/assets/LocaleSwitcher-D_RVO6EU.css                                                   0.23 kB │ gzip:   0.15 kB
+#30 84.70 ../backend/internal/web/dist/assets/ModelWhitelistSelector-BR3Adxor.css                                           0.25 kB │ gzip:   0.20 kB
+#30 84.70 ../backend/internal/web/dist/assets/LoadingSpinner-DT-rtrW_.css                                                   0.27 kB │ gzip:   0.19 kB
+#30 84.70 ../backend/internal/web/dist/assets/GroupsView-Iph2G4D1.css                                                       0.41 kB │ gzip:   0.15 kB
+#30 84.70 ../backend/internal/web/dist/assets/AuthLayout-BMNyCXdz.css                                                       0.42 kB │ gzip:   0.21 kB
+#30 84.70 ../backend/internal/web/dist/assets/PricingEntryCard-BYJIfL54.css                                                 0.43 kB │ gzip:   0.22 kB
+#30 84.70 ../backend/internal/web/dist/assets/LoginAgreementPrompt-DhEkaHwn.css                                             0.51 kB │ gzip:   0.18 kB
+#30 84.70 ../backend/internal/web/dist/assets/OpsDashboard-DwWJHeD7.css                                                     0.56 kB │ gzip:   0.25 kB
+#30 84.70 ../backend/internal/web/dist/assets/BatchImageGuideView-BJDwNkfA.css                                              0.66 kB │ gzip:   0.30 kB
+#30 84.70 ../backend/internal/web/dist/assets/AccountsView-DzKmF5ha.css                                                     1.07 kB │ gzip:   0.45 kB
+#30 84.70 ../backend/internal/web/dist/assets/SubscriptionsView-Bcwp8LbK.css                                                1.22 kB │ gzip:   0.45 kB
+#30 84.70 ../backend/internal/web/dist/assets/CaptchaChallenge-BmkiKxf7.css                                                 1.40 kB │ gzip:   0.48 kB
+#30 84.70 ../backend/internal/web/dist/assets/ChannelsView-Doy4iJ2q.css                                                     1.44 kB │ gzip:   0.46 kB
+#30 84.70 ../backend/internal/web/dist/assets/KeyUsageView-DUJT76vw.css                                                     1.47 kB │ gzip:   0.56 kB
+#30 84.70 ../backend/internal/web/dist/assets/HomeView-Dagk0jRk.css                                                         2.36 kB │ gzip:   0.87 kB
+#30 84.70 ../backend/internal/web/dist/assets/DataTable-bsUFtred.css                                                        3.24 kB │ gzip:   0.77 kB
+#30 84.70 ../backend/internal/web/dist/assets/TablePageLayout-CTUsgGJ4.css                                                  3.52 kB │ gzip:   0.83 kB
+#30 84.70 ../backend/internal/web/dist/assets/vendor-misc-DB0Q8XAf.css                                                      3.94 kB │ gzip:   1.10 kB
+#30 84.70 ../backend/internal/web/dist/assets/LegalDocumentView-DCxikJph.css                                                4.87 kB │ gzip:   0.85 kB
+#30 84.70 ../backend/internal/web/dist/assets/ModelPlazaView-CPKLu4gi.css                                                   5.03 kB │ gzip:   1.02 kB
+#30 84.70 ../backend/internal/web/dist/assets/SettingsView-Dl_WPYyH.css                                                     6.16 kB │ gzip:   1.56 kB
+#30 84.70 ../backend/internal/web/dist/assets/ChannelStatusView-CPGYMDhs.css                                                7.93 kB │ gzip:   1.85 kB
+#30 84.70 ../backend/internal/web/dist/assets/TokenUsageTrend-C15Qf8qF.css                                                  8.85 kB │ gzip:   1.40 kB
+#30 84.70 ../backend/internal/web/dist/assets/ProxySelector-CF2DQrty.css                                                    9.02 kB │ gzip:   1.41 kB
+#30 84.70 ../backend/internal/web/dist/assets/Select-xgK-Q8rp.css                                                           9.63 kB │ gzip:   1.51 kB
+#30 84.70 ../backend/internal/web/dist/assets/AppHeader-Dp7YA4R7.css                                                        9.99 kB │ gzip:   1.99 kB
+#30 84.70 ../backend/internal/web/dist/assets/CustomPageView-ra23CWf1.css                                                  11.47 kB │ gzip:   2.07 kB
+#30 84.70 ../backend/internal/web/dist/assets/index-jvWJGXE6.css                                                          280.12 kB │ gzip:  36.69 kB
+#30 84.70 ../backend/internal/web/dist/assets/maskApiKey-ClKV8GuA.js                                                        0.11 kB │ gzip:   0.11 kB
+#30 84.70 ../backend/internal/web/dist/assets/stableObjectKey-DullU5Fx.js                                                   0.15 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/channel-SyyoV7lJ.js                                                           0.15 kB │ gzip:   0.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/groups-5V_AcEi-.js                                                            0.25 kB │ gzip:   0.18 kB
+#30 84.70 ../backend/internal/web/dist/assets/authError-Ch9RozGZ.js                                                         0.26 kB │ gzip:   0.17 kB
+#30 84.70 ../backend/internal/web/dist/assets/peak-rate-qZGUWdry.js                                                         0.28 kB │ gzip:   0.21 kB
+#30 84.70 ../backend/internal/web/dist/assets/platforms-RZ2uYDSi.js                                                         0.29 kB │ gzip:   0.23 kB
+#30 84.70 ../backend/internal/web/dist/assets/mcp-D9SFfMfa.js                                                               0.49 kB │ gzip:   0.26 kB
+#30 84.70 ../backend/internal/web/dist/assets/pricing-0z6xY1WL.js                                                           0.73 kB │ gzip:   0.35 kB
+#30 84.70 ../backend/internal/web/dist/assets/totp-CRq0S7iE.js                                                              0.73 kB │ gzip:   0.29 kB
+#30 84.70 ../backend/internal/web/dist/assets/index-Dj0mKYRx.js                                                             0.76 kB │ gzip:   0.37 kB
+#30 84.70 ../backend/internal/web/dist/assets/currency-DpW1WrYL.js                                                          0.77 kB │ gzip:   0.49 kB
+#30 84.70 ../backend/internal/web/dist/assets/LoadingSpinner-JcdcP1pM.js                                                    0.83 kB │ gzip:   0.51 kB
+#30 84.70 ../backend/internal/web/dist/assets/SearchInput.vue_vue_type_script_setup_true_lang-DRcvVhrD.js                   0.85 kB │ gzip:   0.52 kB
+#30 84.70 ../backend/internal/web/dist/assets/payment-CrWIbNLn.js                                                           0.90 kB │ gzip:   0.36 kB
+#30 84.70 ../backend/internal/web/dist/assets/Toggle.vue_vue_type_script_setup_true_lang-DjfB-jGy.js                        0.92 kB │ gzip:   0.53 kB
+#30 84.70 ../backend/internal/web/dist/assets/useClipboard-DL4RxoSH.js                                                      0.92 kB │ gzip:   0.57 kB
+#30 84.70 ../backend/internal/web/dist/assets/AdminAffiliateInvitesView-OyOEgAL2.js                                         0.96 kB │ gzip:   0.48 kB
+#30 84.70 ../backend/internal/web/dist/assets/AdminAffiliateRebatesView-DCqZyJEK.js                                         0.96 kB │ gzip:   0.47 kB
+#30 84.70 ../backend/internal/web/dist/assets/AdminAffiliateTransfersView-ndu7uEPS.js                                       0.96 kB │ gzip:   0.48 kB
+#30 84.70 ../backend/internal/web/dist/assets/useTableSelection-DGa3V1c1.js                                                 0.99 kB │ gzip:   0.47 kB
+#30 84.70 ../backend/internal/web/dist/assets/TablePageLayout-BUOkgDJJ.js                                                   0.99 kB │ gzip:   0.51 kB
+#30 84.70 ../backend/internal/web/dist/assets/payment-BHnSie28.js                                                           1.18 kB │ gzip:   0.58 kB
+#30 84.70 ../backend/internal/web/dist/assets/oauthAffiliate-CrlUwkd1.js                                                    1.20 kB │ gzip:   0.50 kB
+#30 84.70 ../backend/internal/web/dist/assets/usePersistedPageSize-x0WpaIWh.js                                              1.21 kB │ gzip:   0.58 kB
+#30 84.70 ../backend/internal/web/dist/assets/apiError-zX02PgX9.js                                                          1.21 kB │ gzip:   0.57 kB
+#30 84.70 ../backend/internal/web/dist/assets/ConfirmDialog.vue_vue_type_script_setup_true_lang-Cg4oljBr.js                 1.54 kB │ gzip:   0.75 kB
+#30 84.70 ../backend/internal/web/dist/assets/registrationEmailPolicy-BIuq-4e8.js                                           1.58 kB │ gzip:   0.71 kB
+#30 84.70 ../backend/internal/web/dist/assets/EmptyState.vue_vue_type_script_setup_true_lang-6n_0Aumq.js                    1.71 kB │ gzip:   0.93 kB
+#30 84.70 ../backend/internal/web/dist/assets/paymentUx-DAEiek0q.js                                                         1.81 kB │ gzip:   0.75 kB
+#30 84.70 ../backend/internal/web/dist/assets/usage-BTAGDSoo.js                                                             1.88 kB │ gzip:   0.62 kB
+#30 84.70 ../backend/internal/web/dist/assets/user-Ch1qBbFe.js                                                              2.06 kB │ gzip:   0.87 kB
+#30 84.70 ../backend/internal/web/dist/assets/OrderStatusBadge.vue_vue_type_script_setup_true_lang-Dnogn2dB.js              2.14 kB │ gzip:   0.68 kB
+#30 84.70 ../backend/internal/web/dist/assets/LocaleSwitcher-D3I6YnHs.js                                                    2.37 kB │ gzip:   1.18 kB
+#30 84.70 ../backend/internal/web/dist/assets/AuthLayout-B60azYKB.js                                                        2.42 kB │ gzip:   1.17 kB
+#30 84.70 ../backend/internal/web/dist/assets/NotFoundView-CkSbl_wE.js                                                      2.51 kB │ gzip:   1.27 kB
+#30 84.70 ../backend/internal/web/dist/assets/WechatPaymentCallbackView-Bv-uvAPz.js                                         2.56 kB │ gzip:   1.29 kB
+#30 84.70 ../backend/internal/web/dist/assets/DingTalkEmailCompletionView-CeHj3IfA.js                                       2.85 kB │ gzip:   1.39 kB
+#30 84.70 ../backend/internal/web/dist/assets/OrderTable.vue_vue_type_script_setup_true_lang-CbskzfFS.js                    2.85 kB │ gzip:   1.17 kB
+#30 84.70 ../backend/internal/web/dist/assets/rechargeBonus-Cjpd3isk.js                                                     2.99 kB │ gzip:   1.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/wxpay-UHDvuORB.js                                                             2.99 kB │ gzip:   1.29 kB
+#30 84.70 ../backend/internal/web/dist/assets/HelpTooltip.vue_vue_type_script_setup_true_lang-Bo6n6jkm.js                   3.20 kB │ gzip:   1.47 kB
+#30 84.70 ../backend/internal/web/dist/assets/vendor-stripe-DSy-tJeT.js                                                     3.31 kB │ gzip:   1.52 kB
+#30 84.70 ../backend/internal/web/dist/assets/GroupOptionItem-Di-WQ_yG.js                                                   3.32 kB │ gzip:   1.49 kB
+#30 84.70 ../backend/internal/web/dist/assets/GroupSelector.vue_vue_type_script_setup_true_lang-BoWY2O6W.js                 3.70 kB │ gzip:   1.63 kB
+#30 84.70 ../backend/internal/web/dist/assets/AirwallexPaymentView-BG9rir93.js                                              3.72 kB │ gzip:   1.75 kB
+#30 84.70 ../backend/internal/web/dist/assets/providerConfig-BiMVXo-X.js                                                    3.73 kB │ gzip:   1.27 kB
+#30 84.70 ../backend/internal/web/dist/assets/StripePopupView-cNko1rcd.js                                                   4.21 kB │ gzip:   1.88 kB
+#30 84.70 ../backend/internal/web/dist/assets/paymentFlow-cys_N5rS.js                                                       4.39 kB │ gzip:   1.55 kB
+#30 84.70 ../backend/internal/web/dist/assets/UsageProgressBar.vue_vue_type_script_setup_true_lang-50WtLq_X.js              4.43 kB │ gzip:   1.67 kB
+#30 84.70 ../backend/internal/web/dist/assets/PaymentQRCodeView-D94E8lZo.js                                                 4.82 kB │ gzip:   2.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/useStepUp-CB5YUzmO.js                                                         5.17 kB │ gzip:   2.44 kB
+#30 84.70 ../backend/internal/web/dist/assets/LegalDocumentView-DiOouTzS.js                                                 5.49 kB │ gzip:   2.20 kB
+#30 84.70 ../backend/internal/web/dist/assets/Pagination-DYaqIP81.js                                                        5.81 kB │ gzip:   2.02 kB
+#30 84.70 ../backend/internal/web/dist/assets/GroupBadge.vue_vue_type_script_setup_true_lang-GOv2MGCj.js                    5.85 kB │ gzip:   1.87 kB
+#30 84.70 ../backend/internal/web/dist/assets/ProxySelector-lQywABEA.js                                                     5.99 kB │ gzip:   2.35 kB
+#30 84.70 ../backend/internal/web/dist/assets/UserOrdersView-B9CdxTn4.js                                                    6.34 kB │ gzip:   2.34 kB
+#30 84.70 ../backend/internal/web/dist/assets/ForgotPasswordView-_9H-pbai.js                                                6.37 kB │ gzip:   2.61 kB
+#30 84.70 ../backend/internal/web/dist/assets/PendingOAuthCreateAccountForm-BEHYR0AO.js                                     6.45 kB │ gzip:   2.35 kB
+#30 84.70 ../backend/internal/web/dist/assets/errorBadges-T5SX4FZQ.js                                                       7.50 kB │ gzip:   2.96 kB
+#30 84.70 ../backend/internal/web/dist/assets/ResetPasswordView-DKUfiEU8.js                                                 7.64 kB │ gzip:   2.54 kB
+#30 84.70 ../backend/internal/web/dist/assets/MCPView-RrvCvbJR.js                                                           7.74 kB │ gzip:   2.75 kB
+#30 84.70 ../backend/internal/web/dist/assets/EndpointDistributionChart.vue_vue_type_script_setup_true_lang-CYkacja1.js     7.79 kB │ gzip:   2.70 kB
+#30 84.70 ../backend/internal/web/dist/assets/MCPOAuthAuthorizeView-ZrZ1O6Ks.js                                             7.95 kB │ gzip:   2.95 kB
+#30 84.70 ../backend/internal/web/dist/assets/TokenUsageTrend.vue_vue_type_script_setup_true_lang-B9ZKl2U9.js               8.02 kB │ gzip:   3.04 kB
+#30 84.70 ../backend/internal/web/dist/assets/Select-BTdDRIDn.js                                                            8.05 kB │ gzip:   3.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/AffiliateView-DPplUheA.js                                                     8.39 kB │ gzip:   2.61 kB
+#30 84.70 ../backend/internal/web/dist/assets/OAuthCallbackView-D9sDKDld.js                                                 8.60 kB │ gzip:   2.94 kB
+#30 84.70 ../backend/internal/web/dist/assets/UserBalanceHistoryModal.vue_vue_type_script_setup_true_lang-Dl_FSNZS.js       9.11 kB │ gzip:   3.21 kB
+#30 84.70 ../backend/internal/web/dist/assets/AdminPaymentDashboardView-BqCaEXwa.js                                         9.66 kB │ gzip:   3.13 kB
+#30 84.70 ../backend/internal/web/dist/assets/CustomPageView-CfP4giii.js                                                    9.70 kB │ gzip:   4.23 kB
+#30 84.70 ../backend/internal/web/dist/assets/SubscriptionsView-k-YRPQkS.js                                                 9.78 kB │ gzip:   3.10 kB
+#30 84.70 ../backend/internal/web/dist/assets/StripePaymentView-CBqcWkFB.js                                                 9.89 kB │ gzip:   3.99 kB
+#30 84.70 ../backend/internal/web/dist/assets/ModelTagInput.vue_vue_type_script_setup_true_lang-Hi_s6B2l.js                10.04 kB │ gzip:   3.68 kB
+#30 84.70 ../backend/internal/web/dist/assets/PaymentResultView-CjM7C064.js                                                10.10 kB │ gzip:   3.23 kB
+#30 84.70 ../backend/internal/web/dist/assets/platformColors-Ch0CsDuQ.js                                                   10.25 kB │ gzip:   2.03 kB
+#30 84.70 ../backend/internal/web/dist/assets/CaptchaChallenge.vue_vue_type_script_setup_true_lang-81S1_621.js             10.79 kB │ gzip:   4.14 kB
+#30 84.70 ../backend/internal/web/dist/assets/RedeemView-oOStf7Yf.js                                                       12.87 kB │ gzip:   4.25 kB
+#30 84.70 ../backend/internal/web/dist/assets/EmailVerifyView-BKb-y0ZZ.js                                                  13.05 kB │ gzip:   4.54 kB
+#30 84.70 ../backend/internal/web/dist/assets/PluginsView-DuD8AtcJ.js                                                      14.57 kB │ gzip:   4.63 kB
+#30 84.70 ../backend/internal/web/dist/assets/LinuxDoCallbackView-CGZP5ukZ.js                                              14.57 kB │ gzip:   4.39 kB
+#30 84.70 ../backend/internal/web/dist/assets/ModelDistributionChart.vue_vue_type_script_setup_true_lang-DFN_oVy-.js       14.65 kB │ gzip:   4.13 kB
+#30 84.70 ../backend/internal/web/dist/assets/OidcCallbackView-DJh5G3Jc.js                                                 14.75 kB │ gzip:   4.45 kB
+#30 84.70 ../backend/internal/web/dist/assets/DingTalkCallbackView-CSXFKiw8.js                                             15.08 kB │ gzip:   4.52 kB
+#30 84.70 ../backend/internal/web/dist/assets/AdminPaymentPlansView-CBzVJUyy.js                                            15.51 kB │ gzip:   4.77 kB
+#30 84.70 ../backend/internal/web/dist/assets/DataTable-DhdPSMnn.js                                                        15.65 kB │ gzip:   5.31 kB
+#30 84.70 ../backend/internal/web/dist/assets/SetupWizardView-DamWBhu3.js                                                  15.80 kB │ gzip:   3.93 kB
+#30 84.70 ../backend/internal/web/dist/assets/LoginAgreementPrompt-DIir061e.js                                             16.20 kB │ gzip:   5.69 kB
+#30 84.70 ../backend/internal/web/dist/assets/PromoCodesView-QQ7wUXA0.js                                                   16.55 kB │ gzip:   4.82 kB
+#30 84.70 ../backend/internal/web/dist/assets/DashboardView-DJ3ziE-p.js                                                    16.79 kB │ gzip:   5.00 kB
+#30 84.70 ../backend/internal/web/dist/assets/LoginView-D9IFY_6n.js                                                        17.92 kB │ gzip:   6.41 kB
+#30 84.70 ../backend/internal/web/dist/assets/AuditLogView-24A1K1Dn.js                                                     18.07 kB │ gzip:   5.23 kB
+#30 84.70 ../backend/internal/web/dist/assets/WechatCallbackView-CuuX3NnE.js                                               18.90 kB │ gzip:   5.41 kB
+#30 84.70 ../backend/internal/web/dist/assets/PlatformIcon.vue_vue_type_script_setup_true_lang-D1T9uBd4.js                 18.90 kB │ gzip:   7.53 kB
+#30 84.70 ../backend/internal/web/dist/assets/proxyExpiry-D7jOmlCf.js                                                      19.43 kB │ gzip:   6.56 kB
+#30 84.70 ../backend/internal/web/dist/assets/HomeView-CiRfuslG.js                                                         20.41 kB │ gzip:   5.08 kB
+#30 84.70 ../backend/internal/web/dist/assets/AdminAffiliateRecordsTable.vue_vue_type_script_setup_true_lang-AwUUc5et.js   20.54 kB │ gzip:   6.26 kB
+#30 84.70 ../backend/internal/web/dist/assets/AvailableChannelsView-DitR_gWB.js                                            20.91 kB │ gzip:   5.61 kB
+#30 84.70 ../backend/internal/web/dist/assets/RegisterView-EFu4iAwX.js                                                     21.30 kB │ gzip:   6.10 kB
+#30 84.70 ../backend/internal/web/dist/assets/AdminOrdersView-DZ3HiQH4.js                                                  21.44 kB │ gzip:   5.79 kB
+#30 84.70 ../backend/internal/web/dist/assets/channelMonitorV2-Bb-hKTC7.js                                                 24.64 kB │ gzip:   9.36 kB
+#30 84.70 ../backend/internal/web/dist/assets/AnnouncementsView-DRAkrjnh.js                                                26.86 kB │ gzip:   7.34 kB
+#30 84.70 ../backend/internal/web/dist/assets/OpsErrorLogTable.vue_vue_type_script_setup_true_lang-Db99KW3t.js             26.91 kB │ gzip:   7.26 kB
+#30 84.70 
+#30 84.70 (!) Some chunks are larger than 500 kB after minification. Consider:
+#30 84.70 - Using dynamic import() to code-split the application
+#30 84.70 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+#30 84.70 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+#30 84.70 ../backend/internal/web/dist/assets/RedeemView-kW1s30cF.js                                                       27.00 kB │ gzip:   7.54 kB
+#30 84.70 ../backend/internal/web/dist/assets/DashboardView-CYbK6mfj.js                                                    27.01 kB │ gzip:   7.43 kB
+#30 84.70 ../backend/internal/web/dist/assets/PricingEntryCard-Bdq7aANH.js                                                 27.80 kB │ gzip:   6.24 kB
+#30 84.70 ../backend/internal/web/dist/assets/UsageView-D_iVnzKc.js                                                        29.85 kB │ gzip:   9.07 kB
+#30 84.70 ../backend/internal/web/dist/assets/ModelPlazaView-75USKvPM.js                                                   31.21 kB │ gzip:   8.17 kB
+#30 84.70 ../backend/internal/web/dist/assets/KeyUsageView-By8jeKT4.js                                                     31.75 kB │ gzip:   8.34 kB
+#30 84.70 ../backend/internal/web/dist/assets/ChannelsView-BzV02Hwl.js                                                     41.36 kB │ gzip:  10.69 kB
+#30 84.70 ../backend/internal/web/dist/assets/GroupDistributionChart.vue_vue_type_script_setup_true_lang-ym5xgjat.js       48.81 kB │ gzip:  12.31 kB
+#30 84.70 ../backend/internal/web/dist/assets/SubscriptionsView-c5nxYXLt.js                                                49.09 kB │ gzip:  13.25 kB
+#30 84.70 ../backend/internal/web/dist/assets/UsageView-BbId_VW0.js                                                        50.55 kB │ gzip:  14.56 kB
+#30 84.70 ../backend/internal/web/dist/assets/ProxiesView-D5lOB5Az.js                                                      51.76 kB │ gzip:  13.73 kB
+#30 84.70 ../backend/internal/web/dist/assets/vendor-i18n-CtYfAsS9.js                                                      56.99 kB │ gzip:  19.20 kB
+#30 84.70 ../backend/internal/web/dist/assets/PaymentView-7neC4XsW.js                                                      63.14 kB │ gzip:  18.78 kB
+#30 84.70 ../backend/internal/web/dist/assets/ProfileView-Bi-fyKTu.js                                                      66.56 kB │ gzip:  16.87 kB
+#30 84.70 ../backend/internal/web/dist/assets/BatchImageGuideView-C67ViSNd.js                                              68.41 kB │ gzip:  21.85 kB
+#30 84.70 ../backend/internal/web/dist/assets/PromptAuditView-Bfxovrvw.js                                                  68.74 kB │ gzip:  17.11 kB
+#30 84.70 ../backend/internal/web/dist/assets/ModelWhitelistSelector.vue_vue_type_script_setup_true_lang-Bku0HbXU.js       72.04 kB │ gzip:  23.30 kB
+#30 84.70 ../backend/internal/web/dist/assets/ChannelStatusView-yzjUpDa6.js                                                77.89 kB │ gzip:  22.42 kB
+#30 84.70 ../backend/internal/web/dist/assets/ChannelMonitorView-DH9e173p.js                                               78.04 kB │ gzip:  19.42 kB
+#30 84.70 ../backend/internal/web/dist/assets/RiskControlView-BKX-bZJA.js                                                  88.07 kB │ gzip:  19.41 kB
+#30 84.70 ../backend/internal/web/dist/assets/AppLayout.vue_vue_type_script_setup_true_lang-DqZPAVao.js                    98.44 kB │ gzip:  26.57 kB
+#30 84.70 ../backend/internal/web/dist/assets/KeysView-ajMjWPvA.js                                                        110.69 kB │ gzip:  29.24 kB
+#30 84.70 ../backend/internal/web/dist/assets/UsersView-J6mMMbOP.js                                                       111.84 kB │ gzip:  28.25 kB
+#30 84.70 ../backend/internal/web/dist/assets/vendor-vue-7uxdbyyz.js                                                      114.25 kB │ gzip:  44.40 kB
+#30 84.70 ../backend/internal/web/dist/assets/vendor-chart-wjrtXwIo.js                                                    178.34 kB │ gzip:  61.36 kB
+#30 84.70 ../backend/internal/web/dist/assets/index-D3G7KMrv.js                                                           189.47 kB │ gzip:  57.34 kB
+#30 84.70 ../backend/internal/web/dist/assets/GroupsView-vFhyFTNB.js                                                      218.10 kB │ gzip:  45.10 kB
+#30 84.70 ../backend/internal/web/dist/assets/OpsDashboard-C99Fh307.js                                                    219.27 kB │ gzip:  47.15 kB
+#30 84.70 ../backend/internal/web/dist/assets/index-BjVezyVj.js                                                           273.41 kB │ gzip: 143.74 kB
+#30 84.70 ../backend/internal/web/dist/assets/vendor-misc-DJBtZ4rH.js                                                     280.57 kB │ gzip:  95.90 kB
+#30 84.70 ../backend/internal/web/dist/assets/vendor-ui-xQ8_aauh.js                                                       432.46 kB │ gzip: 144.82 kB
+#30 84.70 ../backend/internal/web/dist/assets/SettingsView-BZDUjY6C.js                                                    437.53 kB │ gzip:  87.80 kB
+#30 84.70 ../backend/internal/web/dist/assets/index-B9Q9L35_.js                                                           442.33 kB │ gzip: 134.74 kB
+#30 84.70 ../backend/internal/web/dist/assets/AccountsView-Ze1cgdEO.js                                                    855.26 kB │ gzip: 178.30 kB
+#30 84.70 ✓ built in 35.23s
+#30 DONE 85.2s
+
+#37 [backend-builder 7/8] COPY --from=frontend-builder /app/backend/internal/web/dist ./internal/web/dist
+#37 DONE 0.1s
+
+#38 [backend-builder 8/8] RUN --mount=type=cache,id=sub2api-gomod,target=/go/pkg/mod     --mount=type=cache,id=sub2api-gobuild,target=/root/.cache/go-build     VERSION_VALUE="" &&     if [ -z "${VERSION_VALUE}" ]; then VERSION_VALUE="$(./scripts/resolve-version.sh)"; fi &&     DATE_VALUE="${DATE:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" &&     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build     -tags embed     -ldflags="-s -w -X main.Version=${VERSION_VALUE} -X main.Commit=d851a38477597157e78450d30af2d8504764d085 -X main.Date=${DATE_VALUE} -X main.BuildType=release"     -trimpath     -o /app/sub2api     ./cmd/server
+#38 DONE 70.1s
+
+#39 [stage-3  8/12] COPY --from=backend-builder --chown=sub2api:sub2api /app/sub2api /app/sub2api
+#39 DONE 0.2s
+
+#40 [stage-3  9/12] COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
+#40 DONE 0.0s
+
+#41 [stage-3 10/12] RUN mkdir -p /app/data && chown sub2api:sub2api /app/data
+#41 DONE 0.2s
+
+#42 [stage-3 11/12] COPY deploy/docker-entrypoint.sh /app/docker-entrypoint.sh
+#42 DONE 0.0s
+
+#43 [stage-3 12/12] RUN chmod +x /app/docker-entrypoint.sh
+#43 DONE 0.2s
+
+#44 exporting to image
+#44 exporting layers
+#44 exporting layers 3.2s done
+#44 exporting manifest sha256:cecf0598820dff33cdbe4ac66ce8626fa4566c720bc1ace97dfe38b95a3becac done
+#44 exporting config sha256:62cb3769069c6a9c3c7fa708defd71229fe2befe396fc7cda32720ec69631f82 0.0s done
+#44 exporting attestation manifest sha256:9443c45f94c3d98137b6f44aba488b66e5101aef25d8e7bc61cd9357ee56eae5 0.0s done
+#44 exporting manifest list sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a 0.0s done
+#44 naming to docker.io/clearapi/sub2api-isolated:d851a384 done
+#44 unpacking to docker.io/clearapi/sub2api-isolated:d851a384
+#44 unpacking to docker.io/clearapi/sub2api-isolated:d851a384 0.5s done
+#44 DONE 3.8s

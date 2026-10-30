@@ -1,0 +1,103 @@
+=== RUN   TestStage72LegacyFinalizationOnce
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/30 - 12:26:24 | SYSTEM | 用户 0 请求失败, 返还预扣费（token_quota=＄0.000200, funding=synthetic） 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+--- PASS: TestStage72LegacyFinalizationOnce (0.00s)
+=== RUN   TestUsageRetryStopsAfterClientOutput
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+--- PASS: TestUsageRetryStopsAfterClientOutput (0.00s)
+=== RUN   TestUsageRetryDispatchFence
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+--- PASS: TestUsageRetryDispatchFence (0.00s)
+=== RUN   TestResponsesUsageAccumulatorTerminalAccounting
+=== RUN   TestResponsesUsageAccumulatorTerminalAccounting/response.completed
+=== RUN   TestResponsesUsageAccumulatorTerminalAccounting/response.done
+=== RUN   TestResponsesUsageAccumulatorTerminalAccounting/response.incomplete
+=== RUN   TestResponsesUsageAccumulatorTerminalAccounting/response.failed
+=== RUN   TestResponsesUsageAccumulatorTerminalAccounting/response.cancelled
+=== RUN   TestResponsesUsageAccumulatorTerminalAccounting/response.canceled
+--- PASS: TestResponsesUsageAccumulatorTerminalAccounting (0.00s)
+    --- PASS: TestResponsesUsageAccumulatorTerminalAccounting/response.completed (0.00s)
+    --- PASS: TestResponsesUsageAccumulatorTerminalAccounting/response.done (0.00s)
+    --- PASS: TestResponsesUsageAccumulatorTerminalAccounting/response.incomplete (0.00s)
+    --- PASS: TestResponsesUsageAccumulatorTerminalAccounting/response.failed (0.00s)
+    --- PASS: TestResponsesUsageAccumulatorTerminalAccounting/response.cancelled (0.00s)
+    --- PASS: TestResponsesUsageAccumulatorTerminalAccounting/response.canceled (0.00s)
+=== RUN   TestInterruptedStreamLocalEstimateRetainsReservation
+[INFO] 2026/10/30 - 12:26:24 | h2-gpt-6-luna-1-1 | 预扣费与实际消耗一致，无需调整：＄0.000200（按次计费） 
+[SYS] 2026/10/30 - 12:26:24 | failed to send quota notify to user 1: notification limit exceeded for user 1 with type email 
+[SYS] 2026/10/30 - 12:26:24 | failed to update channel used quota: channel_id=1, delta_quota=100, error=SQL logic error: no such table: channels (1) 
+[INFO] 2026/10/30 - 12:26:24 | h2-gpt-6-luna-1-1 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":3,"completion_tokens":2,"model_name":"gpt-6-luna","token_name":"","quota":100,"content":"","token_id":1,"use_time_seconds":63928959984,"is_stream":true,"group":"default","other":{"admin_info":{"expected_quota":100,"interrupted_unknown_usage":true,"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"local_estimate","quality":"local_estimate","input":null,"output":null,"cache_read":null,"cache_write":null,"reasoning":null,"total":null,"total_derived":false,"raw":{},"protocol":"","interrupted":true,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","usage_retained_for_review":true,"use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+--- PASS: TestInterruptedStreamLocalEstimateRetainsReservation (0.28s)
+=== RUN   TestInterruptedStreamUpstreamPartialRetainsReservation
+[INFO] 2026/10/30 - 12:26:24 | h2-gpt-6-luna-1-2 | 预扣费与实际消耗一致，无需调整：＄0.000200（按次计费） 
+[SYS] 2026/10/30 - 12:26:24 | failed to send quota notify to user 1: notification limit exceeded for user 1 with type email 
+[SYS] 2026/10/30 - 12:26:24 | failed to update channel used quota: channel_id=1, delta_quota=100, error=SQL logic error: no such table: channels (1) 
+[INFO] 2026/10/30 - 12:26:24 | h2-gpt-6-luna-1-2 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":100,"completion_tokens":5,"model_name":"gpt-6-luna","token_name":"","quota":100,"content":"","token_id":1,"use_time_seconds":63928959984,"is_stream":true,"group":"default","other":{"admin_info":{"expected_quota":100,"interrupted_unknown_usage":true,"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"upstream_response","quality":"upstream_partial","input":100,"output":5,"cache_read":null,"cache_write":null,"reasoning":null,"total":105,"total_derived":false,"raw":{"completion_tokens":5,"prompt_tokens":100,"total_tokens":105},"protocol":"openai","interrupted":true,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","usage_retained_for_review":true,"use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+--- PASS: TestInterruptedStreamUpstreamPartialRetainsReservation (0.30s)
+=== RUN   TestInterruptedStreamExactMeterSettlesExactly
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-3 | 预扣费后返还扣费：＄0.000196（实际消耗：＄0.000004，预扣费：＄0.000200） 
+[SYS] 2026/10/30 - 12:26:25 | failed to send quota notify to user 1: notification limit exceeded for user 1 with type email 
+[SYS] 2026/10/30 - 12:26:25 | failed to update channel used quota: channel_id=1, delta_quota=2, error=SQL logic error: no such table: channels (1) 
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-3 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":100,"completion_tokens":20,"model_name":"gpt-6-luna","token_name":"","quota":2,"content":"","token_id":1,"use_time_seconds":63928959985,"is_stream":true,"group":"default","other":{"admin_info":{"codex_metering":{"final":false,"status":"exact","source":"codex_upstream","input_tokens":100,"cached_input_tokens":30,"output_tokens":20,"reasoning_tokens":7,"total_tokens":120,"total_derived":false},"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"unknown","quality":"missing","input":null,"output":null,"cache_read":null,"cache_write":null,"reasoning":null,"total":null,"total_derived":false,"raw":{},"protocol":"","interrupted":true,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+--- PASS: TestInterruptedStreamExactMeterSettlesExactly (0.30s)
+=== RUN   TestCompletedStreamEstimateSettlesEstimate
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-4 | 预扣费后返还扣费：＄0.000200（实际消耗：＄0.000000，预扣费：＄0.000200） 
+[SYS] 2026/10/30 - 12:26:25 | failed to update channel used quota: channel_id=1, delta_quota=0, error=SQL logic error: no such table: channels (1) 
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-4 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":3,"completion_tokens":2,"model_name":"gpt-6-luna","token_name":"","quota":0,"content":"","token_id":1,"use_time_seconds":63928959985,"is_stream":true,"group":"default","other":{"admin_info":{"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"local_estimate","quality":"local_estimate","input":null,"output":null,"cache_read":null,"cache_write":null,"reasoning":null,"total":null,"total_derived":false,"raw":{},"protocol":"","interrupted":false,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+--- PASS: TestCompletedStreamEstimateSettlesEstimate (0.29s)
+=== RUN   TestR7UndispatchedUnknownUsageDoesNotRetain
+=== RUN   TestR7UndispatchedUnknownUsageDoesNotRetain/missing
+[ERR] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-5 | total tokens is 0, cannot consume quota, userId 1, channelId 1, tokenId 1, model gpt-6-luna， pre-consumed quota 100 
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-5 | 预扣费后返还扣费：＄0.000200（实际消耗：＄0.000000，预扣费：＄0.000200） 
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-5 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":0,"completion_tokens":0,"model_name":"gpt-6-luna","token_name":"","quota":0,"content":"上游没有返回计费信息，无法扣费（可能是上游超时）","token_id":1,"use_time_seconds":63928959985,"is_stream":false,"group":"default","other":{"admin_info":{"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"unknown","quality":"missing","input":null,"output":null,"cache_read":null,"cache_write":null,"reasoning":null,"total":null,"total_derived":false,"raw":{},"protocol":"","interrupted":true,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+=== RUN   TestR7UndispatchedUnknownUsageDoesNotRetain/local_estimate
+[ERR] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-6 | total tokens is 0, cannot consume quota, userId 1, channelId 1, tokenId 1, model gpt-6-luna， pre-consumed quota 100 
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-6 | 预扣费后返还扣费：＄0.000200（实际消耗：＄0.000000，预扣费：＄0.000200） 
+[INFO] 2026/10/30 - 12:26:25 | h2-gpt-6-luna-1-6 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":0,"completion_tokens":0,"model_name":"gpt-6-luna","token_name":"","quota":0,"content":"上游没有返回计费信息，无法扣费（可能是上游超时）","token_id":1,"use_time_seconds":63928959985,"is_stream":false,"group":"default","other":{"admin_info":{"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"local_estimate","quality":"local_estimate","input":null,"output":null,"cache_read":null,"cache_write":null,"reasoning":null,"total":null,"total_derived":false,"raw":{},"protocol":"","interrupted":true,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+=== RUN   TestR7UndispatchedUnknownUsageDoesNotRetain/upstream_partial
+[ERR] 2026/10/30 - 12:26:26 | h2-gpt-6-luna-1-7 | total tokens is 0, cannot consume quota, userId 1, channelId 1, tokenId 1, model gpt-6-luna， pre-consumed quota 100 
+[INFO] 2026/10/30 - 12:26:26 | h2-gpt-6-luna-1-7 | 预扣费后返还扣费：＄0.000200（实际消耗：＄0.000000，预扣费：＄0.000200） 
+[INFO] 2026/10/30 - 12:26:26 | h2-gpt-6-luna-1-7 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":0,"completion_tokens":0,"model_name":"gpt-6-luna","token_name":"","quota":0,"content":"上游没有返回计费信息，无法扣费（可能是上游超时）","token_id":1,"use_time_seconds":63928959986,"is_stream":false,"group":"default","other":{"admin_info":{"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"upstream_response","quality":"upstream_partial","input":null,"output":null,"cache_read":null,"cache_write":null,"reasoning":null,"total":0,"total_derived":false,"raw":{"total_tokens":0},"protocol":"openai","interrupted":true,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+--- PASS: TestR7UndispatchedUnknownUsageDoesNotRetain (0.79s)
+    --- PASS: TestR7UndispatchedUnknownUsageDoesNotRetain/missing (0.25s)
+    --- PASS: TestR7UndispatchedUnknownUsageDoesNotRetain/local_estimate (0.27s)
+    --- PASS: TestR7UndispatchedUnknownUsageDoesNotRetain/upstream_partial (0.27s)
+=== RUN   TestR7InterruptedExactZeroSettlesZero
+[ERR] 2026/10/30 - 12:26:26 | h2-gpt-6-luna-1-8 | total tokens is 0, cannot consume quota, userId 1, channelId 1, tokenId 1, model gpt-6-luna， pre-consumed quota 100 
+[INFO] 2026/10/30 - 12:26:26 | h2-gpt-6-luna-1-8 | 预扣费后返还扣费：＄0.000200（实际消耗：＄0.000000，预扣费：＄0.000200） 
+[INFO] 2026/10/30 - 12:26:26 | h2-gpt-6-luna-1-8 | record consume log: userId=1, params={"channel_id":1,"prompt_tokens":0,"completion_tokens":0,"model_name":"gpt-6-luna","token_name":"","quota":0,"content":"上游没有返回计费信息，无法扣费（可能是上游超时）","token_id":1,"use_time_seconds":63928959986,"is_stream":false,"group":"default","other":{"admin_info":{"codex_metering":{"final":false,"status":"exact","source":"codex_upstream","input_tokens":0,"cached_input_tokens":0,"output_tokens":0,"reasoning_tokens":0,"total_tokens":0,"total_derived":false},"request_policy":[{"attempt":0,"elapsed_ms":0,"decision":{"action":"success","reason":"request_completed","source":"upstream"}}],"token_observation":{"source":"unknown","quality":"missing","input":null,"output":null,"cache_read":null,"cache_write":null,"reasoning":null,"total":null,"total_derived":false,"raw":{},"protocol":"","interrupted":true,"internal_model":"gpt-6-luna","model_alias":"gpt-6-luna"},"usage_billing_path":"upstream","use_channel":null},"billing_mode":"tiered_expr","billing_preference":"wallet_only","billing_source":"wallet","billing_unit":"token","cache_ratio":0,"cache_tokens":0,"completion_ratio":0,"expr_b64":"bGVuIDw9IDI3MjAwMCA/IHRpZXIoInVwc3RyZWFtXzEiLCBwKjAuMDIgKyBjciowLjAwMiArIGNjKjAuMDI1ICsgY2MxaCowLjAyNSArIGMqMC4xMCkgOiB0aWVyKCJ1cHN0cmVhbV8yIiwgcCowLjA0ICsgY3IqMC4wNCArIGNjKjAuMDUgKyBjYzFoKjAuMDUgKyBjKjAuMTUp","frt":0,"group_ratio":1,"matched_tier":"upstream_1","model_price":0,"model_ratio":0,"request_path":"/v1/chat/completions","user_group_ratio":-1}} 
+--- PASS: TestR7InterruptedExactZeroSettlesZero (0.27s)
+=== RUN   TestBasicBillingSettlement
+=== RUN   TestBasicBillingSettlement/actual-above-estimate
+=== RUN   TestBasicBillingSettlement/actual-below-estimate
+=== RUN   TestBasicBillingSettlement/insufficient-wallet
+[SYS] 2026/10/30 - 12:26:26 | durable billing refund intent could not be saved; reservation requires review 
+=== RUN   TestBasicBillingSettlement/insufficient-key
+[SYS] 2026/10/30 - 12:26:26 | durable billing refund intent could not be saved; reservation requires review 
+=== RUN   TestBasicBillingSettlement/storage-failure
+[SYS] 2026/10/30 - 12:26:26 | durable billing refund intent could not be saved; reservation requires review 
+=== RUN   TestBasicBillingSettlement/insufficient-preconsume
+=== RUN   TestBasicBillingSettlement/refund
+--- PASS: TestBasicBillingSettlement (0.33s)
+    --- PASS: TestBasicBillingSettlement/actual-above-estimate (0.02s)
+    --- PASS: TestBasicBillingSettlement/actual-below-estimate (0.02s)
+    --- PASS: TestBasicBillingSettlement/insufficient-wallet (0.02s)
+    --- PASS: TestBasicBillingSettlement/insufficient-key (0.02s)
+    --- PASS: TestBasicBillingSettlement/storage-failure (0.02s)
+    --- PASS: TestBasicBillingSettlement/insufficient-preconsume (0.01s)
+    --- PASS: TestBasicBillingSettlement/refund (0.02s)
+PASS
+ok  	github.com/QuantumNous/new-api/service	2.634s

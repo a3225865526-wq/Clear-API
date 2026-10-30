@@ -1,0 +1,35 @@
+2026/10/30 12:27:36 Timezone initialized: UTC (UTC offset: +00:00)
+=== RUN   TestGroupIsolation_SimpleMode_SkipsGroupIsolation
+--- PASS: TestGroupIsolation_SimpleMode_SkipsGroupIsolation (0.00s)
+=== RUN   TestGroupIsolation_SimpleMode_GroupedAccountAlsoSchedulable
+--- PASS: TestGroupIsolation_SimpleMode_GroupedAccountAlsoSchedulable (0.00s)
+=== RUN   TestGatewayServiceRecordUsage_PreservesRequestedAndUpstreamModels
+2026/10/30 12:27:36 [Billing] Using fallback pricing for model: claude-sonnet-4
+--- PASS: TestGatewayServiceRecordUsage_PreservesRequestedAndUpstreamModels (0.00s)
+=== RUN   TestGatewayServiceRecordUsage_PreservesChannelMappedUpstreamModel
+2026/10/30 12:27:36 [Billing] Using fallback pricing for model: gpt-5.6-terra
+--- PASS: TestGatewayServiceRecordUsage_PreservesChannelMappedUpstreamModel (0.00s)
+=== RUN   TestBuildUsageBillingCommandSimpleModeOnlyChargesAPIKeyWindows
+--- PASS: TestBuildUsageBillingCommandSimpleModeOnlyChargesAPIKeyWindows (0.00s)
+=== RUN   TestApplyUsageBillingSimpleModeDeduplicatesWithoutBalanceEffects
+--- PASS: TestApplyUsageBillingSimpleModeDeduplicatesWithoutBalanceEffects (0.00s)
+=== RUN   TestApplyUsageBillingSimpleModeRejectsLegacyFallback
+=== RUN   TestApplyUsageBillingSimpleModeRejectsLegacyFallback/repository
+=== RUN   TestApplyUsageBillingSimpleModeRejectsLegacyFallback/request_id
+=== RUN   TestApplyUsageBillingSimpleModeRejectsLegacyFallback/api_key
+--- PASS: TestApplyUsageBillingSimpleModeRejectsLegacyFallback (0.00s)
+    --- PASS: TestApplyUsageBillingSimpleModeRejectsLegacyFallback/repository (0.00s)
+    --- PASS: TestApplyUsageBillingSimpleModeRejectsLegacyFallback/request_id (0.00s)
+    --- PASS: TestApplyUsageBillingSimpleModeRejectsLegacyFallback/api_key (0.00s)
+=== RUN   TestFinalizeSimpleModePreservesLastUsedWithoutFinancialCacheWrites
+=== RUN   TestFinalizeSimpleModePreservesLastUsedWithoutFinancialCacheWrites/false
+2026/10/30 12:27:36 Warning: invalidate api key rate limit cache failed for key 13: redis unavailable
+2026/10/30 12:27:36 Warning: invalidate simple-mode api key rate-limit cache failed for key 13: redis unavailable
+=== RUN   TestFinalizeSimpleModePreservesLastUsedWithoutFinancialCacheWrites/true
+2026/10/30 12:27:36 Warning: invalidate api key rate limit cache failed for key 13: redis unavailable
+2026/10/30 12:27:36 Warning: invalidate simple-mode api key rate-limit cache failed for key 13: redis unavailable
+--- PASS: TestFinalizeSimpleModePreservesLastUsedWithoutFinancialCacheWrites (0.00s)
+    --- PASS: TestFinalizeSimpleModePreservesLastUsedWithoutFinancialCacheWrites/false (0.00s)
+    --- PASS: TestFinalizeSimpleModePreservesLastUsedWithoutFinancialCacheWrites/true (0.00s)
+PASS
+ok  	github.com/Wei-Shaw/sub2api/internal/service	0.028s

@@ -1729,3 +1729,594 @@ Status: **BLOCKED**（首次生产切换尚未完成）
 - 新隔离 Sub2API 从固定SHA构建启动成功，PG17.11/Redis7.4.11使用新卷，loopback18881，health200、正常管理员登录200；账号API423 ADMIN_COMPLIANCE_ACK_REQUIRED。未代替负责人接受部署与运营承诺，未改DB造确认。完整ClearAPI→Sub2API→mock成功链、跨服务SSE/Usage/恰好一次计费、真实客户端/厂商与同条件性能对比尚未完成，不标记为集成PASS。
 - 真实空闲资源采样已记录；请求性能NOT MEASURED。未来美国VPS按内部Docker网络/type59/内部Key/simple模式衔接，先补隔离集成再按原发布机制启用。原香港VPS、生产DB/余额/用户数据未访问或修改，生产状态本轮未重新读取；沿用上轮master=false记录，未启用/部署生产。
 - 当前状态：源码研究与推荐、客户端开发和局部验证完成；Sub2API完整转发验收BLOCKED，待负责人完成其固有确认后继续。完整交付 `CLEARAPI_POOL_STRATEGY_FINAL.md`，证据 `evidence/pool-strategy-20261030/`。
+
+
+## 2026-10-29 01:32:31 Asia/Shanghai — 已接受732a2d51续C；现价核实完成，输出/最终费用约束阻断，0派发未启用
+
+- 用户明确接受Gateway732a2d5162c15604aa7ec7bbba12bb5c9d356031。原部署锁内前驱/Executor201ce387及state045c133e…440d2核实一致，未再漂移；生产写入前停止，没有启动新备份。
+- 现价为gpt-6-luna tiered_expr：len<=272000输入0.10/输出0.50 USD每百万tokens；长上下文0.20/0.75，缓存按原表达式和原分组倍率。旧model_ratio37.5非生效价格。价格、分组/分组间规则均未改。
+- **实际阻断**：已发布Executor201ce387的Responses→Codex转换删除max_output_tokens，128不能保证送达上游；Gateway当前只预扣估算输入(C=0)，按实际usage可追加预留，旧保护flag仅为ledger别名。没有证据证明独立0.05 USD最终费用硬上限，25000余额不能代替；按用户要求不派发，不擅自改协议/计费或发布代码。
+- 最终master=false，账号3/4 version4/not_admitted，grant/capability0，model-routes空，Token8/渠道6禁用；user/Token/channel使用0。**本轮及前次C合计模型请求0、重试0、验收费用0；真实usage/receipt/扣费一致性NOT RUN；PG03正式开放分组无，尚不可声称可使用。** 独立可用性/权限/上游额度探测仍“用户跳过、未验证”。站长/30分钟grant续期撤销规则保持，无新维护平台/4c90d982发布。
+- 验证：run-remote.py preflight-corrected及stop-postcheck各exit0；固定Gateway源码与Executor发布归档核对，未重跑应用测试。初次只读SQL引号错误及本地GBK读取错误已如实记入报告，没有生产写入或模型调用。
+- 最终报告 `evidence/pg03-C-resume-732a2d51-20261029/RESULT.md`，receipt.json、budget-output-analysis.json及原始快照同目录。新前驱已被接受，不再将前驱确认当作当前阻断；剩余为输出和最终费用约束，未扩大原C范围。
+
+---
+
+
+
+## 2026-10-29 — 新前驱差异只读补充：原C授权保留，未接受732a2d51
+
+已核对停止报告与本地不可变提交83b2f41a→732a2d51差异。直接PG03/accountpool/准入路由相关源码未列入变更；但pkg/billingexpr、relay/helper/price.go及billing_expr_request.go存在计费表达式/时间处理变更，不能将旧计价与预算确认结论无条件移用。已读取现行billing规则和表达式契约；本项仅源码差异核对，不是新版本计费回归通过或新的生产现场观察。
+
+仍需负责人明确接受或处理732a2d51前驱，原C其余授权、最多一次真实派发/0.05USD等值上限、跳过独立模型探测等约定保留。接受后在原锁内核对实际前驱、当前gpt-6-luna生效计价及预算/输出约束，复用有效证据；不满足原限制则不派发，不自行放宽预算或恢复可选维护方案。未恢复生产写入/请求/启用，未重跑测试。
+
+本地差异证据：`evidence/pg03-C-production-acceptance-20261029/new-predecessor-source-review.json`及`new-predecessor-billing.diff`。下文停止时现场观察保持有效；本补充不授予新前驱接受权限。
+
+---
+
+
+
+## 2026-10-29 01:21:52 Asia/Shanghai — PG03 C 已授权；前驱已变为732a2d51，按用户门禁停止，未启用
+
+- 执行前复用原pinned SSH/部署锁只读核实，state SHA从99370053…1038b变为045c133e…440d2；Gateway实际为732a2d5162c15604aa7ec7bbba12bb5c9d356031、CID292a2987…7bf6c，21:26:54 +08:00启动，已不同于授权基准83b2f41a/afa35fa5。按“前驱变化停止生产写入”停止，未自行接受新基准。Executor201ce387及PG身份/启动时间保持，Executor healthy且无宿主端口映射。
+- 后续仅原锁内READ ONLY取证：master=false，账号3/4 version4/not_admitted，grant/capability均0，model-route options空；Token8/渠道6均status2禁用，user7请求/使用与Token/渠道使用均0。**本轮真实模型派发0、重试0、验收扣费0 units/0.00 USD等值；C验收NOT RUN，PG03正式开放分组无。**
+- 无生产配置/数据库写入、新备份、重启、OAuth、信任/模型能力/grant签发或来源切换；保留原普通API配置，未恢复4c90d982。独立模型可用性/权限/上游额度探测为“用户跳过、未验证”；实际0.05 USD硬预算、128输出限制及receipt/usage/扣费/日志验收仍未执行，不声明账号池已可使用。维护人/30分钟grant续期撤销规则保持，暂无grant可续期。
+- 实际命令：本轮run-remote.py preflight exit1（漂移门禁触发）；drift-observation、route-admission各exit0（仅只读取证），未重跑测试。新鲜备份在停止前未启动，不能沿用旧包冒称本次新鲜备份。需明确接受或处理新前驱后再续原C；C其他授权无需重复申请，本轮不改基准。
+- 最终报告：`evidence/pg03-C-production-acceptance-20261029/RESULT.md`；receipt.json及原始失败/只读证据同目录。本条为最新现场，下面83b2f41a等为历史观察。
+
+---
+
+
+
+## 2026-10-28 — 按用户要求取消独立模型可用性探测
+
+用户明确“第一个可以跳过，模型可用性不用验证”。因此不再把逐账号gpt-6-luna真实可用性/额度探测列为上线前置，不为它增加请求；状态为用户跳过/未验证，不能写成测试通过。
+
+保留账号信任、账号×模型授权准入、grant绑定/有效期、路由隔离及必要usage/计费验收。现有GrantPoolModelCapability是显式准入API，本身不发探测请求；其内部ledger状态verified不等于报告中的真实模型实测通过。按后续合法授权操作时，证据仅引用已有有效自动化测试并另记用户豁免，不虚构真实上游结果，不弱化身份/CAS/计费门禁，也不增加新的探测门槛。
+
+后续只保留必要的限定预算usage/计费验收，不另开模型探测轮次，原总派发/费用限制不增加。本次只调整范围，不修改生产、开启master、签发grant或发送模型请求；C原授权边界保留。具体范围回执见 `evidence/pg03-necessary-credentials-20261028/model-probe-scope.json`。下文“模型可用性必须先验证”等历史描述已被本项取代。
+
+---
+
+
+
+## 2026-10-28 20:48 Asia/Shanghai — 必要凭据刷新及现有API交接完成，master关闭
+
+- 两账号各一次真实OAuth刷新成功，声明期限至11月7日20:35（+08:00），canonical身份不变；复用现有正式OAuth客户端隔离获取，未发模型请求。原桌面文件保持旧副本，后续勿盲目重刷；真实token仅保存在受限私有目录，经pinned SSH stdin传输，未进普通证据/参数/输出。
+- 无需新维护接口/root任务方案：先用201ce387断网单例验证现有DELETE→同ref import，再在原锁内确认账号隔离、trust/grant/cap/在途/未决claim/请求历史均0。新鲜加密备份20261028T124603Z原helper验证通过后，逐账号通过原native管理API安全替换，Gateway账号ID3/4、ref与历史保持，正常sync后version4，仍not_admitted/disabled。此路径仅限当前初始无业务请求状态，非一般活跃账号轮换契约。
+- 独立只读检查PASS：Gateway83b2f41a/Executor201ce387及PG身份启动时间保持，master=false，model-routes空；Token8/渠道6禁用，用户/Token/渠道用量0。两OAuth调用成功，真实模型调用0；不把OAuth写成模型能力或usage计费验证。
+- 无新应用发布/接口/权限、服务重启、账号DB删除/直接SQL写入、Schema修改或磁盘清理。两正常sync/原认证审计有既定DB写入；原service Refresh保护保持。候选4c90d982继续不采用，未恢复，原四份dirty fixture/既有修复不动；未重复历史测试矩阵。
+- 详细结果、备份路径/SHA、实际操作及独立证据见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-necessary-credentials-20261028/RESULT.md`、receipt.json、handoff-result.json、postcheck.stdout.json。剩余另批C：模型能力/准入、全局来源影响选择、有效预算和真实usage计费验收；当前不启用、不自动发模型请求。下文过期凭据未刷新等均为历史状态。
+
+---
+
+
+
+## 用户范围收缩：不采用新增维护方案
+
+用户要求非必要项不用。新增maintenance接口、root单次批准及三个目录是可选实现，不是PG03上线不可替代的前置条件；此前将发布该候选列为唯一下一步不准确，现已撤回。
+
+候选4c90d982仅保留在独立分支、归档与unused-source，不发布、不创建生产目录或新增权限。活动Executor工作区仅撤回该候选的八文件改动，恢复已验证生产201ce387对应源码，保留此前两POST修复及四份既有dirty fixture；原HEAD/index不变。以固定字节及SHA核对恢复，未重跑已通过测试，未操作生产。
+
+真正必需的是合法有效凭据，以及符合现有准入/身份约束的更新或重新授权路径。两份原材料声明期限已过；实际OAuth有效性尚未验证，service Refresh仍明确拒绝。不能删除保护、覆盖凭据或把相同身份duplicate导入当作更新成功，也不能宣称原B完成。后续只推进证明必要的最小路径；本候选不作为默认发布依赖。
+
+生产状态沿用上次只读观察：master关闭、账号3/4隔离、Token8/渠道6禁用；本轮无新生产观察、部署、OAuth或真实模型请求。恢复回执见 `evidence/pg03-staging-maintenance-20261028/set-aside-receipt.json`。下文候选发布建议均为历史记录，已被本项范围收缩取代。
+
+---
+
+
+
+## 2026-10-28 19:55 Asia/Shanghai — PG03维护链路本地候选4c90d982已验证，生产仍201ce387且master关闭
+
+- 已按审阅方案实现独立GET/POST `/pool/maintenance`，保留service Refresh保护；管理鉴权之外需root预置<=300秒、绑定账号/身份/文件SHA/revision/generation的单次任务。只处理隔离且不trusted、无在途lease账号；OAuth先私有staging再受锁交接，保留账号历史，成功仍disabled，不自动trust/capability/grant或启用。旧watcher快照不能覆盖维护结果。
+- 候选4c90d982f332333d9e18db69239b3efc93d88ccf基于生产Executor201ce387；断网Go1.26.9两包六项顶层定向测试含-race PASS，server编译/gofmt/diff check PASS。八文件固定归档，四份既有dirty fixture与原HEAD/index保留；未构建发布镜像/推送/部署。合成OAuth回调不冒充真实上游，无数据库代码变更或历史矩阵重跑。
+- 本轮锁内只读核对Gateway83b2f41a/Executor201ce387健康，master=false；账号3/4隔离，Token8/渠道6禁用，用量0，model-routes空。无维护目录/批准签发、生产写配置/重启、OAuth或模型请求，未清盘。
+- 新维护接口/root单次批准超出此前两POST修复发布范围，依用户权限扩大停止门禁未延伸部署权限。下一步仅需一次授权固定候选受控发布及三个私有维护目录，再续仍有效B：站长user1主体为账号3/4各一次OAuth维护，保持关闭。需新鲜备份/前驱复核；C启用、全局模型来源切换和真实请求另批。
+- 结果/八文件及SHA/真实命令/权限边界见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-staging-maintenance-20261028/RESULT.md`、receipt.json、candidate.json。下文为历史记录。
+
+---
+
+
+
+## 2026-10-28 18:33 Asia/Shanghai — Executor201ce387已发布；B导入/隔离准备完成部分，受控OAuth维护待补齐，master关闭
+
+- 用户已授权受控发布及续B。Executor201ce387/Engine23c05fb2…0e90、CID4fbe58b3…84d24最终healthy，无公网端口。Gateway83b2f41a和PG身份/启动时间不变。原部署锁/新鲜备份20261028T100126Z通过；独立Executor overlay持久跟踪及备份清单已衔接，原事故Compose/元数据、helper和sudoers保持。
+- 首次收尾把boot文本误按JSON解析，精确新Executor被安全停下；关联原claim的恢复已重启同一候选并完成boot identity=current，不重放发布/备份，不回滚数据库。保留初次失败及恢复回执。
+- 账号3、4导入成功，均not_admitted/quarantined。service包装器Refresh按源码直接拒绝，内部管理刷新500不证明供应商拒绝凭据；未做OAuth刷新成功/能力验证，未移除保护或切生产角色。剩余是受控staging维护与身份交接，不重复申请既有B权限。
+- 测试user7/group pg03_acceptance_20261028、站内额度25000（0.05 USD等值设置）、Token8和渠道6已准备；Token/渠道均禁用，重试跨组false，仅gpt-6-luna/IP限制。原普通渠道配置不变，model-routes仍空；全局模型来源切换提案仅存私有文件。用量/请求/扣费0；额度可用性、输出和最终硬预算及真实计费未验收。
+- **master=false，C未授权，真实模型请求0。** 结果、实际哈希/备份路径/验证/剩余条件见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-executor-controlled-release-20261028/RESULT.md`；receipt.json及STAGING_MAINTENANCE_PROPOSAL.md同目录。下文未发布、账号0等均为历史状态。
+
+---
+
+
+
+## 2026-10-28 17:35 Asia/Shanghai — PG03 Executor导入/刷新接口权限：本地修复及定向验证完成，待生产发布
+
+- 用户“修复接口权限遗漏”已落实：service角色仅增加POST `/v0/management/pool/import` 和 `/v0/management/auth-files/refresh`，保留原管理鉴权、其他拒绝规则和账号池准入控制；没有账号ID/总数特批。业务源码改动一处，回归扩展现有pool_management_test.go。
+- Go1.26.9断网环境下三个指定测试/两包PASS，server编译PASS，gofmt及修改文件diff检查PASS；三个合成账号导入成功，缺失/错误管理密钥401，普通上传/配置/代理/错误方法和相似路径继续拒绝。原四个dirty fixture SHA保持，未重跑历史全矩阵。
+- 本轮未操作生产或替换Executor镜像，未导入真实账号、刷新OAuth、改变master或发真实模型请求。原B环境配置成功、导入403的生产事实保留；14:50现场证据为历史观察。下一步仅需受控发布已验证修复，再续原B；生产发布和C启用/真实请求不能写成已完成。
+- 修复文件、完整命令/结果、ASVS5.0.0适用控制及部署边界见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-executor-interface-permissions-20261028/RESULT.md`；receipt.json、最小补丁和verified-source-fix.zip同目录。
+
+---
+
+
+
+## 2026-10-28 14:50 Asia/Shanghai — PG03 B：83b2f41a环境配置成功，导入403，按权限门禁停止
+
+- 用户已确认83b2f41a为新前驱。原helper配置exit0，新鲜备份`20261028T051240Z`；Gateway同镜像重建，新CID afa35fa5…6e597。两环境开关/实际进程均true，**master仍false**；Executor/PostgreSQL身份与健康、原incident/配置、两运维脚本/限定sudoers均保持。部署与master启用分离已由实际执行验证。
+- 两份指定账号经正常站长API尝试导入，Executor两次HTTP403，Gateway结果EXECUTOR_REJECTED×2；补偿后账号0、auths JSON0。源码对应service管理白名单未包含native import及主动refresh两个POST入口；management列表/models读取200。需要修改该白名单并发布Executor，超出B范围，已按用户原权限扩大停止门禁停止；没有绕过白名单或改角色。
+- B部分完成；OAuth刷新、隔离测试身份/路由、账号模型能力/额度/真实usage计费未完成。master关闭、真实模型请求0，无Executor/PostgreSQL重启、回归矩阵重跑或磁盘清理。正常API审计及导入保留/补偿可能写DB，不能宣称整库零写入。
+- 下一步仅需另授权两个具体POST白名单修复及受控Executor发布，然后继续仍有效B；C启用/真实验收仍需单独授权。最新实际结果与证据：`D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-preparation-B-83b2f41a-20261028/RESULT.md`；receipt.json同目录。下文旧前驱确认、锁阻断、未配置/未上传等为历史记录。
+
+---
+
+
+
+## 2026-10-28 13:04 Asia/Shanghai — PG03 B恢复：锁已释放，前驱变为83b2f41a，写入前停止
+
+- B配置/导入/必要OAuth刷新授权继续有效，C启用/真实请求仍未授权。原部署锁可取得、无持有者；但Gateway已从固定92fd2d6a变为83b2f41aff5b1b253503edd5cbed4aeba9ecc42a，CID b66abf82…72bc3、Engine3096c58e…ecff1，本日12:56:08启动，state success且revision一致。按用户“前驱变化立即停止”门禁，本轮不自动改基准或执行生产变更。
+- 新鲜只读确认两环境开关false、master false、账号0、auths JSON0，root request/overlay不存在；已安装helper/state/限定规则的SHA及root权限均与安装回执一致。92fd→83b所列PG03/relay/计费/脚本依赖定向diff exit0，router仅推荐库存管理路由差异，不冒称整版重新验收。
+- 本轮没有创建请求/claim、备份/配置/重启、导入或刷新凭据、写测试配置、真实请求、测试重跑或磁盘清理。原账号材料按已记录期限均已到期，未来B窗口内需刷新复核；本轮未重读凭据。下一步仅需确认新前驱83b2f41a后按既有B授权继续，无需重复申请相同B权限；执行窗口再变化仍停止。
+- 结果与完整新旧身份/差异/停止依据：`D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-preparation-resume-20261028T1303/RESULT.md`；receipt.json及只读证据同目录。下文“锁仍占用”属于此前历史观察。
+
+---
+
+
+
+## 2026-10-28 00:43 Asia/Shanghai — PG03 B已获授权，原部署锁占用，配置提交前停止
+
+- 用户已集中授权必要OAuth刷新、账号导入、隔离测试配置及按原备份门禁打开两环境开关/Gateway同镜像重建；master保持关闭，不发真实模型请求。B授权有效，不需要重复申请相同范围；C启用/真实请求仍未授权。
+- 新鲜锁内前置检查通过：Gateway仍92fd2d6a/原CID82386c61…33281、state SHA59be30fa…9fa35；已安装脚本身份正确。原站长PAT通过正常/api/user/self鉴权200，用户1/root，不创建/重置/输出身份凭据。/api/pricing200显示gpt-6-luna为倍率模式37.5、输出倍率2，model_price=0不表示免费；保留现价，非供应商报价，未做真实计费验收。
+- 原helper新鲜pg03-plan通过，仅两个环境开关变化、master闭合；snapshot SHA69ee3265…c1f1e、候选Compose83d25bcd…8d54。本次是新授权执行所需计划，不是重跑历史测试。
+- 在创建root request之前，原/run/lock/clearapi-production-deploy.lock被Python3 PID2672628占用；40秒限定等待仍不可用，00:43:38同PID已持锁近4分钟。未抢锁/杀进程/更换锁或基准，没有运行pg03-configure、签发request/claim、启动备份、创建overlay或重建Gateway。未导入账号/上传凭据/刷新OAuth或写测试配置；不把进程用途或安全可终止性作猜测。
+- 末次READ ONLY确认：两环境开关false、master false、账号0、auths JSON0、request/overlay不存在，Gateway身份/启动时间/state不变。既有账号文件A过期问题仍待获执行窗口后刷新，B在线有效性/模型能力未验证。正常站长API访问可能记录原有认证审计，不能宣称全部数据库严格零写入；无业务配置/计费写入和真实模型请求，无测试重跑/磁盘清理。
+- 下一步只需原持锁操作正常结束，再新鲜核对前驱/原脚本/master并在锁内恢复同一B范围；新窗口重新生成plan/root request/当前前驱备份，若身份变化按原门禁停止报告。详细实际结果/停止点/证据见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-preparation-execution-20261028/RESULT.md`，receipt.json和原始stdout/stderr同目录。下文B尚未授权为历史状态，不能据此再次询问同一授权。
+
+---
+
+
+
+## 2026-10-28 00:29 Asia/Shanghai — PG03账号/模型/维护人已补充，格式与测试方案已准备，未导入或启用
+
+- 用户提供两份Codex账号JSON，指定6 Luna、测试范围自行决定、维护人仍站长。已只在本地解析结构/期限并比对账号身份，不复制/上传/输出凭据；账号ID不同。A声明期限已于10月25日01:38过期，B声明期限至10月28日06:36，未在线验证或刷新，不冒称有效或具备模型能力。
+- 生产已有gpt-6-luna渠道配置，站长为用户ID1/role100/status1；维护主体明确。READ ONLY确认Gateway仍92fd2d6a、两PG03环境开关false、master false、账号0。目标模型精确价格覆盖项未见，默认/映射有效价格和硬预算/输出限制尚需核实，不按零价执行或擅自改价。
+- 自定基础方案：隔离用户/Token/group，Responses SSE文本、并发1、最多1次真实派发、重试0、输出请求128 tokens、超时60秒、站内最终扣费上限0.05 USD等值；均为待执行计划，尚未生效。能力探测也计入派发上限，若需额外真实探测先修订授权；超时/UNKNOWN不自动重试退款。不做真实故障回退。
+- 账号导入/必要OAuth刷新、环境配置及Gateway同镜像重建仍需明确B授权，master保持关闭、不发真实模型请求；C启用/真实验收另批。用户此次提供文件及委托测试范围未自动扩大原安装-only执行边界。持续商用授权、在线可用性/能力、有效计价和grant维护仍未验证。
+- 方案和脱敏证据见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-account-preparation-20261028/PLAN.md` 及同目录plan.json/file-inspection.json/target-readonly.json。本轮无生产写入、OAuth刷新、账号导入、凭据上传、请求/重启/测试重跑或磁盘清理；原安装成功记录继续有效。
+
+---
+
+
+
+## 2026-10-28 00:20 Asia/Shanghai — PG03两份运维脚本及限定权限已安装，PG03继续关闭
+
+- 用户明确授权确认最新Gateway后恢复同一安装范围。本轮只读确认实际最新为92fd2d6a7a241b9aab3bbf244563b6ff558f826b（CID82386c61…33281、Engine381a705a…15570、23:46:06已启动），部署状态success/revision一致；固定此身份后锁内前驱复核至独立安装后检查均未变。起初比较昨日66a4d73失败的只读探针保留，确认最新前没有执行安装或写入。
+- 原审阅候选已安装：/opt/clearapi/bin/clearapi-local-deploy.py SHA1b4c7e0a…53206，local-deploy-state.py SHA0a14afeb…a968，均root:root0750。/etc/sudoers.d/clearapi-local-deploy仅保留原规则后追加已审阅plan true/false及configure摘要参数命令，实际SHA dcb5d537…93c85、root:root0440；合并稿/全局visudo及精确字节差异核对通过，无新增通用shell/Python权限。
+- 原两脚本/原规则及审计保留于/opt/clearapi/bin/.pg03-install-ohymt7b8（root:root0700），原件SHA和模式复核通过。真实回执INSTALLED_CHECKED、独立POSTCHECK_PASS；仅三个授权目标及必要私有留存写入。无恢复、服务重启、数据库写入、凭据收发/账号导入、业务HTTP/Provider请求、公网开放或磁盘清理。
+- Gateway运行配置/实际进程/有效Compose的两个PG03环境开关仍false；只读事务确认master缺省false、账号0、pool options0。request/overlay/attempts未创建，未执行plan/configure/receive。Gateway/Executor/PG的身份/启动时间、deployment state、原Compose/env/sentinel/admission/checkpoint等保护摘要前后一致。
+- d55c86b8→92fd2d6a的运维脚本、PG03/accountpool/routechain、relay及所列计费依赖定向diff exit0；router仅兑换批次管理差异，无关商品/身份验证新功能不由本次安装验收。复用已有测试、三项签名集成/helper回归/Compose预览，本轮无测试或构建重跑。新模式实际配置、最新备份恢复、真实账号/usage/计费及grant续期仍未验证。
+- A安装完成；下一步先集中确定合法商业账号授权及安全交付操作人、确切模型、测试环境/用户/额度/总费用和派发上限、维护人和grant续期撤销安排，再单独授权B配置/账号准备，master保持关闭；C启用/真实请求另批。无需重复安装或重新部署应用镜像。本轮不接收凭据、不自动执行后续阶段。
+- 最新结果/精确SHA/原件恢复路径见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-script-install-20261028/RESULT.md`，receipt.json和preflight/install/postcheck原始证据同目录。下文未安装/前驱停止记录均保留为历史，不代表当前安装状态。
+
+---
+
+
+
+## 2026-10-27 21:51 Asia/Shanghai — PG03脚本安装触发前驱变化门禁，写入前停止
+
+- 安装-only授权已收到；实际事务持有原部署锁，发现Gateway从d55c86b879858010a4213f760f3492bb16737d0f变为66a4d73af0f1b1a8c252cbc98572b516a53744ac（CID e0c0aeab…a1e2f、Engine99d2cd00…a3755，17:55:57已启动），在暂存/替换文件前停止。没有自动更新基准、重试或绕过门禁。
+- 新helper/state和新限定sudoers规则**未安装**。停止后只读核对三文件仍为原SHA b9c11350…45417f / e9596a28…2da3e / 843e4777…7bbd8，root:root0750/0750/0440；未创建生产留存目录，文件/权限写入0，无需恢复。
+- Gateway配置/实际进程两个PG03环境开关仍false；READ ONLY查询master缺省false、账号0、pool options0；request/overlay/attempts不存在。Executor/PG容器身份及启动时间未变且healthy。本轮无账号/凭据收发、服务重启、数据库写入、业务HTTP/Provider请求、备份/恢复、公网变更或磁盘清理。
+- 本地仅固定候选摘要及安装程序AST检查；15:40原前驱检查通过，21:50锁内新鲜检查触发停止，21:51只读定位变化。没有重跑已有测试/构建/Compose预览；66a4d73相关代码/有效Compose/备份未重新验证，历史d55差异结论不移用为新前驱通过。
+- 下一步最小条件：负责人一次确认66a4d73是否为预期发布，并明确按确认后的前驱恢复同一安装-only范围；之后先核对新前驱及相关差异/窗口再锁内安装。B环境/账号准备、C启用/真实验收均未授权。账号合法商业授权、确切模型、额度/费用与派发上限及维护人/grant续期安排仍待后续提供，本阶段不接收凭据。
+- 真实停止结果及准确SHA/边界见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-script-install-20261027/RESULT.md`，机器回执receipt.json及只读证据同目录。下文“可以申请安装/未获得A授权”均为此次授权之前的历史状态。
+
+---
+
+
+
+## 2026-10-27 12:24 Asia/Shanghai — PG03生产接入条件只读核实完成；可申请工具安装-only，池仍关闭
+
+- 新鲜pinned Windows SSH只读现场：Gateway现为d55c86b879858010a4213f760f3492bb16737d0f，CID7aa936c2…f4d70，规范config c81114df…63e4e、Engine34b77f4e…42636、binary1c56f97d…6edc7；Executor仍b6e5a90f/cfad1b51…6ae58且healthy，PG17.6原CID且healthy。变化属于另一个已有监测发布，本轮未部署或重启。
+- PG03运行/Compose两个环境开关false，DB master选项不存在按代码关闭；账号表、凭据JSON、授权能力、receipts、池路由/Route Chain均0，三项配对密钥相等，admission revision1/executor_id匹配。挂载/私有目录权限保持。新request/overlay/attempts均不存在。
+- 生产helper/state仍旧SHA b9c11350…45417f / e9596a28…2da3e，无新PG03模式；sudoers未登记新命令。上一轮候选三份SHA和源文件/封包本轮只做一致性核对。工具安装可独立执行：保留原件、锁内更换两脚本/必要限定规则，不创建启用请求/overlay，不改环境/master，不重启或写库；B配置准备和C启用/真实请求另批。
+- 最新备份20261026T235219Z，manifest SHA cbd42c09…b55f2、密文12436638 bytes/SHA21307ded…e0ac现场吻合；manifest含main dump及PG03 state archive/snapshot。但它绑定旧fb695711前驱，不能代替下一次配置helper的新鲜备份；本轮不解密/恢复，历史恢复证据不冒充这个新包通过。恢复工具及原离线GPG目录仍存在，未读私钥；未知DB状态不自动恢复旧应用/DB或覆盖checkpoint。
+- 按实际Git比较fb695711→d55c86b8仅监测等变更，PG03/分发/relay及所涉计费代码定向diff exit0；复用原Gateway/Executor测试、3项签名集成及helper/Compose证据，本轮测试/构建/Compose预览0。没有HTTP或Provider请求、生产写入/安装/导入/启用/服务启停、提交/推送或磁盘清理。
+- 已准备最小1次真实请求方案：两个合格授权账号按现有策略选择其一，SSE completed、account/attempt/receipt关联、exact usage、现价下quota及用户/Token/账务/单条日志一致；不冒称真实故障回退已验证。如能力验证另需真实派发，必须一并获预算授权，不能隐含增加次数。
+- 需要负责人集中提供：账号商业使用授权及安全交付安排、确切模型、测试环境/用户/额度与总费用/派发/输出限制、维护人和30分钟grant续期/撤销安排。当前仅可申请安装-only授权A；B/C尚未授权，商用条件未验证。详细准备报告 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-production-preparation-20261027/READINESS.md`，原始只读/备份投影/收据同目录；上一轮FINAL和非授权plan已更新当前身份，历史结果保留。
+
+---
+
+
+
+## 2026-10-27 Asia/Shanghai — PG03本地收尾：配对验证/测试修复/配置模式完成，生产仍关闭
+
+- 本轮按当前源码与新鲜只读现场推进，没有执行生产安装、写库/改配置、账号导入、启用、服务重启、真实Provider请求、Git提交/推送或磁盘清理；D生图未部署，全部旧工作区/修改/证据保留。
+- 生产核实（上海07:27–07:38）：Gateway源码fb695711、binary d08cfa3c…5fb49；Executor b6e5a90f / digest cfad1b51…6ae58 / binary e99b4dce…33523，healthy。两环境开关false；三项配对凭据相等，管理GET200，admission/trust revision1、身份/能力/在途均0。生产账号表/凭据/模型授权/池路由为空；PG17.6 healthy，durable billing/outbox开启，历史needs_review2和review markers3未处理。
+- 保留旧入口工作区f30b2473的全部修改，使用应用源码与生产一致的既有native-gates工作树验证Gateway；修复生产配对Executor b6e5a90f工作树四个既有测试夹具的协议/回执条件，恢复普通400不重放、流式并发、身份lease及子进程trust恢复断言，没有放宽生产保护。
+- 本地验证：Gateway accountpool/routechain/middleware/router四包PASS；当前SQL账务/Codex用量/幂等及pool退款/取消定向测试PASS；Executor三包Pool/PG02/PG03组及Receipt组PASS，四个历史失败全部定向PASS，server编译PASS。新鲜Gateway签名wire由配对Executor消费3/3 PASS（含A/B零派发后C一次成功及D优先）；Provider为合成替身。未重复完整三库、全量CI/E2E/前端构建；没有数据库实现/依赖/schema变化。
+- 关闭一项实际本地缺口：在原local-deploy helper/state内新增独立pg03-plan/pg03-configure，精确前驱快照、关闭master、root0600五分钟请求、一次性claim、原fresh backup、仅Gateway两环境开关/同镜像重建；保留原Compose/env/failed摘要及普通receive保护。失败后精确停止可确认的新CID，保留pending，不自动恢复旧版/数据库/checkpoint。Linux root原集中回归31项PASS，新增observer条件定向1项PASS；真实Compose四次合并和visudo检查PASS。候选helper/state/sudoers已按SHA封包，未安装。完整实机配置切换未执行。
+- 当前只能申请下一阶段受控安装/配置准备与限额验收授权，不能称商用开启READY：仍缺真实合法商业账号、明确目标模型/费用范围、新模式实机验收、当前配对真实usage与用户/token/log/回执完整对账及grant到期维护流程。旧opt-in完整handler billing bridge未运行，不能用wire或历史19日上游证据冒充；首版范围为明确授权模型的Codex Responses SSE文本，不开放所有协议/媒体。
+- 完整文件、准确版本、命令/退出码、既有失败、生产只读投影、恢复边界与非授权计划见 `D:/AI/API/worktrees/clearapi-controlled-launch-20261020/evidence/pg03-closeout-20261027/FINAL.md`；helper候选manifest同目录 `helper-candidate/manifest.json`。生产Gateway/Executor已含所需应用实现，不为测试/运维文件重复部署应用镜像。到生产授权边界停止。
+
+---
+
+
+
+## 2026-10-26 Asia/Shanghai — GPT-6.1-Sol 真实调用仍失败：错误路径命中网页回退，最小修复仅本地提交
+
+- **验收状态保留 FAILED / REAL UPSTREAM UNVERIFIED。** 用户报告 `stream disconnected before completion: stream closed before response.completed`、自动重连 5/5；最近失败为本日约 12:37。此次没有新增真实模型调用，不将本地回归通过写成真实上游通过。
+- **生产身份已只读核实：** 04:40:55Z，唯一 Compose Gateway `7a47ead735236fb0b72105956f6a3432974d52ce61226b9218ffafeae346e434`，StartedAt `2026-10-26T03:43:05.831852625Z`；镜像 tag/OCI revision 精确为 `6d43530398f218ffbebecda2a44c7bd8fe5fed80`，engine ID `sha256:70afc8037eda359c1f71ae18b9ab5ccb9c0f7db7edaf8271da286719ff8b5220`；生产 `/new-api` SHA256 `9a705c869c7d034a7824a0d5af2ca2e0db72cc00b21d7999853c48ed1f28cc5e`。Billing Protection=true，无独立 LOG_SQL_DSN。生产没有被此次修复切换。
+- **最远阶段与首个异常：** Codex → 实际 Host `www.clear999.com` 的 Caddy :443 → `127.0.0.1:3000` Gateway → `router.SetWebRouter` 的 NoRoute 网页回退。现场 nginx inactive、无 nginx 配置；Caddy 实际反代设置 `flush_interval -1`，没有剥除 `/v1` 的重写。12:37:02–12:37:32（04:37Z）Codex Desktop UA 共 **12 次 POST `/responses`**，Gateway 均200、约1.6–12.4ms；Caddy均200、`text/html; charset=utf-8`、1426bytes。按非敏感请求长度为两组各6次，不能仅凭这些日志将12次唯一归属一个对话；与用户5次重连相符，但不伪造客户端会话关联。
+- **根因证据：** 正式 Responses 入口为 `/v1/responses`（`pkg/jsplugin/routing.go` → `SetTaskPluginProtocolRouter`），本批实际路径缺少 `/v1`。NoRoute 只对 `/v1`、`/api`、`/assets` 前缀返回404，其他路径无视HTTP方法返回SPA200，因此非法API POST被伪装成成功HTML。只读GET `/`、`/responses` 均为相同1426byte HTML，SHA256均 `a005f3223411efe9255b133fdf97cbcd2e1d87fe6438337c2efc0478e7668603`；无SSE事件。当地CC Switch只读数据库中保存的ClearAPI Codex provider Base URL为 `https://www.clear999.com`（无`/v1`，检查时已非当前provider）；只投影URL，不读取输出密钥。服务端路径证据确定，历史客户端配置是否经过其他工具改写没有逐跳抓包，不能多作推断。
+- **上游/SSE生命周期：** 该批请求未进入 Relay、渠道选择或计费，不存在可枚举的上游SSE事件，未产生 `response.created`、delta或`response.completed`；客户端结束的是HTML响应，并非已建立SSE被中途截断。正常源码路径 `OaiResponsesStreamHandler` → `StreamScannerHandler` → `ResponseChunkData` → `FlushWriter` 的事件转发、错误处理、关闭、超时及最终结算均未在这12次请求中执行，不能归因为Flush或结算截流；也不据此宣称真实上游流已验证。
+- **只读账务：** 从Gateway访问日志恢复全部12个Request ID（首个 `202610260437023776686888268d9d6yNq16ati`），在真实PostgreSQL READ ONLY事务查询 logs、billing_reservations、billing_auth_snapshots、billing_completion_outboxes、billing_completion_receipts、route_chain_request_records、route_chain_attempt_records，按ID全部0；04:36–04:39Z窗口内logs及reservation更新也均0。该批虽多次HTTP重连，但没有多次上游调用、余额预扣、实际扣费或未完成账务。另有2条10月7日历史needs_review、共45 quota，与本批ID和时间无关，原样保留，未处理或冲销；未查询/声称外部厂商账单。
+- **相关历史对比：** `377551526`、`517158135` 到本次生产的web fallback、Responses handler、SSE scanner和发送helper逐字无差异。更早的 `bff96adb7` 到当前，fallback/scanner/发送helper亦无差异，Responses handler仅见读体与计量/中断观察差异，均在本次未进入的调用路径。可用Caddy当前及轮转日志中无成功的 `/v1/responses` 200 SSE，不能将任一早期版本称为已证实正常基线；10月25日已存在 `/responses` 返回HTML的同类记录。
+- **独立最小修复：** 工作区 `D:/Codex/worktrees/clearapi-sol-sse-20261026/clearapi-controlled-launch-20261020`，分支 `codex/clearapi-sol-sse-20261026`，以精确生产Commit建立。仅修改 `router/web-router.go`：将SPA回退限定GET/HEAD，未知POST复用既有 `RelayNotFound` JSON404及no-store；在既有 `router/plugin_router_test.go` 扩展错误路径用例，保留GET网页和缺失API/资源回归。本条与修复同次提交。此修复改善错误可见性，不提供裸 `/responses` 别名，不等于真实调用已恢复；客户端最终路径仍须为 `/v1/responses`，该服务Base URL应为 `https://www.clear999.com/v1`。本次未修改客户端配置。
+- **实际验证：** golang:1.25.1、Docker `--network none`、复用现有模块/编译缓存；先在修复前运行 `go test ./router -run '^TestWebFallbackDoesNotCacheMissingAPIOrAssets$' -count=1`，新增3个POST用例实际失败（200 HTML）；修复后运行 `go test ./router -run '^(TestWebFallbackDoesNotCacheMissingAPIOrAssets|TestClearAPIPublicRelayRoutes)$' -count=1 -v`，2个顶层测试及7个表用例通过，包含已有GET网页断言与正式Responses注册检查。已gofmt及 `git diff --check`。未改数据库逻辑，不重跑协议全套/三库矩阵；未执行生产付费调用或真实SSE验收。
+- **边界与证据：** 未Push、合并main、部署、改生产配置/价格/账务数据或新增安全准入；其他工作区已有成果保留。此工作区及原总控均追加本条，不覆盖旧正文。证据目录 `D:/AI/API/evidence/sol-sse-20261026/`：identity-log-projection.json、edge-log-inventory.json、requests-schema.json、accounting-path.json、historical-comparison.json、local-client-path.json、source-comparison.json、focused-tests.log。投影不含请求原文、API Key、Authorization或Cookie。
+
+---
+
+
+
+## 2026-10-25 19:56 Asia/Shanghai — Protected Billing 线上复发：身份一致，具体字段待客户端结构确认；保持不部署
+
+- **本条覆盖下方“当前修复/部署无未解决阻塞”的结论。** 用户报告正常业务仍失败；最新指令要求先取得真实脱敏字段结构、确认根因，再决定最小修复，并明确选择“保持不部署：从客户端提供该失败请求的脱敏 JSON 结构”。本轮没有新增部署或生产诊断代码。
+- **已实查生产日志：** 用户文本中的 Request ID `202610251145047860914098268d9d6lrOZshCp` 无精确命中；按相同时段报错定位并核对的真实 ID 为 `202610251145047860914098268d9d6IrOZshCp`（大写 `I`，不是小写 `l`）。2026-10-25T11:45:05.307Z 的 `/v1/responses` 返回 HTTP 400，错误与截图一致；11:45:07Z 另有同类错误。没有发送验证请求。
+- **当前运行身份通过只读核对：** 唯一运行中的 Compose `new-api` 容器为 `80a6b1bee8c41c96ed423e25f5616b945df67134635c01c014cc6acd0de01ca9`，启动于 11:34:56Z；image/revision 均绑定 `377551526aaea9f64ff085ada3714c6ff8a7abee`，engine ID `sha256:b39499ee829f689012a6b69c5b569514fb31c503b47de42c212441613d575050`。生产 `/new-api` SHA256 `e8ab484b39b2d1e77397ae52e756b51b0b03de4f407b9604b93aae5762372321` 与本地该候选逐字一致；Billing Protection=true，没有发现运行旧 Compose Gateway 的证据。
+- **错误源码已定位，字段根因尚未确认：** `relay/helper/billing_protection.go:130` 的 `validateProtectedResponsesText` 顶层字段白名单默认分支（:139）是该错误文本的唯一源码。入站路径为 `controller.Relay` → `relay.PrepareRequestBilling` → `helper.ModelPriceHelper` → `protectedTextLimit` → `protectedResponsesTextLimit` → 此函数；出站 `relay.PrepareResponsesRequest` → `helper.ValidateProtectedTextBody` 也调用同一校验。Chat 分支的错误文本不同。历史日志未标明阶段，因此不能仅凭该通用错误断言具体是哪次入口拒绝；此前排查交流中的“预扣前拒绝”属于推断，尚非现场证实。
+- **证据边界：** 该 ID 仅命中访问日志和通用错误两条，没有字段名、请求正文或响应错误 code；生产 DEBUG=false、未另配 LOG_SQL_DSN。真实 PostgreSQL 的只读事务查询未找到该 ID 的 logs、route_chain_request_records 或 attempt 记录。没有历史字段结构可恢复，不伪造 JSON。当前 `reasoning`、`text`、`store`、`temperature`、`top_p` 等确实不在白名单，但仅是源码候选，不能宣称就是此次触发字段。
+- **本轮验证及状态：** 完成 SSH 固定主机身份下的只读日志投影、真实 PostgreSQL READ ONLY 查询、运行镜像/revision/二进制核对；本地二进制校验容器使用 `--network none`。未修改业务代码、白名单或账务数据，未重跑测试/数据库矩阵，未新增收费上游调用，未提交修复、执行 DryRun 或部署。修复 Commit=尚无；线上故障=未解决/未验收。等待客户端脱敏 JSON 后，仅对实际字段补回归及最小修复，再遵循既有备份和发布流程。
+- **保留证据：** `D:/AI/API/evidence/protected-billing-closeout-20261025/incident-query.json`、`incident-identity.json`；均为脱敏投影，不含请求原文、Token、Authorization、Cookie 或凭据值。没有安装临时敏感诊断逻辑，不存在待卸载的生产诊断。
+
+---
+
+
+
+## 2026-10-25 19:37 Asia/Shanghai — Protected Billing 修复完成并已真实本地部署
+
+- **修复及生产实际运行 Commit：** `377551526aaea9f64ff085ada3714c6ff8a7abee`；分支 `codex/clearapi-protected-billing-20261025`，正式源码工作区 `D:/Codex/worktrees/clearapi-protected-billing-20261025/clearapi-controlled-launch-20261020`。仅六文件：`relay/helper/billing_protection.go`、`relaykit/dto/openai_request.go`、`service/relay_error.go`、`controller/relay.go` 及两份已有 service 测试；53行新增、12行删除。兼容可计量函数工具/provider/文本消息字段并保留预扣后内容一致性，普通429不立即重试，Retry-After沿用有界解析；真实usage结算、权限及幂等保护保持。
+- **保全与候选：** 原工作区HEAD `f30b247383ee5a18f370d1ad65b30204d32c8833`、原未提交修复和其他工作成果保留；完整tracked/index补丁、原状态和六文件原件在 `D:/AI/API/evidence/protected-billing-closeout-20261025/`。初次单独提交 `0927137cc022b56b37038b668045d06c3fe4668a` 保存在原公告历史支线；该候选夹带前次文档回执 `migration.json` 被原DryRun门禁拒绝，未切换。随后从生产实际应用 `4b5067a43fef8736e1ef8878e4332a755e7766c2` 创建独立候选，精确cherry-pick六文件为上列正式修复SHA。没有修改或绕过部署门禁，前次记录仍在原分支。
+- **定向验证实际通过：** golang:1.25.1 Linux容器运行 `go test ./service -run 'TestProtectedBillingDatabase|TestProtectedTextBudget|TestProtectedResponsesTextBudget|TestDecideRelayRetryReasons' -count=1`；`go test ./controller -run '^TestShouldRetryHonorsPinRetryMode$' -count=1`；`go test ./service/routechain -run '^TestParseRetryAfterSeconds$' -count=1`；`cd relaykit && GOWORK=off go build ./...`；六文件gofmt及diff检查。覆盖SQLite预扣/保留/恢复/幂等、Chat/Responses字段和改写拒绝、429及有界Retry-After。最终候选与受测版本的业务源码完全相同，未重复相同测试。既有SQLite3.50.4/MySQL8.4.11/PG17.6及Responses/relay证据复用；本次无数据库/迁移逻辑变更，未重跑完整三库矩阵或历史30项E2E。
+- **真实部署：** 正式PowerShell7运行 `.\scripts\deploy-local.ps1 -DryRun` PASS（相对生产仅六文件、backend、新备份必需），随后同目录运行 `.\scripts\deploy-local.ps1`，SUCCESS / health PASS / rollback false。真实目标 clearadmin@103.42.181.219:22，非fixture或TestTarget；构建上下文、SOURCE_COMMIT、SSH固定身份、安装资产及前驱合同一致。仅Gateway更新，2026-10-25 19:35:18 Asia/Shanghai写入success状态。
+- **实际镜像身份：** image `clearapi-local:377551526aaea9f64ff085ada3714c6ff8a7abee`；生产engine/RepoDigest `sha256:b39499ee829f689012a6b69c5b569514fb31c503b47de42c212441613d575050`；规范OCI config `sha256:5863dadbf9ccedebba24d055f19a8532d22690a450b3a55ee50b1003703e1dd3`；传输归档SHA256 `83e619288a1b4e23fa0aa23ed775a5226d746893db3828c26b07c3477e7598b0`。生产OCI revision、部署状态和本地正式候选一致，`/new-api`二进制摘要逐字匹配。
+- **真实新备份回执：** `20261025T113407Z`；manifest `/opt/clearapi/backups/manifests/20261025T113407Z.json`，SHA256 `b1209d3dd61a86360208b8a88874191e777d0180bf589cd9f17acce8c7f3567d`；密文 `/opt/clearapi/backups/encrypted/20261025T113407Z/clearapi-backup-20261025T113407Z.tar.gz.gpg`，12422660bytes，SHA256 `a3556e37bf5eec00c29ffb1ab0ca28a870acdfc8e0e36fca2381fe93eab057cf`。实际重新校验密文/大小，回执绑定4b5067a4前驱容器、OCI config和部署状态，systemd Result=success/ExecMainStatus=0、timer active；没有声称新密文已重做解密或恢复演练。
+- **上线后验证：** Gateway running；公网及本机 `/api/status` success=true，首页、`/login`及六个JS/CSS均HTTP200且页面/资源SHA与源站一致。PostgreSQL17.6、共享Executor、Caddy的容器/镜像/启动时间/mounts完全保持，Gateway环境hash和部署资产完全保持，Billing Protection=true，POOL_ENABLED及POOL_CLIPROXY_DEDICATED=false。页面/状态验证不替代真实上游验收。
+- **未验证与边界：** GPT-6.1-Sol真实上游及真实Provider SSE仍未验证，待正常业务请求观察；本次额外收费请求0，不把本地自动化或网站健康写成真实厂商验证。PG03继续暂缓商业，D生图未纳入；不Push、不合并main。当前修复/部署无未解决阻塞。下方历史完整保留，后续文档提交不作为再次部署候选。
+- **完整证据：** `evidence/protected-billing-release-20261025/` 的 validation、dryrun、deployment-result、production-before/after、verification及定向日志；外部保全目录同时保留初次DryRun阻断记录。
+
+---
+
+
+
+## 2026-10-23 22:03 — 已获限定事故恢复授权；原件归档与boot资产安装通过
+
+- 用户明确授权指定RC39957948359/1的限定管理员事故恢复：仅Gateway、两个PG03专属false开关及runtime修复，本地身份/健康/Runtime通过后启动原Caddy；共享Executor、PostgreSQL和其他业务配置不变，失败不自动启动旧PG03或恢复数据库。
+- 新鲜现场复核仍为Gateway/Caddy停止、Executor/PG健康。准备稿第一次误引用不存在的deploy.env路径，在任何生产写入前失败；修正为既有/opt/clearapi/config/deploy.env后全部原始哈希匹配。
+- 生产原件、容器身份及runtime文件已保存至root0700目录/opt/clearapi/.website-recovery-39957948359-1/original。指定boot输入哈希核对通过；既有事务安装器完成归档/独立归档校验/安装/有效systemd校验，archive SHA256=b78885df7bcc6c4dd4d447d18c16821759e9e2874535c3cfe8e1f391bc0ef048。未启动或重启服务。
+- 正式镜像生产拉取进行中，临时私有认证仅用于该拉取并在finally清理，不输出凭据。已核实现场正常登录工具与main源码LF哈希一致（91e124374c1d07607b04d7a0e34f593317db0d75ab1864896de5f9818e9e2212），Runtime会话仍需正常登录更新。
+- 这是本轮授权后的生产文件写入，不能再称“生产无新增写入”；Gateway/Caddy尚未恢复。PG03专项继续延期，其他业务保持原样。证据：authorized-stage-result.json、authorized-boot-install-result.json。
+
+
+
+## 2026-10-23 21:50 — 最新正式候选的生产schema启动验证通过，生产尚未执行
+
+- 用户已通过GitHub标准流程补充现有CLI的read:packages权限。精确RC39957948359镜像已在本机拉取；临时registry凭据已清理。Docker Desktop的containerd镜像ID表示与现有classic configID契约不符，第一次测试在创建容器前诚实拒绝；保留该记录，没有降低身份校验。随后复用原独立classic daemon（ID993ae24e-7a62-430d-aa88-8ac1980bc17d），候选configID48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f与正式manifest完全匹配。
+- 未修改既有schema rehearsal工具，使用最新只读生产schema及精确候选完成两次隔离master启动：健康、迁移证明、clean exit、第二次幂等性均通过；前后schema均3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035，结构无变化。PostgreSQL170006，固定Debian镜像00bc866…；这是当前生产schema兼容性旁证，未恢复业务行，不是完整业务数据升级→回退演练。原正式RC生产readiness字段未改写。所有本次拥有的容器清理通过，独立daemon为空。
+- 新鲜只读生产源指纹完成于13:39 UTC：86表全部行、索引、约束、序列及迁移状态与已实际恢复的备份源一致。初次schema哈希差异是pg_dump restrict-key nonce不同；保留原始差异报告，使用同一原nonce另行只读复核后schema哈希3771662c8cb8e49c8376454d2675aeea708c0ec187ba6ea72035ba39cfe89193精确一致。没有伪造历史完成回执、重做解密或两次数据恢复。
+- 最新候选具备上述实际版本/备份/结构兼容性证据；Gateway、Caddy仍未恢复，本轮生产未写入或启停。普通wrapper仍不适用于停止的事故PG03基线，未称其PASS；必要复核确认独立且明确批准的管理员事故恢复并非被仓库一概禁止。PG03完整接管专项仍按用户指令延期，不能作为默认前置。
+- 剩余实际外部条件：本轮生产安装/镜像替换/服务启动及公网恢复尚未获新授权；现有root Runtime probe JWT已过期，需要正常官方登录取得新会话，不得伪造或绕过登录。生成含生产范围的本地计划命令曾被自动审批审查拒绝，仅返回blocked by policy；未换工具/文件形式绕过该被拒操作，也没有委托他人代写被拒计划。
+- 证据：off-release-39957948359/production-schema-compatibility-result.json、production-source-refresh-comparison.json、production-source-schema-same-nonce-check.json、runtime-probe-session-metadata.json。仅PG03专项延期，所有其他业务功能和配置保持原样；网站恢复未完成。
+
+
+
+## 2026-10-23 21:30 — 新正式RC通过；网站恢复配置已核对，当前待包读取授权
+
+- 当前主线仅网站与原有业务恢复；PG03专项继续暂停，不纳入此次RC或生产默认前置。新正式RC39957948359/1已完成6/6 jobs PASS（前端、Race、三库、Docker/发布）。源码a032815cb6244a7ee5e812de82f8300c02554e99；tree6eb17ab8b77ae02ec7e7e5f5ffebe77b9e26774f；镜像sha256:ed6f93a91285abab0f8730c7c14a36b5e52bfaed521ce8c4e798d2815da286b1；configID sha256:48df93b31f69cf7e3597130c8be86e2c6e97f046de789ccc505257276183b71f；binary SHA256=37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5。正式artifact12503928727已下载，现有验证器核验全部文件/源码/运行身份PASS；尚未部署。
+- 最新生产Compose只读合并预览：仅Gateway image、两个PG03专属开关和runtime mount source变化；其他服务定义及全部非PG03环境保持一致，与旧Gateway现有环境也无漂移。未新增DISABLE_RELAY、MASTER_NODE或其他业务限制。boot依赖局部复核确认安装这两份helper和四份systemd/tmpfiles资产不依赖PG03 wrapper/control全套替换；旧boot生成稿不能冒充新RC生成稿。
+- 已通过只读连接取得154806字节生产schema，仅存本机root私有tmpfs，不含生产业务行；复用未修改的既有schema rehearsal工具，精确新候选启动验证尚未执行。新鲜只读启动选项检查：users=5，旧控制台待转换项0，主题无需规范化，RegisterEnabled与PasswordRegisterEnabled均true，不需要更改这些业务设置。
+- 当前实际外部条件：本机既有Docker凭据、匿名及现有GitHub CLI凭据均无法拉取精确新镜像，GHCR返回permission_denied。CLI当前只有gist/read:org/repo/workflow，无read:packages；已启动GitHub标准scope refresh，等待用户在浏览器确认包读取权限，不索取Token，不授生产权限。临时测试凭据目录均已清理，生产登录配置未改。
+- 生产Gateway/Caddy仍停止，Executor/PG健康；新RC及配置预览均不代表网站已恢复。下一步是精确镜像读取→真实生产schema启动兼容性→最终收敛受保护基础恢复操作和必要生产授权。既有两次真实86表恢复保留，不重复完整OFF专项或11项演练。新证据目录off-release-39957948359；WEBSITE-RECOVERY-PREPARATION-20261023.json仅准备稿，不是生产授权。
+
+
+
+## 2026-10-23 21:00 — 用户纠正优先级：当前只恢复网站，PG03专项延期
+
+- 当前主线：部署适合现有普通业务的合格版本，恢复Gateway、Caddy和网站；注册、登录、普通API、渠道、模型路由、定价、充值、支付及其他配置保持原样。后续主线：PG03账号池专项上线。保留全部PG03代码、配置、分支、测试和历史证据，暂停完整OFF/fence/checkpoint/wrapper专项；不再将其默认列作本轮生产恢复前置。仅处理有直接证据的实际自动执行/写入风险。
+- 最新生产只读核实（12:58 UTC）：Gateway退出127的直接错误是OCI挂载/run/clearapi不存在，进程尚未启动；Caddy停止，Executor和PostgreSQL健康。当前Gateway仍是事故旧镜像且Pool=true，不得直接原样启动作为普通业务恢复。boot恢复脚本及systemd/tmpfiles资产未安装，持久runtime/new-api已存在root:root0750，其父目录0750与现有boot脚本预期0755不符。没有执行生产写入、服务启动或镜像替换。
+- GitHub最新正式OFF RC仍为39817772180/1（09948b38eb1571f27ebcabdbe24086a6555f4646，镜像sha256:c0a90da319d4a1e0b01b4e7891c02de2749a708a82bebab7306f788b0c64491b）。当前main=a032815cb6244a7ee5e812de82f8300c02554e99，相比RC仅六个备份/恢复脚本及测试变化，Gateway/前端/boot源码无变化。优先评估复用该正式应用产物；不能称其包含新的恢复脚本，也不为暂停的PG03专项重新构建镜像。
+- 已完成的两次真实86表恢复和正式CI保留，不重复。仍需普通网站恢复所必需的实际Gateway/数据库启动兼容性、回退条件、精确资产安装及受保护事故恢复入口；目前的普通wrapper会拒绝停止且failed的旧PG03基线，boot脚本只准备/核对身份，不会启动Gateway，不能直接当作部署工具。调整恢复范围不等于绕过这些真实入口限制。
+- 暂停前的采集器修复保留：内核挂载映射（含nsfs）、容器bind别名及宿主挂载漂移，52项局部合同测试通过，独立增量复审通过；新只读采集unknown=[]，四个FD经cgroup归属现有PG容器。它不代表持续fence或生产许可，后续不再为本轮展开该专项。
+- 新证据：website-recovery-priority-readonly-20261023.json、website-recovery-scope-decision-20261023.json。网站尚未恢复；下一步仅收敛已有正式版本的基础恢复与必要授权。
+
+
+
+## 2026-10-23 19:31 — PR91已合并，真实隔离数据库恢复2/2通过；完整服务回退及网站尚未完成
+
+- PR91必要复审无新增关键问题，已Ready并正常合并；main=a032815cb6244a7ee5e812de82f8300c02554e99，main CI39944096489与PR CI39942181557均8/8 PASS。现有其他WIP保留，未绕过分支保护。
+- 用户明确授权限定本机离线policy重绑定及两份固定恢复签名。首稿UTC使用+00:00而工具要求Z，在claim/容器创建前拒绝；旧稿、签名和失败记录保留。修正保持真实时间不变，经plan校验及用户对新哈希明确授权后执行，没有降低UTC门禁或回填解密授权。既有policy原件保留，新policy SHA256=6b4f37a432073e3bd08c47c59ef427040d9ef4899f26bee91be27711aeb108da，仅绑定已合并工具，信任根/daemon/机器不变。
+- 最新备份20261023T102102Z已在既有独立空daemon实际恢复两次，86表数据及schema/index/constraint/sequence/migration投影严格比较通过；恢复端实际REINDEX验证。不同容器、独立单次claim；恢复库存SHA256均5b0b7ddec73127b8b0a51375d365de70a17e5c4640dc6372f1ea5b797c8aa9ad。PG03只恢复到独立tmpfs，不触及现场journal/floor；容器及输出明文载荷清理通过，daemon最终为空。未重新解密或重跑11项演练。完整证据已在本机root0700目录封存，未导出私钥或原始生产数据。
+- 第二次实际证明回退目标可重建；不是升级→回退切换或Gateway服务回退。两份audit保持producer_authentication=UNKNOWN、production_readiness=BLOCKED、production_execution_allowed=false；历史OFF RC仅作工具要求的参考身份，未用作新候选或执行Gateway。source未fenced的事实不变。证据actual-offline-restore-pair-result-20261023.json（SHA256 fdac2457e4c460e3eccc009c283318c04525ec431d9f0f55fbba3e94d7a78c64）。
+- 现有持续观察/host入口guard的5项受影响组合测试通过，但实际生产端口仍未接入。当前真正阻塞是可信持续fence与wrapper的精确OFF mode-exit/stopped incident准入/共享Executor后置校验，不能仅把flock或两个数据库恢复结果充作闭环。新正式RC、完整服务回退资格、生产安装/镜像替换/启动及公网验收均未完成，本阶段无生产写入。仅PG03暂缓，其他业务功能和配置不变。
+
+
+
+## 2026-10-23 19:06 — 只读源库采集完成；PR91正式CI 8/8通过，网站尚未恢复
+
+- 仅 PG03 暂缓，其余业务功能和配置不变。本次授权的单文件修复及一次新备份20261023T102102Z已完成，真实completion及密文保留、实际解密成功；真实隔离恢复和配对回退仍NOT_RUN，未签发恢复授权。
+- source producer已在固定SSH下只读采集86表及schema/index/constraint/sequence/migration指纹：单个RR READ ONLY事务、exported snapshot schema dump、服务端statement/idle transaction timeout，COPY仅hash。source唯一性明确null，不执行生产REINDEX；恢复端仍实际REINDEX并严格比较全部其他字段。持续writer排除及备份快照对应关系均保留UNVERIFIED。
+- 提交7db0b818dd0d4432de11dfe063aef9a8fdbf042f，草稿PR91，正式CI39942181557已8/8 PASS，包含真实隔离PostgreSQL源/恢复比较；该CI使用合成数据，不是生产备份恢复。本地恢复测试42项：41通过、1 hosted项跳过，该hosted路径随后在正式CI通过。未合并或构建RC。
+- 本地OFF v2支持精确固定、已完成且新鲜的existing_backup，避免仅为时间顺序重复备份；仍要求fence内当前source、真实恢复/配对回退、严格比较及最终source重核。3项新增定向测试及独立局部复审通过，OFF合同全文件50项通过。实际Executor运行binary及进程namespace重启路径均匹配e99b4dceee9b857c67e7b2b5101552511dbce60c789b2bec3c8fdd6bb5a33523，空grant/checkpoint未变化；未再次调用会fsync的管理snapshot。这些不代表完整OFF或派发证明。
+- 最新只读健康：Executor、PostgreSQL running/healthy；Gateway、Caddy exited/restart=no。仍缺可信持续fence及wrapper接管、经具体审阅授权的离线policy更新/签名及真实恢复回退、统一集成与新正式RC、生产恢复和公网验收。旧policy仍绑定旧工具，未擅自更新；无须用户提供新解密密钥，旧RC不能冒充新合格版本。详细新证据：off-release-39817772180/source-inventory-and-off-delta-validation-20261023.json。
+
+
+
+## 2026-10-23 18:21 — 新鲜生产加密备份真实完成，并已安全转存/解密；尚未恢复
+
+- 用户单独授权单文件journal修复及一次新备份。执行前确认main=c4e73860729794882411567b51a2d0a1f1797685、main CI39937355659与PR CI39936345578均8/8 PASS；核对plan505af9c7e604ab9b9ad6453ea366e6136e6cdf3f5fdb640498da552cee9410d8与执行稿784fe1baae403376833978803dcd4396ee6c705796b2524e677e099d1a1e8f8d的实际字节后，通过固定SSH执行，未重用上一份授权。
+- pg03-backup-state.py已原子更新为ad4aecf27de0bcdccde84743c9a390bff6ec645f94734696839f453d630aaa26并保存原件。新备份20261023T102102Z真实rc=0；完整身份/PG03前后快照、明文清理、密文/hash和fsync验证后生成受保护真实completion。archive=/opt/clearapi/.fresh-backup-journal-repair-20261023。Gateway和Caddy保持停止，共享Executor和PG保持运行及身份/配置不变，无服务启动/镜像替换/生产DB恢复/业务配置修改。
+- 新manifest SHA256=76733dbc572569aca713dfad81076c59c96526069b311ff8972e7803ed6a77c3；密文SHA256=995100eb925127adcbb063bf8e7f8cee93597d3f5e11e488d7835d2ad988e609，12330812字节；真实completion原文件SHA256=01d9ebd34ff05e5fd649f5509eb5613ad5b4bc428ce76d1689161133df24deac。原manifest/receipt字节和密文已安全转存本机独立环境，不是重构历史回执。
+- 新备份已通过历史GPG入口实际解密，rc0、完整性状态通过；bundle SHA256=4a8d7a33a14eb1e709abebc2138329321adb307bc0ff096f7a3680f1014b155a，与新manifest匹配。明文只位于私有tmpfs，私钥未导出，真实命令/status日志仅保存在私有tmpfs，报告仅存hash。未将解密记录伪称为已绑定候选/challenge的正式恢复回执。
+- 已消除“无新鲜备份及真实完成回执”阻塞。仍缺：认证的生产只读数据/目录指纹producer、完整OFF/fence/wrapper接管、新正式RC；实际独立恢复及配对回退尚未执行，未签发恢复授权、未安装新离线policy或启动网站。签名/恢复阶段只能基于精确审阅输入，备份成功不等于恢复或上线成功。
+
+
+
+## 2026-10-23 — PR90已合并，下一次备份仅需更新一份状态工具
+
+- journal修复PR90 CI39936345578已8/8 PASS，按分支保护正常合并。正式main=c4e73860729794882411567b51a2d0a1f1797685；patch commit4bc3307aa5e27300f97ba969550d670fdd33337c。main CI39937355659自动运行中，不把PR结果冒充main结果。
+- 固定新源码内存只读现场inventory PASS14项，未安装或写状态。失败备份20261023T095442Z阶段确认为pg03_capture：staging已清理、无新manifest、无密文、无completion，未进入dump。保留全部旧备份和修复前工具原件；已授权一次未被重试。
+- 更小新稿FRESH-BACKUP-JOURNAL-REPAIR-PLAN-20261023.json仅更新pg03-backup-state.py(1b974d1de8fc0a9af6477474d34375203c5eb5a41b61c34e69857dfa5df5f43f→ad4aecf27de0bcdccde84743c9a390bff6ec645f94734696839f453d630aaa26)，固定已安装两工具、admission/checkpoint哈希，使用已有锁，不再改变任何容器策略。独立delta复审无新增P1/P2；默认只读PLAN和旧审批摘要不能授权新稿测试PASS。新plan SHA505af9c7e604ab9b9ad6453ea366e6136e6cdf3f5fdb640498da552cee9410d8；实际脚本SHA784fe1baae403376833978803dcd4396ee6c705796b2524e677e099d1a1e8f8d。等待main CI通过及本次限定生产写入/一次备份授权，未执行。
+- 离线新源码/策略候选已准备但未安装或签名；新依赖不能沿用旧policy哈希。完整OFF接管、真实新备份/恢复/回退、新RC及公网网站均未完成。
+- 同时修正未发布OFF前阶段合同的现场表示：旧Gateway的CLIPROXY_DEDICATED实际未设置，允许显式null记录该事实，但缺字段仍拒绝；候选仍必须显式false。两项受影响组合测试PASS；不是生产OFF证明。
+
+
+
+## 2026-10-23 17:54—18:03 — 获批准备已执行；一次新备份失败，根因已本地修复并提交PR90
+
+- 用户已明确授权限定准备及一次备份。严格按plan fde67b97…和实际执行字节b2deb97b…校验后执行；创建正式部署锁、保留两份原件，原子安装备份shell SHA7edb9ce97eff93992dc15b9c0f7cccf78e28009fc5a5d35ab022e653770c85ac和identity helper SHAe1e21e0227b8f668bc9945e13e460542d8a07f7e6d3bdf7eaf00546180d7dc0d。原件/计划/调用日志位于/opt/clearapi/.fresh-backup-preparation-20261023(root0700)。
+- 精确旧Gateway保持exited，restart从unless-stopped改为no；未启动或替换镜像。Executor与PostgreSQL仍running/healthy且镜像身份不变，Caddy仍exited。其他业务配置不变。
+- 备份调用20261023T095442Z实际rc=1，未发completion、未重试。安全诊断复现：pg03-backup-state.inventory对真实checkpoint.journal两条JSONL调用单文档json.loads，Extra data line2。journal SHA仍为授权接受后的b131fa9652ae0d5d872b58a6e8ab875361bcb2caa8ebc0175c132613bf2cbe66，未改写或降低floor；失败发生在PG03采集，数据库dump之前。此前通用错误输出未显示细节，已用只读函数调用精确定位，未输出生产数据。
+- 本地同时修复备份与恢复审计的相同解析错误：共享逐条framing校验，保留全量字节，拒绝截断/空行/重复字段/revision回退；runtime trust/integrity仍交给Executor，未新增恢复许可。3项备份与3项恢复审计定向测试PASS，独立局部复审无新增P1/P2。
+- 仅4个相关源码/测试文件提交4bc3307aa5e27300f97ba969550d670fdd33337c并推送同一分支；PR90已创建并附加，CI39936345578等待结果。不动其他WIP，不重跑11项OFF演练或构建旧RC。修复尚未安装生产，旧批准执行稿未被篡改或重用。
+- 真正剩余：待正式源码CI/集成后，准备仅更新PG03状态工具与一次新备份的精确限定稿（已有两工具/重启策略无需重复变更）。新备份、真实恢复/回退、完整OFF接管、新RC与网站恢复均未通过。
+
+
+
+## 2026-10-23 — 新备份最小路径已形成可审批执行稿，尚未写入生产
+
+- 24小时是现有恢复工具的生产准入新鲜性上限，不是GPG密文或旧备份的数据“失效日期”。旧备份继续保留，其解密/9项payload校验结果保留，不再重复。真正不可由hash替代的是当前可回退数据点、准确来源、整次备份子进程成功及EXIT明文清理。现有脚本先发布manifest后完成清理，因此manifest不能代替完整完成回执；不补写旧回执，不新增审批层。
+- 已只读核实当前PG服务健康、故障Gateway身份/失败manifest/精确镜像一致、备份公钥存在、offsite hook配置不存在，PG03状态依赖与正式源码hash相同。当前backup脚本及identity helper需要更新；wrapper/control保留拒绝，不在本次备份范围内变更。
+- 新鲜备份限定稿：FRESH-BACKUP-ONLY-PLAN-20261023.json 与 fresh-backup-only-execution-20261023.py。仅创建正式wrapper同路径部署锁（如缺失）、保存原件并原子更新两份精确主线备份工具、将精确已停止Gateway的restart改为no、保留旧备份执行一次加密备份、真实结束后验证并持久化完成回执。共享Executor/PG/Caddy业务配置和服务运行状态不变，无数据库恢复/镜像替换/上线/恢复签名。
+- 独立审查发现并修复：运行时offsite hook未绑定、超时后代可能残留、密文持久性弱于receipt。已加入offsite absent双检查、自建进程组TERM/宽限/KILL（保留leader未reap避免PID重用）、密文FD/hash与fsync及目录同步。Linux默认PLAN、错误审批摘要拒绝、真实本机独立进程组超时回归均PASS。独立窄复审允许提交限定审批，不冒充真实备份测试。
+- plan SHA256=fde67b97fbc646e0138a107455489bee80488ea405ba8b4164c4839865c31383；执行文件实际字节SHA256=b2deb97bc20f3a9a888526c1f88d4fbd38b7f8d90127109f1a0ae18a597e31dd。执行时必须核对传输字节，不能沿用CRLF/LF转换前hash。
+- 失败保留原件及现场、不自动重试、不发completion，不自动启动旧PG03 Gateway或恢复其自动重启策略。该项属于新增生产文件/容器元数据写入及新备份，须取得用户限定授权后执行。真实新备份、独立恢复、配对回退、完整OFF链、新RC与网站恢复仍未完成。
+
+
+
+## 2026-10-23 17:24 — 旧备份输入不满足当前恢复合同；共享Executor前阶段合同已补齐局部组合验证
+
+- 已区分密钥用途：历史GPG入口已实际解密并通过完整性；新Ed25519仅用于离线执行授权，未签发任何恢复授权。本轮对解密包9项payload逐一流式对照历史manifest全部匹配，明文仅在tmpfs；不是恢复PASS。隔离环境暂存的manifest解析副本已明确标为parsed-metadata，不能替代原manifest字节哈希。
+- 新鲜生产只读查询：10月20日备份identity schema=1、running_identity，无stopped_writer_identity，已超过24小时。当前runner要求新鲜schema2失败态备份、真实完成回执和认证source-inventory；不得补造/回填。Gateway与Caddy仍exited，Executor/PostgreSQL healthy；Gateway restart=unless-stopped，仍不满足现有受保护静止条件。未新增生产写入。
+- 本地off-host-contract.py新增显式plan/observation v2前阶段：绑定旧Gateway真实PG03开关及候选两个false开关，分别处理事故基线和未来候选；共享Executor保持running且核验PG03隔离/业务身份。旧v1、其他writer/fence/资产/备份条件全部保留。抽出可复用PG03隔离校验，最终validate_pg03_off仍必须看到候选实际开关false。PrerequisiteSession仍只签发前提结果，production_execution_allowed=false，不假冒候选接管。
+- 10项定向组合/关联回归：首轮9通过、1个fixture重复使用claim错误；修正fixture后仅重跑该项通过。独立局部复审无新增P1/P2。全部为本地合成验证；未重跑11项OFF演练或旧CI/RC，未提交本轮未完成合同。
+- 真实剩余：可信完整producer/持续fence、共享允许writer与备份一致性、受保护静止操作、wrapper候选接管、真实新鲜备份/签名审阅/隔离恢复/回退、新RC及生产网站恢复。未删除既有拒绝条件，未将局部验证升级为完整OFF PASS。
+
+
+
+## 2026-10-23 14:07 — 已获限定授权并完成本机离线信任根初始化
+
+- 用户明确授权仅初始化本机隔离WSL信任根与固定策略。本次已按记录提案执行，未扩大为恢复签发或生产操作。
+- Ed25519私钥仅生成并保留在本机root0700 authority目录内，文件0600，未导出或输出；派生公钥与固定v2策略已安装到/etc/clearapi，root:root0600，独占创建，未覆盖原文件。密钥对公钥一致性、机器身份、专用空daemon及Docker/OpenSSL/runner/两依赖源码哈希已核验。
+- 最终policy SHA256=484ee1d8567bf70b1f64f80e3c1cdfdfcd262305f1fc725cc1089e6237358710；public key SHA256=033a3985ae160c849d1c0eebbe579d35e6216fede499fd4517315d969745d228。完整绑定见offline-trust-bootstrap-result-20261023.json。
+- 未创建任何签名、未签发恢复授权、未执行数据库恢复或配对回退，未连接或修改生产。仅PG03暂缓，其余业务配置保持不变。
+- 已消除“本机离线信任根/策略未初始化”这一项缺口；完整OFF组合链、新鲜恢复输入/实际恢复与回退、新正式RC及生产网站恢复仍未完成。当前授权不包含签发未具体绑定的恢复授权。
+
+
+
+## 2026-10-23 — 真实解密成功；离线审批机制为尚未初始化的新门禁
+
+- 使用已找回的历史专用GPG keyring实际解密20261020T002138Z密文成功，GPG完整性验证成功。明文仅位于root私有tmpfs；无私钥导出、无数据输出。该结果不等于数据库恢复或回退PASS。
+- 独立daemon新鲜核验ID=993ae24e-7a62-430d-aa88-8ac1980bc17d且容器为空。此前输入tmpfs挂载已消失，执行在写入前拒绝；确认目录为空后重新挂载私有tmpfs，随后才解密，没有明文写入磁盘。
+- Git和历史记录证明：Ed25519 policy/pub/signature要求于10月21日引入；当前本机policy/pub均不存在，未找到已配置签名系统的证据。独立审查要求新信任根单独授权，已准备精确bootstrap提案并集中提出一次授权，不向用户索要未经证实存在的凭据。未生成或安装新信任根，未绕过门禁。
+- 本轮不需要用户提供私钥、密码或Token。真实备份恢复/配对回退未运行；完整OFF合同、authorizer/wrapper组合链和新RC仍待完成，网站仍未恢复。
+
+
+
+## 2026-10-23 — 最新有效进展：限定元数据核验通过，已找到历史解密密钥
+
+- 仅 PG03 暂缓，其余业务功能和配置保持不变，共享 Executor 保持运行。
+- 用户单独授权的空 grant revision 1 核验已执行：原 admission/checkpoint 已保存于生产 root0700 受保护目录；通过现有认证管理接口正常接受 revision，未直接编辑 journal。checkpoint SHA256=b131fa9652ae0d5d872b58a6e8ab875361bcb2caa8ebc0175c132613bf2cbe66，符合预期；capabilities/identities/in_flight 均0。容器身份、配置、运行状态未变；完整 OFF 恢复链仍未通过，不签发部署许可。
+- 恢复传输修复 PR #89 已合并，main=6ca9aa4b2290925166bb449c439a3684b2ff3bed；PR CI39903132565、main CI39904295635 均8/8 PASS。仅此传输修复已集成；本地完整OFF合同未集成，尚未生成包含全部修复的新RC，旧RC39817772180不能替代。
+- 已准备独立空WSL Docker daemon，精确PG17.6镜像实际启动验证通过后清理任务容器；这不是真实备份恢复。密文已安全转存独立环境，未接触生产数据库。
+- 追溯10月6日历史验收记录，在本机 Documents/ClearAPI-Infra-Work/gpg 确认存在备份指纹D675187C7097EF9D8C3BFF966B1439F896043FFD的私钥及解密子钥元数据；未输出或导出私钥。此前“未找到密钥”仅适用于默认keyring，不能代表历史专用目录。离线策略/审批签名是否真实初始化仍待追溯，不要求用户提供未经证实存在的凭据。
+- 真实解密恢复、配对回退、完整OFF链及生产恢复仍未验证；Gateway/Caddy尚未恢复。下一步复用现有历史解密入口并核查恢复策略实际来源，保留全部数据安全保护。
+
+
+
+## 2026-10-23 — 当前有效补记：共享Executor保持运行；最新OFF修复未进入正式RC
+
+- **仅PG03暂缓，其他业务及配置不变；本轮明确禁止整体关闭Executor。** 下方停止Executor/restart=no的旧提案、旧5项测试对应v1谓词不再适用于当前生产恢复。旧安全门禁保留，未通过放宽它们强行恢复。
+- 新鲜GitHub查询：main=09948b38eb1571f27ebcabdbe24086a6555f4646；正式OFF RC39817772180/1成功且同source。旧RC39357150402/1 source=69a66431646b5cc8912bf97a739e08de07316443，为release-pg03-gateway.yml。最新off-host-contract.py/集中测试在正式commit中不存在，authorizer/workflow改动也仅本地；**最新OFF修复尚未进入目标正式发布产物，不能用于生产GO。** Docker运行镜像按设计不含host管理脚本，必须核验相应源码绑定控制资产交付，不能只看Gateway digest。
+- 精确Executor源码b6e5a90…区分：service_lifecycle启动加载/刷新/监听为共用能力；pool_guard的grant/策略准入及management_isolation为PG03专属。conductor_refresh_disabled_test明确普通disabled凭据仍可刷新，这是共用功能，不能整体关闭；pool_guard_test的RefreshPauseAndRestartPreserveQuarantine、management_isolation_p0_test覆盖隔离状态不被刷新/监听/重启清除的设计。仅阅读精确源码/既有测试，未把不同HEAD的测试冒充生产版本运行证明。
+- 本地validate_pg03_off修为v2：共享Executor必须running且runtime身份不变，PG03账号完整分类/持久隔离、enabled grants与inflight为0，刷新/reload/restart/受保护恢复不得解除PG03隔离。4项新定向测试PASS；独立局部审查无新增P1/P2。只接受未来可信host实证，不授生产许可。当前不存在可信scope producer；旧PrerequisiteSession仍要求writer停用，组合链仍不兼容且拒绝，完整OFF未验证。未重跑旧fingerprint测试、CI/RC/11项演练。
+- 已实际准备本机WSL离线恢复私有tmpfs输入/结果目录(0700)、ext4持久claim目录、精确09948…Git字节三份脚本(0500)。未创建/导出/复制私钥或新信任根，未使用生产SSH做离线授权。既有WSL GPG keyring元数据中未找到备份公钥指纹D675187C7097EF9D8C3BFF966B1439F896043FFD的匹配私钥；仅检查指定指纹元数据。初次Windows捕获WSL stderr遇GBK解码告警，stdout有效返回list退出2/无匹配项，未据此宣称任何解密成功。
+- 离线执行仍缺：专用空Docker daemon（现有daemon有其他工作负载，未修改/停止）、已有审查信任根与有效policy/签名授权、认证解密输入及predecryption回执。真实离线恢复和Gateway配对回退NOT RUN；未重复备份hash校验。准备目录不等于环境已可execute。
+- 本轮未连接生产或写入生产、启停服务、替换镜像、改数据库/配置或开放公网。已更新原MINIMAL-PRODUCTION-RECOVERY-PLAN-20261023.md，撤销旧全停方案；证据off-release-coverage-20261023.json、offline-environment-preparation-20261023.json。当前三项答案：完整OFF未通过、真实备份未恢复、最新版本生产恢复条件未具备。
+
+
+
+## 2026-10-23 — 新增：Executor独立循环已定位，PG03专属OFF局部校验5项通过
+
+- **范围不变：仅PG03暂缓，其余业务功能及配置保持原样。** 本轮未新增全站限制，未重复已通过CI/RC/11项OFF演练。
+- 新鲜只读Executor证据：CID1081a1b5…/image cfad1b51…仍running、restart=unless-stopped、PG03 role=service、auth目录普通文件0、无匹配cron/systemd unit。OCI声明精确源码b6e5a90fce6c0b3fa231d43ab07a65622f981be2，本地该Git版本service_lifecycle.go:92独立启动AutoRefresh、:187起文件监听；conductor_refresh.go:46启动后台循环；--local-model只管模型目录更新，Gateway pool开关不停止上述循环。未声称空目录等于OFF；未启停Executor。
+- 新增只读渠道依赖投影：3个渠道的直接hostname/IP均未指向Executor，未解析地址0；不覆盖DNS别名/跳转/代理及其他caller，不签发停服许可。证据executor-independent-mechanisms-20261023.json、executor-channel-dependency-20261023.json。
+- 在现有off-host-contract.py添加两个局部函数：仅排除两个PG03开关的完整业务配置fingerprint；PG03 OFF校验要求固定CID、两个开关精确false、master明确缺省/false、Executor exited/restart=no/无进程或连接且无额外实例/重启caller。UNKNOWN拒绝，生产执行许可始终false；未安装/接通生产host。新增5项定向测试分别运行全部PASS（未重跑旧34项），独立只读审查无局部P1/P2；完整可信采集/数据库业务基线/新鲜性/fence仍由外层合同负责。
+- 真实旧备份原件本轮只读重算：20261020T002138Z manifest SHA a9b9c32cd168c5a68740e20f1c949cff41da665b14d7aeb5790404dd0d795166；密文SHA 0c8757c8d204cddd7cc5b3b9a7835823e376093b9ee344f5a8bd8c219d3b3b31、12323351字节。未解密或恢复，不能替代启动前新鲜备份。现有offline runner只运行隔离PG17.6，不能单独证明Gateway健康/镜像回退。
+- 实际剩余阻塞：(1) OFF mode-exit/fence/producer与authorizer/wrapper端到端生产入口尚未实现/审查通过；(2) 独立恢复环境及已认证解密输入缺失，用户提供的是已有生产SSH入口，不能替代。真实独立恢复和配对回退NOT RUN，Executor完整OFF未验证，网站未恢复。无生产文件/配置/服务/数据库变更。
+- 最小有限执行方案及精确身份/条件已写入off-release-39817772180/MINIMAL-PRODUCTION-RECOVERY-PLAN-20261023.md；局部源码hash、5项实际命令与独立审查边界见pg03-off-local-validation-20261023.json。新控制代码为本地未提交版本，不冒充现有RC或生产证据。
+
+
+
+## 2026-10-23 — 紧急边界纠正：仅 PG03 暂缓，其余功能保持不变
+
+- 本条为当前有效范围，覆盖下方12:10记录中“基础访问隔离”“关闭商业流量”和最小slave启动提案：仅PG03账号池暂不开放；注册、登录、现有渠道/模型路由、商业API、充值、支付、定价和用户功能保持原样。商业专项验收不扩大为恢复前置，也不得通过关闭业务功能替代PG03隔离。
+- 已确认并精确撤回上一轮由本代理新增的本地候选四项覆盖：CLEARAPI_CLOSED_LAUNCH=true、NODE_TYPE=slave、UPDATE_TASK=false、FRONTEND_BASE_URL空。恢复从现有生产base继承原值/缺省设计；未更改生产base或其他已有合法修改。保留正式OFF RC精确镜像摘要及既有PG03专属POOL_ENABLED=false、POOL_CLIPROXY_DEDICATED=false。候选仍是未安装的审查overlay。
+- 未生成/安装Caddy业务拦截规则，未改生产注册、渠道、模型、充值支付或API。下方“公网恢复前必须阻断商业入口”的建议撤销，不再是门禁；原Caddy配置应按既有发布安全流程保留。此前basic-recovery-local-identity回执仅对应当时已撤回提案的历史哈希，不能用于当前配置授权；新纠正回执记录当前hash。
+- 现有独立控制：common/pool.go及middleware/pool.go关闭账号池管理入口；model/pool_master.go仅精确true开放pool调度准入；model/pool_routing.go保留普通source=api/非pool路由，不能改写既有模型来源来绕过pool关闭。数据库pool master缺失按代码关闭，已有只读快照pool route/绑定为0。上述不证明独立Executor调度关闭；Executor进程仍running、持续writer排除UNKNOWN是具体未解决缺口，不得用全站API/注册封锁替代。
+- 恢复路径继续沿现有工作区：修复受保护生产恢复机制及OFF mode-exit，保留原master启动设计并核查AutoMigrate/后台任务副作用，完成真实备份/独立恢复/回退后部署最新合格OFF候选，恢复原Caddy和完整网站功能。旧schema匹配、RC/11项演练通过证据保留，不重复测试；UNKNOWN及真实恢复失败仍阻止相应生产操作。未新增生产授权要求，未进行生产写入。
+
+
+
+## 2026-10-23 12:10 — 基础网站恢复优先；商业验收后置，生产尚未恢复
+
+- 最新用户指令调整当前目标：恢复首页、登录、后台及基础 API，PG03/账号池不开放；暂缓完整财务对账、真实 Provider Usage/Billing 和商业验收。此前历史条目中将这些商业验收列为恢复前置的描述不再适用。保留数据库启动兼容性、真实备份/独立恢复/配对回退、服务与发布身份安全检查；不是重新申请已授予的发布权限。
+- 新鲜生产只读证据 `basic-site-readiness-20261023T035743Z.json`：Gateway exited 127、Caddy exited、Executor running。生产 PostgreSQL 17.6 规范化 schema SHA256 `3c1c77f355a2f9376f7cd4133267c99856cd4905b6116ad2ba615dbf84305035` 与正式 OFF RC target 一致，替代此前 production_schema=unverified 的旧快照；不证明真实恢复成功。Executor 调度关闭及持续 writer 排除仍 UNKNOWN，不把进程 running 描述成已关闭。
+- `startup-side-effect-counts-20261023T040432Z.json`：route-chain 未终结、billing reservation/outbox、finance sync、referral、task settlement 待处理计数均0，属于启动副作用核查，不是完整财务审计；1个启用渠道仍存在，启动前须重新核对，不能据此宣称商业流量关闭。
+- 正式 RC 39817772180/1、commit `09948b38eb1571f27ebcabdbe24086a6555f4646`、image digest `sha256:c0a90da319d4a1e0b01b4e7891c02de2749a708a82bebab7306f788b0c64491b` 保留。重算本地artifact inventory的10项payload、两份Git源码及四份生成资产全部匹配；回执 `basic-recovery-local-identity-20261023.json`。未重建RC或重跑11项OFF演练。inventory中original_rc_contains_this_inventory=false原值保留，不推断安装/生产验证已完成。
+- P0兼容性：旧Gateway仍是冻结事故c50镜像、runtime bind=/run/clearapi；当前boot helper明确拒绝该事故并要求/opt/clearapi/runtime/new-api。现场父目录0750而helper要求0755，boot/systemd资产缺失。仅安装当前bundle或直接启动旧容器均不是已验证恢复方案；不得清除事故记录或绕过拒绝。
+- 本地修正既有 `compose.non-pg03.candidate.yaml` 的过期镜像摘要，提出POOL=false、CLOSED_LAUNCH=true、NODE_TYPE=slave、UPDATE_TASK=false、FRONTEND_BASE_URL空的最小基础访问配置；docker compose config解析通过，未合并生产base/安装/启动。保留生产readiness必需finance/durable wallet/billing outbox/task settlement保护开关。独立只读审查确认基础路由仍注册，但slave仍运行部分writer、CheckSetup可写，需真实恢复基线；不得声称只读启动。
+- 新鲜Caddy脱敏投影 `edge-basic-access-projection-20261023.json`：原配置SHA256 `6b1246669fbab3287a5c9e99f041cbcff0c44ebbcedb9c0a751310f7b1b05969`，存在reverse_proxy/import，商业入口关闭UNVERIFIED。CLOSED_LAUNCH仅限制注册/赠额/重试，不阻断relay；公网开放需经审查的边缘请求约束覆盖relay/WebSocket/插件及后台上游测试入口。未输出原配置/凭据，未启动Caddy。
+- 当前最短剩余链：完成现有OFF受保护恢复入口和writer排除 → 四工具兼容修复及必要只读preflight → 真实备份/独立恢复/配对回退 → 精确OFF候选及持久runtime配置恢复Gateway → 经审查的基础访问边缘配置恢复Caddy → 首页/登录/后台/基础API验收。商业专项不阻塞该链；现有authorizer/wrapper的拒绝保持有效。
+- 当前生产操作按UNKNOWN/恢复基线未验证门禁停止；本轮没有生产写入、服务启停、数据库修改、备份/恢复/回退或部署。未提交/推送本地WIP，authorizer/workflow的新接入也未完成端到端测试，不是可执行发布版本。总控旧记录保留为历史，不表示当前权限缺失或现场健康。
+
+
+
+## 2026-10-23 07:48 — 接手核验：外部 fence/独立恢复端口未具备可验证绑定
+
+- 当前 HEAD/tree 仍为 `09948b38eb1571f27ebcabdbe24086a6555f4646` / `b9591f98fc390c7672df0050d0d4f04d3c6a2a47`；保留现有工作区及用户修改。正式 OFF 合同、authorizer/wrapper 接入尚未完成。
+- 现场排他能力仍未得到证明：现有 writer collector 明确不验证 manual/remote fence，共享 flock 不排除控制台/root 等非协作入口。需要已有维护控制端和持续撤销证据；不是重复索取部署授权。
+- 实际 Ubuntu/root 检查：独立恢复 runner 所需 policy、公钥和持久 claim 目录均不存在于本机；其他独立主机尚未确认。此前生产 SSH 私钥具体路径未在交接材料中找到，未扩大查找或新建身份。
+- 本轮只更新交接证据；未修改源码、提交/PR/CI/RC，未生产连接或变更，未重复旧34项测试/11项演练。Executor 调度/writer 继续 UNKNOWN，网站恢复未验证。
+- 详细事实、缺失输入与续作点：`evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/CONTINUATION-BLOCKERS-0748.md`。状态 BLOCKED_EXTERNAL_BINDING，不是正式合同通过。
+
+# ClearAPI — 权威总控（MASTER STATUS）
+
+
+
+## 2026-10-23 — 本地 OFF 核验链实现及 34 项定向回归通过；完整模式退出仍未就绪
+
+- 当前工作区新增 `scripts/off-host-contract.py` 与单一集中测试文件 `scripts/ci/test-off-host-contract.py`；CI 增加该定向测试。未修改原四工具、authorizer 或 wrapper 拒绝路径，保留用户已有变更。未创建工作区/分支，未提交、推送或触发生产。
+- 实现本地先决条件校验、root私有O_EXCL/fsync持久一次claim（失败不释放）、实际调用窗口内的备份/恢复/回退时间与独立生产源摘要/producer哈希绑定、丢失后不可复用的revocation generation检查；恢复后重新采集；不接受UNKNOWN或序列化PASS作为许可。
+- 新增固定SSH只读inventory transport及真实Linux root writer扫描：核验祖先/权限/完整哈希后直接执行同一次读取字节；扫描所有容器RW挂载、保护根祖先/别名、宿主FD和共享可写mmap；不可读/未映射/churn保留UNKNOWN。inventory始终不声明人工/远端入口已经fence，也不签发执行许可。生产未安装或验证该helper。
+- 实测命令：`wsl.exe -d Ubuntu -u root -- python3 -B /mnt/d/AI/API/worktrees/clearapi-controlled-launch-20261020/scripts/ci/test-off-host-contract.py`，最终34/34 PASS；包括真实本地子进程闭FD共享mmap回归。Python语法及git diff --check通过（既有换行警告保留）。没有重跑已通过11项OFF Rehearsal。
+- 独立子代理只读复审：本轮局部核验链无剩余P1/P2；完整OFF合同仍未通过，不能升级为生产GO。不存在新增双签名authority的部署要求，早期本地设计已撤回。
+- 工具集/完整版本diff/控制代码快照/权限与现场、真实备份恢复及配对回退约束已生成到 `evidence/non-pg03-20261021/off-release-39817772180/off-host-local-20261023/`。bundle和执行计划完整SHA256见inventory.json，已逐项重算匹配；四工具canonical源码仍绑定09948b38.../b9591f98...，新控制代码仅为未提交快照，不能冒充该RC源码。
+- 新增AssetRepairTransaction本地四文件修复API，固定集合/顺序、共享锁、原件字节归档、外部seal前置、同FS原子发布、持久一次claim和已验证文件恢复；失fence/未知目标不继续写入，完成发布异常保持UNKNOWN。独立只读复审无剩余P1/P2，未在生产绑定或执行。
+- 实质剩余：可信持续fence与恢复producer端口、四资产修复API的生产可信绑定、保留事故记录的OFF模式退出事务、authorizer/wrapper接入及端到端定向审查。execution-plan.json明确BLOCKED_NOT_EXECUTABLE；这些尚未实现，不能用局部模块或测试通过掩盖。
+- 本轮生产访问/变更均未执行：无文件替换、服务启停、配置/数据库修改、生产preflight/备份/恢复/回退/部署/公网验收。Executor调度的最新现场结论仍为UNKNOWN，未宣称关闭。真实恢复失败/UNKNOWN/范围扩大时的停止门禁继续有效。
+
+
+
+## 2026-10-23 — 新鲜只读核验：备份 helper 版本缺口及 OFF host 硬门禁，生产写入停止
+
+- 复用用户指定 Windows OpenSSH 私钥和原 known_hosts，严格主机校验通过，clearadmin sudo euid=0；未读取/输出私钥内容，未更改 SSH 或权限。
+- 三份远端资产已读取原始字节、完整哈希及 root:root/0750 元数据；与此前 preflight 旧哈希相同，已本地留存。备份脚本来源精确确认到历史提交 `65767084e6f551dc2b1af293e7c01e1165623dc8`。
+- 新发现第四个兼容依赖：远端 backup-identity.py 仍为旧版 `fd6f4fe5bdb4c125dc286df7e80c71e6bcab2285f713f14e74feef543ae1696b`，当前 canonical Git 为 `e1e21e0227b8f668bc9945e13e460542d8a07f7e6d3bdf7eaf00546180d7dc0d`；旧 helper 不支持 stopped Gateway 路径，不能只覆盖三份文件。
+- Executor 实测 running、restart=unless-stopped、存在 RW 数据目录；20 秒三次观察仅 TCP 监听，无已建立连接、落盘字节增长或数据目录变化。数据库无其他客户端/事务，PoolMaster key=NULL，路由/绑定数量=0。调度关闭及持续 writer 排除仍 UNKNOWN，不宣称 PG03/Executor 已关闭，未擅自启停服务。
+- authorizer `automatic-release.py:518` 固定拒绝 OFF，且 :472 要求 rehearsal source=current main；wrapper 同时拒绝未经合同退出的 PG03 manifest、残留 controlled state，OFF postflight 要求 executor 容器数量=0（停止容器也不满足）。远端 controlled state/PG03 文件仍存在。未删记录、改 manifest 或绕过门禁。
+- 本轮未替换远端资产，未创建生产恢复归档，未运行生产备份、隔离恢复、配对回退、Runtime、GHCR pull、部署或公网验收；未重跑已有 11 项 OFF Rehearsal。既有 RC/演练不被升级为新源码/生产证据。
+- 完整审查及下一阶段约束：`evidence/non-pg03-20261021/off-release-39817772180/OFF-HOST-CONTRACT-GAP-REVIEW-20261023.md`；现场证据 `executor-readonly-20261023.json`、`executor-activity-window-20261023.json` 和 `remote-assets-20261023/inspection.json`。状态为 BLOCKED：writer/scheduling UNKNOWN、四资产兼容事务未就绪、OFF mode-exit/真实恢复基线未具备；生产相应操作按用户停止条件停止。
+
+
+
+## 2026-10-23 — 非 PG03 生产 readiness preflight BLOCKED，未执行生产变更
+
+- 按本次预先授权先执行只读 readiness preflight：GitHub production environment、SSH host/user、pinned known hosts、`clearapi-deploy` sudo 身份和受保护 workflow 均可达；RC/main 身份仍为 commit `09948b38eb1571f27ebcabdbe24086a6555f4646`、tree `b9591f98fc390c7672df0050d0d4f04d3c6a2a47`，OFF RC `39817772180/1` 与 rehearsal `39820023740/1` 仍为已核验候选。
+- 只读 VPS inspection run `39823787085` 在 2026-10-22T17:34:15Z 完成并以 BLOCKED 结束；`production_deployed=false`、`installation_attempted=false`、`session_creation_attempted=false`、`runtime_gate_passed=false`。证据：`evidence/non-pg03-20261021/off-release-39817772180/production-preflight-39823787085.json` 及该 run 的 inspection artifact。
+- 真实发现远端生产资产 hash 漂移：`/opt/clearapi/bin/production-deploy-v2.sh` actual `1bd21eae376dd8316d1cfabe558133b4e0390965c2f13b7005e4deb656eac109` != reviewed `dd4e2fbedff508588b203d3736b6104e1fcd5557c05182f5ef47db8a3ed34d85`；`/opt/clearapi/bin/pg03-release-control.py` actual `08f457e01f7a10ab1870a31d5818f45fb784e98dfbfcc5dc2840e8c8ad745308` != reviewed `2c14d16d3d821b86bc3baaea7959f4b954f979de99b9660b12df3d79fe62d81d`；`/opt/clearapi/backups/bin/clearapi-backup.sh` actual `0d70b1e1228827d3f275e2e56b15772f560dfc95d9be10bdb9ad0992d1726023` != reviewed `7edb9ce97eff93992dc15b9c0f7cccf78e28009fc5a5d35ab022e653770c85ac`。Runtime identity、probe session 和 PG03 backup state 的检查项匹配，但整体资产合同失败。
+- 受保护 inspection 因资产不一致没有调用 Runtime，也没有 GHCR pull、真实生产备份、恢复、部署或线上验收。不得把旧只读快照、隔离 rehearsal 或本次 CI 结果升级为真实生产证据；`CLEARAPI_AUTO_PRODUCTION_ENABLED=false` 继续有效，PG03、账号池和 Executor 保持关闭。
+- 停止原因是现有受保护发布流程拒绝在生产 wrapper/backup helper 与审查 hash 不一致时继续。当前不能自行覆盖或安装远端工具来绕过该合同；需要通过负责人批准的受保护资产修复/安装流程重新核验，再重新执行完整 preflight。生产 blocker 更新为：`remote production asset hash drift; reviewed wrapper and backup helper reconciliation required before backup/deploy`。
+
+
+
+## 最终核验 — PR #88 已合并，新 OFF RC 与演练通过；生产保持 BLOCKED
+
+- PR #88 已正常合并，main/候选源码为 `09948b38eb1571f27ebcabdbe24086a6555f4646`，tree `b9591f98fc390c7672df0050d0d4f04d3c6a2a47`。PR CI `39816378844` 与合并后 main CI `39817671465` 均 8/8 jobs PASS，未绕过保护。Authorizer 现在按 OFF/PG03 分别验证 workflow、artifact 和 manifest；PG03 原门禁保留。
+- 新正式 OFF RC `39817772180/1`：6/6 jobs PASS；artifact `clearapi-off-rc-39817772180-1`（artifact ID `12444765156`）。镜像 `ghcr.io/a3225865526-wq/clearapi@sha256:c0a90da319d4a1e0b01b4e7891c02de2749a708a82bebab7306f788b0c64491b`，实下载二进制 SHA256 `37bb4bac32c86492e9e1bbc78a164ca53c647b15027451861961290020208aa5`；该 SHA256 是对新 artifact 实际重算的结果。旧 RC 的身份未沿用到新源码。
+- 新 OFF Deployment Rehearsal `39820023740/1`：success；proof artifact `deployment-proof-39820023740-1`。最终 proof SHA256 `b9d4231c31ecf7c4f701c42e369868f46446f4947a219517cb3017efe9277640`，11/11 OFF gates PASS；PG03 operator backup、Executor pairing、PG03 Provider、PG03 operator rollback 四个 steps 明确 skipped。失败步骤日志为空，未删除或覆盖历史失败证据。
+- `validate_off_rc_artifact`、`validate_proof` 及独立原始元数据/receipt/hash 复核 PASS，精确绑定仓库、main commit/tree、run/attempt、artifact、镜像 digest、binary 和 schema receipt。Schema receipt SHA256 `562c6c3debc9fb117a1987f16468a0f52845b60183b2604efad52625b0638494`；真实隔离 PostgreSQL 17.6 两次启动成功并收敛，容器清理完整；生产 schema 仍为 `unverified`。
+- 定向回归：WSL `python3 -B scripts/ci/test-automatic-release.py` 46/46 PASS，`python3 -B scripts/ci/test-rehearsal-producer.py` 11/11 PASS。Windows producer 额外尝试受到 GBK/UTF-8 子进程解码及 Bash 环境限制而失败；Linux/WSL 与 Actions 通过，不宣称 Windows 验证通过。
+- `CLEARAPI_AUTO_PRODUCTION_ENABLED=false`；对应 automatic-deploy `39821130419` skipped，生产 job 未执行。本任务未 SSH、连接生产数据库、生成/恢复真实生产备份、安装生产工具、替换/重启 Gateway、部署或切换流量；PG03、账号池和 Executor 的启用未获授权且未执行。
+- 唯一剩余阶段：负责人/服务器管理员确认真实生产恢复基线，单独批准 OFF host/mode-exit 合同及现场操作；随后依次做真实生产备份、隔离恢复验收、回滚验证和部署/流量审批。`off production execution blocked: recovered baseline and approved host contract required` 继续有效。离线 backup/rollback 回归、测试 Provider 和隔离 schema 不构成生产接受。
+- 完整本地收尾证据：`evidence/non-pg03-20261021/off-release-39817772180/`，其中 `local-validation.json` 记录独立核验结果，`FINAL-REVIEW.md` 记录 gate 范围与人工边界。收尾报告保留在当前工作区，未再合并文档提交；main 保持上面已构建/演练的精确源码身份。后续任何 main 变更都必须重新满足源码绑定，不能重用本候选身份。
+
+
+
+## 2026-10-23 23:18 Asia/Shanghai — 本地一键部署支线：Windows 构建和隔离直传通过；未切换生产
+
+- 独立本地分支 `codex/local-deploy-isolated-20261023`，基于只读核对一致的 GitHub main `a032815cb6244a7ee5e812de82f8300c02554e99`；工作区为 `C:/Users/Chen/Documents/Codex/2026-10-23/referenced-chatgpt-conversation-this-is-an-2/work/repo`。导入补充 ZIP（SHA256 `5772c5273c3ad08083045faea2b507a81687f91a6b7b4c976d85d326e78278f8`），沿用其脚本，未重写部署体系。本节仅为该支线记录，不改变生产恢复主线任何授权或现场结论。
+- Windows PowerShell 5.1/PowerShell 7.6.5、Docker Desktop 4.87.0、Engine 29.7.2、Buildx 0.36.1 实际可用；初检 C/D 约有 97/202 GiB 可用。原 Dockerfile 的真实 Linux/amd64 构建 exit 0；这是隔离目标实测架构，未连接生产探测。manifest `sha256:1afe191f8549dc0f03c8cc3dfe320fbc92bd56ec5909ed26e419ca6348fbf3a9`，config `sha256:96dfd337e209a88d3733c78f00c737dff4668a003ae2f416cacdeddceaa07777`，Gateway binary SHA256 `979713027c986fbd3d4f2e95bf74414f0f3db26481d19bc10c4753162bd9c394`；非正式 RC，不冒充历史 CI 产物。
+- 真实 `docker save -> SSH -> checksum -> docker load` PASS：142598144 字节归档，SHA256 `227abff1e4ac6a3d38662287c4ec9e64c237400533aa59bb68775c65b28ad25b`；只连接任务新建的回环 SSH 容器，使用临时独立测试密钥和由自有容器取得的固定 host key，StrictHostKeyChecking/IdentitiesOnly 均 yes。classic daemon config ID、revision、架构和文件层全部匹配，RepoDigests 为空。未读取生产私钥、未连接生产 VPS。
+- 真实隔离 Compose：Gateway+PostgreSQL17.6 基线健康；不同 image ID 的同后端测试更新；故障镜像退出和 HTTP 不健康；测试脚本恢复上一合格镜像后健康。测试数据、schema、业务配置字节、PostgreSQL/共享服务容器 ID 和启动时间全部保持。Executor/Caddy 是 sleep 替身，只证明未重建；回退是测试脚本控制，不能称生产助手自动 apply/rollback 已验收。首次 release 模式 fixture 被 HTTPS 安全要求正确拒绝，随后用开发模式验证；未改应用保护。
+- 测试计数实核：原包 helper mock 13 + cutover mock 2 = 15 项，实际全部通过；包内“helper 15项”不准确，“11项”无本包执行证据。修复后只重跑受影响 helper 14 项通过（增加1项配置保护回归），未重复未变化的2项切换测试。两版 PowerShell fixture DryRun、真实 config digest 提取通过；5.1 测试仅进程级 RemoteSigned，未改系统/用户策略。
+- 最小修复：PowerShell变量冒号语法；允许真实仓库 production remote；通过 save 配置字节校验 canonical config ID，避免 Desktop manifest ID/classic config ID 混比；Compose 合并预检在任何非镜像配置变化时阻断，避免原助手重写 override 丢失额外业务配置。后者同时有 mock 和真实 Compose 预览验证。脚本单服务更新使用 --no-deps，无生产数据删除/数据库恢复命令；仅保留原有 root-controlled 临时文件清理。
+- 工作流实核：push main -> CI -> PG03 RC -> Rehearsal -> Automatic production -> Deploy Production 的定义仍存在。只读变量当前 AUTO_RC=false、AUTO_PRODUCTION=false；不是永久停用。现有 cutover 工具在当前实际工作流上生成预览成功；没有 --apply、workflow修改、变量修改、push、merge或dispatch。
+- 剩余切换条件：直传已验证，但仍须适配并验证 runtime-identity/backup/apply 的真实 digest 身份契约，不能伪造 GHCR RepoDigest；生产助手完整端到端、正式备份证明、登录/授权API/HTTPS和业务检查尚未验收。恢复主线先形成健康合格前驱；在单独切换授权下解决 sudoers/启用配置与身份合同，停旧生产入口并确认无竞争任务，再做首次受控生产部署。当前不声明一键部署或网站恢复完成。
+- 证据：独立分支 `evidence/local-deploy-isolated-20261023/`、`docs/README-LOCAL-DEPLOY-CN.md`。该支线未更改生产数据库、容器、Caddy、公网入口或业务配置；本节不否定其他已授权恢复任务的独立操作。
+
+
+## 2026-10-25 — Protected Billing GPT-6.1-Sol 兼容性本地修复
+
+- 错误来源区分：截图中的 429 是上游限流状态；Protected Billing 拒绝发生于 ClearAPI 的 `relay/helper/billing_protection.go` 请求字段白名单校验。后者不是上游错误。普通重试策略现对 429 返回停止决策，避免按通用状态码规则立即重复请求；Route Chain 原有逐候选 `failover_on_429` 显式策略不变。上游提供 `Retry-After` 时，ClearAPI 将其解析并按既有上限截断后透传给客户端。
+- 门禁调整前后对照：
+
+  | 类别 | 调整前 | 调整后 |
+  | --- | --- | --- |
+  | 用户权限、余额、预扣/结算、幂等 | 必须阻断 | 保留 |
+  | 输出预算与预扣后请求一致性 | 必须阻断 | 保留 |
+  | Chat `provider`、函数 `tools`、`tool_choice`、工具调用引用 | 白名单一概拒绝 | 在可计量范围放行，改写后仍阻断 |
+  | Responses 函数工具、provider、stream 元数据、消息 item `id` | 可合法字段被拒绝 | 在可计量范围放行，改写后仍阻断 |
+  | 内置搜索/额外计费工具、图像/文件/多模态输入、不可自包含引用 | 阻断 | 保留 |
+  | 普通上游 429 | 按通用可重试状态可能立即重试 | 停止无效连续重试，透传有界 `Retry-After` |
+- 门禁调整：保留用户权限、限量预算预扣、实际 usage 结算、请求内容与预扣预算一致性检查、渠道覆盖/注入限制，以及不可自包含多模态内容拒绝。原本一概拒绝的可计量 Chat/Responses 工具定义、provider 路由元数据、Responses 文本消息 item ID 和 Chat 工具调用引用改为允许；工具/provider 字段在预扣后若被改写仍拒绝。不可计量的历史响应/会话引用、图像/文件等多模态输入及不受支持字段继续拒绝。
+- 定向验证：`docker run ... golang:1.25.1 go test ./service -run 'TestProtectedBillingDatabase|TestProtectedTextBudget|TestProtectedResponsesTextBudget|TestDecideRelayRetryReasons' -count=1` 通过；覆盖 SQLite 预扣/结算、失败保留、恢复、重复完成幂等，以及 Chat/Responses 字段放行和改写拒绝。`cd relaykit && GOWORK=off go build ./...` 通过。未改生产、数据库、渠道/业务配置或部署状态。PG03 继续暂缓，D 生图不部署。完整真实上游流式请求、真实 Provider 用量和三数据库矩阵未在本地本轮执行。
+
+
+
+## 2026-10-25 — 轻量化模型上架验收规则固化
+
+- 已将长期默认规则写入根目录 `AGENTS.md`：常规新增模型复用现有协议适配器、渠道行为、计费路径和自动化测试，不再强制逐模型真实上游调用。
+- 自动验收范围固定为模型映射、价格、计费配置、渠道支持和必要请求参数；新增或修改协议、适配器或计费逻辑时，只运行受影响的定向测试。受控真实上游调用仅在已确认真实故障、高风险协议变化或自动化无法覆盖时要求，并须隔离、限预算、不得连接生产。
+- SQLite/MySQL/PostgreSQL 矩阵仅在数据库逻辑或影响数据库行为的共享代码变化时执行；单纯模型映射、价格或渠道配置新增不重复数据库矩阵。相关数据库代码的既有三库强制兼容规则不变。
+- 保留权限、准确 usage 结算、防重复扣费/幂等和生产数据安全；删除或合并重复、过时、没有实际价值的阻断条件，不关闭 Billing，不新增门禁。验收状态必须分开记录：自动化通过、隔离集成通过、真实上游已验证，三者不得混淆。以后常规模型上架默认按本规则执行，无需重复讨论。
+- 本次仅更新开发规则和项目状态文档，未修改生产配置、应用代码、部署流程或业务数据。PG03 继续暂缓，D 生图继续不部署。
+
+
+---
+
+
+
+## 2026-10-30 19:58:41 Asia/Shanghai — 四客户端配置最小验收：三CLI解析/模拟派发通过，Cherry实机UNVERIFIED
+
+- 应用基线 `a91d559181021a3bbf33638f61f257f00737917a`，工作区 `D:/AI/API/worktrees/clearapi-client-config-integration-20261030`、分支 `codex/client-config-integration-20261030`；开始干净且无其他active聊天占用该工作区。未发现必须修复的配置缺陷，应用源码未改、未新增代码提交。
+- 已对照当前OpenAI/Claude/OpenCode/Cherry官方文档。Codex0.148.0、Claude Code2.1.293、OpenCode2.0.29使用独立临时配置/虚拟Key验证解析，exit0；实际CLI向本机模拟服务请求Responses、Messages、Chat Completions，模型/虚拟Key/部署路径前缀均一致，无重复/v1。Windows含空格配置路径及CLEARAPI_API_KEY环境引用验证通过。
+- 模拟服务统一返回418标记后结束；Codex6次、Claude1次、OpenCode2次，共9次仅本机模拟HTTP请求，真实付费调用0。推理命令exit1为预期哨兵错误，不能写成回复/SSE/E2E通过。未知fixture模型有目录提示，未伪造模型元数据。Cherry未发现可直接使用的安装，仅完成官方参数指南核对，实机UNVERIFIED；未为其安装或扩建环境。
+- 发布判断：可作为配置指南进入下一批统一发布候选；不得宣称四客户端实机/真实模型全部已验。三个CLI配置层最小验收通过；Cherry仅指南可入候选，实际兼容保留UNVERIFIED。真实模型、SSE、工具能力不在本轮已验范围。
+- 未读取用户现有客户端Key或覆盖配置，未重复运行原14项前端测试/完整构建；未改Gateway/Sub2API/PG03/计费/数据库/生产配置，未推送/合并/部署。只向本唯一权威总控追加本节，不更新集成工作区内旧main的总控副本。
+- 报告：`D:/AI/API/worktrees/clearapi-client-config-integration-20261030/CLEARAPI_CLIENT_COMPATIBILITY_ACCEPTANCE.md`；证据：`D:/AI/API/runtime/client-compatibility-20261030/local-cli-results.json`等。
+
+
+
+
+## 2026-10-30 20:14:09 Asia/Shanghai — 商业资金与邀请奖励闭环收尾：内部证据通过，无新代码修复；真实交易闭环待业务确认
+
+- 核验基线为干净已发布源码`732a2d5162c15604aa7ec7bbba12bb5c9d356031`（pricing-holidays-release工作区）；原主工作区f30b及全部既有dirty成果保留。本轮不连接或修改生产，不作新的实时生产状态声明。
+- 纠正过时交接：旧正式库存一键补录83b2f41af已于10/28部署并由负责人真实页面确认，最终production-confirmed.json为290正式码paid、待补录0、唯一资格审计id5，6未用及3已用样码保留；不是“候选尚未进入生产”，不重复开发/部署/补录。其关键源码在732a2d51完整保留。
+- 已启用10%规则证据：10/28独立快照invites/rewards=true，1000bp，version2/epoch1及原上限保持；配置启用、资格设置、真实发奖是不同阶段，最终reward/ledger仍0，真实用户返奖未验。STORE成功兑换接入原队列/唯一奖励账本的37b844baf已部署，原三库8项及后续2项定向证据、STORE14项及注册邀请绑定/权限结果复核有效，未重跑矩阵。
+- 补缺仅运行现有两项测试：隔离SQLite3.50.4的TestPaymentReceiptDatabase（5支付提供方，含重复并发仅一次入账、状态与回滚）及TestWaffoPancakeSignedWebhookPaymentGuard（合成签名回调/不符事实拒绝/失败回滚/重复通知）均PASS；Docker断网、源码只读、无生产DSN/真实付款。未扩大后端/前端/三库全量验证。
+- 未发现新可复现商业代码阻塞，无源码修复及新Commit。已有商城、批次、STORE奖励、设置页修复及一键补录可保留在下一批统一发布，不为未变化代码单独重发。外部真实支付、公网通知、第三方交付、真实邀请用户兑换后10%唯一奖励仍需负责人未来正常业务操作验证；内部自动商品校验不冒充外部交付成功。
+- 未作真实支付/兑换/余额调整/历史返奖，不改生产价格、比例、订单、PG03、Sub2API或客户端功能；无推送/合并/部署/重启。报告`CLEARAPI_COMMERCIAL_CLOSURE_STATUS_20261030.md`；本轮证据`D:/AI/API/runtime/commercial-closeout-20261030/`。任务完成后停止。
+
+
+## 2026-10-30 Asia/Shanghai — Sub2API隔离集成交付：环境/契约通过，423及双服务验收未闭环
+
+- 独立工作区 `D:/AI/API/worktrees/clearapi-sub2api-integration-20261030`，分支 `codex/sub2api-isolated-integration-20261030`，基线ed461d35；本地实现提交 `871bdf75ba22d6482c7d7633be4a8360ca0a4db6`。原主工作区/选型/客户端/PG03成果保留，不把main当当前生产，不推送/合并/部署，不访问生产。
+- 固定Sub2API d851a384原正式Dockerfile构建前端+embed成功，0.2.19；独立PG17.11/Redis7.4.11/应用三持久卷及专用bridge，只有127.0.0.1:18882发布。启动/restart/force-recreate三阶段health/HTML/JS/login通过，PG身份/应用配置/Redis AOF持久化通过。修正本轮网络发布与缺上游restart策略的隔离配置问题，未改上游程序或Billing。
+- accounts/groups/users均423 ADMIN_COMPLIANCE_ACK_REQUIRED，官方状态required=true/v2026.06.10/无确认记录。未调用accept、伪造DB确认或使用旧版本绕过。账号/Key/Usage记录均0，真实双服务成功链仍BLOCKED。
+- type59继续复用现有多协议适配器。新增6组Chat/Responses/Messages JSON/SSE HTTP mock契约通过，覆盖映射/内部Key替换/白名单会话头/cache Usage/terminal；新增正式适配器→HTTP mock→持久SQLite钱包/日志用例：1派发，1000input/20output/200cache，9units，用户/Token/渠道/唯一日志/settled reservation一致，重复settle/refund/recovery不重复扣款。不是实际Sub2API双服务E2E。
+- 原有Billing/Usage/retry 11项、失败/取消10项、Sub2API simple/模型/组语义8项聚焦测试通过；源码生产逻辑、DBschema/依赖、relaykit与前端未改，未重跑完整CI/三库矩阵/PG03/客户端旧验证。
+- 新核实限制：simple模式scheduler会跨内部账号组按platform调度，绑定不同组/Key不能宣称硬隔离。仅作为ClearAPI单信任域池；有同平台硬隔离需求时须真实实例边界或后续已验证配置。取消后Sub2API可能继续drain而Gateway收不到终态Usage；两层重试实际attempt、跨服务Usage/最终账务仍UNVERIFIED，不承诺厂商只派发一次。
+- 空闲采样已保存，未伪造请求延迟/资源对比。当前只达到隔离环境+Gateway mock/独立契约验收，完整隔离集成未达标，下一批不得正式启用Sub2API；客户端指南候选资格独立。原普通渠道和PG03生产关闭历史保持，本轮无新鲜生产状态声明。
+- 负责人最少事项：用本机原后台自行阅读并决定是否完成官方强制承诺；之后通过官方后台准备不与PG03重叠的获授权隔离测试账号/平台路由/内部Key，确认simple池共享调度边界。后续双服务mock/失败/取消/对账由集成继续，不要求生产授权/支付/迁移。
+- 完整交付 `CLEARAPI_SUB2API_INTEGRATION_FINAL.md`，证据 `evidence/sub2api-integration-20261030/`；容器保持healthy，停止/恢复及未来内部网络/type59/备份/渠道禁用回滚说明见报告。仅在本隔离分支已有同名总控追加缺失历史和本节，未创建第二个总控路径或覆盖原权威工作区；随统一集成进入唯一总控。

@@ -1,0 +1,111 @@
+{
+  "time_utc": "2026-10-30T12:27:39.842815+00:00",
+  "project": "clearapi-sub2api-isolated-20261030",
+  "endpoint": "http://127.0.0.1:18882",
+  "compliance_accept_called": false,
+  "production_accessed": false,
+  "phases": [
+    {
+      "phase": "initial_start",
+      "health": 200,
+      "frontend": 200,
+      "frontend_asset_sha256": "d8252c9c4299403997a6a8b08fad572d103e7acd19a968ebd84615df4fc0e30e",
+      "admin_login": 200,
+      "compliance_required": true,
+      "compliance_version": "v2026.06.10",
+      "acknowledgement_present": false,
+      "management": {
+        "/api/v1/admin/accounts": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        },
+        "/api/v1/admin/groups": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        },
+        "/api/v1/admin/users": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        }
+      },
+      "unauthenticated_protocols": {
+        "/v1/chat/completions": 401,
+        "/v1/responses": 401,
+        "/v1/messages": 401
+      },
+      "database_identity": "17.11\n1:sub2-test@example.invalid",
+      "app_file_hashes": "e8c91790aa897cb1d8594d9b37cf2709b8a6c97293194df05e161833e73a9315  /app/data/model_pricing.json\n62ceb54ca0c2d12044ac944e046d5d152463e307983634d17a9ad3262bd5bc06  /app/data/.installed\nd7ff5c59307762b408dba7908da4d6ac74af4092e3580366f1575854f78743b9  /app/data/config.yaml"
+    },
+    {
+      "phase": "restart",
+      "health": 200,
+      "frontend": 200,
+      "frontend_asset_sha256": "d8252c9c4299403997a6a8b08fad572d103e7acd19a968ebd84615df4fc0e30e",
+      "admin_login": 200,
+      "compliance_required": true,
+      "compliance_version": "v2026.06.10",
+      "acknowledgement_present": false,
+      "management": {
+        "/api/v1/admin/accounts": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        },
+        "/api/v1/admin/groups": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        },
+        "/api/v1/admin/users": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        }
+      },
+      "unauthenticated_protocols": {
+        "/v1/chat/completions": 401,
+        "/v1/responses": 401,
+        "/v1/messages": 401
+      },
+      "database_identity": "17.11\n1:sub2-test@example.invalid",
+      "app_file_hashes": "e8c91790aa897cb1d8594d9b37cf2709b8a6c97293194df05e161833e73a9315  /app/data/model_pricing.json\n62ceb54ca0c2d12044ac944e046d5d152463e307983634d17a9ad3262bd5bc06  /app/data/.installed\nd7ff5c59307762b408dba7908da4d6ac74af4092e3580366f1575854f78743b9  /app/data/config.yaml"
+    },
+    {
+      "phase": "container_recreation",
+      "health": 200,
+      "frontend": 200,
+      "frontend_asset_sha256": "d8252c9c4299403997a6a8b08fad572d103e7acd19a968ebd84615df4fc0e30e",
+      "admin_login": 200,
+      "compliance_required": true,
+      "compliance_version": "v2026.06.10",
+      "acknowledgement_present": false,
+      "management": {
+        "/api/v1/admin/accounts": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        },
+        "/api/v1/admin/groups": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        },
+        "/api/v1/admin/users": {
+          "status": 423,
+          "code": "ADMIN_COMPLIANCE_ACK_REQUIRED"
+        }
+      },
+      "unauthenticated_protocols": {
+        "/v1/chat/completions": 401,
+        "/v1/responses": 401,
+        "/v1/messages": 401
+      },
+      "database_identity": "17.11\n1:sub2-test@example.invalid",
+      "app_file_hashes": "e8c91790aa897cb1d8594d9b37cf2709b8a6c97293194df05e161833e73a9315  /app/data/model_pricing.json\n62ceb54ca0c2d12044ac944e046d5d152463e307983634d17a9ad3262bd5bc06  /app/data/.installed\nd7ff5c59307762b408dba7908da4d6ac74af4092e3580366f1575854f78743b9  /app/data/config.yaml"
+    }
+  ],
+  "persistence": {
+    "postgres": "PASS",
+    "redis_aof": "PASS",
+    "app_volume": "PASS"
+  },
+  "redis_version": "Redis server v=7.4.11 sha=00000000:0 malloc=jemalloc-5.3.0 bits=64 build=40ff01a501d8e4b6",
+  "backup_client_version": "pg_dump (PostgreSQL) 17.11",
+  "idle_stats": "clearapi-sub2api-isolated-20261030-postgres-1 CPU=1.14% MEM=52.91MiB / 15.37GiB\nclearapi-sub2api-isolated-20261030-redis-1 CPU=0.44% MEM=6.281MiB / 15.37GiB\nclearapi-sub2api-isolated-20261030-sub2api-1 CPU=0.79% MEM=42.37MiB / 15.37GiB",
+  "status": "ISOLATION_PASS_MANAGEMENT_BLOCKED"
+}

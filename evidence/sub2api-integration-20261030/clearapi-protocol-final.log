@@ -1,0 +1,43 @@
+=== RUN   TestSub2APIProtocolContract
+=== RUN   TestSub2APIProtocolContract/chat_JSON
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestSub2APIProtocolContract/responses_JSON
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestSub2APIProtocolContract/messages_JSON
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+=== RUN   TestSub2APIProtocolContract/chat_SSE
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/30 - 12:30:34 | SYSTEM | stream ended: reason=done 
+=== RUN   TestSub2APIProtocolContract/responses_SSE
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/30 - 12:30:34 | SYSTEM | stream ended: reason=eof 
+=== RUN   TestSub2APIProtocolContract/messages_SSE
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/30 - 12:30:34 | SYSTEM | stream ended: reason=eof 
+--- PASS: TestSub2APIProtocolContract (0.01s)
+    --- PASS: TestSub2APIProtocolContract/chat_JSON (0.00s)
+    --- PASS: TestSub2APIProtocolContract/responses_JSON (0.00s)
+    --- PASS: TestSub2APIProtocolContract/messages_JSON (0.00s)
+    --- PASS: TestSub2APIProtocolContract/chat_SSE (0.00s)
+    --- PASS: TestSub2APIProtocolContract/responses_SSE (0.00s)
+    --- PASS: TestSub2APIProtocolContract/messages_SSE (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/relay/channel/sub2api	0.028s
