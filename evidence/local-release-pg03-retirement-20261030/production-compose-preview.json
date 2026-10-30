@@ -1,0 +1,163 @@
+{
+  "read_only": true,
+  "compose_files_sha256": {
+    "docker-compose.prod.yml": "c5fc8ca1ecd1711aa2c68efe5a582a081ed7dd70df20ce85cde51c0782d482fa",
+    "compose-pg03.yaml": "5b237a189639a044d4a883fc258140ac67c462402a855b691593c9ada9f661c0",
+    "compose-candidate.yaml": "077407c6ebe7d69f501f6c758fc449db4084061e6e73319f5d7e44b6cf8a2b6e",
+    "compose-website-recovery-39957948359.json": "fa3fa85025146f70caa75f4a0e8099584b483c707465b254fc4c8582479cd1d5",
+    "compose-local.yaml": "481306cd1ffa312b07bd8e15067f5403f4655750e9be95a79d9266191f4e7918",
+    "compose-local-pg03.json": "35d2de2abb5fb83664747ad0089c3ac60326a41695639787d46197ea0fe7dfea",
+    "compose-local-executor.json": "8ad0b21ce51a51aa897e9bdbe79a695af969a47e80181302808a8e9cdb1a81d2"
+  },
+  "services": {
+    "new-api": {
+      "image": "clearapi-local:732a2d5162c15604aa7ec7bbba12bb5c9d356031",
+      "entrypoint": [
+        "/entrypoint-secure.sh",
+        "/new-api"
+      ],
+      "mounts": [
+        {
+          "type": "bind",
+          "target": "/data",
+          "read_only": false
+        },
+        {
+          "type": "bind",
+          "target": "/app/logs",
+          "read_only": false
+        },
+        {
+          "type": "bind",
+          "target": "/run/clearapi",
+          "read_only": true
+        }
+      ],
+      "networks": [
+        "internal"
+      ],
+      "environment_names": [
+        "BATCH_UPDATE_ENABLED",
+        "CLEARAPI_BILLING_OUTBOX",
+        "CLEARAPI_BILLING_PROTECTION",
+        "CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE",
+        "CLEARAPI_CLOSED_LAUNCH",
+        "CLEARAPI_DEPLOYMENT_INSTANCES",
+        "CLEARAPI_DURABLE_WALLET",
+        "CLEARAPI_ENABLE_REALTIME",
+        "CLEARAPI_ENABLE_RESPONSES_WEBSOCKET",
+        "CLEARAPI_FINANCE_ENABLED",
+        "CLEARAPI_FINANCE_OWNER_USER_ID",
+        "CLEARAPI_GUIDE_EDITOR_USER_ID",
+        "CLEARAPI_PG02_GATEWAY_PROOF_KEY",
+        "CLEARAPI_PG03_POLICY_KEY",
+        "CLEARAPI_POOL_CLIPROXY_DEDICATED",
+        "CLEARAPI_POOL_CLIPROXY_KEY",
+        "CLEARAPI_POOL_CLIPROXY_URL",
+        "CLEARAPI_POOL_ENABLED",
+        "CLEARAPI_PRODUCTION",
+        "CLEARAPI_STRICT_PREPAID",
+        "CLEARAPI_TASK_SETTLEMENT",
+        "CLEARAPI_TOKEN_ENCRYPTION",
+        "CLEARAPI_TOKEN_ENCRYPTION_KEY_FILE",
+        "CountToken",
+        "DEBUG",
+        "DIFY_DEBUG",
+        "ENABLE_PPROF",
+        "GIN_MODE",
+        "MAX_REQUEST_BODY_MB",
+        "MAX_UPSTREAM_RESPONSE_MB",
+        "RELAY_CONCURRENCY_GLOBAL",
+        "RELAY_CONCURRENCY_IP",
+        "RELAY_CONCURRENCY_TOKEN",
+        "RELAY_CONCURRENCY_USER",
+        "SESSION_COOKIE_SECURE",
+        "SESSION_COOKIE_TRUSTED_URL",
+        "SHUTDOWN_TIMEOUT_SECONDS",
+        "SQL_MAX_IDLE_CONNS",
+        "SQL_MAX_OPEN_CONNS",
+        "TRUSTED_PROXIES",
+        "TZ"
+      ],
+      "selected_flags": {
+        "BATCH_UPDATE_ENABLED": "false",
+        "CLEARAPI_BILLING_OUTBOX": "true",
+        "CLEARAPI_DURABLE_WALLET": "true",
+        "CLEARAPI_FINANCE_ENABLED": "true",
+        "CLEARAPI_POOL_ENABLED": "true"
+      }
+    },
+    "pool-executor": {
+      "image": "clearapi-executor-local:201ce387c12750f545009295636375786af98204",
+      "entrypoint": [
+        "/CLIProxyAPI/CLIProxyAPI"
+      ],
+      "mounts": [
+        {
+          "type": "bind",
+          "target": "/CLIProxyAPI/config.yaml",
+          "read_only": true
+        },
+        {
+          "type": "bind",
+          "target": "/var/lib/pool-executor/auths",
+          "read_only": false
+        },
+        {
+          "type": "bind",
+          "target": "/var/lib/pool-executor/pool",
+          "read_only": false
+        },
+        {
+          "type": "bind",
+          "target": "/var/lib/pool-executor/receipts",
+          "read_only": false
+        }
+      ],
+      "networks": [
+        "internal"
+      ],
+      "environment_names": [
+        "CLEARAPI_PG02_GATEWAY_PROOF_KEY",
+        "CLEARAPI_PG02_HTTP_NON_STREAM",
+        "CLEARAPI_PG02_PROCESS_EPOCH",
+        "CLEARAPI_PG02_RECEIPT_DIR",
+        "CLEARAPI_PG02_RESPONSES_SSE",
+        "CLEARAPI_PG03_POLICY_KEY",
+        "CLEARAPI_POOL_ADMISSION_FILE",
+        "CLEARAPI_POOL_CHECKPOINT_FILE",
+        "CLEARAPI_POOL_EXECUTOR_ID",
+        "CLEARAPI_POOL_ROLE",
+        "MANAGEMENT_PASSWORD",
+        "TZ"
+      ],
+      "selected_flags": {}
+    },
+    "postgres": {
+      "image": "postgres:17.6-alpine@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+      "entrypoint": null,
+      "mounts": [
+        {
+          "type": "bind",
+          "target": "/var/lib/postgresql/data",
+          "read_only": false
+        }
+      ],
+      "networks": [
+        "internal"
+      ],
+      "environment_names": [
+        "POSTGRES_DB",
+        "POSTGRES_PASSWORD_FILE",
+        "POSTGRES_USER",
+        "TZ"
+      ],
+      "selected_flags": {}
+    }
+  },
+  "helper_sha256": {
+    "clearapi-local-deploy.py": "1b4c7e0a5b7d7b4074edf22c5d398e74381b1a8011e67606d4519a6fbc753206",
+    "local-deploy-state.py": "2284cfb36987970d5df9d7b921c50a921f4a4dd4e3ca3095103b2ba1f46cd18a"
+  },
+  "candidate_change": "image only: clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874; no compose upload, no apply"
+}

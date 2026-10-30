@@ -1,0 +1,13 @@
+{
+  "exit_code": 0,
+  "commit": "92edfc345d9b9526379ed25363bb79abf9839874",
+  "previous_commit": "732a2d5162c15604aa7ec7bbba12bb5c9d356031",
+  "architecture": "amd64",
+  "scope": "backend",
+  "changed_files": 101,
+  "estimated_backup": true,
+  "result": "DRY_RUN_NO_PRODUCTION_WRITES",
+  "fixture": false,
+  "test_target": false,
+  "gate_modified": false
+}

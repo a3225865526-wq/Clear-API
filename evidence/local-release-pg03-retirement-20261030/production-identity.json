@@ -1,0 +1,79 @@
+{
+  "observed_at_utc": "2026-10-30T14:55:28.738755+00:00",
+  "read_only": true,
+  "exit_code": 0,
+  "host_identity_pinned": true,
+  "production_mutations": false,
+  "identity": {
+    "gateway": {
+      "container_id": "292a2987d54c3f6ad89f716d4b08bbf51837698b908453b1f0ceee27f607bf6c",
+      "image_id": "sha256:3da62d984e98d0cddd6fbc1c04fe7cc502268cc23efacfa0c64286ef2f9da960",
+      "image_ref": "clearapi-local:732a2d5162c15604aa7ec7bbba12bb5c9d356031",
+      "started_at": "2026-10-28T13:26:54.959186679Z",
+      "running": true,
+      "health": null,
+      "oci_labels": {
+        "org.opencontainers.image.created": "2026-10-28T13:14:35Z",
+        "org.opencontainers.image.revision": "732a2d5162c15604aa7ec7bbba12bb5c9d356031",
+        "org.opencontainers.image.source": "https://github.com/a3225865526-wq/Clear-API",
+        "org.opencontainers.image.version": ""
+      },
+      "selected_environment": {
+        "CLEARAPI_POOL_ENABLED": "true",
+        "CLEARAPI_DURABLE_WALLET": "true",
+        "CLEARAPI_BILLING_OUTBOX": "true",
+        "CLEARAPI_FINANCE_ENABLED": "true",
+        "CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE": "true",
+        "BATCH_UPDATE_ENABLED": "false"
+      }
+    },
+    "deployment_state_sha256": "045c133e4f99ad52379c927892aa9a0227d5f885ce211d949f169647a3f440d2",
+    "deployment_identity": {
+      "schema": "clearapi.local-deploy-state/v1"
+    },
+    "database_metadata": {
+      "database_version": "PostgreSQL 17.6 on x86_64-pc-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit",
+      "database_time": "2026-10-30T22:55:25.519032+08:00",
+      "pool_master": null,
+      "type59_channels_total": 0,
+      "type59_channels_enabled": 0,
+      "non_type59_channels_enabled": 7,
+      "reservation_table_present": true,
+      "completion_outbox_present": true,
+      "completion_receipt_present": true,
+      "reconciliation_table_present": true,
+      "finance_sync_table_present": true
+    },
+    "services": [
+      {
+        "name": "clearapi-new-api-1",
+        "image_id": "sha256:3da62d984e98d0cddd6fbc1c04fe7cc502268cc23efacfa0c64286ef2f9da960",
+        "running": true,
+        "health": null,
+        "started_at": "2026-10-28T13:26:54.959186679Z"
+      },
+      {
+        "name": "clearapi-pool-executor-1",
+        "image_id": "sha256:23c05fb2eae11464f2d7796055d775b5ed1808b4520d46ade4883f5dfcad0e90",
+        "running": true,
+        "health": "healthy",
+        "started_at": "2026-10-28T10:06:58.544917175Z"
+      },
+      {
+        "name": "clearapi-edge-caddy",
+        "image_id": "sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772",
+        "running": true,
+        "health": null,
+        "started_at": "2026-10-24T03:31:58.532588899Z"
+      },
+      {
+        "name": "clearapi-postgres-1",
+        "image_id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+        "running": true,
+        "health": "healthy",
+        "started_at": "2026-10-20T00:46:43.870944528Z"
+      }
+    ],
+    "no_customer_or_wallet_rows_read": true
+  }
+}

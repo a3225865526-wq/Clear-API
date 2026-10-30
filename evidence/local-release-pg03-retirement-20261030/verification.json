@@ -1,0 +1,15 @@
+{
+  "go_test_command": "docker run --rm --network none -v D:/AI/API/worktrees/clearapi-local-release-pg03-retired-20261030:/src -v codex-go-mod-cache:/go/pkg/mod -v codex-go-build-cache:/root/.cache/go-build -w /src -e GOWORK=off -e GOPROXY=off -e GOSUMDB=off golang:1.26-bookworm go test ./model ./service/accountpool ./service ./relay/channel/sub2api -run 'TestPool(MasterFailClosed|Gate|FilterModelSource|ModelAvailability)|TestSnapshotAdmission|Test.*(RelayChannel|Sub2API)' -count=1",
+  "exit_code": 0,
+  "packages": [
+    "model",
+    "service/accountpool",
+    "service",
+    "relay/channel/sub2api"
+  ],
+  "relaykit_independent": "same container, -w /src/relaykit, GOWORK=off go build ./...; exit 0",
+  "git_diff_check": "exit 0",
+  "new_database_code_or_schema": false,
+  "database_matrix_rerun": false,
+  "production_model_calls": 0
+}

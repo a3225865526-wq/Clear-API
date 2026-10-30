@@ -1,0 +1,63 @@
+{
+  "remote_main": "716cba323d59ef9c5a8e942a1678ce09f315a1cf",
+  "backup_branch": "codex/backup-local-release-pg03-retired-20261030",
+  "hooks": [],
+  "workflows": [
+    {
+      "file": "automatic-deploy.yml",
+      "sha256": "a5c613c889dd30590af44b18db7a4d56cecb8622766f1953d26f99044184b350",
+      "trigger_header": "name: Automatic production release\n\non:\n  workflow_run:\n    workflows: [Deployment rehearsal]\n    branches: [main]\n    types: [completed]\n\n"
+    },
+    {
+      "file": "ci.yml",
+      "sha256": "9ed6ac758ab19f702e24f6f4da518d8d09103d52a2a0f1367627d9a5c8b92b7c",
+      "trigger_header": "name: CI\n\non:\n  pull_request:\n  push:\n    branches:\n      - 'codex/production-cicd'\n      - 'main'\n  workflow_dispatch:\n\n"
+    },
+    {
+      "file": "deploy-production.yml",
+      "sha256": "c362dc52712115984b87a9813057b48f5decbe52f9ee9c3f18aab70d5764c852",
+      "trigger_header": "name: Deploy Production\nrun-name: Deploy ${{ inputs.pool_mode }} ${{ inputs.image_digest }} ${{ inputs.legacy_transition_sha256 || 'normal' }}\n\non:\n  workflow_call:\n    inputs:\n      rehearsal_run_id:\n        description: 'Successful authenticated deployment rehearsal run'\n        required: false\n        type: string\n        default: ''\n  workflow_dispatch:\n    inputs:\n      image_digest:\n        description: 'Exact image digest (sha256:<64 hex>) to deploy'\n        required: true\n        type: string\n      expected_commit:\n        description: 'Expected source commit (full 40 hex) of the image'\n        required: true\n        type: string\n      pool_mode:\n        description: 'Pool mode; pg03 requires verified release authority and exact paired identities'\n        type: choice\n        required: true\n        default: 'off'\n        options: ['off', 'pg03']\n      rc_run_id:\n        description: 'Successful same-commit PG03 RC run (required for pg03)'\n        type: string\n        required: false\n      legacy_transition_sha256:\n        description: 'Optional legacy-retirement-v1 request SHA256; requires fresh root authentication and exact maintenance authority'\n        type: string\n        required: false\n      release_stage:\n        description: 'Controlled holds public ingress after deployment; Provider acceptance is deferred'\n        type: choice\n        required: true\n        default: commercial\n        options: [commercial, controlled]\n      controlled_rehearsal_run_id:\n        description: 'Successful controlled rehearsal (required for controlled stage)'\n        type: string\n        required: false\n      migration_compatible:\n        description: 'Is the candidate migration backward-compatible with the previous image?'\n        required: true\n        type: choice\n        default: 'false'\n        options:\n          - 'false'\n          - 'true'\n      confirmation:\n        description: 'Type DEPLOY_PRODUCTION, or DEPLOY_LEGACY_RETIREMENT_V1 for the separately reviewed transition'\n        required: true\n        type: string\n\n"
+    },
+    {
+      "file": "deployment-rehearsal.yml",
+      "sha256": "0ddd64c7f46ecc886b55a2c73d2109a9ba88e73b03d3f5218a5d86835dbc5860",
+      "trigger_header": "name: Deployment rehearsal\n\non:\n  workflow_run:\n    workflows: [PG03 reviewed main Gateway RC]\n    branches: [main]\n    types: [completed]\n  # Operator-supplied evidence is bound to an RC manifest, which only exists\n  # after the RC finished. The automatic trigger therefore always races the\n  # evidence upload: it runs before an operator can bind the new identity, and\n  # re-running it changes run_attempt, which the release control rejects.\n  # This entry re-runs the identical gates for an already built RC without\n  # producing a new artifact, so the evidence can be bound first.\n  workflow_dispatch:\n    inputs:\n      rc_run_id:\n        description: 'Completed successful Gateway RC run id to rehearse'\n        required: true\n        type: string\n      pool_mode:\n        description: 'Release mode; off does not authorize production deployment'\n        required: true\n        type: choice\n        default: pg03\n        options: [\"off\", \"pg03\"]\n      release_stage:\n        description: 'Controlled deployment keeps public traffic blocked until owner Provider acceptance'\n        type: choice\n        required: true\n        default: commercial\n        options: [commercial, controlled]\n\n"
+    },
+    {
+      "file": "failed-production-recovery.yml",
+      "sha256": "a2e358fc9c5b885125f9b766495bc56ec6cec72cb3cc54eda7b3577e22412e00",
+      "trigger_header": "name: Failed production recovery\nrun-name: Failed controlled recovery ${{ inputs.mode }} RC${{ inputs.assets_rc_run }}\n\non:\n  workflow_dispatch:\n    inputs:\n      mode:\n        type: choice\n        required: true\n        options: [rehearse, recover, restore]\n      assets_rc_run:\n        description: Successful reviewed-main RC for recovery assets\n        type: string\n        required: true\n      rehearsal_run:\n        description: Same-source successful recovery rehearsal; empty for rehearse\n        type: string\n        required: false\n      confirmation:\n        description: REHEARSE_FAILED_RECOVERY, RECOVER_FAILED_CONTROLLED, or RESTORE_FAILED_WEBSITE\n        type: string\n        required: true\n\n"
+    },
+    {
+      "file": "ghcr-pull-rehearsal.yml",
+      "sha256": "f1385f40ca37276e9dcf5d78861d5a69b6af8b71b00f0b4da827c7ce73dad7fe",
+      "trigger_header": "name: GHCR Pull Rehearsal\n\non:\n  workflow_dispatch:\n    inputs:\n      release_audit_only:\n        description: 'Read-only RC/evidence/deployment-record audit; no SSH, environment or rehearsal'\n        required: true\n        type: boolean\n        default: false\n      audit_rc_run_id:\n        description: 'Existing successful RC to audit; never builds or deploys'\n        required: false\n        type: string\n        default: '39205228315'\n      inspection_only:\n        description: 'Read-only SSH/sudo/asset/Runtime verification; never pulls or deploys'\n        required: true\n        type: boolean\n        default: true\n      image_digest:\n        description: 'Exact image digest (sha256:<64 hex>) to rehearse pulling'\n        required: false\n        type: string\n      expected_commit:\n        description: 'Expected source commit (full 40 hex) of the image'\n        required: false\n        type: string\n\n"
+    },
+    {
+      "file": "pg03-isolated-rehearsal.yml",
+      "sha256": "bf70bd5cd86dd48d47e7425549f6038c594ea1814b92b342f47536076ca8533d",
+      "trigger_header": "name: PG03 isolated exact-image schema rehearsal\n\non:\n  workflow_dispatch:\n\n"
+    },
+    {
+      "file": "pg03-successor-approval.yml",
+      "sha256": "e38ee02c5971c1265225bda8b31f7f5c162e9f6de1cd466754390084a154a7d8",
+      "trigger_header": "name: PG03 successor independent grant\nrun-name: PG03 grant ${{ inputs.request_sha256 }}\n\non:\n  workflow_dispatch:\n    inputs:\n      request_json:\n        description: 'Exact canonical successor request; non-secret hashes and identities only'\n        required: true\n        type: string\n      request_sha256:\n        description: 'Exact SHA256 of canonical request_json, also identifies the frozen read-only approval activity'\n        required: true\n        type: string\n      qualification_policy_sha256:\n        description: 'Independently approved candidate qualification policy SHA256'\n        required: true\n        type: string\n\n"
+    },
+    {
+      "file": "release-candidate.yml",
+      "sha256": "d2c7fa448f85cdbed99b33973bbc15c03fe7cc9a481175abfdeda537d6235bb7",
+      "trigger_header": "name: Release Candidate\n\non:\n  workflow_dispatch:\n\n"
+    },
+    {
+      "file": "release-pg03-gateway.yml",
+      "sha256": "7765a55b1ce69868a978d8fe55e0b3a4a3a5c1b3f85f17c24c152c59806d63a0",
+      "trigger_header": "name: PG03 reviewed main Gateway RC\n\non:\n  workflow_dispatch:\n  workflow_run:\n    workflows: [CI]\n    branches: [main]\n    types: [completed]\n\n"
+    },
+    {
+      "file": "release-state-audit.yml",
+      "sha256": "315089f860aa5f7eaa1fdec0dff091acd96be3bb431200c2655e0088594c7ec7",
+      "trigger_header": "name: PG03 release state audit\n\non:\n  push:\n    branches: [codex/pg03-predecessor-compat-20261019]\n    paths:\n      - .github/workflows/release-state-audit.yml\n      - scripts/ci/audit-release-state.py\n\n"
+    }
+  ],
+  "conclusion": "no push match for backup branch; no production trigger"
+}

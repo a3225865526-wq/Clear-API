@@ -1,0 +1,29 @@
+{
+  "scanner": "gitleaks 8.30.1; downloaded archive SHA256 verified against release checksums",
+  "history_range": "production/main..92edfc345d9b9526379ed25363bb79abf9839874",
+  "history_commits": 34,
+  "history_raw_exit": 1,
+  "history_matches": 38,
+  "history_review": "all commit/file/image hashes or symbolic isolated secret references; no usable credential",
+  "tree_raw_exit": 1,
+  "tree_matches": 330,
+  "tree_review": "312 combined tree/history hash matches, 24 symbolic references; remaining 32 tree matches manually reviewed as fixture strings, fixed Auth-Version marker, PEM delimiters without key material, documented masking example, environment names, image tags and public OpenPGP fingerprint; no usable production credential found",
+  "no_scanner_rules_disabled": true,
+  "existing_small_evidence_archives_reviewed": [
+    "evidence/pg03-isolated-39514525897/original-artifact.zip",
+    "evidence/pg03-isolated-39516153502/original-artifact.zip",
+    "evidence/pg03-isolated-39517646061/original-artifact.zip",
+    "evidence/pg03-rc-39511197302/release-original.zip",
+    "evidence/raw-build-and-cutover-logs.zip"
+  ],
+  "files_over_5MB": [],
+  "private_runtime_uploaded": false,
+  "limits": "pattern scan and targeted review, not a guarantee that arbitrary unknown credentials can be detected",
+  "archive_scan": {
+    "count": 5,
+    "max_bytes": 25194,
+    "raw_exit": 1,
+    "matches": 4,
+    "review": "all module h1 sums in binary-build-info; archives only logs/patches/manifest/schema, no row dumps"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "status_success": true,
+  "embedded_frontend_root": true,
+  "setup_api_success": true,
+  "network": "none",
+  "sub2api_or_redis_attached": false,
+  "host_ports": [],
+  "production_data_or_secrets": false,
+  "provider_calls": 0,
+  "wallet_or_setup_posts": 0,
+  "purpose": "New final image startup and embedded frontend; prior ordinary provider mock evidence reused separately, not rerun here"
+}

@@ -1,0 +1,90 @@
+{
+  "workloads_rerun": false,
+  "files_verified": 21,
+  "files": [
+    {
+      "path": "evidence/sub2api-final-acceptance-20261030/current-gate.json",
+      "sha256_lf_utf8": "ce65172daf3fd62fca62ab14143076b820c45f3964d5767fce269fbf4bbb0764"
+    },
+    {
+      "path": "evidence/sub2api-final-acceptance-20261030/mock-e2e.json",
+      "sha256_lf_utf8": "f8e2ccd5f62eeba0d3ef8cca6c9b12bb81796795f1feb5a6c207a429bdde6019"
+    },
+    {
+      "path": "evidence/sub2api-final-acceptance-20261030/operations.json",
+      "sha256_lf_utf8": "57a78e10812ca982e6975d20fa6313a7a954ac297448a04c6ff51ac0ab0fcc55"
+    },
+    {
+      "path": "evidence/sub2api-final-acceptance-20261030/preliminary-filesystem-failure.json",
+      "sha256_lf_utf8": "de0e74b0db62b3802f7bb776b9012128730905b81bcaa9d38c7247b589eff258"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/after-new-cases.json",
+      "sha256_lf_utf8": "84a25bc28b9a92e55ab3911de62025c1d77564736d7f66ffe2efe2c25ab8bf69"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/after-review.json",
+      "sha256_lf_utf8": "af5d9137e4caf3fae4040e0f0b3246181eef78fd3e18fe8709bfec0c89a28ecc"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/before-preliminary-trial.json",
+      "sha256_lf_utf8": "b96d63e2513324e011c77395e451239355cc97a815a0a083fac0c4ff37836855"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/before.json",
+      "sha256_lf_utf8": "4c6b0a20fa15295d4b7c34f161e6399f3f0eb220c166093e25f21ab1728f30e8"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/capability.json",
+      "sha256_lf_utf8": "d399034f7f5c0eb488bf6f073ea4613ec450d52237fb942d9957706749cea277"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/controlled-provider-executions.json",
+      "sha256_lf_utf8": "fc5c71daa16855bb3ae65f89e47ee64f8c362596fe3abf9213e7f1c88aa100cb"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/environment-recovery.json",
+      "sha256_lf_utf8": "36b076a8d55a92dd610cffdba57fd0d06726985bb301c63b02185bbd92e9f8dc"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/final.json",
+      "sha256_lf_utf8": "451173e4ffd8a56c05d64cfe2958138f12d4dcd88a94370426d09196db57ec55"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/new-cases.json",
+      "sha256_lf_utf8": "3cbdcec0a46d79a8bd991480b92e52313f66ca8803cc0e98e59bf3961bebe9eb"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/ordinary-with-review-enabled.json",
+      "sha256_lf_utf8": "035b0b9bab884326eb1e6cbada4d4c6077b2594748c668e8586bc59c4367485c"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/pending-before.json",
+      "sha256_lf_utf8": "ee0631a2e949a4851d3eb16554b5650a5384ff54ea74b758af079cb3dbc9d32c"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/pending-final.json",
+      "sha256_lf_utf8": "a5cfe6cc101fce75fd1e2e25b0c18c0761efb8f4ce8ae553e9df99baf4a704b9"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/recovery-round-1.json",
+      "sha256_lf_utf8": "757309a77482f7fc676eca525234ce3da2a7fed8fe7e4f5ff95f1a521be7f356"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/recovery-round-2.json",
+      "sha256_lf_utf8": "94d6a53313f441a85f006075fb88cbb82c67d4ec7af63ae403a6a4363ccf4a85"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/review-results.json",
+      "sha256_lf_utf8": "5cd3e077ab6068c1661a2eeb948cf863ae5a4ebad206455d75721f73b48414ac"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/timeout-first-observation.json",
+      "sha256_lf_utf8": "e7754f2e140b542af108f838076107e13b581707eb305dbb33684483f6ef614c"
+    },
+    {
+      "path": "evidence/sub2api-billing-closeout-20261030/timeout-second-observation.json",
+      "sha256_lf_utf8": "b7dad7ea993670000a6821730551e356977dce5ff9282d9029b704da41cba66c"
+    }
+  ]
+}

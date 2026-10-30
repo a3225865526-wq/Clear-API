@@ -1,0 +1,32 @@
+{
+  "commit": "92edfc345d9b9526379ed25363bb79abf9839874",
+  "tree": "1442086ab3632db793509f2d4cc03c35deafec3c",
+  "tag": "clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874",
+  "source_tar_sha256": "d41cf9c4d86da20ee54b55b00a3a0c4db4ce5eba290d8bb159155f08f8bdb3cb",
+  "build_command": [
+    "docker",
+    "--context",
+    "desktop-linux",
+    "buildx",
+    "build",
+    "--platform",
+    "linux/amd64",
+    "--provenance=false",
+    "--sbom=false",
+    "--load",
+    "--metadata-file",
+    "D:\\AI\\API\\runtime\\local-release-pg03-retired-20261030\\build-metadata.json",
+    "--build-arg",
+    "SOURCE_COMMIT=92edfc345d9b9526379ed25363bb79abf9839874",
+    "--build-arg",
+    "SOURCE_REPO=https://github.com/a3225865526-wq/Clear-API",
+    "--build-arg",
+    "BUILD_TIMESTAMP=2026-10-30T14:57:08.976802+00:00",
+    "--build-arg",
+    "VERSION_LABEL=candidate-92edfc3",
+    "-t",
+    "clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874",
+    "-"
+  ],
+  "context": "immutable git archive; no private runtime"
+}
