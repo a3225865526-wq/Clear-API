@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getGuide, getGuideAccess } from './api'
+import { ClientSetup } from './client-setup'
 import { GuideEditor } from './editor'
 
 import './guide.css'
@@ -62,6 +63,7 @@ export function UsageGuidePage() {
     <SectionPageLayout>
       <SectionPageLayout.Title>{t('console.guide')}</SectionPageLayout.Title>
       <SectionPageLayout.Content>
+        <ClientSetup />
         <Button
           variant='outline'
           render={<Link to='/docs/clearapi' search={{ lang: 'zh' }} />}

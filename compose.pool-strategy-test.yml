@@ -1,0 +1,57 @@
+# Local isolation only. Build the pinned Sub2API backend into POOL_TEST_RUNTIME/sub2api.
+# Supply passwords through an untracked env file; do not use production data.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pooltest
+      POSTGRES_DB: pooltest
+      POSTGRES_PASSWORD: ${POOL_TEST_DB_PASSWORD:?required}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U pooltest -d pooltest']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --save, '', --appendonly, 'no']
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  sub2api:
+    image: node:24-bookworm-slim
+    working_dir: /app/data
+    command: [/app/sub2api]
+    ports:
+      - '127.0.0.1:18881:8080'
+    volumes:
+      - ${POOL_TEST_RUNTIME:?required}/sub2api:/app/sub2api:ro
+      - sub2api:/app/data
+    environment:
+      AUTO_SETUP: 'true'
+      RUN_MODE: simple
+      SIMPLE_MODE_KEY_RATE_LIMIT_ENABLED: 'false'
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: '8080'
+      DATABASE_HOST: postgres
+      DATABASE_USER: pooltest
+      DATABASE_DBNAME: pooltest
+      DATABASE_PASSWORD: ${POOL_TEST_DB_PASSWORD:?required}
+      DATABASE_SSLMODE: disable
+      REDIS_HOST: redis
+      ADMIN_EMAIL: pool-test@example.invalid
+      ADMIN_PASSWORD: ${POOL_TEST_ADMIN_PASSWORD:?required}
+      JWT_SECRET: ${POOL_TEST_JWT_SECRET:?required}
+      TOTP_ENCRYPTION_KEY: ${POOL_TEST_TOTP_KEY:?required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+volumes:
+  postgres:
+  sub2api:
