@@ -1,0 +1,40 @@
+{
+  "time_utc": "2026-10-30T11:07:57.141479+00:00",
+  "condition": "idle, zero upstream inference; Docker Desktop Windows host, other containers running; not comparative benchmark",
+  "stats": [
+    {
+      "BlockIO": "2.38MB / 36.9kB",
+      "CPUPerc": "0.67%",
+      "Container": "clearapi-pool-strategy-20261030-sub2api-1",
+      "ID": "9e15a98a04a3",
+      "MemPerc": "0.26%",
+      "MemUsage": "40.18MiB / 15.37GiB",
+      "Name": "clearapi-pool-strategy-20261030-sub2api-1",
+      "NetIO": "1.92MB / 3.55MB",
+      "PIDs": "18"
+    },
+    {
+      "BlockIO": "28.3MB / 96.1MB",
+      "CPUPerc": "2.54%",
+      "Container": "clearapi-pool-strategy-20261030-postgres-1",
+      "ID": "d310d5a2bf8e",
+      "MemPerc": "0.39%",
+      "MemUsage": "61.42MiB / 15.37GiB",
+      "Name": "clearapi-pool-strategy-20261030-postgres-1",
+      "NetIO": "3.06MB / 1.63MB",
+      "PIDs": "9"
+    },
+    {
+      "BlockIO": "32.8kB / 0B",
+      "CPUPerc": "0.41%",
+      "Container": "clearapi-pool-strategy-20261030-redis-1",
+      "ID": "de689b799381",
+      "MemPerc": "0.03%",
+      "MemUsage": "4.672MiB / 15.37GiB",
+      "Name": "clearapi-pool-strategy-20261030-redis-1",
+      "NetIO": "481kB / 279kB",
+      "PIDs": "6"
+    }
+  ],
+  "sub2api_binary_sha256": "97ffe212fe2aae57d2e3f9ce6568ad84e727b13751d1ebc588e6c44a37a516eb"
+}

@@ -1,0 +1,72 @@
+{
+  "time_utc": "2026-10-30T11:15:43.483835+00:00",
+  "checks": [
+    {
+      "command": "go build -buildvcs=false -o /out/sub2api ./cmd/server",
+      "cwd": "Sub2API backend, fixed d851a384",
+      "result": "PASS",
+      "note": "Docker golang:1.26-bookworm with GOTOOLCHAIN=auto downloaded required go1.27.3; no frontend embed"
+    },
+    {
+      "command": "go test ./internal/domain -run TestPlatform -count=1",
+      "cwd": "Sub2API backend",
+      "result": "PASS"
+    },
+    {
+      "command": "go test ./relay/channel/sub2api ./relay/channel/newapi -count=1 -timeout=90s",
+      "cwd": "ClearAPI",
+      "result": "PASS",
+      "note": "GOWORK=off, network none, fixed verification image d9c68c2c5116; sub2api 3 tests; newapi no test files"
+    },
+    {
+      "command": "go test -tags unit ./internal/service -run \"Test(HandleCCStreamingFromAnthropic_ClientDisconnectDrainsUpstreamUsage|HandleResponsesStreamingResponse_ClientDisconnectDrainsUpstreamUsage|AnthropicCompatStreaming_RequestContextCanceledDrainsWithoutWriting)$\" -count=1 -v -timeout=90s",
+      "cwd": "Sub2API backend",
+      "result": "PASS",
+      "note": "3 top-level tests and 4 cancellation subcases; 0.068s; mocks, not complete service chain"
+    },
+    {
+      "command": "bun run typecheck",
+      "cwd": "ClearAPI web",
+      "result": "PASS"
+    },
+    {
+      "command": "bunx --no-install oxlint -c .oxlintrc.json src/features/usage-guide/client-config.ts src/features/usage-guide/client-setup.tsx src/features/usage-guide/index.tsx src/features/usage-guide/__tests__/client-setup.test.tsx",
+      "cwd": "ClearAPI web",
+      "result": "PASS",
+      "note": "0 warnings, 0 errors"
+    },
+    {
+      "command": "bun run test src/features/usage-guide",
+      "cwd": "ClearAPI web",
+      "result": "PASS",
+      "note": "4 files,14 tests"
+    },
+    {
+      "command": "bun run build",
+      "cwd": "ClearAPI web",
+      "result": "PASS",
+      "note": "Rsbuild ready built in 20.5s"
+    },
+    {
+      "command": "bun run i18n:sync; scripted scope preservation; JSON semantic comparison against HEAD",
+      "cwd": "ClearAPI web",
+      "result": "PASS for this task 7 new keys in each of 7 locales",
+      "note": "75 pre-existing missing keys in non-zh locales reported by sync, unrelated normalization/fallback writes removed by sanctioned script; original values preserved; not a globally clean i18n report"
+    }
+  ],
+  "initial_unsuccessful_attempts": [
+    "reused dependencies lacked Linux rolldown optional binding, replaced by fresh frozen-lock Linux volume install",
+    "offline Sub2API test dependencies not cached, fetched online",
+    "test selection without unit build tag reported no tests to run, not counted as pass"
+  ],
+  "not_run": [
+    "two-server successful relay to mock",
+    "cross-server SSE/usage/billing reconciliation",
+    "live client E2E",
+    "real provider calls",
+    "comparable A/B performance",
+    "production deployment",
+    "ClearAPI three-database matrix (no DB changes)"
+  ],
+  "pg03_evidence": "REUSED, not rerun; pinned Gateway87732dc22 + Executor1264c6c1 and original verification/source manifests"
+}

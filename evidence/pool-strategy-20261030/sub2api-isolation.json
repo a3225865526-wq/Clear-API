@@ -1,0 +1,8 @@
+{
+  "backend_build": "PASS (no frontend embed)",
+  "login_status": 200,
+  "accounts_status": 423,
+  "accounts_code": "ADMIN_COMPLIANCE_ACK_REQUIRED",
+  "compliance_acknowledged_by_agent": false,
+  "e2e_forwarding": "NOT RUN: administrator acknowledgement required before configuring accounts through supported API"
+}

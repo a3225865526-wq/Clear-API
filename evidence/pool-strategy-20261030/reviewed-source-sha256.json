@@ -1,0 +1,35 @@
+{
+  "gateway": {
+    "service/accountpool/policy_snapshot.go": "3efb0394f72902de8e74a0de669a3ff64a7c59311669e121cf42e569f2af482a",
+    "relay/channel/sub2api/adaptor.go": "e3f7098abdf1c50a6f2575dd659ada47f32f9b28619916d5037ae1f40de680c7",
+    "relay/channel/newapi/adaptor.go": "ad7302b742072b1a07430d43eb47863da946d46c8cf147a8106ad40e9382ef0e",
+    "relay/channel/api_request.go": "875ba391d889d22e83585d535e5fac04b2060ab8a4220684ca905c01b24b2efa",
+    "web/src/features/upstream-pool/index.tsx": "6439ec0629741835ece466e82dbb6ae657cba989501b16c6a877ae4e1fdc0245",
+    "web/src/features/upstream-pool/detail.tsx": "e0ef20c726d98c284a2b4e9beea9aae33b64d7d8f0959ae18afa061d7446f49a",
+    "web/src/features/upstream-pool/components/credential-import-panel.tsx": "ea8fc3808e8ca2530d4a4a3dd79185bbd71e64a3dbb61a6ffadefd03effa9fc2"
+  },
+  "executor": {
+    "sdk/cliproxy/auth/pool_guard.go": "3a5632dc8dc980f50fb2bbb6f5e6c5ae366fe1d65787968b3036dd3537551902",
+    "sdk/cliproxy/auth/pool_model_sync.go": "3c24a71d0714f344fc8852182b04c0cfd889bb30400135858eeab63bc20166e4",
+    "sdk/cliproxy/service_models.go": "d9a585e979cec2c262c8f49a42810ef1bff1667b50a1744dd7d19664626c37a2",
+    "internal/runtime/executor/codex_pool_models.go": "50559c1cf6dfc370517bad0d02fe68973b1f4268bd214f0c7cf05b4750e2d10c",
+    "internal/runtime/executor/gemini_executor.go": "affa34f3e2d063ce1cb3d09329ea597cbb0361df2f700b196bad3d804934098c"
+  },
+  "cliproxyapi": {
+    "sdk/auth/filestore.go": "32682543cccdf4bf6d1aa583ebfe49338b51f5ade02469b06e7d8776e6b74e59",
+    "internal/runtime/executor/gemini_executor.go": "2dda1b3672e9ca3f35b3b681d78c5f15c21fe4f7319c9b4b14ad0d63710bd492",
+    "internal/runtime/executor/kimi_executor.go": "e3e1d883f34060624c2de8a401a61ba47fc8c45fa21615caf86053f162a40c64",
+    "internal/runtime/executor/xai_executor.go": "9c0a34296eedee29a0d1ab8ae7c8d5311533ef3b288d45fee5ad0f89e106c6ee"
+  },
+  "sub2api": {
+    "backend/internal/server/routes/gateway.go": "8fd2ebf61aeb2e6b7b79976b0d44ab1b46178e803b225139f3401af123021be4",
+    "backend/internal/service/gateway_usage_billing.go": "ad5e6de0c2a1165757c6fc5a43e1588ab57fea2044cbdaa336ddb5c0c868c723",
+    "backend/internal/service/openai_gateway_forward.go": "5f539016439085c502f6ab9fed8f12b72f9d0a11b654080884fa32fb4d1a013f",
+    "backend/internal/domain/platforms.go": "255f65e97fce140479f79607847e599f4882639effebef19741460adf4313e56",
+    "frontend/src/views/admin/AccountsView.vue": "b4bb58a72e863cc1a92e98403afee476304d8c4bd83447808b4ecd1efd17f56a",
+    "frontend/src/components/account/CreateAccountModal.vue": "be18c6cd18666ae5223777b9b93d95122bf43e0dfd8810dd055165d769522ca4",
+    "frontend/src/components/account/AccountStatsModal.vue": "cd11a7bdf0bb6aae3b55b6f551563d77b4d2623e9d0a5e92f5c9f6a71982d5ba",
+    "frontend/src/components/keys/UseKeyModal.vue": "3e3c53017c02c754e70703daebc6b7a51c6ae733b6b8db8bf07f00f47ccc36ec",
+    "backend/internal/server/middleware/admin_compliance.go": "3420c027413fa7627e16328c08297e896ae2fb779fc5244c688610fdbc0c6728"
+  }
+}

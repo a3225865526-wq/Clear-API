@@ -1700,3 +1700,32 @@ Status: **BLOCKED**（首次生产切换尚未完成）
 - 交付：`evidence/pg03-general-pool-20261029/RESULT.md`、receipt.json、verified-closeout.json、existing-autosync-fixed.json、production-closeout.stdout.json、source-manifest.json与两份review.patch。独立候选：`D:/AI/API/worktrees/pg03-general-pool-gateway-20261029`（732a2d51基线）及`D:/AI/API/worktrees/pg03-general-pool-executor-20261029`（201ce387基线）；未提交/推送/创建PR。代码完成、定向测试通过、隔离真实调用通过；生产部署/PG03生产启用/完整生产验收均未完成。
 
 - Git 后续交付：已按用户指令提交本轮独立候选，Executor `1264c6c1`；Gateway 分支 `codex/pg03-general-pool-gateway-20261029`。原工作区其他修改保留，未推送、未部署。
+
+
+## 2026-10-29 09:38:49 Asia/Shanghai — PG03 Git交付完成，未推送/未部署
+
+- 用户指令“提交Git”已执行：Gateway `87732dc22fcecdc5195833fff34785b7c477bda7`，分支 `codex/pg03-general-pool-gateway-20261029`；Executor `1264c6c178fc9ef135b36fd9821daf83fba56bdc`，分支 `codex/pg03-general-pool-executor-20261029`。
+- Gateway提交包含本轮代码、总控追加记录及必要验收回执/日志；Executor提交仅包含本轮10个代码/测试文件。诊断二进制、私有凭据/运行状态及临时工具未入库。两份提交源码按规范化换行与已验证副本逐文件一致；本次没有重复测试。
+- 原主工作区的其他既有修改保留，未推送、未发布，生产master仍按前次现场为false。提交回执：`evidence/pg03-general-pool-20261029/git-commit-receipt.json`。
+
+
+## 2026-10-29T12:27:33+08:00 — PG03 出口定位完成；生产保持关闭
+
+- 同一二进制、OAuth账号/token、域名/方法/UA在本地JP出口发现4模型HTTP200；VPS宿主及Executor容器出口103.42.181.219/HK，对模型清单及推理路径安全探针均返回Cloudflare HTML403。GET /v0/management/pool/models正常200，非内部管理权限遗漏。模型清单Ray `a51f67b45e264639-HKG`；具体上游拒绝规则未公开，不武断认定地区/IP信誉中的某项。
+- 已查主机服务/全部容器/代理配置/监听/路由/隧道，未发现可复用代理或其他出站线路；无IPv6默认路由。未假设Windows出口可长期供VPS使用。推理仅做认证GET及无认证POST空对象，未发送收费模型任务；不能等同于真实模型成功或全部模型失败。
+- 最小方案：优先联系现有服务商/目标运营方凭Ray恢复当前出口；或指定受控、长期在线且可被上游接受的HTTP(S) CONNECT/SOCKS5出口，再配置现有Executor proxy-url，无需改调度/计费/逐模型准入机制。未写入占位配置或新增白名单。
+- 已发现并核对既有Gateway候选87732dc22fcecdc5195833fff34785b7c477bda7/Executor候选1264c6c178fc9ef135b36fd9821daf83fba56bdc，21文件与旧验收源码相等（4文件仅换行差异），旧测试日志SHA匹配；没有重复全量测试或新提交。诊断工具断网构建、本地/生产非收费探针及最终状态读取成功。
+- 12:25:12生产仍Gateway732a2d51/Executor201ce387，原容器/state/启动时间保持；master=false，账号3/4 not_admitted，cap/grant0，in-flight空，Token8/渠道6禁用，验收用户/Token/渠道用量0。本轮新候选部署/真实生产usage及结算验收/正式启用均未发生；仅/tmp诊断工具上传及只读核验，无配置/账务/schema修改。正常认证GET可能产生原审计。
+- CODE READY/LOCAL TEST PASS沿用有效证据；PRODUCTION DEPLOYED/PRODUCTION ACCEPTANCE PASS/PG03 ENABLED均否。唯一优先条件为可长期使用且上游接受的VPS出口。详情及手动操作：`evidence/pg03-production-finish-20261029/RESULT.md`与receipt.json。历史内容原样保留。
+
+
+## 2026-10-30 19:16:32 Asia/Shanghai — 独立账号池选型支线：推荐 Sub2API；客户端代码已提交，转发验收待确认门禁
+
+- 本轮独立工作区 `D:/AI/API/worktrees/clearapi-pool-strategy-20261030`，分支 `feature/pool-strategy-integration`，基于最新 PG03 Gateway 候选 `87732dc22`；未重置原工作区或覆盖其未提交修改。远端 main 核实为 `716cba323`，没有假定它包含所有本地候选。
+- 三层明确决策：未来多厂商执行选独立 Sub2API；账号运营复用其原后台；用户客户端接入统一留在 ClearAPI。PG03 Executor `1264c6c1`、Gateway 和已有 Codex 真实隔离/账务成果全部保留，不同时重造两套调度。当前普通第三方渠道保持原样，账号池不成为强制依赖。
+- 关键源码：PG03 真实派发门禁、fencing、manifest 和 metering 仍有 Codex 专用约束，不能将多个现有 Executor 适配器等同于多厂商池已准入。Sub2API 更省运营开发，但取消后可能 drain 上游获取usage，不保证立即硬取消。
+- 客户端最小开发已提交 `39a7b9f824e45d984d14eb2165ae8340a6cbb9dd`：扩展现有 usage-guide，Codex CLI / Claude Code / OpenCode / Cherry Studio 选客户端→按协议筛选实际可用模型→生成配置→复用复制组件；密钥仅本地占位符/环境引用，7语言各新增7key。另有独立本地 Sub2API Compose 配置。
+- 已验证 type=59 Sub2API 渠道源码可复用，无新增代理/渠道/Billing/DB代码。前端 typecheck/lint、14相关测试、build通过；现有渠道3项测试、Sub2API平台目录测试、带unit标签的3项取消/drain/usage测试通过。完整命令与边界见报告及verification.json。
+- 新隔离 Sub2API 从固定SHA构建启动成功，PG17.11/Redis7.4.11使用新卷，loopback18881，health200、正常管理员登录200；账号API423 ADMIN_COMPLIANCE_ACK_REQUIRED。未代替负责人接受部署与运营承诺，未改DB造确认。完整ClearAPI→Sub2API→mock成功链、跨服务SSE/Usage/恰好一次计费、真实客户端/厂商与同条件性能对比尚未完成，不标记为集成PASS。
+- 真实空闲资源采样已记录；请求性能NOT MEASURED。未来美国VPS按内部Docker网络/type59/内部Key/simple模式衔接，先补隔离集成再按原发布机制启用。原香港VPS、生产DB/余额/用户数据未访问或修改，生产状态本轮未重新读取；沿用上轮master=false记录，未启用/部署生产。
+- 当前状态：源码研究与推荐、客户端开发和局部验证完成；Sub2API完整转发验收BLOCKED，待负责人完成其固有确认后继续。完整交付 `CLEARAPI_POOL_STRATEGY_FINAL.md`，证据 `evidence/pool-strategy-20261030/`。
