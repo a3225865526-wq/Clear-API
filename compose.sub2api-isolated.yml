@@ -1,0 +1,69 @@
+# Local integration only; never combine with a production Compose project.
+# Build the unchanged upstream Dockerfile at the pinned source SHA (see final report).
+services:
+  postgres:
+    restart: unless-stopped
+    image: postgres:17-alpine@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b
+    environment:
+      POSTGRES_USER: sub2test
+      POSTGRES_DB: sub2test
+      POSTGRES_PASSWORD: ${SUB2_TEST_DB_PASSWORD:?required}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U sub2test -d sub2test']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [pool]
+  redis:
+    restart: unless-stopped
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+    command: [redis-server, --appendonly, 'yes', --appendfsync, everysec]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [pool]
+  sub2api:
+    restart: unless-stopped
+    image: clearapi/sub2api-isolated:d851a384
+    ports:
+      - '127.0.0.1:18882:8080'
+    volumes:
+      - sub2api:/app/data
+    environment:
+      AUTO_SETUP: 'true'
+      RUN_MODE: simple
+      SIMPLE_MODE_KEY_RATE_LIMIT_ENABLED: 'false'
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: '8080'
+      DATABASE_HOST: postgres
+      DATABASE_PORT: '5432'
+      DATABASE_USER: sub2test
+      DATABASE_DBNAME: sub2test
+      DATABASE_PASSWORD: ${SUB2_TEST_DB_PASSWORD:?required}
+      DATABASE_SSLMODE: disable
+      REDIS_HOST: redis
+      REDIS_PORT: '6379'
+      REDIS_DB: '0'
+      ADMIN_EMAIL: sub2-test@example.invalid
+      ADMIN_PASSWORD: ${SUB2_TEST_ADMIN_PASSWORD:?required}
+      JWT_SECRET: ${SUB2_TEST_JWT_SECRET:?required}
+      TOTP_ENCRYPTION_KEY: ${SUB2_TEST_TOTP_KEY:?required}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [pool]
+networks:
+  pool:
+    driver: bridge
+volumes:
+  postgres:
+  redis:
+  sub2api:

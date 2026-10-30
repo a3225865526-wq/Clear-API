@@ -3,15 +3,20 @@ package service_test
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay/channel/sub2api"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/QuantumNous/new-api/relay/helper"
@@ -324,4 +329,78 @@ func TestBasicBillingSettlement(t *testing.T) {
 			assert.Equal(t, walletState{tc.balance - want, tc.tokenBalance - want}, walletOf(t, u))
 		})
 	}
+}
+
+// A real type=59 adapter and HTTP mock feed the ordinary durable wallet path.
+// This covers Gateway-side accounting only, not Sub2API's own service/DB.
+func TestSub2APIMockUsageWalletAndConsumeLog(t *testing.T) {
+	db := newHardeningDB(t)
+	configureTieredModel(t, h2ModelA, fixtureAExpr)
+	oldRedis, oldBatch, oldLog, oldQuota := common.RedisEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled, common.QuotaPerUnit
+	common.RedisEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled, common.QuotaPerUnit = false, false, true, 500000
+	t.Cleanup(func() {
+		common.RedisEnabled, common.BatchUpdateEnabled, common.LogConsumeEnabled, common.QuotaPerUnit = oldRedis, oldBatch, oldLog, oldQuota
+	})
+	require.NoError(t, db.AutoMigrate(&model.Channel{}))
+	channel := model.Channel{Id: h2ChannelA, Type: constant.ChannelTypeSub2API, Key: "internal-fixture-key"}
+	require.NoError(t, db.Create(&channel).Error)
+	u := createHardeningUser(t, db, "sub2-mock-wallet", 10000)
+	flow := startHardeningFlow(t, u, channel.Id, h2ModelA, h2OutboundBodyA)
+	flow.Info.StartTime = time.Now()
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		assert.Equal(t, "/v1/chat/completions", r.URL.Path)
+		assert.Equal(t, "Bearer internal-fixture-key", r.Header.Get("Authorization"))
+		_, err := io.Copy(io.Discard, r.Body)
+		assert.NoError(t, err)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"fixture","model":"gpt-6-luna","choices":[{"index":0,"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":{"prompt_tokens":1000,"completion_tokens":20,"total_tokens":1020,"prompt_tokens_details":{"cached_tokens":200}}}`)
+	}))
+	t.Cleanup(upstream.Close)
+	flow.Info.ChannelType = constant.ChannelTypeSub2API
+	flow.Info.ChannelBaseUrl = upstream.URL
+	flow.Info.ApiKey = channel.Key
+	flow.Info.RequestURLPath = "/v1/chat/completions"
+	flow.Ctx.Request = httptest.NewRequest(http.MethodPost, flow.Info.RequestURLPath, strings.NewReader(h2OutboundBodyA))
+	flow.Ctx.Request.Header.Set("Content-Type", "application/json")
+	flow.Ctx.Request.Header.Set("Authorization", "Bearer clearapi-user-fixture")
+	adaptor := &sub2api.Adaptor{}
+	adaptor.Init(flow.Info)
+	response, err := adaptor.DoRequest(flow.Ctx, flow.Info, strings.NewReader(flow.OutboundBody))
+	require.NoError(t, err)
+	resp, ok := response.(*http.Response)
+	require.True(t, ok)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+	usageValue, apiErr := adaptor.DoResponse(flow.Ctx, resp, flow.Info)
+	require.Nil(t, apiErr)
+	usage, ok := usageValue.(*dto.Usage)
+	require.True(t, ok)
+	require.NotNil(t, usage)
+	assert.Equal(t, 1000, usage.PromptTokens)
+	assert.Equal(t, 20, usage.CompletionTokens)
+	assert.Equal(t, 200, usage.PromptTokensDetails.CachedTokens)
+	flow.settle(t, usage)
+	// Repeated final wallet operations must not apply another charge/refund.
+	require.NoError(t, flow.Info.Billing.Settle(9))
+	flow.Info.Billing.Refund(flow.Ctx)
+	require.NoError(t, model.RecoverBillingCompletions(100))
+	assert.Equal(t, int32(1), calls.Load())
+	assert.Equal(t, walletState{9991, 9991}, walletOf(t, u))
+	reservation := reservationOf(t, flow.RequestID)
+	assert.Equal(t, "settled", reservation.State)
+	assert.Equal(t, 9, reservation.Applied) // ((1000-200)*.02 + 200*.002 + 20*.10) * .5, rounded.
+	var user model.User
+	require.NoError(t, db.First(&user, u.UserID).Error)
+	assert.Equal(t, 9, user.UsedQuota)
+	assert.Equal(t, 1, user.RequestCount)
+	require.NoError(t, db.First(&channel, channel.Id).Error)
+	assert.Equal(t, int64(9), channel.UsedQuota)
+	var logs []model.Log
+	require.NoError(t, db.Where("request_id = ? AND type = ?", flow.RequestID, model.LogTypeConsume).Find(&logs).Error)
+	require.Len(t, logs, 1)
+	assert.Equal(t, 9, logs[0].Quota)
+	assert.Equal(t, 1000, logs[0].PromptTokens)
+	assert.Equal(t, 20, logs[0].CompletionTokens)
+	assert.Equal(t, h2ModelA, logs[0].ModelName)
 }
