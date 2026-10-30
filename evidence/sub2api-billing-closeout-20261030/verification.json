@@ -1,0 +1,93 @@
+{
+  "time_utc": "2026-10-30T13:56:12.201465+00:00",
+  "baseline": "6867f8a2e",
+  "scope": "new focused mock billing closeout; no provider calls or production access",
+  "python_ast": "PASS",
+  "diff_check": "PASS",
+  "existing_binary_reused": true,
+  "core_go_billing_auth_schema_code_changes": false,
+  "new_cases": [
+    "stream timeout with late Sub2API usage",
+    "completed provider execution but lost response",
+    "completed small-usage execution but lost response"
+  ],
+  "one_preliminary_trial_retained": "First timeout fixture followed Chat conversion without delay; normal usage890 saved, then recoverable missing finance_sync_events discovered. Existing v7 migration repaired only isolated schema. No trial rows removed.",
+  "review": "Two real owner API decisions, each submitted twice concurrently and then once again; one id/audit/refund per reservation. Stale and conflicting decisions rejected; explicit execution-ended confirmation enforced.",
+  "recovery": "Two actual Gateway restarts, each followed by startup recovery and at least one 10s periodic recovery; wallets/token/reservations/receipts/logs/decisions byte-equivalent to reviewed snapshot.",
+  "normal_channel": "One focused ordinary-channel regression after enabling finance; pool channels off, status200, one890 charge/log.",
+  "containers": [
+    {
+      "name": "clearapi-sub2api-isolated-20261030-acceptance-gateway-1",
+      "state": "exited",
+      "health": null,
+      "image": "sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205",
+      "created": "2026-10-30T13:47:39.229172905Z"
+    },
+    {
+      "name": "clearapi-sub2api-isolated-20261030-mock-upstream-1",
+      "state": "exited",
+      "health": null,
+      "image": "sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1",
+      "created": "2026-10-30T13:13:14.464917805Z"
+    },
+    {
+      "name": "clearapi-sub2api-isolated-20261030-sub2api-1",
+      "state": "running",
+      "health": "healthy",
+      "image": "sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a",
+      "created": "2026-10-30T12:27:54.708743896Z"
+    },
+    {
+      "name": "clearapi-sub2api-isolated-20261030-postgres-1",
+      "state": "running",
+      "health": "healthy",
+      "image": "sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+      "created": "2026-10-30T12:27:54.181749755Z"
+    },
+    {
+      "name": "clearapi-sub2api-isolated-20261030-redis-1",
+      "state": "running",
+      "health": "healthy",
+      "image": "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+      "created": "2026-10-30T12:27:54.180871048Z"
+    }
+  ],
+  "not_run": [
+    "previously passing 16-case protocol suite",
+    "new Go build/tests (no Go modifications)",
+    "historical database matrices",
+    "frontend/browser regression",
+    "real provider calls",
+    "production deployment"
+  ],
+  "known_boundaries": [
+    "Remaining pending records retain unknown usage, not a proven final consumption amount",
+    "Owner review can refund/retain applied amount; cannot collect late usage above that amount",
+    "Single-instance reconciliation requires durable wallet, no Gateway Redis or batch updates",
+    "No trusted automatic Sub2API Usage callback/correlation/pricing replay was added",
+    "Finance review refunds append adjustments, gross consume logs remain immutable",
+    "Full owner finance UI requires existing schema v9, not migrated or browser-tested here; owner billing API exercised with v1/v2/v3/v7 + reconciliation schema"
+  ],
+  "evidence_sha256_lf_utf8": {
+    "after-new-cases.json": "84a25bc28b9a92e55ab3911de62025c1d77564736d7f66ffe2efe2c25ab8bf69",
+    "after-review.json": "af5d9137e4caf3fae4040e0f0b3246181eef78fd3e18fe8709bfec0c89a28ecc",
+    "before-preliminary-trial.json": "b96d63e2513324e011c77395e451239355cc97a815a0a083fac0c4ff37836855",
+    "before.json": "4c6b0a20fa15295d4b7c34f161e6399f3f0eb220c166093e25f21ab1728f30e8",
+    "capability.json": "d399034f7f5c0eb488bf6f073ea4613ec450d52237fb942d9957706749cea277",
+    "controlled-provider-executions.json": "fc5c71daa16855bb3ae65f89e47ee64f8c362596fe3abf9213e7f1c88aa100cb",
+    "environment-recovery.json": "36b076a8d55a92dd610cffdba57fd0d06726985bb301c63b02185bbd92e9f8dc",
+    "final.json": "451173e4ffd8a56c05d64cfe2958138f12d4dcd88a94370426d09196db57ec55",
+    "new-cases.json": "3cbdcec0a46d79a8bd991480b92e52313f66ca8803cc0e98e59bf3961bebe9eb",
+    "ordinary-with-review-enabled.json": "035b0b9bab884326eb1e6cbada4d4c6077b2594748c668e8586bc59c4367485c",
+    "pending-before.json": "ee0631a2e949a4851d3eb16554b5650a5384ff54ea74b758af079cb3dbc9d32c",
+    "pending-final.json": "a5cfe6cc101fce75fd1e2e25b0c18c0761efb8f4ce8ae553e9df99baf4a704b9",
+    "recovery-round-1.json": "757309a77482f7fc676eca525234ce3da2a7fed8fe7e4f5ff95f1a521be7f356",
+    "recovery-round-2.json": "94d6a53313f441a85f006075fb88cbb82c67d4ec7af63ae403a6a4363ccf4a85",
+    "review-results.json": "5cd3e077ab6068c1661a2eeb948cf863ae5a4ebad206455d75721f73b48414ac",
+    "timeout-first-observation.json": "e7754f2e140b542af108f838076107e13b581707eb305dbb33684483f6ef614c",
+    "timeout-second-observation.json": "b7dad7ea993670000a6821730551e356977dce5ff9282d9029b704da41cba66c"
+  },
+  "implementation_commit": "a156234421b72d7539e2368a659cdb878d177b8a",
+  "artifact_secret_scan": "PASS",
+  "report_sha256_lf_utf8": "3bff544a6a689bf2cf3099601b6112f9882e987f331739be58e4309aa2de90ab"
+}

@@ -1,0 +1,18 @@
+[
+  {
+    "model": "mock-completed-drop",
+    "attempt": 1,
+    "completed": true,
+    "input_tokens": 1000,
+    "output_tokens": 20,
+    "cache_read_tokens": 200
+  },
+  {
+    "model": "mock-completed-drop-small",
+    "attempt": 1,
+    "completed": true,
+    "input_tokens": 2,
+    "output_tokens": 0,
+    "cache_read_tokens": 0
+  }
+]

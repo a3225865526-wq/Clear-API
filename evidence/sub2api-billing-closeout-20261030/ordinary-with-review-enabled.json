@@ -1,0 +1,16 @@
+{
+  "request_id": "202610301354506723482558268d9d66GfBCBwT",
+  "status": 200,
+  "wallet_delta": 890,
+  "token_delta": 890,
+  "unique_log": {
+    "id": 24,
+    "request_id": "202610301354506723482558268d9d66GfBCBwT",
+    "quota": 890,
+    "type": 2,
+    "prompt_tokens": 1000,
+    "completion_tokens": 20
+  },
+  "all_pool_channels_disabled": true,
+  "review_decisions_unchanged": true
+}

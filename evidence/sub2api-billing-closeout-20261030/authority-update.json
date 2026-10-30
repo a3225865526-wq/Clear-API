@@ -1,0 +1,11 @@
+{
+  "authority_path": "D:\\AI\\API\\worktrees\\clearapi-controlled-launch-20261020\\CLEARAPI_MASTER_STATUS.md",
+  "previous_latest_heading": "## 2026-10-30T21:43:03+08:00 — Sub2API最终隔离验收：423已解除，13平台配置落地，双服务mock通过；未知Usage结算边界保持关闭",
+  "time": "2026-10-30T21:59:40+08:00",
+  "before_bytes": 349706,
+  "after_bytes": 354152,
+  "before_sha256": "66de915016b87e17c6fac9294c6eda8c5e013343b7b5b0f67259a4fb28c5be88",
+  "after_sha256": "3381a26d47fa29c7bc06894b1698f92b24c19ff0add7649dade0b9eb3a3c2521",
+  "original_prefix_preserved": true,
+  "authority_not_committed_with_preexisting_changes": true
+}

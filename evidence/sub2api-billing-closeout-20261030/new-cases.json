@@ -1,0 +1,110 @@
+[
+  {
+    "model": "accept-timeout",
+    "upstream_model": "mock-timeout",
+    "request_id": "202610301351143229077518268d9d6gIyuG907",
+    "http_status": 200,
+    "native_timeout_evidence": [
+      "[GIN] 2026/10/30 - 13:51:19 | relay | 202610301351143229077518268d9d6gIyuG907 | 200 |  5.115388584s |    192.168.16.1 |    POST /v1/responses",
+      "[ERR] 2026/10/30 - 13:51:19 | 202610301351143229077518268d9d6gIyuG907 | stream ended: reason=timeout, received=4 "
+    ],
+    "response_not_retained": "Observer originally exceeded wait for transient SQLite-busy outbox retry; no new request dispatched. Native timeout and persistent Usage/ledger preserved.",
+    "reservation": {
+      "id": 21,
+      "request_id": "202610301351143229077518268d9d6gIyuG907",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 10,
+      "target": 10,
+      "applied": 10,
+      "state": "settled",
+      "updated_at": 1793368279
+    },
+    "markers": [
+      {
+        "id": 8,
+        "reservation_id": 21,
+        "reason": "interrupted_unknown_usage",
+        "created_at": 1793368279
+      }
+    ],
+    "sub2_usage": [
+      {
+        "id": 14,
+        "request_id": "client:e4e56312-3f77-4f64-8990-4bd7784cca64",
+        "model": "mock-timeout",
+        "api_key_id": 2,
+        "account_id": 1,
+        "input_tokens": 800,
+        "output_tokens": 20,
+        "cache_read_tokens": 200
+      },
+      {
+        "id": 15,
+        "request_id": "client:7b5a1c97-38fa-4765-82d7-94056ac74cf0",
+        "model": "mock-timeout",
+        "api_key_id": 2,
+        "account_id": 1,
+        "input_tokens": 800,
+        "output_tokens": 20,
+        "cache_read_tokens": 200
+      }
+    ]
+  },
+  {
+    "model": "accept-completed-drop",
+    "upstream_model": "mock-completed-drop",
+    "request_id": "202610301352330748995558268d9d64tZCPvvk",
+    "http_status": 502,
+    "seconds": 0.0779999999795109,
+    "response": "{\"error\":{\"message\":\"Upstream service temporarily unavailable\",\"type\":\"upstream_error\",\"param\":\"\",\"code\":null}}",
+    "reservation": {
+      "id": 22,
+      "request_id": "202610301352330748995558268d9d64tZCPvvk",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 4,
+      "target": 4,
+      "applied": 4,
+      "state": "settled",
+      "updated_at": 1793368353
+    },
+    "markers": [
+      {
+        "id": 9,
+        "reservation_id": 22,
+        "reason": "upstream_usage_unknown",
+        "created_at": 1793368353
+      }
+    ],
+    "sub2_usage": []
+  },
+  {
+    "model": "accept-completed-drop-small",
+    "upstream_model": "mock-completed-drop-small",
+    "request_id": "202610301352369796971648268d9d6HEKRHm5Y",
+    "http_status": 502,
+    "seconds": 0.0779999999795109,
+    "response": "{\"error\":{\"message\":\"Upstream service temporarily unavailable\",\"type\":\"upstream_error\",\"param\":\"\",\"code\":null}}",
+    "reservation": {
+      "id": 23,
+      "request_id": "202610301352369796971648268d9d6HEKRHm5Y",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 4,
+      "target": 4,
+      "applied": 4,
+      "state": "settled",
+      "updated_at": 1793368357
+    },
+    "markers": [
+      {
+        "id": 10,
+        "reservation_id": 23,
+        "reason": "upstream_usage_unknown",
+        "created_at": 1793368357
+      }
+    ],
+    "sub2_usage": []
+  }
+]

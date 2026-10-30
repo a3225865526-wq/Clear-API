@@ -1,0 +1,142 @@
+{
+  "results": [
+    {
+      "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+      "before": {
+        "id": 10,
+        "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 12,
+        "target": 12,
+        "applied": 12,
+        "state": "settled",
+        "updated_at": 1793366637,
+        "reason": "upstream_usage_unknown",
+        "executing": false
+      },
+      "decision": {
+        "id": 1,
+        "reservation_id": 10,
+        "user_id": 1,
+        "original_state": "settled",
+        "reserved": 12,
+        "target": 12,
+        "applied": 12,
+        "refund_quota": 12,
+        "final_quota": 0,
+        "reason": "Isolated mock-reject code proves rejection before execution; old mock E2E request and fixture verified; final quota zero.",
+        "token_refund": "credited",
+        "actor_id": 1,
+        "created_at": 1793368369
+      },
+      "parallel_duplicate_same_id": true,
+      "third_duplicate_ok": true,
+      "stale_conflict": 409,
+      "missing_execution_confirmation": 400,
+      "over_refund_conflict": 409,
+      "changed_decision_conflict": 409
+    },
+    {
+      "request_id": "202610301352369796971648268d9d6HEKRHm5Y",
+      "before": {
+        "id": 23,
+        "request_id": "202610301352369796971648268d9d6HEKRHm5Y",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 4,
+        "target": 4,
+        "applied": 4,
+        "state": "settled",
+        "updated_at": 1793368357,
+        "reason": "upstream_usage_unknown",
+        "executing": false
+      },
+      "decision": {
+        "id": 2,
+        "reservation_id": 23,
+        "user_id": 1,
+        "original_state": "settled",
+        "reserved": 4,
+        "target": 4,
+        "applied": 4,
+        "refund_quota": 2,
+        "final_quota": 2,
+        "reason": "Controlled provider execution receipt: input=2 output=0 cache=0; frozen synthetic expression tier mock gives quota=2; execution ended; no inferred zero.",
+        "token_refund": "credited",
+        "actor_id": 1,
+        "created_at": 1793368369
+      },
+      "parallel_duplicate_same_id": true,
+      "third_duplicate_ok": true,
+      "stale_conflict": 409,
+      "missing_execution_confirmation": 400,
+      "over_refund_conflict": 409,
+      "changed_decision_conflict": 409
+    }
+  ],
+  "refund_total": 14,
+  "reviewed": {
+    "items": [
+      {
+        "id": 23,
+        "request_id": "202610301352369796971648268d9d6HEKRHm5Y",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 4,
+        "target": 4,
+        "applied": 2,
+        "state": "reviewed",
+        "updated_at": 1793368369,
+        "reason": "upstream_usage_unknown",
+        "executing": false,
+        "decision": {
+          "id": 2,
+          "reservation_id": 23,
+          "user_id": 1,
+          "original_state": "settled",
+          "reserved": 4,
+          "target": 4,
+          "applied": 4,
+          "refund_quota": 2,
+          "final_quota": 2,
+          "reason": "Controlled provider execution receipt: input=2 output=0 cache=0; frozen synthetic expression tier mock gives quota=2; execution ended; no inferred zero.",
+          "token_refund": "credited",
+          "actor_id": 1,
+          "created_at": 1793368369
+        }
+      },
+      {
+        "id": 10,
+        "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 12,
+        "target": 12,
+        "applied": 0,
+        "state": "reviewed",
+        "updated_at": 1793368369,
+        "reason": "upstream_usage_unknown",
+        "executing": false,
+        "decision": {
+          "id": 1,
+          "reservation_id": 10,
+          "user_id": 1,
+          "original_state": "settled",
+          "reserved": 12,
+          "target": 12,
+          "applied": 12,
+          "refund_quota": 12,
+          "final_quota": 0,
+          "reason": "Isolated mock-reject code proves rejection before execution; old mock E2E request and fixture verified; final quota zero.",
+          "token_refund": "credited",
+          "actor_id": 1,
+          "created_at": 1793368369
+        }
+      }
+    ],
+    "total": 2
+  },
+  "gross_logs_immutable": true,
+  "wallet_token_single_refund": true
+}

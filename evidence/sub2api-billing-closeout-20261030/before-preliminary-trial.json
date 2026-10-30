@@ -1,0 +1,590 @@
+{
+  "user": {
+    "id": 1,
+    "quota": 99991932,
+    "used_quota": 8038
+  },
+  "token": {
+    "id": 1,
+    "remain_quota": 91932,
+    "used_quota": 8068
+  },
+  "reservations": [
+    {
+      "id": 1,
+      "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 12,
+      "target": 890,
+      "applied": 12,
+      "state": "needs_review",
+      "updated_at": 1793366351
+    },
+    {
+      "id": 2,
+      "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366489
+    },
+    {
+      "id": 3,
+      "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366494
+    },
+    {
+      "id": 4,
+      "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366497
+    },
+    {
+      "id": 5,
+      "request_id": "202610301321431725933628268d9d6ytHnO0Sw",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 6,
+      "target": 0,
+      "applied": 0,
+      "state": "settled",
+      "updated_at": 1793366503
+    },
+    {
+      "id": 6,
+      "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366621
+    },
+    {
+      "id": 7,
+      "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366626
+    },
+    {
+      "id": 8,
+      "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366627
+    },
+    {
+      "id": 9,
+      "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366633
+    },
+    {
+      "id": 10,
+      "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 12,
+      "target": 12,
+      "applied": 12,
+      "state": "settled",
+      "updated_at": 1793366637
+    },
+    {
+      "id": 11,
+      "request_id": "202610301324032681872748268d9d6laZWeaGo",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 8,
+      "target": 8,
+      "applied": 8,
+      "state": "settled",
+      "updated_at": 1793366643
+    },
+    {
+      "id": 12,
+      "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 8,
+      "target": 8,
+      "applied": 8,
+      "state": "settled",
+      "updated_at": 1793366648
+    },
+    {
+      "id": 13,
+      "request_id": "202610301324140653635168268d9d68tlROazR",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 4,
+      "target": 4,
+      "applied": 4,
+      "state": "settled",
+      "updated_at": 1793366654
+    },
+    {
+      "id": 14,
+      "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 4,
+      "target": 4,
+      "applied": 4,
+      "state": "settled",
+      "updated_at": 1793366759
+    },
+    {
+      "id": 15,
+      "request_id": "202610301326045910574698268d9d6pXlWtnri",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 4,
+      "target": 4,
+      "applied": 4,
+      "state": "settled",
+      "updated_at": 1793366764
+    },
+    {
+      "id": 16,
+      "request_id": "202610301329080346860918268d9d6aABHG7hj",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 12,
+      "target": 0,
+      "applied": 0,
+      "state": "refunded",
+      "updated_at": 1793366948
+    },
+    {
+      "id": 17,
+      "request_id": "202610301329086495331018268d9d6HijMRP0o",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 6,
+      "target": 6,
+      "applied": 6,
+      "state": "settled",
+      "updated_at": 1793366948
+    },
+    {
+      "id": 18,
+      "request_id": "202610301329141596476438268d9d63dR8Ywew",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793366954
+    },
+    {
+      "id": 19,
+      "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+      "user_id": 1,
+      "token_id": 1,
+      "reserved": 890,
+      "target": 890,
+      "applied": 890,
+      "state": "settled",
+      "updated_at": 1793367133
+    }
+  ],
+  "logs": [
+    {
+      "id": 1,
+      "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+      "quota": 12,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 2,
+      "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 3,
+      "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 4,
+      "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 5,
+      "request_id": "202610301321431725933628268d9d6ytHnO0Sw",
+      "quota": 0,
+      "type": 2,
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    },
+    {
+      "id": 6,
+      "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 7,
+      "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 8,
+      "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 800,
+      "completion_tokens": 20
+    },
+    {
+      "id": 9,
+      "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 10,
+      "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+      "quota": 12,
+      "type": 2,
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    },
+    {
+      "id": 11,
+      "request_id": "202610301324032681872748268d9d6laZWeaGo",
+      "quota": 8,
+      "type": 2,
+      "prompt_tokens": 4,
+      "completion_tokens": 2
+    },
+    {
+      "id": 12,
+      "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+      "quota": 8,
+      "type": 2,
+      "prompt_tokens": 4,
+      "completion_tokens": 2
+    },
+    {
+      "id": 13,
+      "request_id": "202610301324140653635168268d9d68tlROazR",
+      "quota": 4,
+      "type": 2,
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    },
+    {
+      "id": 14,
+      "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+      "quota": 4,
+      "type": 2,
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    },
+    {
+      "id": 15,
+      "request_id": "202610301326045910574698268d9d6pXlWtnri",
+      "quota": 4,
+      "type": 2,
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    },
+    {
+      "id": 16,
+      "request_id": "202610301329080346860918268d9d6aABHG7hj",
+      "quota": 12,
+      "type": 6,
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    },
+    {
+      "id": 17,
+      "request_id": "202610301329086495331018268d9d6HijMRP0o",
+      "quota": 6,
+      "type": 2,
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    },
+    {
+      "id": 18,
+      "request_id": "202610301329141596476438268d9d63dR8Ywew",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    },
+    {
+      "id": 19,
+      "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+      "quota": 890,
+      "type": 2,
+      "prompt_tokens": 1000,
+      "completion_tokens": 20
+    }
+  ],
+  "outbox": [
+    {
+      "id": 1,
+      "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+      "state": "delivered"
+    },
+    {
+      "id": 2,
+      "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+      "state": "delivered"
+    },
+    {
+      "id": 3,
+      "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+      "state": "delivered"
+    },
+    {
+      "id": 4,
+      "request_id": "202610301321431725933628268d9d6ytHnO0Sw",
+      "state": "delivered"
+    },
+    {
+      "id": 5,
+      "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+      "state": "delivered"
+    },
+    {
+      "id": 6,
+      "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+      "state": "delivered"
+    },
+    {
+      "id": 7,
+      "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+      "state": "delivered"
+    },
+    {
+      "id": 8,
+      "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+      "state": "delivered"
+    },
+    {
+      "id": 9,
+      "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+      "state": "delivered"
+    },
+    {
+      "id": 10,
+      "request_id": "202610301324032681872748268d9d6laZWeaGo",
+      "state": "delivered"
+    },
+    {
+      "id": 11,
+      "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+      "state": "delivered"
+    },
+    {
+      "id": 12,
+      "request_id": "202610301324140653635168268d9d68tlROazR",
+      "state": "delivered"
+    },
+    {
+      "id": 13,
+      "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+      "state": "delivered"
+    },
+    {
+      "id": 14,
+      "request_id": "202610301326045910574698268d9d6pXlWtnri",
+      "state": "delivered"
+    },
+    {
+      "id": 15,
+      "request_id": "202610301329080346860918268d9d6aABHG7hj",
+      "state": "delivered"
+    },
+    {
+      "id": 16,
+      "request_id": "202610301329086495331018268d9d6HijMRP0o",
+      "state": "delivered"
+    },
+    {
+      "id": 17,
+      "request_id": "202610301329141596476438268d9d63dR8Ywew",
+      "state": "delivered"
+    },
+    {
+      "id": 18,
+      "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+      "state": "delivered"
+    }
+  ],
+  "receipts": [
+    {
+      "id": 1,
+      "request_id": "202610301321289675816908268d9d6H5pJ8ALw"
+    },
+    {
+      "id": 2,
+      "request_id": "202610301321344924029518268d9d6DyiSw7Jg"
+    },
+    {
+      "id": 3,
+      "request_id": "202610301321377329962718268d9d6rl1AC8Sq"
+    },
+    {
+      "id": 4,
+      "request_id": "202610301321431725933628268d9d6ytHnO0Sw"
+    },
+    {
+      "id": 5,
+      "request_id": "202610301323415548164168268d9d6U0qXRFdF"
+    },
+    {
+      "id": 6,
+      "request_id": "202610301323469197483538268d9d6xkVhmtFe"
+    },
+    {
+      "id": 7,
+      "request_id": "202610301323479424640968268d9d6FKtMfdVz"
+    },
+    {
+      "id": 8,
+      "request_id": "202610301323534212310688268d9d6gcrHplvJ"
+    },
+    {
+      "id": 9,
+      "request_id": "202610301323578232012398268d9d6n7Bcvw9D"
+    },
+    {
+      "id": 10,
+      "request_id": "202610301324032681872748268d9d6laZWeaGo"
+    },
+    {
+      "id": 11,
+      "request_id": "202610301324079641586228268d9d6fGtQCy0c"
+    },
+    {
+      "id": 12,
+      "request_id": "202610301324140653635168268d9d68tlROazR"
+    },
+    {
+      "id": 13,
+      "request_id": "202610301325590290893958268d9d6ePm1lIlx"
+    },
+    {
+      "id": 14,
+      "request_id": "202610301326045910574698268d9d6pXlWtnri"
+    },
+    {
+      "id": 15,
+      "request_id": "202610301329080346860918268d9d6aABHG7hj"
+    },
+    {
+      "id": 16,
+      "request_id": "202610301329086495331018268d9d6HijMRP0o"
+    },
+    {
+      "id": 17,
+      "request_id": "202610301329141596476438268d9d63dR8Ywew"
+    },
+    {
+      "id": 18,
+      "request_id": "202610301332124789259258268d9d6AAOjmE0q"
+    }
+  ],
+  "markers": [
+    {
+      "id": 1,
+      "reservation_id": 10,
+      "reason": "upstream_usage_unknown",
+      "created_at": 1793366637
+    },
+    {
+      "id": 2,
+      "reservation_id": 11,
+      "reason": "interrupted_unknown_usage",
+      "created_at": 1793366643
+    },
+    {
+      "id": 3,
+      "reservation_id": 12,
+      "reason": "interrupted_unknown_usage",
+      "created_at": 1793366648
+    },
+    {
+      "id": 4,
+      "reservation_id": 13,
+      "reason": "upstream_usage_unknown",
+      "created_at": 1793366654
+    },
+    {
+      "id": 5,
+      "reservation_id": 14,
+      "reason": "upstream_usage_unknown",
+      "created_at": 1793366759
+    },
+    {
+      "id": 6,
+      "reservation_id": 15,
+      "reason": "upstream_usage_unknown",
+      "created_at": 1793366764
+    },
+    {
+      "id": 7,
+      "reservation_id": 17,
+      "reason": "upstream_usage_unknown",
+      "created_at": 1793366948
+    }
+  ],
+  "decisions": [],
+  "audit": [],
+  "refund_events": []
+}
