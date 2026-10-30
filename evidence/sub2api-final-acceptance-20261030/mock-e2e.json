@@ -1,0 +1,1751 @@
+{
+  "time_utc": "2026-10-30T13:21:28.672909+00:00",
+  "kind": "MOCK_E2E",
+  "real_provider_calls": 0,
+  "cases": [
+    {
+      "name": "chat-json",
+      "path": "/v1/chat/completions",
+      "model": "accept-chat",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+      "response_fixture": "{\"id\": \"chatcmpl_mock\", \"object\": \"chat.completion\", \"model\": \"mock-chat\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"mock ok\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 1000, \"completion_tokens\": 20, \"total_tokens\": 1020, \"prompt_tokens_details\": {\"cached_tokens\": 200}}}",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 2,
+          "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "completion_tokens": 20,
+              "prompt_tokens": 1000,
+              "prompt_tokens_details.cached_tokens": 200,
+              "total_tokens": 1020
+            },
+            "protocol": "openai",
+            "interrupted": false,
+            "internal_model": "mock-chat",
+            "model_alias": "accept-chat"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 2,
+          "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366489
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/chat/completions",
+          "model": "mock-chat",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "responses-json",
+      "path": "/v1/responses",
+      "model": "accept-response",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+      "response_fixture": "{\"id\":\"chatcmpl_mock\",\"object\":\"response\",\"created_at\":1793366494,\"model\":\"mock-response\",\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"id\":\"item_ca71c9182f10ff5c81dc9532\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"mock ok\"}],\"status\":\"completed\"}],\"usage\":{\"input_tokens\":1000,\"output_tokens\":20,\"total_tokens\":1020,\"input_tokens_details\":{\"cached_tokens\":200}}}",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 3,
+          "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "input_tokens": 1000,
+              "input_tokens_details.cached_tokens": 200,
+              "output_tokens": 20,
+              "total_tokens": 1020
+            },
+            "protocol": "responses",
+            "interrupted": false,
+            "internal_model": "mock-response",
+            "model_alias": "accept-response"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 3,
+          "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366494
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/chat/completions",
+          "model": "mock-response",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "responses-sse",
+      "path": "/v1/responses",
+      "model": "accept-response",
+      "stream": true,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+      "response_fixture": "event: response.created\ndata: {\"type\":\"response.created\",\"response\":{\"id\":\"chatcmpl_mock\",\"object\":\"response\",\"created_at\":1793366497,\"model\":\"mock-response\",\"status\":\"in_progress\",\"output\":[]},\"sequence_number\":0}\n\nevent: response.output_item.added\ndata: {\"item\":{\"content\":[{\"text\":\"\",\"type\":\"output_text\"}],\"id\":\"item_09750e63c48852866761c9f7\",\"role\":\"assistant\",\"status\":\"in_progress\",\"type\":\"message\"},\"output_index\":0,\"sequence_number\":1,\"type\":\"response.output_item.added\"}\n\nevent: response.content_part.added\ndata: {\"content_index\":0,\"item_id\":\"item_09750e63c48852866761c9f7\",\"output_index\":0,\"part\":{\"annotations\":[],\"logprobs\":[],\"text\":\"\",\"type\":\"output_text\"},\"sequence_number\":2,\"type\":\"response.content_part.added\"}\n\nevent: response.output_text.delta\ndata: {\"content_index\":0,\"delta\":\"mock ok\",\"item_id\":\"item_09750e63c48852866761c9f7\",\"output_index\":0,\"sequence_number\":3,\"type\":\"response.output_text.delta\"}\n\nevent: response.output_text.done\ndata: {\"content_index\":0,\"item_id\":\"item_09750e63c48852866761c9f7\",\"output_index\":0,\"sequence_number\":4,\"text\":\"mock ok\",\"type\":\"response.output_text.done\"}\n\nevent: response.content_part.done\ndata: {\"content_index\":0,\"item_id\":\"item_09750e63c48852866761c9f7\",\"output_index\":0,\"part\":{\"annotations\":[],\"logprobs\":[],\"text\":\"mock ok\",\"type\":\"output_text\"},\"sequence_number\":5,\"type\":\"response.content_part.done\"}\n\nevent: response.output_item.done\ndata: {\"item\":{\"content\":[{\"text\":\"mock ok\",\"type\":\"output_text\"}],\"id\":\"item_09750e63c48852866761c9f7\",\"role\":\"assistant\",\"status\":\"completed\",\"type\":\"message\"},\"output_index\":0,\"sequence_number\":6,\"type\":\"response.output_item.done\"}\n\nevent: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"chatcmpl_mock\",\"object\":\"response\",\"created_at\":1793366497,\"model\":\"mock-response\",\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"id\":\"item_09750e63c48852866761c9f7\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"mock ok\"}],\"status\":\"completed\"}],\"usage\":{\"input_tokens\":1000,\"output_tokens\":20,\"total_tokens\":1020,\"input_tokens_details\":{\"cached_tokens\":200}}},\"sequence_number\":7}\n\n",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 4,
+          "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "input_tokens": 1000,
+              "input_tokens_details.cached_tokens": 200,
+              "output_tokens": 20,
+              "total_tokens": 1020
+            },
+            "protocol": "responses",
+            "interrupted": false,
+            "internal_model": "mock-response",
+            "model_alias": "accept-response"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 4,
+          "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366497
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/chat/completions",
+          "model": "mock-response",
+          "stream": true,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "responses-json-native",
+      "path": "/v1/responses",
+      "model": "accept-response",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+      "response_fixture": "{\"id\": \"resp_mock\", \"object\": \"response\", \"model\": \"mock-response\", \"status\": \"completed\", \"output\": [{\"id\": \"msg_mock\", \"type\": \"message\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"mock ok\", \"annotations\": []}]}], \"usage\": {\"input_tokens\": 1000, \"output_tokens\": 20, \"total_tokens\": 1020, \"input_tokens_details\": {\"cached_tokens\": 200}}}",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 6,
+          "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "input_tokens": 1000,
+              "input_tokens_details.cached_tokens": 200,
+              "output_tokens": 20,
+              "total_tokens": 1020
+            },
+            "protocol": "responses",
+            "interrupted": false,
+            "internal_model": "mock-response",
+            "model_alias": "accept-response"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 6,
+          "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366621
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-response",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "responses-sse-native",
+      "path": "/v1/responses",
+      "model": "accept-response",
+      "stream": true,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+      "response_fixture": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_mock\", \"model\": \"mock-response\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_text.delta\ndata: {\"type\": \"response.output_text.delta\", \"item_id\": \"msg_mock\", \"output_index\": 0, \"content_index\": 0, \"delta\": \"mock \"}\n\nevent: response.completed\ndata: {\"type\": \"response.completed\", \"response\": {\"id\": \"resp_mock\", \"object\": \"response\", \"model\": \"mock-response\", \"status\": \"completed\", \"output\": [{\"id\": \"msg_mock\", \"type\": \"message\", \"role\": \"assistant\", \"status\": \"completed\", \"content\": [{\"type\": \"output_text\", \"text\": \"mock ok\", \"annotations\": []}]}], \"usage\": {\"input_tokens\": 1000, \"output_tokens\": 20, \"total_tokens\": 1020, \"input_tokens_details\": {\"cached_tokens\": 200}}}}\n\n",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 7,
+          "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "input_tokens": 1000,
+              "input_tokens_details.cached_tokens": 200,
+              "output_tokens": 20,
+              "total_tokens": 1020
+            },
+            "protocol": "responses",
+            "interrupted": false,
+            "internal_model": "mock-response",
+            "model_alias": "accept-response"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 7,
+          "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366626
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-response",
+          "stream": true,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "messages-json",
+      "path": "/v1/messages",
+      "model": "accept-message",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+      "response_fixture": "{\"id\": \"msg_mock\", \"type\": \"message\", \"role\": \"assistant\", \"model\": \"mock-message\", \"content\": [{\"type\": \"text\", \"text\": \"mock ok\"}], \"stop_reason\": \"end_turn\", \"usage\": {\"input_tokens\": 800, \"output_tokens\": 20, \"cache_read_input_tokens\": 200}}",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 8,
+          "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+          "quota": 890,
+          "prompt_tokens": 800,
+          "completion_tokens": 20,
+          "channel_id": 2,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 800,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": null,
+            "total_derived": false,
+            "raw": {
+              "cache_read_input_tokens": 200,
+              "input_tokens": 800,
+              "output_tokens": 20
+            },
+            "protocol": "anthropic",
+            "interrupted": false,
+            "internal_model": "mock-message",
+            "model_alias": "accept-message"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 8,
+          "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366627
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/anthropic/v1/messages?beta=true",
+          "model": "mock-message",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "chat-sse",
+      "path": "/v1/chat/completions",
+      "model": "accept-chat",
+      "stream": true,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+      "response_fixture": "data: {\"id\":\"resp_mock\",\"object\":\"chat.completion.chunk\",\"created\":1793366633,\"model\":\"mock-chat\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"resp_mock\",\"object\":\"chat.completion.chunk\",\"created\":1793366633,\"model\":\"mock-chat\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"mock \"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"resp_mock\",\"object\":\"chat.completion.chunk\",\"created\":1793366633,\"model\":\"mock-chat\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\"},\"finish_reason\":\"stop\"}]}\n\ndata: {\"id\":\"resp_mock\",\"object\":\"chat.completion.chunk\",\"created\":1793366633,\"model\":\"mock-chat\",\"choices\":[],\"usage\":{\"prompt_tokens\":1000,\"completion_tokens\":20,\"total_tokens\":1020,\"prompt_tokens_details\":{\"cached_tokens\":200}}}\n\ndata: [DONE]\n\n",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 9,
+          "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "completion_tokens": 20,
+              "prompt_tokens": 1000,
+              "prompt_tokens_details.cached_tokens": 200,
+              "total_tokens": 1020
+            },
+            "protocol": "openai",
+            "interrupted": false,
+            "internal_model": "mock-chat",
+            "model_alias": "accept-chat"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 9,
+          "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366633
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-chat",
+          "stream": true,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "upstream-rejection",
+      "path": "/v1/chat/completions",
+      "model": "accept-reject",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 400,
+      "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+      "response_fixture": "{\"error\":{\"message\":\"bounded mock rejection\",\"type\":\"invalid_request_error\",\"param\":\"\",\"code\":null}}",
+      "wallet_delta": 12,
+      "token_delta": 12,
+      "user_used_delta": 0,
+      "token_used_delta": 12,
+      "request_count_delta": 0,
+      "consume_logs": [
+        {
+          "id": 10,
+          "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+          "quota": 12,
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "channel_id": 1,
+          "token_observation": null,
+          "cache_tokens": null
+        }
+      ],
+      "reservation": [
+        {
+          "id": 10,
+          "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 12,
+          "target": 12,
+          "applied": 12,
+          "state": "settled",
+          "updated_at": 1793366637
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-reject",
+          "stream": true,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": [
+        {
+          "reservation_id": 10,
+          "reason": "upstream_usage_unknown"
+        }
+      ]
+    },
+    {
+      "name": "missing-terminal",
+      "path": "/v1/responses",
+      "model": "accept-incomplete",
+      "stream": true,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301324032681872748268d9d6laZWeaGo",
+      "response_fixture": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_mock\", \"model\": \"mock-incomplete\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_text.delta\ndata: {\"type\": \"response.output_text.delta\", \"item_id\": \"msg_mock\", \"output_index\": 0, \"content_index\": 0, \"delta\": \"mock \"}\n\nevent: response.failed\ndata: {\"type\":\"response.failed\",\"sequence_number\":0,\"response\":{\"id\":\"resp_43093147e9aa46c1825558ba9aa4467b\",\"object\":\"response\",\"created_at\":1793366643,\"model\":\"mock-incomplete\",\"status\":\"failed\",\"output\":[],\"error\":{\"code\":\"upstream_error\",\"message\":\"Upstream request failed\"}}}\n\n",
+      "wallet_delta": 8,
+      "token_delta": 8,
+      "user_used_delta": 8,
+      "token_used_delta": 8,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 11,
+          "request_id": "202610301324032681872748268d9d6laZWeaGo",
+          "quota": 8,
+          "prompt_tokens": 4,
+          "completion_tokens": 2,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "unknown",
+            "quality": "missing",
+            "input": null,
+            "output": null,
+            "cache_read": null,
+            "cache_write": null,
+            "reasoning": null,
+            "total": null,
+            "total_derived": false,
+            "raw": {},
+            "protocol": "",
+            "interrupted": true,
+            "internal_model": "mock-incomplete",
+            "model_alias": "accept-incomplete"
+          },
+          "cache_tokens": 0
+        }
+      ],
+      "reservation": [
+        {
+          "id": 11,
+          "request_id": "202610301324032681872748268d9d6laZWeaGo",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 8,
+          "target": 8,
+          "applied": 8,
+          "state": "settled",
+          "updated_at": 1793366643
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-incomplete",
+          "stream": true,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": [
+        {
+          "reservation_id": 11,
+          "reason": "interrupted_unknown_usage"
+        }
+      ]
+    },
+    {
+      "name": "client-cancel",
+      "path": "/v1/responses",
+      "model": "accept-cancel",
+      "stream": true,
+      "client_cancelled": true,
+      "http_status": 200,
+      "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+      "response_fixture": "event: response.created\ndata: {\"type\": \"response.created\", \"response\": {\"id\": \"resp_mock\", \"model\": \"mock-cancel\", \"status\": \"in_progress\", \"output\": []}}\n\nevent: response.output_text.delta\n",
+      "wallet_delta": 8,
+      "token_delta": 8,
+      "user_used_delta": 8,
+      "token_used_delta": 8,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 12,
+          "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+          "quota": 8,
+          "prompt_tokens": 4,
+          "completion_tokens": 2,
+          "channel_id": 1,
+          "token_observation": {
+            "source": "unknown",
+            "quality": "missing",
+            "input": null,
+            "output": null,
+            "cache_read": null,
+            "cache_write": null,
+            "reasoning": null,
+            "total": null,
+            "total_derived": false,
+            "raw": {},
+            "protocol": "",
+            "interrupted": true,
+            "internal_model": "mock-cancel",
+            "model_alias": "accept-cancel"
+          },
+          "cache_tokens": 0
+        }
+      ],
+      "reservation": [
+        {
+          "id": 12,
+          "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 8,
+          "target": 8,
+          "applied": 8,
+          "state": "settled",
+          "updated_at": 1793366648
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-cancel",
+          "stream": true,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "wallet_held_before_disconnect": 4,
+      "manual_review_markers": [
+        {
+          "reservation_id": 12,
+          "reason": "interrupted_unknown_usage"
+        }
+      ]
+    },
+    {
+      "name": "malformed-json",
+      "path": "/v1/responses",
+      "model": "accept-badjson",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 500,
+      "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+      "response_fixture": "{\"error\":{\"message\":\"invalid character 'o' in literal null (expecting 'u')\",\"type\":\"bad_response_body\",\"param\":\"\",\"code\":\"bad_response_body\"}}",
+      "wallet_delta": 4,
+      "token_delta": 4,
+      "user_used_delta": 0,
+      "token_used_delta": 4,
+      "request_count_delta": 0,
+      "consume_logs": [
+        {
+          "id": 14,
+          "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+          "quota": 4,
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "channel_id": 1,
+          "token_observation": null,
+          "cache_tokens": null
+        }
+      ],
+      "reservation": [
+        {
+          "id": 14,
+          "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 4,
+          "target": 4,
+          "applied": 4,
+          "state": "settled",
+          "updated_at": 1793366759
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-badjson",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": [
+        {
+          "reservation_id": 14,
+          "reason": "upstream_usage_unknown"
+        }
+      ]
+    },
+    {
+      "name": "connection-drop",
+      "path": "/v1/responses",
+      "model": "accept-drop",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 502,
+      "request_id": "202610301326045910574698268d9d6pXlWtnri",
+      "response_fixture": "{\"error\":{\"message\":\"Upstream service temporarily unavailable\",\"type\":\"upstream_error\",\"param\":\"\",\"code\":null}}",
+      "wallet_delta": 4,
+      "token_delta": 4,
+      "user_used_delta": 0,
+      "token_used_delta": 4,
+      "request_count_delta": 0,
+      "consume_logs": [
+        {
+          "id": 15,
+          "request_id": "202610301326045910574698268d9d6pXlWtnri",
+          "quota": 4,
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "channel_id": 1,
+          "token_observation": null,
+          "cache_tokens": null
+        }
+      ],
+      "reservation": [
+        {
+          "id": 15,
+          "request_id": "202610301326045910574698268d9d6pXlWtnri",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 4,
+          "target": 4,
+          "applied": 4,
+          "state": "settled",
+          "updated_at": 1793366764
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/responses",
+          "model": "mock-drop",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": [
+        {
+          "reservation_id": 15,
+          "reason": "upstream_usage_unknown"
+        }
+      ]
+    },
+    {
+      "name": "sub2api-connect-refused",
+      "path": "/v1/chat/completions",
+      "model": "accept-connect-refused",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 500,
+      "request_id": "202610301329080346860918268d9d6aABHG7hj",
+      "response_fixture": "{\"error\":{\"message\":\"upstream error: do request failed (request id: 202610301329080346860918268d9d6aABHG7hj)\",\"type\":\"new_api_error\",\"param\":\"\",\"code\":\"do_request_failed\"}}",
+      "wallet_delta": 0,
+      "token_delta": 0,
+      "user_used_delta": 0,
+      "token_used_delta": 0,
+      "request_count_delta": 0,
+      "consume_logs": [],
+      "reservation": [
+        {
+          "id": 16,
+          "request_id": "202610301329080346860918268d9d6aABHG7hj",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 12,
+          "target": 0,
+          "applied": 0,
+          "state": "refunded",
+          "updated_at": 1793366948
+        }
+      ],
+      "mock_attempts": [],
+      "manual_review_markers": []
+    },
+    {
+      "name": "paused-account-refused",
+      "path": "/v1/messages",
+      "model": "accept-message",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 503,
+      "request_id": "202610301329086495331018268d9d6HijMRP0o",
+      "response_fixture": "{\"error\":{\"type\":\"\\u003cnil\\u003e\",\"message\":\"No available accounts: no available accounts (request id: 202610301329086495331018268d9d6HijMRP0o)\"},\"type\":\"error\"}",
+      "wallet_delta": 6,
+      "token_delta": 6,
+      "user_used_delta": 0,
+      "token_used_delta": 6,
+      "request_count_delta": 0,
+      "consume_logs": [
+        {
+          "id": 17,
+          "request_id": "202610301329086495331018268d9d6HijMRP0o",
+          "quota": 6,
+          "prompt_tokens": 0,
+          "completion_tokens": 0,
+          "channel_id": 2,
+          "token_observation": null,
+          "cache_tokens": null
+        }
+      ],
+      "reservation": [
+        {
+          "id": 17,
+          "request_id": "202610301329086495331018268d9d6HijMRP0o",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 6,
+          "target": 6,
+          "applied": 6,
+          "state": "settled",
+          "updated_at": 1793366948
+        }
+      ],
+      "mock_attempts": [],
+      "manual_review_markers": [
+        {
+          "reservation_id": 17,
+          "reason": "upstream_usage_unknown"
+        }
+      ]
+    },
+    {
+      "name": "ordinary-channel-with-pool-disabled",
+      "path": "/v1/chat/completions",
+      "model": "ordinary-model",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301329141596476438268d9d63dR8Ywew",
+      "response_fixture": "{\"id\": \"chatcmpl_mock\", \"object\": \"chat.completion\", \"model\": \"ordinary-model\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"mock ok\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 1000, \"completion_tokens\": 20, \"total_tokens\": 1020, \"prompt_tokens_details\": {\"cached_tokens\": 200}}}",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 18,
+          "request_id": "202610301329141596476438268d9d63dR8Ywew",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 3,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "completion_tokens": 20,
+              "prompt_tokens": 1000,
+              "prompt_tokens_details.cached_tokens": 200,
+              "total_tokens": 1020
+            },
+            "protocol": "openai",
+            "interrupted": false,
+            "internal_model": "ordinary-model",
+            "model_alias": "ordinary-model"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 18,
+          "request_id": "202610301329141596476438268d9d63dR8Ywew",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793366954
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/ordinary/v1/chat/completions",
+          "model": "ordinary-model",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    },
+    {
+      "name": "one-retry-one-wallet-settlement",
+      "path": "/v1/responses",
+      "model": "accept-retry",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+      "response_fixture": "{\"id\":\"chatcmpl_mock\",\"object\":\"response\",\"created_at\":1793367133,\"model\":\"mock-retry\",\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"id\":\"item_df630a84fa289210af50d33d\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"mock ok\"}],\"status\":\"completed\"}],\"usage\":{\"input_tokens\":1000,\"output_tokens\":20,\"total_tokens\":1020,\"input_tokens_details\":{\"cached_tokens\":200}}}",
+      "wallet_delta": 890,
+      "token_delta": 890,
+      "user_used_delta": 890,
+      "token_used_delta": 890,
+      "request_count_delta": 1,
+      "consume_logs": [
+        {
+          "id": 19,
+          "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+          "quota": 890,
+          "prompt_tokens": 1000,
+          "completion_tokens": 20,
+          "channel_id": 5,
+          "token_observation": {
+            "source": "upstream_response",
+            "quality": "upstream_partial",
+            "input": 1000,
+            "output": 20,
+            "cache_read": 200,
+            "cache_write": null,
+            "reasoning": null,
+            "total": 1020,
+            "total_derived": false,
+            "raw": {
+              "input_tokens": 1000,
+              "input_tokens_details.cached_tokens": 200,
+              "output_tokens": 20,
+              "total_tokens": 1020
+            },
+            "protocol": "responses",
+            "interrupted": false,
+            "internal_model": "mock-retry",
+            "model_alias": "accept-retry"
+          },
+          "cache_tokens": 200
+        }
+      ],
+      "reservation": [
+        {
+          "id": 19,
+          "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 890,
+          "target": 890,
+          "applied": 890,
+          "state": "settled",
+          "updated_at": 1793367133
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/chat/completions",
+          "model": "mock-retry",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        },
+        {
+          "path": "/openai/v1/chat/completions",
+          "model": "mock-retry",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ],
+      "manual_review_markers": []
+    }
+  ],
+  "gateway_final": {
+    "user": {
+      "id": 1,
+      "quota": 99991932,
+      "used_quota": 8038,
+      "request_count": 12
+    },
+    "token": {
+      "id": 1,
+      "remain_quota": 91932,
+      "used_quota": 8068
+    },
+    "logs": [
+      {
+        "id": 1,
+        "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+        "quota": 12,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"charged_quota\":12,\"expected_quota\":890,\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":35,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":168,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"settlement_failed\":true,\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"completion_tokens\":20,\"prompt_tokens\":1000,\"prompt_tokens_details.cached_tokens\":200,\"total_tokens\":1020},\"protocol\":\"openai\",\"interrupted\":false,\"internal_model\":\"mock-chat\",\"model_alias\":\"accept-chat\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Compatible\"],\"request_path\":\"/v1/chat/completions\",\"response_model\":{\"requested_model\":\"accept-chat\",\"upstream_model\":\"mock-chat\",\"returned_model\":\"mock-chat\"},\"upstream_model_name\":\"mock-chat\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 2,
+        "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":8,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":50,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"completion_tokens\":20,\"prompt_tokens\":1000,\"prompt_tokens_details.cached_tokens\":200,\"total_tokens\":1020},\"protocol\":\"openai\",\"interrupted\":false,\"internal_model\":\"mock-chat\",\"model_alias\":\"accept-chat\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Compatible\"],\"request_path\":\"/v1/chat/completions\",\"response_model\":{\"requested_model\":\"accept-chat\",\"upstream_model\":\"mock-chat\",\"returned_model\":\"mock-chat\"},\"upstream_model_name\":\"mock-chat\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 3,
+        "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":7,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":54,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"input_tokens\":1000,\"input_tokens_details.cached_tokens\":200,\"output_tokens\":20,\"total_tokens\":1020},\"protocol\":\"responses\",\"interrupted\":false,\"internal_model\":\"mock-response\",\"model_alias\":\"accept-response\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Responses\"],\"request_path\":\"/v1/responses\",\"response_model\":{\"requested_model\":\"accept-response\",\"upstream_model\":\"mock-response\",\"returned_model\":\"mock-response\"},\"upstream_model_name\":\"mock-response\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 4,
+        "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":6,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":43,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"input_tokens\":1000,\"input_tokens_details.cached_tokens\":200,\"output_tokens\":20,\"total_tokens\":1020},\"protocol\":\"responses\",\"interrupted\":false,\"internal_model\":\"mock-response\",\"model_alias\":\"accept-response\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":19,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Responses\"],\"request_path\":\"/v1/responses\",\"response_model\":{\"requested_model\":\"accept-response\",\"upstream_model\":\"mock-response\",\"returned_model\":\"mock-response\"},\"stream_status\":{\"end_reason\":\"done\",\"response_status\":\"completed\",\"status\":\"ok\"},\"upstream_model_name\":\"mock-response\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 5,
+        "request_id": "202610301321431725933628268d9d6ytHnO0Sw",
+        "quota": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "channel_id": 2,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":2,\"group\":\"default\",\"elapsed_ms\":8,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":2,\"group\":\"default\",\"elapsed_ms\":39,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":null,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"completion_tokens\":20,\"prompt_tokens\":1000,\"total_tokens\":1020},\"protocol\":\"anthropic\",\"interrupted\":false,\"internal_model\":\"mock-message\",\"model_alias\":\"accept-message\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"2\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_creation_ratio\":0,\"cache_creation_tokens\":0,\"cache_ratio\":0,\"cache_tokens\":0,\"claude\":true,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"Claude Messages\"],\"request_path\":\"/v1/messages\",\"response_model\":{\"requested_model\":\"accept-message\",\"upstream_model\":\"mock-message\",\"returned_model\":\"mock-message\"},\"upstream_model_name\":\"mock-message\",\"usage_semantic\":\"anthropic\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 6,
+        "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":6,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":60,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"input_tokens\":1000,\"input_tokens_details.cached_tokens\":200,\"output_tokens\":20,\"total_tokens\":1020},\"protocol\":\"responses\",\"interrupted\":false,\"internal_model\":\"mock-response\",\"model_alias\":\"accept-response\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Responses\"],\"request_path\":\"/v1/responses\",\"response_model\":{\"requested_model\":\"accept-response\",\"upstream_model\":\"mock-response\",\"returned_model\":\"mock-response\"},\"upstream_model_name\":\"mock-response\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 7,
+        "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":6,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":66,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"input_tokens\":1000,\"input_tokens_details.cached_tokens\":200,\"output_tokens\":20,\"total_tokens\":1020},\"protocol\":\"responses\",\"interrupted\":false,\"internal_model\":\"mock-response\",\"model_alias\":\"accept-response\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":17,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Responses\"],\"request_path\":\"/v1/responses\",\"response_model\":{\"requested_model\":\"accept-response\",\"upstream_model\":\"mock-response\",\"returned_model\":\"mock-response\"},\"stream_status\":{\"end_reason\":\"eof\",\"response_status\":\"completed\",\"status\":\"ok\"},\"upstream_model_name\":\"mock-response\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 8,
+        "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+        "quota": 890,
+        "prompt_tokens": 800,
+        "completion_tokens": 20,
+        "channel_id": 2,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":2,\"group\":\"default\",\"elapsed_ms\":4,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":2,\"group\":\"default\",\"elapsed_ms\":35,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":800,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":null,\"total_derived\":false,\"raw\":{\"cache_read_input_tokens\":200,\"input_tokens\":800,\"output_tokens\":20},\"protocol\":\"anthropic\",\"interrupted\":false,\"internal_model\":\"mock-message\",\"model_alias\":\"accept-message\"},\"usage_billing_path\":\"billing-usage-anthropic\",\"use_channel\":[\"2\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_creation_ratio\":0,\"cache_creation_tokens\":0,\"cache_ratio\":0,\"cache_tokens\":200,\"claude\":true,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"Claude Messages\"],\"request_path\":\"/v1/messages\",\"response_model\":{\"requested_model\":\"accept-message\",\"upstream_model\":\"mock-message\",\"returned_model\":\"mock-message\"},\"upstream_model_name\":\"mock-message\",\"usage_semantic\":\"anthropic\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 9,
+        "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":5,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":37,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"completion_tokens\":20,\"prompt_tokens\":1000,\"prompt_tokens_details.cached_tokens\":200,\"total_tokens\":1020},\"protocol\":\"openai\",\"interrupted\":false,\"internal_model\":\"mock-chat\",\"model_alias\":\"accept-chat\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":18,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Compatible\"],\"request_path\":\"/v1/chat/completions\",\"response_model\":{\"requested_model\":\"accept-chat\",\"upstream_model\":\"mock-chat\",\"returned_model\":\"mock-chat\"},\"stream_status\":{\"end_reason\":\"done\",\"response_status\":\"completed\",\"status\":\"ok\"},\"upstream_model_name\":\"mock-chat\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 10,
+        "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+        "quota": 12,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "channel_id": 1,
+        "other": ""
+      },
+      {
+        "id": 11,
+        "request_id": "202610301324032681872748268d9d6laZWeaGo",
+        "quota": 8,
+        "prompt_tokens": 4,
+        "completion_tokens": 2,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"expected_quota\":8,\"interrupted_unknown_usage\":true,\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":6,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":42,\"decision\":{\"action\":\"stop\",\"reason\":\"stream_not_successful\",\"source\":\"system\"}}],\"token_observation\":{\"source\":\"unknown\",\"quality\":\"missing\",\"input\":null,\"output\":null,\"cache_read\":null,\"cache_write\":null,\"reasoning\":null,\"total\":null,\"total_derived\":false,\"raw\":{},\"protocol\":\"\",\"interrupted\":true,\"internal_model\":\"mock-incomplete\",\"model_alias\":\"accept-incomplete\"},\"usage_billing_path\":\"upstream\",\"usage_retained_for_review\":true,\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":0,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":18,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Responses\"],\"request_path\":\"/v1/responses\",\"response_model\":{\"requested_model\":\"accept-incomplete\",\"upstream_model\":\"mock-incomplete\",\"returned_model\":\"mock-incomplete\"},\"stream_status\":{\"end_reason\":\"eof\",\"response_status\":\"failed\",\"status\":\"error\"},\"upstream_model_name\":\"mock-incomplete\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 12,
+        "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+        "quota": 8,
+        "prompt_tokens": 4,
+        "completion_tokens": 2,
+        "channel_id": 1,
+        "other": "{\"admin_info\":{\"expected_quota\":8,\"interrupted_unknown_usage\":true,\"request_policy\":[{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":5,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":1,\"group\":\"default\",\"elapsed_ms\":326,\"decision\":{\"action\":\"stop\",\"reason\":\"stream_not_successful\",\"source\":\"system\"}}],\"token_observation\":{\"source\":\"unknown\",\"quality\":\"missing\",\"input\":null,\"output\":null,\"cache_read\":null,\"cache_write\":null,\"reasoning\":null,\"total\":null,\"total_derived\":false,\"raw\":{},\"protocol\":\"\",\"interrupted\":true,\"internal_model\":\"mock-cancel\",\"model_alias\":\"accept-cancel\"},\"usage_billing_path\":\"upstream\",\"usage_retained_for_review\":true,\"use_channel\":[\"1\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":0,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":19,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Responses\"],\"request_path\":\"/v1/responses\",\"response_model\":{\"requested_model\":\"accept-cancel\",\"upstream_model\":\"mock-cancel\",\"returned_model\":\"mock-cancel\"},\"stream_status\":{\"end_error\":\"context canceled\",\"end_reason\":\"client_gone\",\"status\":\"error\"},\"upstream_model_name\":\"mock-cancel\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 13,
+        "request_id": "202610301324140653635168268d9d68tlROazR",
+        "quota": 4,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "channel_id": 1,
+        "other": ""
+      },
+      {
+        "id": 14,
+        "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+        "quota": 4,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "channel_id": 1,
+        "other": ""
+      },
+      {
+        "id": 15,
+        "request_id": "202610301326045910574698268d9d6pXlWtnri",
+        "quota": 4,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "channel_id": 1,
+        "other": ""
+      },
+      {
+        "id": 17,
+        "request_id": "202610301329086495331018268d9d6HijMRP0o",
+        "quota": 6,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "channel_id": 2,
+        "other": ""
+      },
+      {
+        "id": 18,
+        "request_id": "202610301329141596476438268d9d63dR8Ywew",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 3,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":3,\"group\":\"default\",\"elapsed_ms\":7,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":3,\"group\":\"default\",\"elapsed_ms\":34,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"completion_tokens\":20,\"prompt_tokens\":1000,\"prompt_tokens_details.cached_tokens\":200,\"total_tokens\":1020},\"protocol\":\"openai\",\"interrupted\":false,\"internal_model\":\"ordinary-model\",\"model_alias\":\"ordinary-model\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"3\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Compatible\"],\"request_path\":\"/v1/chat/completions\",\"user_group_ratio\":-1}"
+      },
+      {
+        "id": 19,
+        "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+        "quota": 890,
+        "prompt_tokens": 1000,
+        "completion_tokens": 20,
+        "channel_id": 5,
+        "other": "{\"admin_info\":{\"request_policy\":[{\"attempt\":1,\"channel_id\":5,\"group\":\"default\",\"elapsed_ms\":6,\"decision\":{\"action\":\"attempt\",\"reason\":\"channel_selected\",\"source\":\"routing\"}},{\"attempt\":1,\"channel_id\":5,\"group\":\"default\",\"elapsed_ms\":579,\"decision\":{\"action\":\"success\",\"reason\":\"request_completed\",\"source\":\"upstream\"}}],\"token_observation\":{\"source\":\"upstream_response\",\"quality\":\"upstream_partial\",\"input\":1000,\"output\":20,\"cache_read\":200,\"cache_write\":null,\"reasoning\":null,\"total\":1020,\"total_derived\":false,\"raw\":{\"input_tokens\":1000,\"input_tokens_details.cached_tokens\":200,\"output_tokens\":20,\"total_tokens\":1020},\"protocol\":\"responses\",\"interrupted\":false,\"internal_model\":\"mock-retry\",\"model_alias\":\"accept-retry\"},\"usage_billing_path\":\"upstream\",\"use_channel\":[\"5\"]},\"billing_mode\":\"tiered_expr\",\"billing_source\":\"wallet\",\"billing_unit\":\"token\",\"cache_ratio\":0,\"cache_tokens\":200,\"completion_ratio\":0,\"expr_b64\":\"dGllcigibW9jayIsIHAqMiArIGNyKjAuNSArIGMqNCk=\",\"frt\":-1000,\"group_ratio\":1,\"is_model_mapped\":true,\"matched_tier\":\"mock\",\"model_price\":0,\"model_ratio\":0,\"request_conversion\":[\"OpenAI Responses\"],\"request_path\":\"/v1/responses\",\"response_model\":{\"requested_model\":\"accept-retry\",\"upstream_model\":\"mock-retry\",\"returned_model\":\"mock-retry\"},\"upstream_model_name\":\"mock-retry\",\"user_group_ratio\":-1}"
+      }
+    ],
+    "reservations": [
+      {
+        "id": 1,
+        "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 12,
+        "target": 890,
+        "applied": 12,
+        "state": "needs_review",
+        "updated_at": 1793366351
+      },
+      {
+        "id": 2,
+        "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366489
+      },
+      {
+        "id": 3,
+        "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366494
+      },
+      {
+        "id": 4,
+        "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366497
+      },
+      {
+        "id": 5,
+        "request_id": "202610301321431725933628268d9d6ytHnO0Sw",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 6,
+        "target": 0,
+        "applied": 0,
+        "state": "settled",
+        "updated_at": 1793366503
+      },
+      {
+        "id": 6,
+        "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366621
+      },
+      {
+        "id": 7,
+        "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366626
+      },
+      {
+        "id": 8,
+        "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366627
+      },
+      {
+        "id": 9,
+        "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366633
+      },
+      {
+        "id": 10,
+        "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 12,
+        "target": 12,
+        "applied": 12,
+        "state": "settled",
+        "updated_at": 1793366637
+      },
+      {
+        "id": 11,
+        "request_id": "202610301324032681872748268d9d6laZWeaGo",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 8,
+        "target": 8,
+        "applied": 8,
+        "state": "settled",
+        "updated_at": 1793366643
+      },
+      {
+        "id": 12,
+        "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 8,
+        "target": 8,
+        "applied": 8,
+        "state": "settled",
+        "updated_at": 1793366648
+      },
+      {
+        "id": 13,
+        "request_id": "202610301324140653635168268d9d68tlROazR",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 4,
+        "target": 4,
+        "applied": 4,
+        "state": "settled",
+        "updated_at": 1793366654
+      },
+      {
+        "id": 14,
+        "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 4,
+        "target": 4,
+        "applied": 4,
+        "state": "settled",
+        "updated_at": 1793366759
+      },
+      {
+        "id": 15,
+        "request_id": "202610301326045910574698268d9d6pXlWtnri",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 4,
+        "target": 4,
+        "applied": 4,
+        "state": "settled",
+        "updated_at": 1793366764
+      },
+      {
+        "id": 16,
+        "request_id": "202610301329080346860918268d9d6aABHG7hj",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 12,
+        "target": 0,
+        "applied": 0,
+        "state": "refunded",
+        "updated_at": 1793366948
+      },
+      {
+        "id": 17,
+        "request_id": "202610301329086495331018268d9d6HijMRP0o",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 6,
+        "target": 6,
+        "applied": 6,
+        "state": "settled",
+        "updated_at": 1793366948
+      },
+      {
+        "id": 18,
+        "request_id": "202610301329141596476438268d9d63dR8Ywew",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793366954
+      },
+      {
+        "id": 19,
+        "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 890,
+        "target": 890,
+        "applied": 890,
+        "state": "settled",
+        "updated_at": 1793367133
+      }
+    ],
+    "outbox": [
+      {
+        "id": 1,
+        "request_id": "202610301321289675816908268d9d6H5pJ8ALw",
+        "state": "delivered"
+      },
+      {
+        "id": 2,
+        "request_id": "202610301321344924029518268d9d6DyiSw7Jg",
+        "state": "delivered"
+      },
+      {
+        "id": 3,
+        "request_id": "202610301321377329962718268d9d6rl1AC8Sq",
+        "state": "delivered"
+      },
+      {
+        "id": 4,
+        "request_id": "202610301321431725933628268d9d6ytHnO0Sw",
+        "state": "delivered"
+      },
+      {
+        "id": 5,
+        "request_id": "202610301323415548164168268d9d6U0qXRFdF",
+        "state": "delivered"
+      },
+      {
+        "id": 6,
+        "request_id": "202610301323469197483538268d9d6xkVhmtFe",
+        "state": "delivered"
+      },
+      {
+        "id": 7,
+        "request_id": "202610301323479424640968268d9d6FKtMfdVz",
+        "state": "delivered"
+      },
+      {
+        "id": 8,
+        "request_id": "202610301323534212310688268d9d6gcrHplvJ",
+        "state": "delivered"
+      },
+      {
+        "id": 9,
+        "request_id": "202610301323578232012398268d9d6n7Bcvw9D",
+        "state": "delivered"
+      },
+      {
+        "id": 10,
+        "request_id": "202610301324032681872748268d9d6laZWeaGo",
+        "state": "delivered"
+      },
+      {
+        "id": 11,
+        "request_id": "202610301324079641586228268d9d6fGtQCy0c",
+        "state": "delivered"
+      },
+      {
+        "id": 12,
+        "request_id": "202610301324140653635168268d9d68tlROazR",
+        "state": "delivered"
+      },
+      {
+        "id": 13,
+        "request_id": "202610301325590290893958268d9d6ePm1lIlx",
+        "state": "delivered"
+      },
+      {
+        "id": 14,
+        "request_id": "202610301326045910574698268d9d6pXlWtnri",
+        "state": "delivered"
+      },
+      {
+        "id": 15,
+        "request_id": "202610301329080346860918268d9d6aABHG7hj",
+        "state": "delivered"
+      },
+      {
+        "id": 16,
+        "request_id": "202610301329086495331018268d9d6HijMRP0o",
+        "state": "delivered"
+      },
+      {
+        "id": 17,
+        "request_id": "202610301329141596476438268d9d63dR8Ywew",
+        "state": "delivered"
+      },
+      {
+        "id": 18,
+        "request_id": "202610301332124789259258268d9d6AAOjmE0q",
+        "state": "delivered"
+      }
+    ],
+    "markers": [
+      {
+        "reservation_id": 10,
+        "reason": "upstream_usage_unknown"
+      },
+      {
+        "reservation_id": 11,
+        "reason": "interrupted_unknown_usage"
+      },
+      {
+        "reservation_id": 12,
+        "reason": "interrupted_unknown_usage"
+      },
+      {
+        "reservation_id": 13,
+        "reason": "upstream_usage_unknown"
+      },
+      {
+        "reservation_id": 14,
+        "reason": "upstream_usage_unknown"
+      },
+      {
+        "reservation_id": 15,
+        "reason": "upstream_usage_unknown"
+      },
+      {
+        "reservation_id": 17,
+        "reason": "upstream_usage_unknown"
+      }
+    ]
+  },
+  "sub2api_usage": [
+    {
+      "id": 1,
+      "model": "mock-chat",
+      "stream": false,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:01793b2a-a27f-491d-8cc1-5da356bd124a",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-chat",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 2,
+      "model": "mock-chat",
+      "stream": false,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:16d5df71-4217-4305-8694-dd6433c29203",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-chat",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 3,
+      "model": "mock-response",
+      "stream": false,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:e5903176-a133-4156-bae6-24e277f00a75",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-response",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 4,
+      "model": "mock-response",
+      "stream": true,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:45509d44-e34c-42e1-bf73-2b615d0501aa",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-response",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 5,
+      "model": "mock-message",
+      "stream": false,
+      "account_id": 2,
+      "api_key_id": 1,
+      "request_id": "client:9e0a4a7d-3ffb-47d1-be85-2af1761ba69a",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "requested_model": "mock-message",
+      "cache_read_tokens": 0,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 6,
+      "model": "mock-response",
+      "stream": false,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:ec8e9517-e15b-46cc-a83a-4f7abe6dca6c",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-response",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 7,
+      "model": "mock-response",
+      "stream": true,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:fef76e65-4cb4-4420-9a70-377b27fc6a44",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-response",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 8,
+      "model": "mock-message",
+      "stream": false,
+      "account_id": 2,
+      "api_key_id": 1,
+      "request_id": "client:1cbc9a3b-f275-4f35-9142-32d39f377373",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-message",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 9,
+      "model": "mock-chat",
+      "stream": true,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:f0426d4e-f883-4470-8690-e324f0be0f59",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-chat",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 10,
+      "model": "mock-cancel",
+      "stream": true,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:02770529-2af5-4ef8-830f-35546eae9ef9",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-cancel",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 11,
+      "model": "mock-badjson",
+      "stream": false,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:34a8645f-d4a5-4422-ad05-6afed9a7dac3",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "requested_model": "mock-badjson",
+      "cache_read_tokens": 0,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 12,
+      "model": "mock-badjson",
+      "stream": false,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:7748594a-0115-4924-a1e5-859f64f53090",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "requested_model": "mock-badjson",
+      "cache_read_tokens": 0,
+      "cache_creation_tokens": 0
+    },
+    {
+      "id": 13,
+      "model": "mock-retry",
+      "stream": false,
+      "account_id": 1,
+      "api_key_id": 2,
+      "request_id": "client:f0b1ae73-d5c2-401f-81d9-08d048f089ad",
+      "input_tokens": 800,
+      "output_tokens": 20,
+      "requested_model": "mock-retry",
+      "cache_read_tokens": 200,
+      "cache_creation_tokens": 0
+    }
+  ],
+  "sub2api_balances": [
+    {
+      "id": 1,
+      "balance": 0.0
+    },
+    {
+      "id": 2,
+      "balance": 0.0
+    }
+  ],
+  "operations": {
+    "native_groups": 13,
+    "internal_keys": 13,
+    "mock_accounts": 2,
+    "account_pause_refused": true,
+    "account_resumed": true,
+    "revoked_key_status": 401,
+    "pool_channels_disabled": true,
+    "ordinary_channel_still_worked": true
+  },
+  "assertions": "PASS for normal/mock accounting, transport refund, pause/key denial, pool-off ordinary channel, unique log and aggregate wallet/token/reservation/log totals; retained/uncertain cases reported separately",
+  "aggregate": {
+    "wallet_decrease": 8068,
+    "token_used": 8068,
+    "reservation_applied": 8068,
+    "unique_consume_logs": 18,
+    "consume_log_quota": 8068,
+    "user_used_quota": 8038,
+    "review_markers": 7,
+    "preliminary_needs_review": [
+      {
+        "id": 1,
+        "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+        "user_id": 1,
+        "token_id": 1,
+        "reserved": 12,
+        "target": 890,
+        "applied": 12,
+        "state": "needs_review",
+        "updated_at": 1793366351
+      }
+    ]
+  }
+}

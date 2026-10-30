@@ -1,0 +1,45 @@
+{
+  "time_utc": "2026-10-30T13:19:11.537844+00:00",
+  "kind": "MOCK_E2E",
+  "real_provider_calls": 0,
+  "cases": [
+    {
+      "name": "chat-json",
+      "path": "/v1/chat/completions",
+      "model": "accept-chat",
+      "stream": false,
+      "client_cancelled": false,
+      "http_status": 200,
+      "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+      "response_fixture": "{\"id\": \"chatcmpl_mock\", \"object\": \"chat.completion\", \"model\": \"mock-chat\", \"choices\": [{\"index\": 0, \"message\": {\"role\": \"assistant\", \"content\": \"mock ok\"}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 1000, \"completion_tokens\": 20, \"total_tokens\": 1020, \"prompt_tokens_details\": {\"cached_tokens\": 200}}}",
+      "wallet_delta": 12,
+      "token_delta": 12,
+      "user_used_delta": 0,
+      "token_used_delta": 12,
+      "request_count_delta": 0,
+      "consume_logs": [],
+      "reservation": [
+        {
+          "id": 1,
+          "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 12,
+          "target": 0,
+          "applied": 12,
+          "state": "active",
+          "updated_at": 1793366351
+        }
+      ],
+      "mock_attempts": [
+        {
+          "path": "/openai/v1/chat/completions",
+          "model": "mock-chat",
+          "stream": false,
+          "auth_matches_mock_account": true,
+          "prompt_cache_key": null
+        }
+      ]
+    }
+  ]
+}

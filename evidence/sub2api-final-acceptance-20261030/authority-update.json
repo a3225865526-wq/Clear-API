@@ -1,0 +1,12 @@
+{
+  "authority_path": "D:\\AI\\API\\worktrees\\clearapi-controlled-launch-20261020\\CLEARAPI_MASTER_STATUS.md",
+  "previous_latest_heading": "## 2026-10-30T20:56:06+08:00 — Sub2API全平台批量准备收尾：13平台/31档案，423未解除，所有新增池渠道保持关闭",
+  "time": "2026-10-30T21:43:03+08:00",
+  "before_bytes": 345092,
+  "after_bytes": 349706,
+  "before_sha256": "d0dc389df13fed420b7d3faed495a73c3948d3be88d0fc8a3bfd0feacc125766",
+  "after_sha256": "66de915016b87e17c6fac9294c6eda8c5e013343b7b5b0f67259a4fb28c5be88",
+  "original_prefix_preserved": true,
+  "other_worktree_master_not_updated": true,
+  "authority_file_not_committed_with_preexisting_changes": true
+}

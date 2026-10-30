@@ -1,0 +1,193 @@
+{
+  "time_utc": "2026-10-30T13:42:22.271278+00:00",
+  "baseline": "2324d837ec21a26aa112f0c0090a973c7c9d6d75",
+  "implementation_commit": "216f2e67eb08aaab74d2e71be76f233bd8939be9",
+  "branch": "codex/sub2api-isolated-integration-20261030",
+  "sub2api_fixed_commit": "d851a38477597157e78450d30af2d8504764d085",
+  "gateway_binary_sha256": "235e2709111087e097acaac459ca3291ce5dcd04d88f7d0d41055c3c79ec2b2f",
+  "build": {
+    "result": "PASS",
+    "go_version": "1.26.9",
+    "network": "none",
+    "source": "readonly worktree; reused previously built web/dist",
+    "command": "GOWORK=off go build -buildvcs=false -o /out/clearapi-acceptance .",
+    "existing_migration_clis": "billing-migrate and finance-migrate built and run only on new synthetic SQLite; durable wallet/outbox/receipt/finance/reconciliation initialized"
+  },
+  "new_verification": {
+    "actual_http_business_cases": 16,
+    "python_fixture_ast": "PASS",
+    "diff_check": "PASS",
+    "final_accounting_assertions": "PASS for normal/mock accounting, transport refund, pause/key denial, pool-off ordinary channel, unique log and aggregate wallet/token/reservation/log totals; retained/uncertain cases reported separately",
+    "aggregate": {
+      "wallet_decrease": 8068,
+      "token_used": 8068,
+      "reservation_applied": 8068,
+      "unique_consume_logs": 18,
+      "consume_log_quota": 8068,
+      "user_used_quota": 8038,
+      "review_markers": 7,
+      "preliminary_needs_review": [
+        {
+          "id": 1,
+          "request_id": "202610301319115579483268268d9d6IIrnMEc6",
+          "user_id": 1,
+          "token_id": 1,
+          "reserved": 12,
+          "target": 890,
+          "applied": 12,
+          "state": "needs_review",
+          "updated_at": 1793366351
+        }
+      ]
+    },
+    "all_outbox_delivered": true,
+    "closing_state": {
+      "all_13_internal_keys_inactive": true,
+      "both_mock_accounts_unschedulable": true,
+      "all_gateway_test_channels_disabled": true,
+      "gateway_test_channels": [
+        {
+          "id": 1,
+          "name": "sub2-accept-openai",
+          "type": 59,
+          "status": 2
+        },
+        {
+          "id": 2,
+          "name": "sub2-accept-anthropic",
+          "type": 59,
+          "status": 2
+        },
+        {
+          "id": 3,
+          "name": "sub2-accept-ordinary",
+          "type": 1,
+          "status": 2
+        },
+        {
+          "id": 4,
+          "name": "sub2-accept-unreachable",
+          "type": 59,
+          "status": 2
+        },
+        {
+          "id": 5,
+          "name": "sub2-accept-retry",
+          "type": 59,
+          "status": 2
+        }
+      ],
+      "original_admin_frontend_preserved": true
+    },
+    "containers": [
+      {
+        "name": "clearapi-sub2api-isolated-20261030-acceptance-gateway-1",
+        "image_id": "sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205",
+        "status": "exited",
+        "exit_code": 0,
+        "health": null,
+        "created": "2026-10-30T13:20:46.451949913Z",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "clearapi-sub2api-isolated-20261030_acceptance-gateway-data",
+            "destination": "/ledger"
+          },
+          {
+            "type": "bind",
+            "name": null,
+            "destination": "/runtime"
+          }
+        ]
+      },
+      {
+        "name": "clearapi-sub2api-isolated-20261030-mock-upstream-1",
+        "image_id": "sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1",
+        "status": "exited",
+        "exit_code": 137,
+        "health": null,
+        "created": "2026-10-30T13:13:14.464917805Z",
+        "mounts": [
+          {
+            "type": "bind",
+            "name": null,
+            "destination": "/mock.py"
+          },
+          {
+            "type": "bind",
+            "name": null,
+            "destination": "/runtime"
+          }
+        ]
+      },
+      {
+        "name": "clearapi-sub2api-isolated-20261030-sub2api-1",
+        "image_id": "sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a",
+        "status": "running",
+        "exit_code": 0,
+        "health": "healthy",
+        "created": "2026-10-30T12:27:54.708743896Z",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "clearapi-sub2api-isolated-20261030_sub2api",
+            "destination": "/app/data"
+          }
+        ]
+      },
+      {
+        "name": "clearapi-sub2api-isolated-20261030-postgres-1",
+        "image_id": "sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+        "status": "running",
+        "exit_code": 0,
+        "health": "healthy",
+        "created": "2026-10-30T12:27:54.181749755Z",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "clearapi-sub2api-isolated-20261030_postgres",
+            "destination": "/var/lib/postgresql/data"
+          }
+        ]
+      },
+      {
+        "name": "clearapi-sub2api-isolated-20261030-redis-1",
+        "image_id": "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+        "status": "running",
+        "exit_code": 0,
+        "health": "healthy",
+        "created": "2026-10-30T12:27:54.180871048Z",
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "clearapi-sub2api-isolated-20261030_redis",
+            "destination": "/data"
+          }
+        ]
+      }
+    ]
+  },
+  "not_run": [
+    "previously passing six protocol unit test groups",
+    "full CI",
+    "frontend rebuild",
+    "three-database matrix",
+    "real provider paid calls",
+    "production deployment"
+  ],
+  "limitations": [
+    "7 review markers plus preliminary SQLite I/O needs_review record retained",
+    "client cancellation can leave full Sub2API usage without trusted terminal usage at Gateway",
+    "unknown/error completion retains conservative amount, not automatic exact refund",
+    "physical upstream exactly-once execution is not claimed",
+    "TypeSafe System One remains ClearAPI protocol gap",
+    "simple groups are not same-platform account-source hard isolation"
+  ],
+  "source_and_existing_evidence_preserved": true,
+  "evidence_sha256_lf_utf8": {
+    "current-gate.json": "ce65172daf3fd62fca62ab14143076b820c45f3964d5767fce269fbf4bbb0764",
+    "mock-e2e.json": "f8e2ccd5f62eeba0d3ef8cca6c9b12bb81796795f1feb5a6c207a429bdde6019",
+    "operations.json": "57a78e10812ca982e6975d20fa6313a7a954ac297448a04c6ff51ac0ab0fcc55",
+    "preliminary-filesystem-failure.json": "de0e74b0db62b3802f7bb776b9012128730905b81bcaa9d38c7247b589eff258"
+  }
+}

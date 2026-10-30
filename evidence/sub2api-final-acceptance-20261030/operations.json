@@ -1,0 +1,133 @@
+{
+  "time_utc": "2026-10-30T13:34:29.804024+00:00",
+  "groups": {
+    "anthropic": 8,
+    "openai": 9,
+    "gemini": 10,
+    "antigravity": 11,
+    "grok": 12,
+    "kimi": 13,
+    "zhipu": 14,
+    "deepseek": 15,
+    "minimax": 16,
+    "opencode_go": 17,
+    "typesafe": 18,
+    "command_code": 19,
+    "cline": 20
+  },
+  "internal_user_id": 2,
+  "key_ids": {
+    "anthropic": 1,
+    "openai": 2,
+    "gemini": 3,
+    "antigravity": 4,
+    "grok": 5,
+    "kimi": 6,
+    "zhipu": 7,
+    "deepseek": 8,
+    "minimax": 9,
+    "opencode_go": 10,
+    "typesafe": 11,
+    "command_code": 12,
+    "cline": 13
+  },
+  "health_snapshot": [
+    {
+      "id": 2,
+      "name": "clearapi-acceptance-mock-anthropic",
+      "platform": "anthropic",
+      "type": "apikey",
+      "status": "active",
+      "schedulable": false,
+      "error_message": "",
+      "rate_limited_at": null,
+      "rate_limit_reset_at": null
+    },
+    {
+      "id": 1,
+      "name": "clearapi-acceptance-mock-openai",
+      "platform": "openai",
+      "type": "apikey",
+      "status": "active",
+      "schedulable": false,
+      "error_message": "",
+      "rate_limited_at": null,
+      "rate_limit_reset_at": null
+    }
+  ],
+  "native_ops_error_api_status": 200,
+  "native_error_records": [
+    {
+      "id": 3,
+      "platform": "openai",
+      "model": "mock-drop",
+      "status_code": 502,
+      "created_at": "2026-10-30T21:26:04.614237+08:00"
+    },
+    {
+      "id": 2,
+      "platform": "openai",
+      "model": "mock-incomplete",
+      "status_code": 502,
+      "created_at": "2026-10-30T21:24:03.289581+08:00"
+    },
+    {
+      "id": 1,
+      "platform": "openai",
+      "model": "mock-reject",
+      "status_code": 400,
+      "created_at": "2026-10-30T21:23:57.848716+08:00"
+    }
+  ],
+  "original_compliance": {
+    "required": false,
+    "version": "v2026.06.10",
+    "acknowledgement": {
+      "version": "v2026.06.10",
+      "document_zh": "docs/legal/admin-compliance.zh.md",
+      "document_en": "docs/legal/admin-compliance.en.md",
+      "admin_user_id": 1,
+      "ip_address": "192.168.16.1",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0",
+      "accepted_at": "2026-10-30T13:05:18.250299807Z"
+    }
+  },
+  "closing_state": {
+    "all_13_internal_keys_inactive": true,
+    "both_mock_accounts_unschedulable": true,
+    "all_gateway_test_channels_disabled": true,
+    "gateway_test_channels": [
+      {
+        "id": 1,
+        "name": "sub2-accept-openai",
+        "type": 59,
+        "status": 2
+      },
+      {
+        "id": 2,
+        "name": "sub2-accept-anthropic",
+        "type": 59,
+        "status": 2
+      },
+      {
+        "id": 3,
+        "name": "sub2-accept-ordinary",
+        "type": 1,
+        "status": 2
+      },
+      {
+        "id": 4,
+        "name": "sub2-accept-unreachable",
+        "type": 59,
+        "status": 2
+      },
+      {
+        "id": 5,
+        "name": "sub2-accept-retry",
+        "type": 59,
+        "status": 2
+      }
+    ],
+    "original_admin_frontend_preserved": true
+  }
+}
