@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+production.env
+lab.env
+*.dump
+*.rdb
+images.tar
+gateway-source.tar

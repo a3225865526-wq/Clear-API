@@ -1,0 +1,471 @@
+{
+  "concurrency": 4,
+  "requests": 24,
+  "usage": {
+    "prompt": 10,
+    "completion": 2
+  },
+  "seconds": [
+    0.6560000000172295,
+    0.6410000000032596,
+    0.6410000000032596,
+    0.7810000000172295,
+    0.7179999999934807,
+    0.5779999999795109,
+    0.5929999999934807,
+    0.6089999999967404,
+    0.6709999999729916,
+    0.6560000000172295,
+    0.625,
+    0.7650000000139698,
+    0.5310000000172295,
+    0.4220000000204891,
+    0.625,
+    0.5160000000032596,
+    0.375,
+    0.46799999999348074,
+    0.5929999999934807,
+    0.5929999999934807,
+    0.6410000000032596,
+    0.6410000000032596,
+    0.6570000000065193,
+    0.4380000000237487
+  ],
+  "samples": [
+    {
+      "at": 1793377396.0490484,
+      "cgroup": "1558196224\n1610625024\nlow 0\nhigh 0\nmax 188331\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 175273613\nuser_usec 68118797\nsystem_usec 107154815\nnice_usec 0\nnr_periods 5401\nnr_throttled 82\nthrottled_usec 3272138\nnr_bursts 0\nburst_usec 0\n142204\t/state\n12368920\t/var/lib/docker\n",
+      "stats": [
+        {
+          "BlockIO": "0B / 8.19kB",
+          "CPUPerc": "0.00%",
+          "Container": "5f93a32dc4cefc9c7dabfe17bc5286313a4f5ca08d3075291286bc1d86276f3e",
+          "ID": "5f93a32dc4ce",
+          "MemPerc": "3.60%",
+          "MemUsage": "2.305MiB / 64MiB",
+          "Name": "low-edge-1",
+          "NetIO": "9.3kB / 6.11kB",
+          "PIDs": "2"
+        },
+        {
+          "BlockIO": "135MB / 0B",
+          "CPUPerc": "0.47%",
+          "Container": "84b8b8aeeeb016fa010878eede2dfc315e5d549f49f7a166f598e72ec9300fcf",
+          "ID": "84b8b8aeeeb0",
+          "MemPerc": "22.75%",
+          "MemUsage": "87.36MiB / 384MiB",
+          "Name": "low-sub2api-1",
+          "NetIO": "895kB / 1.49MB",
+          "PIDs": "7"
+        },
+        {
+          "BlockIO": "142MB / 32.8kB",
+          "CPUPerc": "0.00%",
+          "Container": "e2506ffaa72a9b7521734d8704ef36b735773e41679711761ee86ec000deca64",
+          "ID": "e2506ffaa72a",
+          "MemPerc": "28.98%",
+          "MemUsage": "129.8MiB / 448MiB",
+          "Name": "low-new-api-1",
+          "NetIO": "732kB / 963kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.7MB / 18.7MB",
+          "CPUPerc": "0.00%",
+          "Container": "338e972d131d6c9471100e05847f9f863cdb319cc638ce181bbe3f8b48818be1",
+          "ID": "338e972d131d",
+          "MemPerc": "18.50%",
+          "MemUsage": "47.36MiB / 256MiB",
+          "Name": "low-gateway-postgres-1",
+          "NetIO": "876kB / 698kB",
+          "PIDs": "8"
+        },
+        {
+          "BlockIO": "31.9MB / 53.2kB",
+          "CPUPerc": "0.52%",
+          "Container": "09505fe609c29c1a2ee8c4b4e86632866f76989414cdebf2dc497770070dc27d",
+          "ID": "09505fe609c2",
+          "MemPerc": "15.66%",
+          "MemUsage": "15.04MiB / 96MiB",
+          "Name": "low-sub2api-redis-1",
+          "NetIO": "183kB / 77.2kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.1MB / 17.6MB",
+          "CPUPerc": "0.44%",
+          "Container": "df094d0fcf5d4db021d7e3eb53611dc1e79fe80a2a104110e9251256b47bc7dc",
+          "ID": "df094d0fcf5d",
+          "MemPerc": "18.37%",
+          "MemUsage": "47.04MiB / 256MiB",
+          "Name": "low-sub2api-postgres-1",
+          "NetIO": "1.3MB / 799kB",
+          "PIDs": "8"
+        }
+      ]
+    },
+    {
+      "at": 1793377401.7975056,
+      "cgroup": "1559183360\n1610625024\nlow 0\nhigh 0\nmax 190016\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 178440811\nuser_usec 69128026\nsystem_usec 109312784\nnice_usec 0\nnr_periods 5495\nnr_throttled 83\nthrottled_usec 3395772\nnr_bursts 0\nburst_usec 0\n142220\t/state\n12368928\t/var/lib/docker\n",
+      "stats": [
+        {
+          "BlockIO": "9.56MB / 8.19kB",
+          "CPUPerc": "0.00%",
+          "Container": "5f93a32dc4cefc9c7dabfe17bc5286313a4f5ca08d3075291286bc1d86276f3e",
+          "ID": "5f93a32dc4ce",
+          "MemPerc": "16.80%",
+          "MemUsage": "10.75MiB / 64MiB",
+          "Name": "low-edge-1",
+          "NetIO": "17.4kB / 11.7kB",
+          "PIDs": "2"
+        },
+        {
+          "BlockIO": "139MB / 0B",
+          "CPUPerc": "2.12%",
+          "Container": "84b8b8aeeeb016fa010878eede2dfc315e5d549f49f7a166f598e72ec9300fcf",
+          "ID": "84b8b8aeeeb0",
+          "MemPerc": "20.37%",
+          "MemUsage": "78.21MiB / 384MiB",
+          "Name": "low-sub2api-1",
+          "NetIO": "948kB / 1.59MB",
+          "PIDs": "7"
+        },
+        {
+          "BlockIO": "147MB / 32.8kB",
+          "CPUPerc": "2.04%",
+          "Container": "e2506ffaa72a9b7521734d8704ef36b735773e41679711761ee86ec000deca64",
+          "ID": "e2506ffaa72a",
+          "MemPerc": "29.07%",
+          "MemUsage": "130.3MiB / 448MiB",
+          "Name": "low-new-api-1",
+          "NetIO": "840kB / 1.07MB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.8MB / 19.3MB",
+          "CPUPerc": "0.02%",
+          "Container": "338e972d131d6c9471100e05847f9f863cdb319cc638ce181bbe3f8b48818be1",
+          "ID": "338e972d131d",
+          "MemPerc": "17.68%",
+          "MemUsage": "45.25MiB / 256MiB",
+          "Name": "low-gateway-postgres-1",
+          "NetIO": "972kB / 800kB",
+          "PIDs": "8"
+        },
+        {
+          "BlockIO": "34.1MB / 69.6kB",
+          "CPUPerc": "2.44%",
+          "Container": "09505fe609c29c1a2ee8c4b4e86632866f76989414cdebf2dc497770070dc27d",
+          "ID": "09505fe609c2",
+          "MemPerc": "15.82%",
+          "MemUsage": "15.18MiB / 96MiB",
+          "Name": "low-sub2api-redis-1",
+          "NetIO": "190kB / 80.1kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.1MB / 17.6MB",
+          "CPUPerc": "0.44%",
+          "Container": "df094d0fcf5d4db021d7e3eb53611dc1e79fe80a2a104110e9251256b47bc7dc",
+          "ID": "df094d0fcf5d",
+          "MemPerc": "17.45%",
+          "MemUsage": "44.68MiB / 256MiB",
+          "Name": "low-sub2api-postgres-1",
+          "NetIO": "1.39MB / 848kB",
+          "PIDs": "8"
+        }
+      ]
+    },
+    {
+      "at": 1793377407.6018689,
+      "cgroup": "1555869696\n1610625024\nlow 0\nhigh 0\nmax 190058\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 179831372\nuser_usec 69670381\nsystem_usec 110160990\nnice_usec 0\nnr_periods 5553\nnr_throttled 84\nthrottled_usec 3560680\nnr_bursts 0\nburst_usec 0\n142256\t/state\n12368932\t/var/lib/docker\n",
+      "stats": [
+        {
+          "BlockIO": "9.56MB / 8.19kB",
+          "CPUPerc": "0.00%",
+          "Container": "5f93a32dc4cefc9c7dabfe17bc5286313a4f5ca08d3075291286bc1d86276f3e",
+          "ID": "5f93a32dc4ce",
+          "MemPerc": "16.69%",
+          "MemUsage": "10.68MiB / 64MiB",
+          "Name": "low-edge-1",
+          "NetIO": "22.3kB / 16.8kB",
+          "PIDs": "2"
+        },
+        {
+          "BlockIO": "139MB / 0B",
+          "CPUPerc": "0.62%",
+          "Container": "84b8b8aeeeb016fa010878eede2dfc315e5d549f49f7a166f598e72ec9300fcf",
+          "ID": "84b8b8aeeeb0",
+          "MemPerc": "20.18%",
+          "MemUsage": "77.49MiB / 384MiB",
+          "Name": "low-sub2api-1",
+          "NetIO": "962kB / 1.61MB",
+          "PIDs": "7"
+        },
+        {
+          "BlockIO": "147MB / 32.8kB",
+          "CPUPerc": "0.00%",
+          "Container": "e2506ffaa72a9b7521734d8704ef36b735773e41679711761ee86ec000deca64",
+          "ID": "e2506ffaa72a",
+          "MemPerc": "29.22%",
+          "MemUsage": "130.9MiB / 448MiB",
+          "Name": "low-new-api-1",
+          "NetIO": "924kB / 1.15MB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.8MB / 19.7MB",
+          "CPUPerc": "2.54%",
+          "Container": "338e972d131d6c9471100e05847f9f863cdb319cc638ce181bbe3f8b48818be1",
+          "ID": "338e972d131d",
+          "MemPerc": "17.89%",
+          "MemUsage": "45.79MiB / 256MiB",
+          "Name": "low-gateway-postgres-1",
+          "NetIO": "1.05MB / 879kB",
+          "PIDs": "8"
+        },
+        {
+          "BlockIO": "34.1MB / 69.6kB",
+          "CPUPerc": "2.11%",
+          "Container": "09505fe609c29c1a2ee8c4b4e86632866f76989414cdebf2dc497770070dc27d",
+          "ID": "09505fe609c2",
+          "MemPerc": "15.30%",
+          "MemUsage": "14.68MiB / 96MiB",
+          "Name": "low-sub2api-redis-1",
+          "NetIO": "193kB / 81.5kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.1MB / 17.6MB",
+          "CPUPerc": "0.79%",
+          "Container": "df094d0fcf5d4db021d7e3eb53611dc1e79fe80a2a104110e9251256b47bc7dc",
+          "ID": "df094d0fcf5d",
+          "MemPerc": "17.54%",
+          "MemUsage": "44.91MiB / 256MiB",
+          "Name": "low-sub2api-postgres-1",
+          "NetIO": "1.41MB / 862kB",
+          "PIDs": "8"
+        }
+      ]
+    },
+    {
+      "at": 1793377413.2467756,
+      "cgroup": "1554030592\n1610625024\nlow 0\nhigh 0\nmax 190066\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 181252574\nuser_usec 70254107\nsystem_usec 110998467\nnice_usec 0\nnr_periods 5610\nnr_throttled 85\nthrottled_usec 3819746\nnr_bursts 0\nburst_usec 0\n142344\t/state\n12368940\t/var/lib/docker\n",
+      "stats": [
+        {
+          "BlockIO": "9.91MB / 8.19kB",
+          "CPUPerc": "0.00%",
+          "Container": "5f93a32dc4cefc9c7dabfe17bc5286313a4f5ca08d3075291286bc1d86276f3e",
+          "ID": "5f93a32dc4ce",
+          "MemPerc": "16.86%",
+          "MemUsage": "10.79MiB / 64MiB",
+          "Name": "low-edge-1",
+          "NetIO": "30.3kB / 22.3kB",
+          "PIDs": "2"
+        },
+        {
+          "BlockIO": "139MB / 0B",
+          "CPUPerc": "0.53%",
+          "Container": "84b8b8aeeeb016fa010878eede2dfc315e5d549f49f7a166f598e72ec9300fcf",
+          "ID": "84b8b8aeeeb0",
+          "MemPerc": "20.16%",
+          "MemUsage": "77.42MiB / 384MiB",
+          "Name": "low-sub2api-1",
+          "NetIO": "975kB / 1.64MB",
+          "PIDs": "7"
+        },
+        {
+          "BlockIO": "147MB / 32.8kB",
+          "CPUPerc": "0.00%",
+          "Container": "e2506ffaa72a9b7521734d8704ef36b735773e41679711761ee86ec000deca64",
+          "ID": "e2506ffaa72a",
+          "MemPerc": "30.05%",
+          "MemUsage": "134.6MiB / 448MiB",
+          "Name": "low-new-api-1",
+          "NetIO": "1.07MB / 1.27MB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.8MB / 20.4MB",
+          "CPUPerc": "0.03%",
+          "Container": "338e972d131d6c9471100e05847f9f863cdb319cc638ce181bbe3f8b48818be1",
+          "ID": "338e972d131d",
+          "MemPerc": "18.06%",
+          "MemUsage": "46.24MiB / 256MiB",
+          "Name": "low-gateway-postgres-1",
+          "NetIO": "1.16MB / 1.02MB",
+          "PIDs": "8"
+        },
+        {
+          "BlockIO": "34.1MB / 69.6kB",
+          "CPUPerc": "0.55%",
+          "Container": "09505fe609c29c1a2ee8c4b4e86632866f76989414cdebf2dc497770070dc27d",
+          "ID": "09505fe609c2",
+          "MemPerc": "15.01%",
+          "MemUsage": "14.41MiB / 96MiB",
+          "Name": "low-sub2api-redis-1",
+          "NetIO": "196kB / 82.7kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.1MB / 17.6MB",
+          "CPUPerc": "2.90%",
+          "Container": "df094d0fcf5d4db021d7e3eb53611dc1e79fe80a2a104110e9251256b47bc7dc",
+          "ID": "df094d0fcf5d",
+          "MemPerc": "17.76%",
+          "MemUsage": "45.45MiB / 256MiB",
+          "Name": "low-sub2api-postgres-1",
+          "NetIO": "1.43MB / 874kB",
+          "PIDs": "8"
+        }
+      ]
+    },
+    {
+      "at": 1793377418.8893425,
+      "cgroup": "1551245312\n1610625024\nlow 0\nhigh 0\nmax 190077\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 182627595\nuser_usec 70860447\nsystem_usec 111767148\nnice_usec 0\nnr_periods 5666\nnr_throttled 86\nthrottled_usec 4088992\nnr_bursts 0\nburst_usec 0\n142368\t/state\n12368948\t/var/lib/docker\n",
+      "stats": [
+        {
+          "BlockIO": "9.91MB / 8.19kB",
+          "CPUPerc": "2.49%",
+          "Container": "5f93a32dc4cefc9c7dabfe17bc5286313a4f5ca08d3075291286bc1d86276f3e",
+          "ID": "5f93a32dc4ce",
+          "MemPerc": "16.82%",
+          "MemUsage": "10.77MiB / 64MiB",
+          "Name": "low-edge-1",
+          "NetIO": "38.2kB / 27.7kB",
+          "PIDs": "2"
+        },
+        {
+          "BlockIO": "139MB / 0B",
+          "CPUPerc": "0.71%",
+          "Container": "84b8b8aeeeb016fa010878eede2dfc315e5d549f49f7a166f598e72ec9300fcf",
+          "ID": "84b8b8aeeeb0",
+          "MemPerc": "20.18%",
+          "MemUsage": "77.47MiB / 384MiB",
+          "Name": "low-sub2api-1",
+          "NetIO": "987kB / 1.66MB",
+          "PIDs": "7"
+        },
+        {
+          "BlockIO": "149MB / 73.7kB",
+          "CPUPerc": "1.85%",
+          "Container": "e2506ffaa72a9b7521734d8704ef36b735773e41679711761ee86ec000deca64",
+          "ID": "e2506ffaa72a",
+          "MemPerc": "30.47%",
+          "MemUsage": "136.5MiB / 448MiB",
+          "Name": "low-new-api-1",
+          "NetIO": "1.19MB / 1.39MB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.8MB / 21.2MB",
+          "CPUPerc": "2.48%",
+          "Container": "338e972d131d6c9471100e05847f9f863cdb319cc638ce181bbe3f8b48818be1",
+          "ID": "338e972d131d",
+          "MemPerc": "18.28%",
+          "MemUsage": "46.81MiB / 256MiB",
+          "Name": "low-gateway-postgres-1",
+          "NetIO": "1.27MB / 1.14MB",
+          "PIDs": "8"
+        },
+        {
+          "BlockIO": "34.1MB / 69.6kB",
+          "CPUPerc": "0.54%",
+          "Container": "09505fe609c29c1a2ee8c4b4e86632866f76989414cdebf2dc497770070dc27d",
+          "ID": "09505fe609c2",
+          "MemPerc": "14.57%",
+          "MemUsage": "13.99MiB / 96MiB",
+          "Name": "low-sub2api-redis-1",
+          "NetIO": "198kB / 84kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.1MB / 17.6MB",
+          "CPUPerc": "0.41%",
+          "Container": "df094d0fcf5d4db021d7e3eb53611dc1e79fe80a2a104110e9251256b47bc7dc",
+          "ID": "df094d0fcf5d",
+          "MemPerc": "17.71%",
+          "MemUsage": "45.33MiB / 256MiB",
+          "Name": "low-sub2api-postgres-1",
+          "NetIO": "1.46MB / 889kB",
+          "PIDs": "8"
+        }
+      ]
+    },
+    {
+      "at": 1793377424.5474138,
+      "cgroup": "1553547264\n1610625024\nlow 0\nhigh 0\nmax 190098\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 184126436\nuser_usec 71525699\nsystem_usec 112600736\nnice_usec 0\nnr_periods 5723\nnr_throttled 86\nthrottled_usec 4088992\nnr_bursts 0\nburst_usec 0\n142416\t/state\n12368956\t/var/lib/docker\n",
+      "stats": [
+        {
+          "BlockIO": "9.91MB / 8.19kB",
+          "CPUPerc": "0.00%",
+          "Container": "5f93a32dc4cefc9c7dabfe17bc5286313a4f5ca08d3075291286bc1d86276f3e",
+          "ID": "5f93a32dc4ce",
+          "MemPerc": "16.99%",
+          "MemUsage": "10.87MiB / 64MiB",
+          "Name": "low-edge-1",
+          "NetIO": "42.9kB / 32.9kB",
+          "PIDs": "2"
+        },
+        {
+          "BlockIO": "139MB / 0B",
+          "CPUPerc": "0.62%",
+          "Container": "84b8b8aeeeb016fa010878eede2dfc315e5d549f49f7a166f598e72ec9300fcf",
+          "ID": "84b8b8aeeeb0",
+          "MemPerc": "20.08%",
+          "MemUsage": "77.09MiB / 384MiB",
+          "Name": "low-sub2api-1",
+          "NetIO": "1MB / 1.68MB",
+          "PIDs": "7"
+        },
+        {
+          "BlockIO": "149MB / 73.7kB",
+          "CPUPerc": "0.00%",
+          "Container": "e2506ffaa72a9b7521734d8704ef36b735773e41679711761ee86ec000deca64",
+          "ID": "e2506ffaa72a",
+          "MemPerc": "30.32%",
+          "MemUsage": "135.8MiB / 448MiB",
+          "Name": "low-new-api-1",
+          "NetIO": "1.28MB / 1.47MB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.8MB / 21.6MB",
+          "CPUPerc": "0.02%",
+          "Container": "338e972d131d6c9471100e05847f9f863cdb319cc638ce181bbe3f8b48818be1",
+          "ID": "338e972d131d",
+          "MemPerc": "18.26%",
+          "MemUsage": "46.73MiB / 256MiB",
+          "Name": "low-gateway-postgres-1",
+          "NetIO": "1.35MB / 1.22MB",
+          "PIDs": "8"
+        },
+        {
+          "BlockIO": "34.1MB / 69.6kB",
+          "CPUPerc": "0.46%",
+          "Container": "09505fe609c29c1a2ee8c4b4e86632866f76989414cdebf2dc497770070dc27d",
+          "ID": "09505fe609c2",
+          "MemPerc": "15.18%",
+          "MemUsage": "14.57MiB / 96MiB",
+          "Name": "low-sub2api-redis-1",
+          "NetIO": "201kB / 85.3kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "52.1MB / 17.6MB",
+          "CPUPerc": "0.37%",
+          "Container": "df094d0fcf5d4db021d7e3eb53611dc1e79fe80a2a104110e9251256b47bc7dc",
+          "ID": "df094d0fcf5d",
+          "MemPerc": "17.90%",
+          "MemUsage": "45.83MiB / 256MiB",
+          "Name": "low-sub2api-postgres-1",
+          "NetIO": "1.47MB / 897kB",
+          "PIDs": "8"
+        }
+      ]
+    }
+  ],
+  "scope": "Gateway billing + mock in edge, six real services; not a new Sub2API business test",
+  "wall_seconds": 38.09399999998277,
+  "ledger": "{\"quota\" : 999664, \"token_used\" : 336, \"applied\" : 336, \"reservations\" : 28, \"consume_count\" : 24, \"consume_quota\" : 336, \"distinct_requests\" : 24, \"pending_outbox\" : 0}"
+}

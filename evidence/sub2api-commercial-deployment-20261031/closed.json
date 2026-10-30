@@ -1,0 +1,8 @@
+{
+  "lab": "clearapi-lowresource-lab-20261031",
+  "stopped": true,
+  "data_retained": true,
+  "cloned_openai_key_inactive": true,
+  "cloned_mock_accounts_unschedulable": true,
+  "original_services_modified": false
+}

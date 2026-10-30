@@ -1,0 +1,17 @@
+{
+  ".gitattributes": "1d5d71dcc6ccd28ab46a335349ecc74742ca4b81f4fcad212f8d134f70f1f13e",
+  ".gitignore": "ebb2d90dbd8bad2dfa298330e2e4e3b337107e3cf088175aa8497b3bd1675be5",
+  "backup.sh": "51024193d95bb7c64f2808d6f0cb80d6f1f37952a7b2e3f17c5e46bd0a57436a",
+  "channel.disabled.plan.json": "8d36daacb4bff55fd35d9cb9c734090e86cca827334c54b70a71b72ec1a307e8",
+  "compose.yaml": "d877ea58a78d42edb6702b191c265b97abbc8d6dc08cd6ca5ca53f0b83ef6963",
+  "gateway-source.tar": "d41cf9c4d86da20ee54b55b00a3a0c4db4ce5eba290d8bb159155f08f8bdb3cb",
+  "images.lock.json": "fa4abb9763b7480302a31a2f246b9a7450001babbf60433d6fff382a2169cd98",
+  "images.tar": "b3f148e24329dddf7e1177347bac005e64b3382dd25aab5b0c91fff1a1d2775c",
+  "logrotate.conf": "90742d16f9eb209ca003257cde7cf958d3683ab0105d172d36bd440a6308c67f",
+  "MIGRATION.md": "9464a61cc15459e446d39ae41d71af70be0552f7456c46f8d55003871a07ddcd",
+  "nginx.conf": "8a0731bd257839ab8a002208fe5288c22c0fae935d97d5a352ce231e566e5704",
+  "OPERATIONS.md": "34cfcc3a87917960864f8d0ea5cff613b7ab215945ed07565b7716b666d06aab",
+  "package.py": "88e169caba77587765ee7029fba2779d4c5837e51de6ccebc8f57fb2da06e95a",
+  "production.env.example": "d9f3911142300579c286d50c29426e4c882fd51efee76c12b49d7b380d84f626",
+  "provider-plan.historical.json": "5a65f711f2af712434794af2041ab8a69b3652179c92f6e22a7c67e05cde7f44"
+}

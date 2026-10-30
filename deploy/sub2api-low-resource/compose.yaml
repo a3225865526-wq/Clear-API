@@ -1,0 +1,269 @@
+services:
+  sub2api-postgres:
+    image: clearapi-sub2api-postgres:17.11-266d3c257594
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      POSTGRES_USER: sub2api
+      POSTGRES_DB: sub2api
+      POSTGRES_PASSWORD: ${SUB2_DB_PASSWORD:?independent production password required}
+    volumes:
+    - ${SUB2_ROOT:-/opt/clearapi-sub2api}/postgres:/var/lib/postgresql/data
+    networks:
+    - data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U sub2api -d sub2api
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+    pids_limit: 128
+    cpus: '0.25'
+    command:
+    - postgres
+    - -c
+    - shared_buffers=32MB
+    - -c
+    - work_mem=1MB
+    - -c
+    - maintenance_work_mem=16MB
+    - -c
+    - max_connections=20
+    - -c
+    - max_wal_size=256MB
+  sub2api-redis:
+    image: clearapi-sub2api-redis:7.4.11-858f009f9709
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: 96m
+    command:
+    - sh
+    - -c
+    - exec redis-server --appendonly yes --appendfsync everysec --maxmemory 48mb --maxmemory-policy
+      noeviction --requirepass "$$REDIS_PASSWORD"
+    environment:
+      REDIS_PASSWORD: ${SUB2_REDIS_PASSWORD:?independent production password required}
+      REDISCLI_AUTH: ${SUB2_REDIS_PASSWORD:?required}
+    volumes:
+    - ${SUB2_ROOT:-/opt/clearapi-sub2api}/redis:/data
+    networks:
+    - data
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+    pids_limit: 128
+    cpus: '0.25'
+  sub2api:
+    image: clearapi-sub2api:d851a384
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: 384m
+    ports:
+    - 127.0.0.1:${SUB2_ADMIN_PORT:-18882}:8080
+    volumes:
+    - ${SUB2_ROOT:-/opt/clearapi-sub2api}/app:/app/data
+    environment:
+      AUTO_SETUP: 'true'
+      RUN_MODE: simple
+      SIMPLE_MODE_KEY_RATE_LIMIT_ENABLED: 'false'
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: '8080'
+      DATABASE_HOST: sub2api-postgres
+      DATABASE_PORT: '5432'
+      DATABASE_USER: sub2api
+      DATABASE_DBNAME: sub2api
+      DATABASE_PASSWORD: ${SUB2_DB_PASSWORD:?required}
+      DATABASE_SSLMODE: disable
+      DATABASE_MAX_OPEN_CONNS: '10'
+      DATABASE_MAX_IDLE_CONNS: '2'
+      REDIS_HOST: sub2api-redis
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: ${SUB2_REDIS_PASSWORD:?required}
+      REDIS_DB: '0'
+      REDIS_POOL_SIZE: '16'
+      REDIS_MIN_IDLE_CONNS: '2'
+      ADMIN_EMAIL: ${SUB2_ADMIN_EMAIL:?owner admin identity required}
+      ADMIN_PASSWORD: ${SUB2_ADMIN_PASSWORD:?independent production password required}
+      JWT_SECRET: ${SUB2_JWT_SECRET:?fixed independent production secret required}
+      TOTP_ENCRYPTION_KEY: ${SUB2_TOTP_KEY:?fixed independent production key required}
+      TZ: Asia/Shanghai
+      GOMEMLIMIT: 288MiB
+      GOMAXPROCS: '1'
+    depends_on:
+      sub2api-postgres:
+        condition: service_healthy
+      sub2api-redis:
+        condition: service_healthy
+    networks:
+      data: {}
+      gateway:
+        aliases:
+        - clearapi-sub2api
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - -q
+      - -T
+      - '5'
+      - -O
+      - /dev/null
+      - http://127.0.0.1:8080/health
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 120s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+    pids_limit: 128
+    cpus: '0.50'
+  gateway-postgres:
+    image: postgres:17.6-alpine
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: '0.25'
+    pids_limit: 128
+    environment:
+      POSTGRES_USER: clearapi
+      POSTGRES_DB: clearapi
+      POSTGRES_PASSWORD: ${GATEWAY_DB_PASSWORD:?required}
+    command:
+    - postgres
+    - -c
+    - shared_buffers=32MB
+    - -c
+    - work_mem=1MB
+    - -c
+    - maintenance_work_mem=16MB
+    - -c
+    - max_connections=20
+    - -c
+    - max_wal_size=256MB
+    volumes:
+    - ${ROOT:-/opt/clearapi-stack}/gateway-postgres:/var/lib/postgresql/data
+    networks:
+    - gateway-data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U clearapi -d clearapi
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+  new-api:
+    image: clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: 448m
+    cpus: '0.50'
+    pids_limit: 128
+    environment:
+      SQL_DSN: postgres://clearapi:${GATEWAY_DB_PASSWORD:?required}@gateway-postgres:5432/clearapi?sslmode=disable
+      SESSION_SECRET: ${GATEWAY_SESSION_SECRET:?preserve existing on migration}
+      CRYPTO_SECRET: ${GATEWAY_CRYPTO_SECRET:?preserve existing on migration}
+      SQL_MAX_OPEN_CONNS: '10'
+      SQL_MAX_IDLE_CONNS: '2'
+      GOMEMLIMIT: 320MiB
+      GOMAXPROCS: '1'
+      TRUSTED_PROXIES: 172.30.81.2
+      RELAY_MAX_IDLE_CONNS: '16'
+      RELAY_MAX_IDLE_CONNS_PER_HOST: '4'
+      STREAMING_TIMEOUT: '300'
+      CLEARAPI_DURABLE_WALLET: 'true'
+      CLEARAPI_BILLING_OUTBOX: 'true'
+      CLEARAPI_FINANCE_ENABLED: 'true'
+      CLEARAPI_FINANCE_OWNER_USER_ID: ${FINANCE_OWNER_USER_ID:?actual owner required}
+      CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE: 'true'
+      CLEARAPI_POOL_ENABLED: 'false'
+      TZ: Asia/Shanghai
+    volumes:
+    - ${ROOT:-/opt/clearapi-stack}/gateway:/data
+    - ${ROOT:-/opt/clearapi-stack}/logs:/app/logs
+    depends_on:
+      gateway-postgres:
+        condition: service_healthy
+    networks:
+    - gateway
+    - gateway-data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget -q -T 5 -O /dev/null http://127.0.0.1:3000/api/status
+      interval: 10s
+      timeout: 6s
+      retries: 18
+      start_period: 120s
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+  edge:
+    image: clearapi-edge:nginx-8541484afbc9
+    pull_policy: never
+    restart: unless-stopped
+    mem_limit: 64m
+    cpus: '0.25'
+    pids_limit: 64
+    ports:
+    - 127.0.0.1:${EDGE_PORT:-18080}:8080
+    volumes:
+    - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      new-api:
+        condition: service_healthy
+    networks:
+      gateway:
+        ipv4_address: 172.30.81.2
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -fsS
+      - --max-time
+      - '5'
+      - http://127.0.0.1:8080/api/status
+      interval: 10s
+      timeout: 6s
+      retries: 12
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: '3'
+networks:
+  data:
+    internal: true
+  gateway-data:
+    internal: true
+  gateway:
+    ipam:
+      config:
+      - subnet: 172.30.81.0/24
+        ip_range: 172.30.81.128/25

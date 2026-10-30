@@ -1,0 +1,30 @@
+[
+  {
+    "stage": "first fresh startup",
+    "result": "Gateway failed closed without explicit Billing schemas; applied existing finance/billing CLIs; no protection disabled"
+  },
+  {
+    "stage": "initial observer",
+    "result": "Observer ran before edge existed; no successful resource result claimed"
+  },
+  {
+    "stage": "Compose correction",
+    "result": "Escaped $$REDIS_PASSWORD, reserved static proxy IP outside dynamic range, switched nginx health wget to installed curl"
+  },
+  {
+    "stage": "ordinary mock first four",
+    "result": "Mock config mount inode unchanged after docker cp; four connection failures retained in isolated data; recreated edge, then 24 requests passed"
+  },
+  {
+    "stage": "first restore comparison",
+    "result": "Compared a live system_instances table, snapshot drifted; stopped all writers and restored into separate new DBs; 83/105 full table digests matched"
+  },
+  {
+    "stage": "backup first attempt",
+    "result": "CRLF env root caused tar path failure; preserved partial private-backup-1, corrected CR stripping; private-backup-2 complete and 11 hashes passed"
+  },
+  {
+    "stage": "resource pool first four",
+    "result": "Used account PUT for schedulable, account remained disabled; four 503 requests retained 40 unknown units; used native POST /schedulable then four concurrent requests passed; no blanket refund or log rewrite"
+  }
+]

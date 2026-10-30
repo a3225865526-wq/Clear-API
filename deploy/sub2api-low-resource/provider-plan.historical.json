@@ -1,0 +1,1323 @@
+{
+  "format": "clearapi-sub2api-disabled-planning-descriptor-v1",
+  "apply": false,
+  "warning": "NOT an import payload or executable deployment. No provider/account/key/channel was created. All planned channels remain disabled.",
+  "source_sha": "d851a38477597157e78450d30af2d8504764d085",
+  "clearapi_commit": "8d2842b2d2878210e1179f42e3e74ef47371abdc",
+  "run_mode": "simple",
+  "simple_mode_key_rate_limit_enabled": false,
+  "composite_group_supported": false,
+  "terminal_user_and_billing_owner": "ClearAPI",
+  "public_routes_or_user_groups_created": false,
+  "providers": [
+    {
+      "platform": "anthropic",
+      "display_name": "Anthropic",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-anthropic",
+        "platform": "anthropic",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-anthropic",
+        "secret_ref": "SUB2API_INTERNAL_ANTHROPIC_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "claude-subscription-oauth",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "access_token",
+            "refresh_token (for refresh)",
+            "expires_at",
+            "provider account/project metadata as returned by official flow"
+          ],
+          "authorization_required": "Owner-authorized Anthropic OAuth account and permitted use",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "claude-setup-token",
+          "account_type": "setup-token",
+          "required_credential_fields": [
+            "access_token (setup token)",
+            "expires_at where available"
+          ],
+          "authorization_required": "Valid inference-scope setup token; not a Console API Key",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "anthropic-console-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)"
+          ],
+          "authorization_required": "Anthropic Console API entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "aws-bedrock-sigv4",
+          "account_type": "bedrock",
+          "required_credential_fields": [
+            "auth_mode=sigv4",
+            "aws_access_key_id",
+            "aws_secret_access_key",
+            "aws_session_token (if temporary)",
+            "aws_region"
+          ],
+          "authorization_required": "AWS IAM authorization and Bedrock model access",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "aws-bedrock-api-key",
+          "account_type": "bedrock",
+          "required_credential_fields": [
+            "auth_mode=apikey",
+            "api_key",
+            "aws_region"
+          ],
+          "authorization_required": "Authorized Bedrock API Key and model access",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "vertex-anthropic-service-account",
+          "account_type": "service_account",
+          "required_credential_fields": [
+            "service_account_json",
+            "project_id",
+            "location"
+          ],
+          "authorization_required": "Google Cloud IAM, Vertex API and Anthropic publisher model entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "OAuth/API Key upstream /models plus account mapping and source Claude defaults; Bedrock and Anthropic Vertex unsupported by generic sync button, use explicitly entitled publisher IDs/mappings",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": null,
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-anthropic",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_ANTHROPIC_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "openai",
+      "display_name": "OpenAI",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-openai",
+        "platform": "openai",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-openai",
+        "secret_ref": "SUB2API_INTERNAL_OPENAI_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "chatgpt-codex-oauth",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "access_token",
+            "refresh_token (for refresh)",
+            "expires_at",
+            "provider account/project metadata as returned by official flow",
+            "chatgpt_account_id if supplied by OAuth"
+          ],
+          "authorization_required": "Authorized ChatGPT/Codex account; not an OpenAI Platform API Key",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "codex-agent-identity-import",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "auth_mode=agentidentity",
+            "agent_private_key",
+            "agent_runtime_id",
+            "official import data / task state"
+          ],
+          "authorization_required": "Owner-authorized Agent Identity import; preserve original lifecycle",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED",
+          "special_auth": true
+        },
+        {
+          "profile": "openai-platform-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)"
+          ],
+          "authorization_required": "OpenAI Platform API entitlement; custom endpoints remain compatible upstreams",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "OAuth Codex authenticated manifest; API Key upstream /models; account mappings and source defaults are candidates only",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": null,
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-openai",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_OPENAI_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "gemini",
+      "display_name": "Gemini",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-gemini",
+        "platform": "gemini",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-gemini",
+        "secret_ref": "SUB2API_INTERNAL_GEMINI_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "gemini-code-assist-oauth",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "access_token",
+            "refresh_token (for refresh)",
+            "expires_at",
+            "provider account/project metadata as returned by official flow",
+            "oauth_type=code_assist",
+            "project_id where required"
+          ],
+          "authorization_required": "Authorized Google Code Assist account/project",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "gemini-google-one-oauth",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "access_token",
+            "refresh_token (for refresh)",
+            "expires_at",
+            "provider account/project metadata as returned by official flow",
+            "oauth_type=google_one"
+          ],
+          "authorization_required": "Authorized Google One/Gemini account",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "gemini-ai-studio-oauth",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "access_token",
+            "refresh_token (for refresh)",
+            "expires_at",
+            "provider account/project metadata as returned by official flow",
+            "oauth_type=ai_studio",
+            "configured client ID/secret as required by supported flow"
+          ],
+          "authorization_required": "Authorized Google OAuth application and AI Studio access",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED",
+          "feature_gate": "ai_studio_oauth_enabled; not assumed enabled"
+        },
+        {
+          "profile": "gemini-ai-studio-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)"
+          ],
+          "authorization_required": "Google AI Studio / Gemini API entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "vertex-gemini-service-account",
+          "account_type": "service_account",
+          "required_credential_fields": [
+            "service_account_json",
+            "project_id",
+            "location"
+          ],
+          "authorization_required": "Google Cloud IAM, Vertex API and publisher model entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "vertex-gemini-api-key",
+          "account_type": "service_account",
+          "required_credential_fields": [
+            "auth_mode=apikey",
+            "api_key",
+            "location",
+            "project_id if required"
+          ],
+          "authorization_required": "Authorized Vertex API Key; source persists it as service_account with apikey auth_mode",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages",
+        "POST /v1beta/models/:model:generateContent",
+        "POST /v1beta/models/:model:streamGenerateContent"
+      ],
+      "model_source": "Gemini API models and Vertex publisher model list; Code Assist project account unsupported by this generic sync button; mappings/source defaults are candidates",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": null,
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-gemini",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_GEMINI_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "antigravity",
+      "display_name": "Antigravity",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-antigravity",
+        "platform": "antigravity",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-antigravity",
+        "secret_ref": "SUB2API_INTERNAL_ANTIGRAVITY_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "antigravity-oauth",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "access_token",
+            "refresh_token (for refresh)",
+            "expires_at",
+            "provider account/project metadata as returned by official flow",
+            "project_id / provider metadata as returned"
+          ],
+          "authorization_required": "Authorized Antigravity account and OAuth consent",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "antigravity-upstream-relay",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "base_url",
+            "api_key"
+          ],
+          "authorization_required": "Authorized existing Antigravity-compatible relay; UI calls this upstream but persists apikey",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED",
+          "source_class": "compatible_relay_not_direct_subscription"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages",
+        "POST /v1beta/models/:model:generateContent",
+        "POST /v1beta/models/:model:streamGenerateContent"
+      ],
+      "model_source": "Authorized OAuth fetchAvailableModels / Antigravity relay models; account mappings; built-in defaults are candidates",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": null,
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-antigravity",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_ANTIGRAVITY_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "grok",
+      "display_name": "Grok",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-grok",
+        "platform": "grok",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-grok",
+        "secret_ref": "SUB2API_INTERNAL_GROK_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "grok-build-oauth",
+          "account_type": "oauth",
+          "required_credential_fields": [
+            "access_token",
+            "refresh_token (for refresh)",
+            "expires_at",
+            "provider account/project metadata as returned by official flow"
+          ],
+          "authorization_required": "Authorized xAI/Grok Build OAuth; supported Web SSO/password import converts to Build tokens, raw SSO/password not an account type",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "xai-official-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)"
+          ],
+          "authorization_required": "xAI official API entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "Grok Build OAuth / official xAI authenticated model catalog and observed metadata; account mappings/source defaults are candidates",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": null,
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-grok",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_GROK_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "kimi",
+      "display_name": "Kimi",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-kimi",
+        "platform": "kimi",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-kimi",
+        "secret_ref": "SUB2API_INTERNAL_KIMI_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "moonshot-payg-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=payg",
+            "api_protocol"
+          ],
+          "authorization_required": "Moonshot pay-as-you-go API entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "kimi-coding-plan-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=coding",
+            "api_protocol"
+          ],
+          "authorization_required": "Kimi Coding Plan API Key entitlement; not device OAuth",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "Authenticated provider /models; explicit account mapping; static pricing/default lists do not prove account entitlement",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": {
+        "default_mode": "payg",
+        "routing": "by_inbound",
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "anthropic": "https://api.moonshot.cn/anthropic",
+              "chat_completions": "https://api.moonshot.cn/v1",
+              "responses": "https://api.moonshot.cn/v1"
+            }
+          },
+          {
+            "mode": "coding",
+            "base_urls": {
+              "anthropic": "https://api.kimi.com/coding",
+              "chat_completions": "https://api.kimi.com/coding/v1",
+              "responses": "https://api.kimi.com/coding/v1"
+            }
+          }
+        ]
+      },
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-kimi",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_KIMI_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "zhipu",
+      "display_name": "Zhipu GLM",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-zhipu",
+        "platform": "zhipu",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-zhipu",
+        "secret_ref": "SUB2API_INTERNAL_ZHIPU_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "glm-payg-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=payg",
+            "api_protocol"
+          ],
+          "authorization_required": "BigModel PaaS API entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "glm-coding-plan-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=coding",
+            "api_protocol",
+            "zhipu_organization / zhipu_project if team plan requires"
+          ],
+          "authorization_required": "GLM Coding Plan API Key entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "Authenticated provider /models; explicit account mapping; static pricing/default lists do not prove account entitlement",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": {
+        "default_mode": "payg",
+        "routing": "by_inbound",
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "anthropic": "https://open.bigmodel.cn/api/anthropic",
+              "chat_completions": "https://open.bigmodel.cn/api/paas/v4"
+            }
+          },
+          {
+            "mode": "coding",
+            "base_urls": {
+              "anthropic": "https://open.bigmodel.cn/api/anthropic",
+              "chat_completions": "https://open.bigmodel.cn/api/coding/paas/v4"
+            }
+          }
+        ]
+      },
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-zhipu",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_ZHIPU_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "deepseek",
+      "display_name": "DeepSeek",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-deepseek",
+        "platform": "deepseek",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-deepseek",
+        "secret_ref": "SUB2API_INTERNAL_DEEPSEEK_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "deepseek-payg-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=payg",
+            "api_protocol"
+          ],
+          "authorization_required": "DeepSeek official API entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "Authenticated provider /models; explicit account mapping; static pricing/default lists do not prove account entitlement",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": {
+        "default_mode": "payg",
+        "routing": "by_inbound",
+        "responses_path": "/responses",
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "anthropic": "https://api.deepseek.com/anthropic",
+              "chat_completions": "https://api.deepseek.com",
+              "responses": "https://api.deepseek.com"
+            }
+          }
+        ]
+      },
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-deepseek",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_DEEPSEEK_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "minimax",
+      "display_name": "MiniMax",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-minimax",
+        "platform": "minimax",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-minimax",
+        "secret_ref": "SUB2API_INTERNAL_MINIMAX_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "minimax-payg-api-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=payg",
+            "api_protocol",
+            "CN or international endpoint selection"
+          ],
+          "authorization_required": "MiniMax pay-as-you-go API entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "minimax-coding-plan-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=coding",
+            "api_protocol",
+            "CN or international endpoint selection"
+          ],
+          "authorization_required": "MiniMax Coding Plan API Key entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "Authenticated provider /models; explicit account mapping; static pricing/default lists do not prove account entitlement",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": {
+        "default_mode": "payg",
+        "routing": "by_inbound",
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "anthropic": "https://api.minimaxi.com/anthropic",
+              "chat_completions": "https://api.minimaxi.com/v1",
+              "responses": "https://api.minimaxi.com/v1"
+            }
+          },
+          {
+            "mode": "coding",
+            "base_urls": {
+              "anthropic": "https://api.minimaxi.com/anthropic",
+              "chat_completions": "https://api.minimaxi.com/v1",
+              "responses": "https://api.minimaxi.com/v1"
+            }
+          }
+        ]
+      },
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-minimax",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_MINIMAX_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "opencode_go",
+      "display_name": "OpenCode",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "native_integrated_aggregation_service",
+      "group": {
+        "name": "clearapi-internal-opencode_go",
+        "platform": "opencode_go",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-opencode_go",
+        "secret_ref": "SUB2API_INTERNAL_OPENCODE_GO_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "opencode-go-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=go",
+            "api_protocol=adaptive",
+            "protocol_rules as supported"
+          ],
+          "authorization_required": "OpenCode Go service API Key; not OpenCode client configuration",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        },
+        {
+          "profile": "opencode-zen-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=zen",
+            "api_protocol=adaptive",
+            "protocol_rules as supported"
+          ],
+          "authorization_required": "OpenCode Zen service API Key; not raw upstream vendor credentials",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "OpenCode Go/Zen upstream /models plus per-mode model protocol rules and account mapping; service entitlement remains unverified",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": {
+        "default_mode": "go",
+        "routing": "by_model",
+        "modes": [
+          {
+            "mode": "go",
+            "base_urls": {
+              "anthropic": "https://opencode.ai/zen/go",
+              "chat_completions": "https://opencode.ai/zen/go/v1",
+              "responses": "https://opencode.ai/zen/go/v1"
+            },
+            "protocol_rules": [
+              {
+                "pattern": "grok-*",
+                "protocol": "responses"
+              },
+              {
+                "pattern": "gpt-*",
+                "protocol": "responses"
+              },
+              {
+                "pattern": "muse-spark-*",
+                "protocol": "responses"
+              },
+              {
+                "pattern": "minimax-*",
+                "protocol": "anthropic"
+              },
+              {
+                "pattern": "qwen*",
+                "protocol": "anthropic"
+              }
+            ]
+          },
+          {
+            "mode": "zen",
+            "base_urls": {
+              "anthropic": "https://opencode.ai/zen",
+              "chat_completions": "https://opencode.ai/zen/v1",
+              "responses": "https://opencode.ai/zen/v1"
+            },
+            "protocol_rules": [
+              {
+                "pattern": "grok-*",
+                "protocol": "responses"
+              },
+              {
+                "pattern": "gpt-*",
+                "protocol": "responses"
+              },
+              {
+                "pattern": "muse-spark-*",
+                "protocol": "responses"
+              },
+              {
+                "pattern": "claude-*",
+                "protocol": "anthropic"
+              },
+              {
+                "pattern": "qwen3.8-max",
+                "protocol": "chat_completions"
+              },
+              {
+                "pattern": "qwen*",
+                "protocol": "anthropic"
+              }
+            ]
+          }
+        ]
+      },
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-opencode_go",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_OPENCODE_GO_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "typesafe",
+      "display_name": "TypeSafe / Jev",
+      "source_native_registered": true,
+      "preparation_status": "SOURCE_SUPPORTED_GATEWAY_PROTOCOL_GAP",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "vendor_or_subscription",
+      "group": {
+        "name": "clearapi-internal-typesafe",
+        "platform": "typesafe",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-typesafe",
+        "secret_ref": "SUB2API_INTERNAL_TYPESAFE_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "typesafe-systemone-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)"
+          ],
+          "authorization_required": "TypeSafe/Jev System One entitlement",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/systemone (native non-streaming only)"
+      ],
+      "model_source": "Fixed jev-latest via native System One; not a Chat/Responses/Messages model",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": null,
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": null,
+      "release_hold": "ClearAPI router/type59 lacks System One DTO/endpoint/billing path; never advertise jev-latest as ordinary LLM"
+    },
+    {
+      "platform": "command_code",
+      "display_name": "Command Code",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "native_integrated_aggregation_service",
+      "group": {
+        "name": "clearapi-internal-command_code",
+        "platform": "command_code",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-command_code",
+        "secret_ref": "SUB2API_INTERNAL_COMMAND_CODE_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "command-code-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=payg",
+            "api_protocol=adaptive"
+          ],
+          "authorization_required": "Command Code service API Key; respect per-model supported_endpoints",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "Authenticated upstream /models including supported_endpoints metadata; account rules take precedence",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": {
+        "default_mode": "payg",
+        "routing": "by_model",
+        "model_catalog": true,
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "anthropic": "https://api.commandcode.ai/provider",
+              "chat_completions": "https://api.commandcode.ai/provider/v1",
+              "responses": "https://api.commandcode.ai/provider/v1"
+            },
+            "protocol_rules": [
+              {
+                "pattern": "claude-*",
+                "protocol": "anthropic"
+              },
+              {
+                "pattern": "gpt-*",
+                "protocol": "responses",
+                "protocols": [
+                  "responses",
+                  "chat_completions"
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-command_code",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_COMMAND_CODE_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    },
+    {
+      "platform": "cline",
+      "display_name": "Cline",
+      "source_native_registered": true,
+      "preparation_status": "CONFIG_READY",
+      "runtime_admin_status": "BLOCKED_423",
+      "real_call_status": "REAL_CALL_UNVERIFIED",
+      "service_class": "native_integrated_aggregation_service",
+      "group": {
+        "name": "clearapi-internal-cline",
+        "platform": "cline",
+        "created": false,
+        "group_id": null,
+        "role": "protocol/platform routing label, NOT an account-set or pricing isolation boundary",
+        "advanced_fields_to_send": []
+      },
+      "internal_key": {
+        "name": "clearapi-internal-cline",
+        "secret_ref": "SUB2API_INTERNAL_CLINE_KEY",
+        "created": false,
+        "value": null,
+        "group_id": null
+      },
+      "account_profiles": [
+        {
+          "profile": "cline-credit-and-clinepass-key",
+          "account_type": "apikey",
+          "required_credential_fields": [
+            "api_key",
+            "base_url (official default or explicitly authorized compatible upstream)",
+            "account_mode=payg",
+            "api_protocol=chat_completions"
+          ],
+          "authorization_required": "Cline official API Key; credit and cline-pass/* subscription models use same key/endpoint",
+          "configured": false,
+          "credential_values_included": false,
+          "real_call_status": "REAL_CALL_UNVERIFIED"
+        }
+      ],
+      "compatible_ingress": [
+        "POST /v1/chat/completions",
+        "POST /v1/responses",
+        "POST /v1/messages"
+      ],
+      "model_source": "Authenticated provider /models; explicit account mapping; static pricing/default lists do not prove account entitlement",
+      "confirmed_models": [],
+      "default_endpoint_profile_from_fixed_source": {
+        "default_mode": "payg",
+        "routing": "by_inbound",
+        "modes": [
+          {
+            "mode": "payg",
+            "base_urls": {
+              "chat_completions": "https://api.cline.bot/api/v1"
+            }
+          }
+        ]
+      },
+      "account_selection_policy": {
+        "same_platform_groups_are_not_hard_isolated": true,
+        "mixed_scheduling": false,
+        "cross_platform_fallback": false,
+        "source_type_or_mode_hard_separation": "Separate executor instance with independent credentials/state if required; not created in this task"
+      },
+      "upstream_native_protocol_note": "Profile native endpoints below; compatible ingress may convert; real upstream protocol support is unverified",
+      "clearapi_channel": {
+        "type": 59,
+        "name": "sub2api-cline",
+        "base_url": "http://sub2api:8080",
+        "status": 2,
+        "enabled": false,
+        "key_ref": "SUB2API_INTERNAL_CLINE_KEY",
+        "models": [],
+        "model_mapping": {},
+        "group": "clearapi-sub2api-isolated",
+        "account_pool_binding": null,
+        "note": "Planning descriptor, not channel creation API body; bind only isolated test abilities after actual model/price confirmation"
+      }
+    }
+  ]
+}

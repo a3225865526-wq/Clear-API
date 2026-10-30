@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-31T00:42:51.037726+08:00",
+  "application_commit": "92edfc345d9b9526379ed25363bb79abf9839874",
+  "sub2api_commit": "d851a38477597157e78450d30af2d8504764d085",
+  "package_files_verified": 15,
+  "images_archive_bytes": 514803200,
+  "known_local_secret_literal_scan": "no matches; exact known strings in package raw bytes and evidence, not a general secret audit or compressed-layer proof",
+  "empty_secret_template": "rejected",
+  "redis_unauthenticated": "NOAUTH",
+  "missing_gateway_key_http": 401,
+  "backup_files_sha256_verified": 11,
+  "shell_syntax": "PASS",
+  "python_compile": "PASS",
+  "git_diff_check": "PASS",
+  "resource_business_mock": "PASS within stated scope",
+  "two_database_logical_restore": "PASS, 83/105 tables",
+  "real_provider_calls": 0,
+  "production_access": 0,
+  "production_writes": 0,
+  "remote_git_writes": 0,
+  "reliable_2gb_commercial_acceptance": "BLOCKED",
+  "new_vps_helper_binding_and_six_service_support": "BLOCKED",
+  "not_run": [
+    "complete 2GB VM and 50GB quota",
+    "host logrotate debug/install",
+    "real TLS/proxy chain",
+    "production encrypted offsite restore",
+    "independent Redis RDB import",
+    "real providers and hard spending bounds",
+    "full CI/frontend/three-dialect matrix"
+  ]
+}

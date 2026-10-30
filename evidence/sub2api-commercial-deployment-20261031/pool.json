@@ -1,0 +1,85 @@
+{
+  "concurrency": 4,
+  "requests": 4,
+  "seconds": [
+    0.7349999999860302,
+    0.9380000000237487,
+    0.75,
+    0.7349999999860302
+  ],
+  "sub2api_usage_delta": 4,
+  "ledger": "999568|432|432|32|0",
+  "sample": {
+    "at": 1793378018.9644997,
+    "cgroup": "1557315584\n1610625024\nlow 0\nhigh 0\nmax 193760\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 283730504\nuser_usec 124209634\nsystem_usec 159520870\nnice_usec 0\nnr_periods 11589\nnr_throttled 95\nthrottled_usec 4900763\nnr_bursts 0\nburst_usec 0\n201848\t/state\n12369056\t/var/lib/docker\n",
+    "stats": [
+      {
+        "BlockIO": "0B / 0B",
+        "CPUPerc": "0.62%",
+        "Container": "4ba1cacf613f9a531ec237d5a501fde1301f74e15c36565b3bb7e91247ed6d38",
+        "ID": "4ba1cacf613f",
+        "MemPerc": "10.05%",
+        "MemUsage": "38.59MiB / 384MiB",
+        "Name": "low-sub2api-1",
+        "NetIO": "940kB / 1.27MB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "11.3MB / 4.1kB",
+        "CPUPerc": "0.00%",
+        "Container": "5f93a32dc4cefc9c7dabfe17bc5286313a4f5ca08d3075291286bc1d86276f3e",
+        "ID": "5f93a32dc4ce",
+        "MemPerc": "18.20%",
+        "MemUsage": "11.65MiB / 64MiB",
+        "Name": "low-edge-1",
+        "NetIO": "168kB / 42.8kB",
+        "PIDs": "2"
+      },
+      {
+        "BlockIO": "37.5MB / 41kB",
+        "CPUPerc": "2.01%",
+        "Container": "e2506ffaa72a9b7521734d8704ef36b735773e41679711761ee86ec000deca64",
+        "ID": "e2506ffaa72a",
+        "MemPerc": "18.67%",
+        "MemUsage": "83.64MiB / 448MiB",
+        "Name": "low-new-api-1",
+        "NetIO": "847kB / 1.02MB",
+        "PIDs": "7"
+      },
+      {
+        "BlockIO": "72.9MB / 88.5MB",
+        "CPUPerc": "0.05%",
+        "Container": "338e972d131d6c9471100e05847f9f863cdb319cc638ce181bbe3f8b48818be1",
+        "ID": "338e972d131d",
+        "MemPerc": "30.29%",
+        "MemUsage": "77.54MiB / 256MiB",
+        "Name": "low-gateway-postgres-1",
+        "NetIO": "2.91MB / 2.54MB",
+        "PIDs": "8"
+      },
+      {
+        "BlockIO": "21.9MB / 254kB",
+        "CPUPerc": "0.64%",
+        "Container": "09505fe609c29c1a2ee8c4b4e86632866f76989414cdebf2dc497770070dc27d",
+        "ID": "09505fe609c2",
+        "MemPerc": "15.40%",
+        "MemUsage": "14.79MiB / 96MiB",
+        "Name": "low-sub2api-redis-1",
+        "NetIO": "399kB / 185kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "75.6MB / 94.5MB",
+        "CPUPerc": "0.40%",
+        "Container": "df094d0fcf5d4db021d7e3eb53611dc1e79fe80a2a104110e9251256b47bc7dc",
+        "ID": "df094d0fcf5d",
+        "MemPerc": "35.14%",
+        "MemUsage": "89.95MiB / 256MiB",
+        "Name": "low-sub2api-postgres-1",
+        "NetIO": "4.61MB / 2.96MB",
+        "PIDs": "8"
+      }
+    ]
+  },
+  "origin": "Existing acknowledged synthetic Sub2API DB restored into a separate local DB; no compliance accept call, no production seed"
+}

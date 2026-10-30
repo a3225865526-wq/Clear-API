@@ -1,0 +1,16 @@
+{
+  "apply": false,
+  "not_an_import_payload": true,
+  "created": false,
+  "type": 59,
+  "status": 2,
+  "base_url": "http://clearapi-sub2api:8080",
+  "native_openai_optional_base": "http://clearapi-sub2api:8080/openai",
+  "key_ref": "TO_BE_CREATED_IN_STAGE_C",
+  "models": [],
+  "model_mapping": {},
+  "public_abilities": false,
+  "pg03_binding": null,
+  "retry": "Gateway 0 does not prove Sub2API zero attempts; verify selected path before paid call",
+  "same_platform_groups_hard_isolated": false
+}

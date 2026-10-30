@@ -1,0 +1,48 @@
+{
+  "clearapi-sub2api-postgres:17.11-266d3c257594": {
+    "engine_id": "sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+    "repo_digests": [
+      "clearapi-sub2api-postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+      "postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
+    ],
+    "bytes": 117214490
+  },
+  "clearapi-sub2api-redis:7.4.11-858f009f9709": {
+    "engine_id": "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+    "repo_digests": [
+      "clearapi-sub2api-redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+      "redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+    ],
+    "bytes": 16260342
+  },
+  "clearapi-sub2api:d851a384": {
+    "engine_id": "sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a",
+    "repo_digests": [
+      "clearapi/sub2api-isolated@sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a",
+      "clearapi-sub2api@sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a"
+    ],
+    "bytes": 46640454
+  },
+  "postgres:17.6-alpine": {
+    "engine_id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+    "repo_digests": [
+      "postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+    ],
+    "bytes": 110633742
+  },
+  "clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874": {
+    "engine_id": "sha256:1f8c11550fce8c05d501b47314472e4d1b4790b800500423d5d07992b1793607",
+    "repo_digests": [
+      "clearapi-local@sha256:1f8c11550fce8c05d501b47314472e4d1b4790b800500423d5d07992b1793607"
+    ],
+    "bytes": 156209783
+  },
+  "clearapi-edge:nginx-8541484afbc9": {
+    "engine_id": "sha256:8541484afbc9c8a5a8a99b379568ebbc957f658583ec9448fc43104229c03cf8",
+    "repo_digests": [
+      "clearapi-edge@sha256:8541484afbc9c8a5a8a99b379568ebbc957f658583ec9448fc43104229c03cf8",
+      "nginx@sha256:8541484afbc9c8a5a8a99b379568ebbc957f658583ec9448fc43104229c03cf8"
+    ],
+    "bytes": 63135215
+  }
+}
