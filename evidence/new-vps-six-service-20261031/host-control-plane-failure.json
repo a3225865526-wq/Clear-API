@@ -1,0 +1,26 @@
+{
+  "observed_at": "2026-10-31T07:31:19+08:00",
+  "docker_client": "29.7.2 / API 1.55 / desktop-linux",
+  "docker_api": "500 on /version, /containers/json and isolated parent inspect/exec",
+  "isolated_ssh_18962": "banner exchange timed out",
+  "docker_desktop_processes": "still present; this does not prove engine health",
+  "root_cause": "not established; no invented OOM or disk diagnosis",
+  "unrelated_local_containers_restarted": false,
+  "docker_desktop_restarted": false,
+  "production_access": false,
+  "last_verified_final_ledger": {
+    "wallet": 999846,
+    "token_used": 154,
+    "reservation_applied": 154,
+    "consume_quota": 154,
+    "consume_logs": 11,
+    "unique_requests": 11,
+    "pending_outbox": 0
+  },
+  "last_verified_closure": "test channels disabled; cloned internal key inactive; mock account unschedulable; relay token disabled",
+  "blocked_checks": [
+    "live verification of final runtime config-hash/resource/mount/network/port drift checks",
+    "replay exact final packaged operator version after last checks",
+    "confirm final lab parent shutdown through healthy control plane"
+  ]
+}

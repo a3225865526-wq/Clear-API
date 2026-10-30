@@ -1,0 +1,63 @@
+{
+  "client_killed_during_service_restart": true,
+  "state_after_disconnect": {
+    "arch": "amd64",
+    "config_sha256": "e51ea6c1eaf312fd06eba19bb39924377d1c77f7b54e34feb4f34b1ad9900782",
+    "generation": "3437f20b808c498e713979b1db2ea2f2259a8fe4fca83fb66603cdb29c3f420c",
+    "healthy": true,
+    "helper_files": {
+      "local-deploy-stack.py": "970ad734d6ac22f0f220fc45e6d7e09375a8ac736261d86c31e47a69931e88d9",
+      "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+    },
+    "isolated": true,
+    "pending": false,
+    "services": {
+      "edge": {
+        "container_id": "64831892d543c24c6ccae55f0f282fb09571bc0c38f22510b632ad6de00bbc94",
+        "health": "healthy",
+        "image_id": "sha256:5253dc86cc93ac6249902934655c6f7c959d8caa45a8c2ecc0b95953834d8ee8",
+        "restart_count": 0
+      },
+      "gateway-postgres": {
+        "container_id": "12856e87031283d463ec1b789d4c5d7ca6a62a84bb206a9737d68034aac0859c",
+        "health": "healthy",
+        "image_id": "sha256:d741b376874687de90374fd34f55c6b2760e8f7bd7e4ae5cd47f50757fc08cf8",
+        "restart_count": 0
+      },
+      "new-api": {
+        "container_id": "47cb7f78007389f2ecbf772bcac112ea1354a890f16355bd00963a8006f105c9",
+        "frontend_sha256": "95628932851413bfff98f5cf7867117217a9950326fd44bd4f4cec76d2fd47e1",
+        "health": "healthy",
+        "image_id": "sha256:a70bf2ccf6da4442666175236754d14bdf2ded5e92c4ffbfcf5756fdeada848c",
+        "restart_count": 0
+      },
+      "sub2api": {
+        "container_id": "9a94b4db29dbfbec9c2f7f7b95aa7ec604b2d94e31c22ab195527d85868f5b18",
+        "frontend_sha256": "65c15f23272a3ab95e4533e5d85a47984b35a301f190af77356112af72c38767",
+        "health": "healthy",
+        "image_id": "sha256:62cb3769069c6a9c3c7fa708defd71229fe2befe396fc7cda32720ec69631f82",
+        "restart_count": 0
+      },
+      "sub2api-postgres": {
+        "container_id": "47d852ac04b0bbed179b5e1a15ec7c68a51c548637e41d73de587808c2d038b1",
+        "health": "healthy",
+        "image_id": "sha256:ab20e934b27ba3ff927c1b4c9ff8cf6c32f315f743efe68dd3441182a87fb085",
+        "restart_count": 0
+      },
+      "sub2api-redis": {
+        "container_id": "d96484170b9939d219946decf1c0e6dfb2e471f34f908c41af932f63a7598ffe",
+        "health": "healthy",
+        "image_id": "sha256:f84b0c4678011602b9b98c227a4dcd5468bf8b088b02fdd4165cb7758bad8058",
+        "restart_count": 0
+      }
+    },
+    "target_id": "clearapi-six-new",
+    "target_mode": "six-service-v1"
+  },
+  "recovery": {
+    "result": "helper_completed_before_disconnect",
+    "healthy": true
+  },
+  "ledger_unchanged": true
+}

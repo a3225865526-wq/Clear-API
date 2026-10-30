@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "root_installer_ran": true,
+  "visudo": "PASS",
+  "logrotate_debug": "PASS",
+  "sshd_effective_key_only": "PASS",
+  "preflight": {
+    "arch": "amd64",
+    "config_sha256": "2aab3bf71fb369c6fefe9cfae4187f609810e24441273844738c5576bb581a87",
+    "generation": "EMPTY",
+    "healthy": false,
+    "helper_files": {
+      "local-deploy-stack.py": "96144c64e2e5d60b71710ab0cea0b3abca0aadbcfe0790ef3f925691de038fd8",
+      "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+    },
+    "isolated": true,
+    "pending": false,
+    "services": null,
+    "target_id": "clearapi-six-final",
+    "target_mode": "six-service-v1"
+  }
+}

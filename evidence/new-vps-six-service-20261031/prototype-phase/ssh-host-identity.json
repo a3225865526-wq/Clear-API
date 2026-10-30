@@ -1,0 +1,5 @@
+{
+  "wrong_host_key_exit": 255,
+  "rejected_before_helper": true,
+  "target": "loopback isolated lab only"
+}

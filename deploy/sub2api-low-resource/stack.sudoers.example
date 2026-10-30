@@ -1,0 +1,3 @@
+# New target only. Root provisions immutable helper/config/activation and approves
+# an exact offline bundle. No arbitrary config paths, commands or legacy modes.
+cleardeploy ALL=(root) NOPASSWD: /opt/clearapi/bin/clearapi-local-deploy.py stack-preflight, /opt/clearapi/bin/clearapi-local-deploy.py stack-receive *, /opt/clearapi/bin/clearapi-local-deploy.py stack-recover, /opt/clearapi/bin/clearapi-local-deploy.py stack-recover --backup-id *, /opt/clearapi/bin/clearapi-local-deploy.py stack-recover --resume-previous, /opt/clearapi/bin/clearapi-local-deploy.py stack-backup, /opt/clearapi/bin/clearapi-local-deploy.py stack-backup --keep-fenced

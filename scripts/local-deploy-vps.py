@@ -577,6 +577,16 @@ def main():
     parser.add_argument('--config-path', default='')
     sub=parser.add_subparsers(dest='mode',required=True)
     sub.add_parser('preflight')
+    sub.add_parser('stack-preflight')
+    recovery = sub.add_parser('stack-recover')
+    recovery.add_argument('--backup-id', default='')
+    recovery.add_argument('--resume-previous', action='store_true')
+    snapshot = sub.add_parser('stack-backup')
+    snapshot.add_argument('--keep-fenced', action='store_true')
+    stack = sub.add_parser('stack-receive')
+    stack.add_argument('--bundle-sha256', required=True)
+    stack.add_argument('--bundle-bytes', required=True, type=int)
+    stack.add_argument('--expected-generation', required=True)
     for mode in ('adopt-check','adopt-running'):
         adoption=sub.add_parser(mode)
         adoption.add_argument('--source-commit',required=True)
@@ -588,6 +598,12 @@ def main():
     ap.add_argument('--scope',required=True,choices=('frontend','backend'))
     a=parser.parse_args()
     if os.geteuid()!=0:raise DeployError('root required; fixed sudoers entry only')
+    if a.mode.startswith('stack-'):
+        spec = importlib.util.spec_from_file_location('local_stack', Path(__file__).with_name('local-deploy-stack.py'))
+        stack = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(stack)
+        stack.dispatch(sys.modules[__name__], a)
+        return
     global TEST_CONFIG
     TEST_CONFIG = a.config_path or None
     if a.mode in ('adopt-check','adopt-running'):

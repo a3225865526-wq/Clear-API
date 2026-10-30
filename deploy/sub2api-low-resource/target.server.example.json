@@ -1,0 +1,35 @@
+{
+  "schema": "clearapi.six-service-target/v1",
+  "target_id": "clearapi-six-new",
+  "isolated": false,
+  "daemon_id": "REPLACE_WITH_ACTUAL_NEW_DOCKER_ID",
+  "arch": "amd64",
+  "minimum_available_bytes": 536870912,
+  "minimum_free_bytes": 8589934592,
+  "bundle_sha256": "REPLACE_WITH_EXACT_BUNDLE_SHA256",
+  "bundle_bytes": 0,
+  "source_archive_sha256": "REPLACE_WITH_PACKAGE_SOURCE_ARCHIVE_SHA256",
+  "gateway_commit": "92edfc345d9b9526379ed25363bb79abf9839874",
+  "backup_recipient": "REPLACE_WITH_OWNER_GPG_FINGERPRINT",
+  "protected_inputs": {
+    "stack.env": "REPLACE_WITH_PRIVATE_ENV_SHA256",
+    "secrets/token-key": "REPLACE_WITH_FIXED_KEY_FILE_SHA256",
+    "secrets/admin-password": "REPLACE_WITH_BOOTSTRAP_PASSWORD_FILE_SHA256",
+    "secrets/terms.txt": "REPLACE_WITH_OWNER_APPROVED_TERMS_FILE_SHA256",
+    "secrets/privacy.txt": "REPLACE_WITH_OWNER_APPROVED_PRIVACY_FILE_SHA256"
+  },
+  "helper_files": {
+    "local-deploy-vps.py": "REPLACE_WITH_INSTALLED_HELPER_SHA256",
+    "local-deploy-stack.py": "REPLACE_WITH_INSTALLED_MODULE_SHA256",
+    "local-deploy-state.py": "REPLACE_WITH_INSTALLED_STATE_MODULE_SHA256"
+  },
+  "bootstrap": {
+    "admin-username": "REPLACE_WITH_OWNER_ADMIN_NAME",
+    "admin-password-file": "/run/clearapi-secrets/admin-password",
+    "terms-file": "/run/clearapi-secrets/terms.txt",
+    "privacy-file": "/run/clearapi-secrets/privacy.txt",
+    "terms-version": "REPLACE_WITH_OWNER_APPROVED_VERSION",
+    "privacy-version": "REPLACE_WITH_OWNER_APPROVED_VERSION",
+    "approved-by": "REPLACE_WITH_REAL_OWNER_APPROVAL_REFERENCE"
+  }
+}

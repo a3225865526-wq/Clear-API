@@ -1,0 +1,31 @@
+{
+  "baseline": "6f92278ad",
+  "legacy_python_methods_unchanged": [
+    "adopt_running",
+    "adoption_snapshot",
+    "apply",
+    "arch",
+    "atomic_write",
+    "backup",
+    "compose_args",
+    "config",
+    "deploy_lock",
+    "deployed",
+    "identity_prepare",
+    "identity_refresh",
+    "image_id",
+    "manifest_next",
+    "override_yaml",
+    "preflight",
+    "probe",
+    "receive_archive",
+    "run",
+    "secure_file",
+    "verify_database",
+    "verify_manifest",
+    "verify_override_scope",
+    "wait_health"
+  ],
+  "legacy_windows_code_unchanged_except_explicit_stack_dispatch": true,
+  "production_contacted": false
+}

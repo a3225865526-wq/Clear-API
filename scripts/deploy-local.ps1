@@ -9,7 +9,8 @@ param(
     [switch]$DryRun,
     [string]$ConfigPath = (Join-Path $PSScriptRoot 'local-deploy.config.json'),
     [string]$FixturePath = '',
-    [switch]$TestTarget
+    [switch]$TestTarget,
+    [switch]$StackTarget
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -107,6 +108,12 @@ function Get-ImageConfigId([string]$Image) {
 try {
     Require-Command 'git'
     $cfg = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if ($StackTarget) {
+        if ($TestTarget -or $FixturePath) { throw 'StackTarget cannot use legacy test/fixture bypasses' }
+        . (Join-Path $PSScriptRoot 'local-deploy-stack.ps1')
+        Invoke-StackDeployment $cfg $ConfigPath $DryRun
+        exit 0
+    }
     if ($TestTarget) {
         if (-not $cfg.testTarget -or $cfg.host -cne '127.0.0.1' -or $cfg.remoteConfigPath -cnotmatch '^/opt/clearapi-test/[A-Za-z0-9._/-]+$') { throw 'TestTarget requires explicit loopback configuration' }
     } else {

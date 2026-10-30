@@ -1,0 +1,14 @@
+{
+  "exit": 2,
+  "error": "BLOCKED: six-service Compose up failed: Container clearapi-six-new-sub2api-postgres-1 Running \n Container clearapi-six-new-gateway-postgres-1 Running \n Container clearapi-six-new-sub2api-redis-1 Recreate \n Container clearapi-six-new-sub2api-redis-1 Recreated \n Container clearapi-six-new-sub2api-redis-1 Starting \n Container clearapi-six-new-sub2api-redis-1 Started \n Container clearapi-six-new-sub2api-postgres-1 Waiting \n Container clearapi-six-new-sub2api-redis-1 Waiting \n Container clearapi-six-new-gateway-postgres-1 Waiting \n Container clearapi-six-new-gateway-postgres-1 Healthy \ncontainer clearapi-six-new-sub2api-redis-1 exited (1)\n",
+  "ledger_before": {
+    "quota": 0,
+    "token_used": null,
+    "applied": null,
+    "reservations": 0,
+    "logs": 0,
+    "unique_logs": 0,
+    "log_quota": null,
+    "pending_outbox": 0
+  }
+}

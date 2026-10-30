@@ -38,6 +38,7 @@ services:
     - max_connections=20
     - -c
     - max_wal_size=256MB
+    memswap_limit: 256m
   sub2api-redis:
     image: clearapi-sub2api-redis:7.4.11-858f009f9709
     pull_policy: never
@@ -70,6 +71,7 @@ services:
         max-file: '3'
     pids_limit: 128
     cpus: '0.25'
+    memswap_limit: 96m
   sub2api:
     image: clearapi-sub2api:d851a384
     pull_policy: never
@@ -106,6 +108,7 @@ services:
       TZ: Asia/Shanghai
       GOMEMLIMIT: 288MiB
       GOMAXPROCS: '1'
+      SERVER_TRUSTED_PROXIES: 172.30.81.3
     depends_on:
       sub2api-postgres:
         condition: service_healthy
@@ -137,6 +140,7 @@ services:
         max-file: '3'
     pids_limit: 128
     cpus: '0.50'
+    memswap_limit: 384m
   gateway-postgres:
     image: postgres:17.6-alpine
     pull_policy: never
@@ -176,6 +180,7 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+    memswap_limit: 256m
   new-api:
     image: clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874
     pull_policy: never
@@ -202,15 +207,33 @@ services:
       CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE: 'true'
       CLEARAPI_POOL_ENABLED: 'false'
       TZ: Asia/Shanghai
+      GIN_MODE: release
+      SESSION_COOKIE_SECURE: 'true'
+      SESSION_COOKIE_TRUSTED_URL: ${PUBLIC_ORIGIN:?HTTPS origin required}
+      CLEARAPI_TASK_SETTLEMENT: 'true'
+      CLEARAPI_STRICT_PREPAID: 'true'
+      CLEARAPI_TOKEN_ENCRYPTION: 'true'
+      CLEARAPI_TOKEN_ENCRYPTION_KEY_FILE: /run/clearapi-secrets/token-key
+      CLEARAPI_DEPLOYMENT_INSTANCES: '1'
+      CLEARAPI_ENABLE_REALTIME: 'false'
+      DEBUG: 'false'
+      DIFY_DEBUG: 'false'
+      ENABLE_PPROF: 'false'
+      BATCH_UPDATE_ENABLED: 'false'
+      MAX_UPSTREAM_RESPONSE_MB: '16'
+      MAX_REQUEST_BODY_MB: '16'
+      CLEARAPI_PRODUCTION: 'true'
     volumes:
     - ${ROOT:-/opt/clearapi-stack}/gateway:/data
     - ${ROOT:-/opt/clearapi-stack}/logs:/app/logs
+    - ${CONFIG_DIR:-/opt/clearapi/config}/secrets:/run/clearapi-secrets:ro
     depends_on:
       gateway-postgres:
         condition: service_healthy
     networks:
-    - gateway
-    - gateway-data
+      gateway:
+        ipv4_address: 172.30.81.3
+      gateway-data: {}
     healthcheck:
       test:
       - CMD-SHELL
@@ -224,6 +247,10 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+    command:
+    - --log-dir
+    - /app/logs
+    memswap_limit: 448m
   edge:
     image: clearapi-edge:nginx-8541484afbc9
     pull_policy: never
@@ -257,6 +284,7 @@ services:
       options:
         max-size: 10m
         max-file: '3'
+    memswap_limit: 64m
 networks:
   data:
     internal: true

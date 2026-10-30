@@ -1,0 +1,14 @@
+{
+  "targetMode": "six-service-v1",
+  "targetId": "clearapi-six-new",
+  "isolated": false,
+  "host": "REPLACE_WITH_VERIFIED_NEW_HOST",
+  "user": "cleardeploy",
+  "port": 22,
+  "identityFile": "C:\\PROTECTED\\new-vps-ed25519",
+  "knownHostsFile": "C:\\PROTECTED\\new-vps-known-hosts",
+  "bundlePath": "D:\\RELEASE\\six-service.tar",
+  "bundleSha256": "REPLACE_WITH_EXACT_BUNDLE_SHA256",
+  "remoteConfigSha256": "REPLACE_WITH_ROOT_APPROVED_CONFIG_SHA256",
+  "gatewayCommit": "92edfc345d9b9526379ed25363bb79abf9839874"
+}
