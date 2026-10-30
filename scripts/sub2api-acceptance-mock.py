@@ -62,6 +62,17 @@ class Handler(BaseHTTPRequestHandler):
         if model == 'mock-drop':
             self.close_connection = True
             return
+        if model in ('mock-completed-drop', 'mock-completed-drop-small'):
+            # Execution is known only to this controlled provider. Its response
+            # and Usage are deliberately lost, so neither proxy may infer zero.
+            with lock:
+                with Path('/runtime/mock-executions.jsonl').open('a', encoding='utf-8') as f:
+                    f.write(json.dumps({'model': model, 'attempt': attempt, 'completed': True,
+                                        'input_tokens': 2 if model.endswith('-small') else 1000,
+                                        'output_tokens': 0 if model.endswith('-small') else 20,
+                                        'cache_read_tokens': 0 if model.endswith('-small') else 200}) + '\n')
+            self.close_connection = True
+            return
         if model == 'mock-badjson':
             self.send_response(200)
             self.send_header('Content-Length', '8')
@@ -104,10 +115,16 @@ class Handler(BaseHTTPRequestHandler):
                 emit({'type': 'response.output_text.delta', 'item_id': 'msg_mock', 'output_index': 0, 'content_index': 0, 'delta': 'mock '})
                 if model == 'mock-cancel':
                     release.wait(timeout=10)
+                if model == 'mock-timeout':
+                    # Gateway's five-second stream deadline fires first. The
+                    # controller then releases a genuine late terminal Usage.
+                    release.wait(timeout=15)
                 if model != 'mock-incomplete':
                     emit({'type': 'response.completed', 'response': response})
             else:
                 emit({'id': 'chatcmpl_mock', 'model': model, 'choices': [{'index': 0, 'delta': {'content': 'mock ok'}, 'finish_reason': None}]})
+                if model == 'mock-timeout':
+                    release.wait(timeout=15)
                 emit({'id': 'chatcmpl_mock', 'model': model, 'choices': [{'index': 0, 'delta': {}, 'finish_reason': 'stop'}], 'usage': chat_usage})
                 self.wfile.write(b'data: [DONE]\n\n')
                 self.wfile.flush()

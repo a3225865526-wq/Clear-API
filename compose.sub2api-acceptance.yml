@@ -20,6 +20,10 @@ services:
       SESSION_SECRET: ${SUB2_ACCEPTANCE_SESSION_SECRET:?required}
       CLEARAPI_DURABLE_WALLET: 'true'
       CLEARAPI_BILLING_OUTBOX: 'true'
+      # Synthetic root user 1, one isolated Gateway process, no Gateway Redis.
+      CLEARAPI_FINANCE_ENABLED: 'true'
+      CLEARAPI_FINANCE_OWNER_USER_ID: '1'
+      CLEARAPI_BILLING_RECONCILIATION_SINGLE_INSTANCE: 'true'
       CLEARAPI_POOL_ENABLED: 'false'
       CLEARAPI_POOL_CLIPROXY_DEDICATED: 'false'
       BATCH_UPDATE_ENABLED: 'false'
