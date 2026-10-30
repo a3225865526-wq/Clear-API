@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-31T07:48:44.654648+08:00",
+  "operator_commit": "669c5691b4c2fc408c9a4e3d70d873dd19954551",
+  "bundle": {
+    "path": "D:\\AI\\API\\runtime\\six-service-helper-20261031\\release-final.tar",
+    "bytes": 560998400,
+    "sha256": "5df0ea860d9ae1f65c640a3e95924bb1619b1fe7938035b696e5002290f16180"
+  },
+  "directory_and_tar_manifest": "PASS: exact 26 files plus SHA256.json; individual payload digests match",
+  "helper_matches_source_commit": "PASS",
+  "private_runtime_credential_literal_scan": {
+    "result": "PASS",
+    "distinct_literals_checked": 23,
+    "note": "Known synthetic runtime passwords/keys/tokens only; not a general secret-audit claim"
+  },
+  "shell_lf": "PASS",
+  "packaged_python_compile": "PASS: three helper modules; generated caches removed",
+  "packaged_powershell_parse": "PASS: both PowerShell entry points using Parser.ParseFile",
+  "git_diff_check": "PASS",
+  "focused_regression": {
+    "command": "python scripts/ci/test-local-deploy-stack.py",
+    "result": "PASS: 2 tests; SSH stdin preservation and exact native readiness status"
+  },
+  "legacy_fixture": {
+    "result": "BLOCKED as required by unchanged sensitive-path gate",
+    "exit": 1,
+    "path": "deploy/sub2api-low-resource/MIGRATION.md",
+    "production_contacted": false
+  },
+  "latest_docker_readonly_probe": "docker version timed out after 20 seconds; final live replay unavailable",
+  "final_bundle_live_replayed": false,
+  "offline_deployment_ready": false
+}
