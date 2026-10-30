@@ -94,16 +94,17 @@
     "frontend/full CI: no frontend/production application changes"
   ],
   "file_hashes": {
-    "clearapi-billing-tests.log": "3bf26c0411294e501c947f43e8dd92d13ef4fb9a97a2432da862922b1945fd02",
-    "clearapi-failure-cancel-tests.log": "d90ca89a857fceae44bf95c50de24f8228ee865315c1cc96520841cde4238052",
-    "clearapi-protocol-final.log": "5d37255a0091eacd736d0c4134cf5123d2c5ef72886087df591c213d7d9dbc87",
-    "clearapi-wallet-mock-final.log": "4ab0e2f69f01fd281542430d2ed0e785e97bb70772dfe4b35544fff395a9d248",
-    "history-sync.json": "a97276eaec3b743855bea5b3a88176474bd53fec0594fc4a8966131c4abafc16",
-    "isolation.json": "8c2946850c69ccdba0682f3253cc84ef4ed29afd6963b9a03c0a144218e7bdd5",
-    "official-build.log": "bb1e9ff0adc757e6d669af3d897b18a5b87420ff5f351c3916e697d1f0fbca6e",
-    "runtime-boundary.json": "c039be8118f48145f67a286964a60b09ec7a15dbc759235639e3a641ae57d1e9",
-    "source-manifest.json": "4e758daed8c712055ba39bec77ccc6a357c7396c1f4dc8a4fa03670365aa08ce",
-    "sub2api-simple-tests.log": "dd0c2a522d667a7e21896444b9988fe5cc2769488fdf40ec9bd24eb886a6b6de",
-    "workspace-inventory.json": "1aded16283baa7c8a1ad76f1116589d557cbe786f92531bcd16e6fbd91ad4daa"
-  }
+    "clearapi-billing-tests.log": "40dfc83fc95aa0351d1ca1df68a49c99515e88993f006261cd4826a7b42fe562",
+    "clearapi-failure-cancel-tests.log": "4eeb9d77f66598083aac174ef6f1274c64b07076c45f399029d7919de16d8c95",
+    "clearapi-protocol-final.log": "007e5a2b87e9d3be4892f3fae56c402e361ddb571aa5f6386f4a38d2342565d1",
+    "clearapi-wallet-mock-final.log": "a465204ec89a3df8e62ccffdf3745c5584fcd77b1d8c7bdb93992fa3fcfc53e1",
+    "history-sync.json": "0162b3fe8f0898a39c971a5ea0406f1965d51c4cd90c376aa5b6ae5427b8eb1f",
+    "isolation.json": "6a7d9d378785411f58bf21dad4e5c2b1d0580de7e477272b1842307c9d9811a1",
+    "official-build.log": "3af4c30aa7ea4e81e17cbbcd1c7c581b800bc4113b3c0a54be21fbf5dd6d7862",
+    "runtime-boundary.json": "1391c215b24f99808ee6ba142f7d803b37c93553c2aaf7d61db061b11ff2585c",
+    "source-manifest.json": "71c828ed729c96eb679c202585b6f57f7cf4fa9272147de1c4da48c4eadcdac1",
+    "sub2api-simple-tests.log": "6749f39e0c1a2234c219e152b1edfa99c524c77cea0e84e29ad4693d8e8a1ede",
+    "workspace-inventory.json": "aa8ebeff14d5bb6104c345bfa4b24d043f3f2e49d85e8cd906e38a947063ead7"
+  },
+  "hash_encoding": "SHA256 of exact LF-normalized committed evidence bytes"
 }
