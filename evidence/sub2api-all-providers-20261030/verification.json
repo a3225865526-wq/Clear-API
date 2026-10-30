@@ -1,0 +1,41 @@
+{
+  "time_utc": "2026-10-30T12:51:15.053746+00:00",
+  "platform_count": 13,
+  "profile_count": 31,
+  "disabled_channel_descriptors": 12,
+  "old_evidence_hash_verification": "PASS; all old evidence reused; zero repeated Go tests from prior verification manifest",
+  "new_test_command": "docker run --rm --network none -e GOWORK=off -e GOTOOLCHAIN=auto -v D:/AI/API/references/sub2api:/src:ro -v pool-strategy-sub2-mod:/go/pkg/mod -v pool-strategy-sub2-cache:/root/.cache/go-build -w /src/backend golang:1.26-bookworm go test -tags unit ./internal/service -run 'Test(SimpleModeRecordUsageWindowOptIn|AdminServiceSimpleModeRejectsDirectCompositeGroupAccess|AdminServiceSimpleModeRejectsCompositeCreateAndConversionDirectly|AdminServiceSimpleModeNormalizesAllUnsupportedCreateFieldsDirectly|AdminServiceSimpleModeNormalizesAllUnsupportedUpdateFieldsDirectly)$' -count=1 -v -timeout=90s",
+  "new_tests_result": "PASS: 5 top-level tests; RecordUsage 8 protocol/mode/stream subcases; mocks not two-service E2E",
+  "current_isolated_counts": "BEGIN\naccounts=0\napi_keys=0\nusage_logs=0\nCOMMIT",
+  "static_descriptor_validation": "PASS: source/catalog platform order exactly matches; complete profile coverage, no Composite, 12 disabled type59 descriptors, no real models or keys",
+  "source_sha256": {
+    "backend/internal/domain/platforms.go": "255f65e97fce140479f79607847e599f4882639effebef19741460adf4313e56",
+    "backend/internal/domain/constants.go": "bfd4658e8ff76e2940b2eba26e83286b2e6b973242564c5c73d4ddf5ef80ffe0",
+    "frontend/src/constants/platformCatalog.builtin.json": "50bd53ed626b43225746a71a8c88973a5d11c521d86206b0e26f142fc7f051aa",
+    "backend/internal/service/provider_profile.go": "bd7eef2600ff60f35960537e777c35619b2d138848d4d50e5fe363c574191d33",
+    "backend/internal/service/admin_group.go": "4c6bad5b2e7fb66c5f2fe3dbf1ebd429e8c54a03258cc2d44403daf2a8e39ad8",
+    "backend/internal/service/admin_service.go": "04633efee81182597d610eccdc0e2c589f34bff3a0591a120bfda4db2a0a39e1",
+    "backend/internal/service/group.go": "91d46705a0f361fcddcaf0949c977a8be0fc0e376669bc59ec60aecf8542b9a0",
+    "backend/internal/service/scheduler_snapshot_service.go": "090e540cdcfd831d17b63e9492c508a23107e2c4648850c0e8f60fb31c110a18",
+    "backend/internal/server/middleware/api_key_auth.go": "71e180a0703d5e2caf6fe6832a3717affbd9866e2ad65278fde718277a822616",
+    "backend/internal/server/middleware/group_model_allowlist.go": "dcf2702c4045db6afde0f072e8670053ece3b665fe676df09a0dda47a6fbe3ba",
+    "backend/internal/server/routes/gateway.go": "8fd2ebf61aeb2e6b7b79976b0d44ab1b46178e803b225139f3401af123021be4",
+    "backend/internal/service/upstream_models.go": "3ab072d7daf9aed952390b0b6fd7d04f8093ff29f5018c81ff7b48a27c4adcdb",
+    "backend/internal/service/openai_agent_identity.go": "2d40a70a453de5aa8bca8aebb42a4d0b7fc81dada426112b411f66ae899bc7f2",
+    "backend/internal/service/vertex_service_account.go": "d4f2cd9f448502fc2cdee739f7437c6fa6fd668e1b4d3088e2c3bf5d960df536",
+    "backend/internal/service/grok_oauth_service.go": "9bba6134e61c4a71c9c7de7fb0ae60674be3f18062006e31b10727e74ce2e8c6",
+    "backend/internal/handler/gateway_systemone.go": "4af6a96b01ef2c510bffc713b2d4135e4f67eb6a40c5b65512b7d9acdbf6ecb2",
+    "frontend/src/components/account/CreateAccountModal.vue": "be18c6cd18666ae5223777b9b93d95122bf43e0dfd8810dd055165d769522ca4",
+    "backend/internal/service/gateway_simple_mode_record_usage_test.go": "172b7d71e1217536566aa654dd3b3fd4dd2d634d4679a1f6412a621281df11a4"
+  },
+  "clearapi_no_systemone_entry": "rg -n SystemOne|systemone|TypeSafe router relay controller common -g *.go: no matches",
+  "unchanged_runtime": "Existing same project/containers reused; no rebuild, restart or new stack; provider inference calls 0",
+  "cross_service_result": "BLOCKED / UNVERIFIED; compliant internal Key cannot be created before owner acceptance",
+  "hash_encoding": "SHA256 of LF-normalized committed evidence bytes",
+  "file_hashes": {
+    "authority-update.json": "cc8f782c1207651c717949c418341d1809a0c8d2da8a919b5cbb5621eb568558",
+    "current-gate.json": "62ddc6042f543c8d9e73d6473da76ad559b1fc2ac084fd7817d15799a711be03",
+    "new-simple-contracts.log": "b646781db2dd464408e49c4d09d0a7679924ff5fd8ef64e859ab59485194775a",
+    "provider-plan.json": "5a65f711f2af712434794af2041ab8a69b3652179c92f6e22a7c67e05cde7f44"
+  }
+}

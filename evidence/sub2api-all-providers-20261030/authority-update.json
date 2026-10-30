@@ -1,0 +1,13 @@
+{
+  "time": "2026-10-30T20:56:06+08:00",
+  "target": "D:\\AI\\API\\worktrees\\clearapi-controlled-launch-20261020\\CLEARAPI_MASTER_STATUS.md",
+  "latest_heading_before": "2026-10-30 20:14:09 Asia/Shanghai — 商业资金与邀请奖励闭环收尾：内部证据通过，无新代码修复；真实交易闭环待业务确认",
+  "before_bytes": 340456,
+  "after_bytes": 345092,
+  "historical_prefix_preserved": true,
+  "before_sha256": "c8f478637fb251b5b02814b8f2f93661a9f3416fa93aecfdc9814d30c87fdf14",
+  "appended_sha256": "455f815369a36bb8794fc9994ec3e58eb080c0c81f1f58f18c7ce3cca0acb703",
+  "after_sha256": "d0dc389df13fed420b7d3faed495a73c3948d3be88d0fc8a3bfd0feacc125766",
+  "other_worktree_master_unchanged": true,
+  "commit_policy": "Authoritative file already dirty before this task; append left in place, not mixed into an unrelated main-worktree commit"
+}

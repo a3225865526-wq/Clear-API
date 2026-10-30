@@ -1,0 +1,45 @@
+2026/10/30 12:47:02 Timezone initialized: UTC (UTC offset: +00:00)
+=== RUN   TestAdminServiceSimpleModeRejectsDirectCompositeGroupAccess
+--- PASS: TestAdminServiceSimpleModeRejectsDirectCompositeGroupAccess (0.00s)
+=== RUN   TestAdminServiceSimpleModeRejectsCompositeCreateAndConversionDirectly
+--- PASS: TestAdminServiceSimpleModeRejectsCompositeCreateAndConversionDirectly (0.00s)
+=== RUN   TestAdminServiceSimpleModeNormalizesAllUnsupportedCreateFieldsDirectly
+--- PASS: TestAdminServiceSimpleModeNormalizesAllUnsupportedCreateFieldsDirectly (0.00s)
+=== RUN   TestAdminServiceSimpleModeNormalizesAllUnsupportedUpdateFieldsDirectly
+--- PASS: TestAdminServiceSimpleModeNormalizesAllUnsupportedUpdateFieldsDirectly (0.00s)
+=== RUN   TestSimpleModeRecordUsageWindowOptIn
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=false/stream=false
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: claude-sonnet-4
+2026/10/30 12:47:02 [SIMPLE MODE] Usage recorded (not billed): user=2, tokens=120
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=false/stream=true
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: claude-sonnet-4
+2026/10/30 12:47:02 [SIMPLE MODE] Usage recorded (not billed): user=2, tokens=120
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=true/stream=false
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: claude-sonnet-4
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=true/stream=true
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: claude-sonnet-4
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=false/stream=false
+2026/10/30 12:47:02 [OpenAI WS Mode][openai_ws_mode=true] bootstrap enabled=false oauth_enabled=false apikey_enabled=false force_http=false responses_websockets_v2=false responses_websockets=false payload_log_sample_rate=0.000 event_flush_batch_size=0 event_flush_interval_ms=0 prewarm_cooldown_ms=0 retry_backoff_initial_ms=0 retry_backoff_max_ms=0 retry_jitter_ratio=0.000 retry_total_budget_ms=0 ws_read_limit_bytes=16777216
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: gpt-5.1
+2026/10/30 12:47:02 [SIMPLE MODE] Usage recorded (not billed): user=2, tokens=120
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=false/stream=true
+2026/10/30 12:47:02 [OpenAI WS Mode][openai_ws_mode=true] bootstrap enabled=false oauth_enabled=false apikey_enabled=false force_http=false responses_websockets_v2=false responses_websockets=false payload_log_sample_rate=0.000 event_flush_batch_size=0 event_flush_interval_ms=0 prewarm_cooldown_ms=0 retry_backoff_initial_ms=0 retry_backoff_max_ms=0 retry_jitter_ratio=0.000 retry_total_budget_ms=0 ws_read_limit_bytes=16777216
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: gpt-5.1
+2026/10/30 12:47:02 [SIMPLE MODE] Usage recorded (not billed): user=2, tokens=120
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=true/stream=false
+2026/10/30 12:47:02 [OpenAI WS Mode][openai_ws_mode=true] bootstrap enabled=false oauth_enabled=false apikey_enabled=false force_http=false responses_websockets_v2=false responses_websockets=false payload_log_sample_rate=0.000 event_flush_batch_size=0 event_flush_interval_ms=0 prewarm_cooldown_ms=0 retry_backoff_initial_ms=0 retry_backoff_max_ms=0 retry_jitter_ratio=0.000 retry_total_budget_ms=0 ws_read_limit_bytes=16777216
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: gpt-5.1
+=== RUN   TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=true/stream=true
+2026/10/30 12:47:02 [OpenAI WS Mode][openai_ws_mode=true] bootstrap enabled=false oauth_enabled=false apikey_enabled=false force_http=false responses_websockets_v2=false responses_websockets=false payload_log_sample_rate=0.000 event_flush_batch_size=0 event_flush_interval_ms=0 prewarm_cooldown_ms=0 retry_backoff_initial_ms=0 retry_backoff_max_ms=0 retry_jitter_ratio=0.000 retry_total_budget_ms=0 ws_read_limit_bytes=16777216
+2026/10/30 12:47:02 [Billing] Using fallback pricing for model: gpt-5.1
+--- PASS: TestSimpleModeRecordUsageWindowOptIn (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=false/stream=false (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=false/stream=true (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=true/stream=false (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=false/enabled=true/stream=true (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=false/stream=false (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=false/stream=true (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=true/stream=false (0.00s)
+    --- PASS: TestSimpleModeRecordUsageWindowOptIn/openai=true/enabled=true/stream=true (0.00s)
+PASS
+ok  	github.com/Wei-Shaw/sub2api/internal/service	0.028s

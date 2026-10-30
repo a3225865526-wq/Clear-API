@@ -1,0 +1,12 @@
+{
+  "time_utc": "2026-10-30T12:43:55.020692+00:00",
+  "login_status": 200,
+  "compliance_status": 200,
+  "required": true,
+  "version": "v2026.06.10",
+  "acknowledgement_present": false,
+  "accounts_status": 423,
+  "accounts_code": "ADMIN_COMPLIANCE_ACK_REQUIRED",
+  "accept_called": false,
+  "restarts_or_rebuilds": false
+}
