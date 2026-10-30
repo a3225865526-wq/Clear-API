@@ -98,20 +98,7 @@ func freezePG03Policy(c *gin.Context, state *pg03RequestSnapshot) error {
 	if err != nil {
 		return err
 	}
-	requestID := c.GetString(common.RequestIdKey)
-	if requestID == "" {
-		var nonce [16]byte
-		if _, err := rand.Read(nonce[:]); err != nil {
-			return err
-		}
-		requestID = hex.EncodeToString(nonce[:])
-	}
 	if policy == nil || !policy.Enabled {
-		// Automatic account selection uses the executor's existing scheduler.
-		// It still requires the independent Gateway proof and one frozen request
-		// identity, even when no per-model fallback policy was configured.
-		state.policy = pg03PolicySnapshot{PoolID: poolID, ModelName: state.model, RequestID: requestID, IssuedAt: time.Now().Unix()}
-		state.active = true
 		return nil
 	}
 	if policy.MaxFallbackCount < 0 || policy.MaxFallbackCount > 3 {
@@ -142,7 +129,11 @@ func freezePG03Policy(c *gin.Context, state *pg03RequestSnapshot) error {
 	if len(order) == 0 || len(order) > 4 {
 		return ErrPoolInvalid
 	}
-	state.policy = pg03PolicySnapshot{PolicyID: policy.Id, PoolID: poolID, ModelName: state.model, AccountOrder: order, MaxFallbackCount: policy.MaxFallbackCount, RequestID: requestID, IssuedAt: time.Now().Unix()}
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		return err
+	}
+	state.policy = pg03PolicySnapshot{PolicyID: policy.Id, PoolID: poolID, ModelName: state.model, AccountOrder: order, MaxFallbackCount: policy.MaxFallbackCount, RequestID: hex.EncodeToString(nonce[:]), IssuedAt: time.Now().Unix()}
 	state.active = true
 	return nil
 }
@@ -191,11 +182,9 @@ func ApplyPG03Policy(c *gin.Context, req *http.Request) error {
 	mac := hmac.New(sha256.New, []byte(key))
 	mac.Write([]byte("clearapi-pg03-policy-v1\n"))
 	mac.Write(payload)
-	if policy.PolicyID > 0 {
-		req.Header.Set(PG03PolicyHeader, base64.RawURLEncoding.EncodeToString(payload))
-		req.Header.Set(PG03SignatureHeader, hex.EncodeToString(mac.Sum(nil)))
-		req.Header.Set(PG03RequestHeader, policy.RequestID)
-	}
+	req.Header.Set(PG03PolicyHeader, base64.RawURLEncoding.EncodeToString(payload))
+	req.Header.Set(PG03SignatureHeader, hex.EncodeToString(mac.Sum(nil)))
+	req.Header.Set(PG03RequestHeader, policy.RequestID)
 	// Preserve C5's independent Gateway proof and durable receipt identity.
 	proofKey := os.Getenv("CLEARAPI_PG02_GATEWAY_PROOF_KEY")
 	if proofKey == "" {

@@ -209,7 +209,7 @@ func channelPoolCanonicalPublished(channel *Channel, requestedModel string) bool
 	}
 	canonical := ResolveChannelUpstreamModel(channel, requestedModel)
 	route, err := GetPoolModelRoute(canonical)
-	if err != nil || route != nil && (!route.Enabled || route.Source != "pool") {
+	if err != nil || route == nil || !route.Enabled || route.Source != "pool" {
 		return false
 	}
 	return PoolMasterEnabled()
@@ -231,8 +231,8 @@ type PoolRouteDecisions struct {
 //
 // Fail-closed semantics:
 //   - corrupt route state: error (never serve)
-//   - unconfigured model: use the existing channel/group/model routing; pool
-//     channels still require master, channel permission and executor admission
+//   - unconfigured model: non-pool channels keep existing routing; pool-bound
+//     channels are denied (an empty publication set never serves)
 //   - paused route: denied for both sources
 //   - api source: pool-bound channels are excluded, others pass
 //   - pool source: the master switch must be on, the channel must be
@@ -245,12 +245,7 @@ func (channel *Channel) CheckPoolModelRoute(modelName string) error {
 			return err
 		}
 		if channel != nil && channel.PoolChannelBound() {
-			if !PoolMasterEnabled() {
-				return ErrPoolGloballyDisabled
-			}
-			if !channel.PoolRoutingEnabled() {
-				return ErrPoolChannelRoutingOff
-			}
+			return ErrPoolModelNotPublished
 		}
 		return nil
 	}

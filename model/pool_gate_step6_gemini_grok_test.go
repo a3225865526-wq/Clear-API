@@ -13,9 +13,9 @@ import (
 // executor-side provider deny is proven separately (CLIProxyAPI
 // pool_gemini_xai_isolation_test.go); this file proves the gateway side.
 
-// Model routing does not infer provider support from names. Channel abilities
-// select candidates and the executor validates actual account support.
-func TestPoolGateUnconfiguredNamesUseChannelRouting(t *testing.T) {
+// Unpublished provider names (the normal case for gemini-*/grok-* channels)
+// keep pool channels out of the candidate list and ordinary channels in.
+func TestPoolGateUnpublishedGeminiGrokNamesExcludePoolChannels(t *testing.T) {
 	setPoolMasterOption(t, "true")
 	pool := boundPoolChannel()
 	ordinary := &Channel{Id: 7, Name: "synthetic-gemini-channel", Models: "gemini-2.5-pro,grok-4"}
@@ -25,11 +25,11 @@ func TestPoolGateUnconfiguredNamesUseChannelRouting(t *testing.T) {
 	canonicalFilter := dto.ChannelFilter{Kind: dto.FilterModelSource, Source: "api", AllowCanonicalPool: true}
 	poolFilter := dtoPoolFilter("pool")
 	for _, name := range []string{"gemini-2.5-pro", "gemini-3-flash-preview", "grok-4", "grok-3-mini"} {
-		require.NoError(t, pool.CheckPoolModelRoute(name))
-		require.NoError(t, pool.CheckPoolChannelPoolAdmission(name))
-		require.True(t, channelMatchesFilter(pool, name, canonicalFilter),
-			"unconfigured %q uses channel routing and executor capability checks", name)
-		require.True(t, channelMatchesFilter(pool, name, poolFilter))
+		require.ErrorIs(t, pool.CheckPoolModelRoute(name), ErrPoolModelNotPublished)
+		require.ErrorIs(t, pool.CheckPoolChannelPoolAdmission(name), ErrPoolModelNotPublished)
+		require.False(t, channelMatchesFilter(pool, name, canonicalFilter),
+			"unpublished %q must never admit a pool channel", name)
+		require.False(t, channelMatchesFilter(pool, name, poolFilter))
 		require.True(t, channelMatchesFilter(ordinary, name, canonicalFilter),
 			"unpublished %q must keep ordinary channels eligible", name)
 	}
