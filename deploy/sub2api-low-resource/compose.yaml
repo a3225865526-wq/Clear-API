@@ -182,7 +182,7 @@ services:
         max-file: '3'
     memswap_limit: 256m
   new-api:
-    image: clearapi-local:4b32d47a02619de7f36688caebfac95865921c6f
+    image: clearapi-local:fa96a74df2b46c0f3617068e0f77fbdc2fae67fe
     pull_policy: never
     restart: unless-stopped
     mem_limit: 448m
