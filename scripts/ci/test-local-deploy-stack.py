@@ -54,6 +54,19 @@ print(len(sys.stdin.buffer.read()))
         self.assertEqual(args[-4:], ['-f', str(Path('/release') / 'compose.admin-access.yaml'), 'up', '-d'])
         self.assertIn(str(Path('/release') / 'compose.admin-access.yaml'), target.dc('/release', 'stop'))
 
+    def test_monitor_initialization_requires_explicit_target_opt_in(self):
+        target = stack.StackTarget.__new__(stack.StackTarget)
+        target.c = {}
+        target.call = Mock()
+        target.initialize_monitoring('/release')
+        target.call.assert_not_called()
+        target.c['initialize_monitoring'] = True
+        target.initialize_monitoring('/release')
+        command = target.call.call_args.args[-1]
+        self.assertIn('--confirm-database clearapi --approve-monitor-migration', command)
+        self.assertNotIn('--catalog', command)
+        self.assertNotIn('--approve-monitor-publication', command)
+
 
 if __name__ == '__main__':
     unittest.main()

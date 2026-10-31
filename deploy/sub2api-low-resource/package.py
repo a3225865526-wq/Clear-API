@@ -47,7 +47,7 @@ def main():
         target.mkdir(parents=True, exist_ok=False)
         # Never enumerate/copy ignored production.env, keys, test DBs or dumps.
         for name in sorted(PACKAGE_FILES):
-            shutil.copy2(HERE / name, target / name)
+            (target / name).write_bytes(subprocess.check_output(['git', '-C', str(repo), 'show', 'HEAD:' + (HERE / name).relative_to(repo).as_posix()]))
         lock = json.loads((HERE / 'images.lock.json').read_text())
         if args.image_archive:
             if not args.image_archive_sha256 or sha(args.image_archive) != args.image_archive_sha256:
@@ -60,7 +60,7 @@ def main():
                     raise SystemExit('image identity mismatch: ' + tag)
             subprocess.run(['docker', 'save', '-o', str(target / 'images.tar'), *lock], check=True)
         for name in sorted(HELPER_FILES):
-            shutil.copy2(repo / 'scripts' / name, target / name)
+            (target / name).write_bytes(subprocess.check_output(['git', '-C', str(repo), 'show', 'HEAD:scripts/' + name]))
         with tarfile.open(target / 'images.tar') as images:
             found = set()
             for item in json.load(images.extractfile('manifest.json')):

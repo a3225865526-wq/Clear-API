@@ -52,6 +52,8 @@ class StackTarget:
         if not re.fullmatch(r'(?:[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64})', c['backup_recipient']):
             raise host.DeployError('backup encryption requires an exact owner key fingerprint')
         protected = {'stack.env', 'secrets/token-key', 'secrets/admin-password', 'secrets/terms.txt', 'secrets/privacy.txt'}
+        if type(c.get('initialize_monitoring', False)) is not bool:
+            raise host.DeployError('initialize_monitoring must be an explicit boolean')
         if type(c.get('admin_access', False)) is not bool:
             raise host.DeployError('admin_access must be an explicit boolean')
         if c.get('admin_access', False):
@@ -232,6 +234,15 @@ class StackTarget:
 
     def read_public(self, path):
         return json.loads(self.h.STATE.read_file(path), object_pairs_hook=self.h.STATE.unique)
+
+    def initialize_monitoring(self, release, state=None):
+        if self.c.get('initialize_monitoring', False):
+            # Explicit new-target migration only. The native command creates a
+            # paused policy and no targets, allowlist memberships or contracts.
+            self.call(release, 'exec', '-T', 'new-api', 'sh', '-ec',
+                      'export CLEARAPI_MONITOR_DSN="$SQL_DSN"; exec /monitor-init '
+                      '--dialect postgres --database clearapi --migrate --apply '
+                      '--confirm-database clearapi --approve-monitor-migration', state=state)
 
     def verify_readiness(self, release, state=None):
         output = self.call(release, 'exec', '-T', 'new-api', '/production-bootstrap', '--verify-only', state=state)
@@ -469,6 +480,7 @@ class StackTarget:
             self.call(release, 'up', '-d', '--wait', '--wait-timeout', '180', 'new-api', 'sub2api', state=old)
             state = {'release': str(release), 'bundle_sha256': a.bundle_sha256,
                      'env_file': str(self.envfile(old)), 'env_sha256': digest(self.envfile(old)), 'backup_id': journal['backup']['backup_id']}
+            self.initialize_monitoring(release, state)
             # Gate traffic on the existing production-bootstrap readiness contract.
             self.verify_readiness(release, state)
             if old and self.financial_digest(release, state) != journal['backup']['financial_digest']:
@@ -540,6 +552,7 @@ class StackTarget:
             self.call(release, 'up', '-d', '--wait', '--wait-timeout', '180')
             state = {'release': release, 'bundle_sha256': journal['bundle_sha256'],
                      'env_file': str(self.envfile()), 'env_sha256': digest(self.envfile()), 'backup_id': journal['backup']['backup_id']}
+            self.initialize_monitoring(release, state)
             health = self.healthy(release, state)
             self.verify_readiness(release)
             self.write(self.state_path, state)

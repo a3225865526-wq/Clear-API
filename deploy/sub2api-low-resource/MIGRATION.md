@@ -42,3 +42,11 @@ and includes its certificate material in encrypted backups. Default false keeps
 the original topology and ports.
 Public DNS/TLS and end-to-end protected admin access still require on-site
 acceptance. ClearAPI and Sub2API keep independent authentication and cookies.
+
+For a new target that needs the monitoring administration module, explicitly set
+`initialize_monitoring: true`. The helper invokes the existing monitor-init
+migration with the exact `clearapi` database confirmation after application
+startup and before opening ingress. A new policy remains paused, with no
+allowlist entries, contracts, budgets or provider calls created by enrollment.
+Existing monitoring settings are preserved. Leave false to keep the original
+opt-in migration behavior.
