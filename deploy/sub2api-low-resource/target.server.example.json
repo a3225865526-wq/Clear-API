@@ -11,7 +11,7 @@
   "bundle_sha256": "REPLACE_WITH_EXACT_BUNDLE_SHA256",
   "bundle_bytes": 0,
   "source_archive_sha256": "REPLACE_WITH_PACKAGE_SOURCE_ARCHIVE_SHA256",
-  "gateway_commit": "6cbf394c1dae4da22ee8beebc770f2b2cdd93728",
+  "gateway_commit": "4b32d47a02619de7f36688caebfac95865921c6f",
   "backup_recipient": "REPLACE_WITH_OWNER_GPG_FINGERPRINT",
   "protected_inputs": {
     "stack.env": "REPLACE_WITH_PRIVATE_ENV_SHA256",
