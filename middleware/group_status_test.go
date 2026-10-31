@@ -68,6 +68,16 @@ func TestGroupStatusAdmissionDatabase(t *testing.T) {
 			assert.False(t, called, "rejected admission must not reach billing or upstream handlers")
 		})
 	}
+	for _, names := range [][2]string{{"CASE-GROUP", "case-group"}, {"café-group", "cafe-group"}} {
+		require.NoError(t, model.SetGroupEnabled(names[0], false))
+		require.NoError(t, model.SetGroupEnabled(names[1], true))
+		assert.ErrorIs(t, model.CheckGroupsEnabled(db, names[0]), model.ErrGroupDisabled, "distinct group identifiers must retain independent state: %q vs %q", names[0], names[1])
+		require.NoError(t, model.CheckGroupsEnabled(db, names[1]), "distinct group identifiers must not collide under database collation")
+		disabled, err := model.GetDisabledGroups()
+		require.NoError(t, err)
+		assert.True(t, disabled[names[0]])
+		assert.False(t, disabled[names[1]])
+	}
 	// Re-enabling preserves the original identifier, without deleting its state.
 	require.NoError(t, model.SetGroupEnabled("legacy-group", true))
 	require.NoError(t, model.CheckGroupsEnabled(db, "legacy-group"))

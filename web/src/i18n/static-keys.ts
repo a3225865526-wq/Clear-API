@@ -1346,4 +1346,5 @@ export const STATIC_I18N_KEYS = [
   'Chinese public holiday (0 or 1)',
   'DeepSeek Flash peak/off-peak (China holidays)',
   'Chinese holiday conditions require Asia/Shanghai timezone.',
+  'Monitoring storage is not initialized. Ask the deployment administrator to run the opt-in monitoring migration; it starts paused.',
 ] as const

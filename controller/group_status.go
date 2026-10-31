@@ -36,7 +36,7 @@ func UpdateGroupStatus(c *gin.Context) {
 		Name    string `json:"name"`
 		Enabled *bool  `json:"enabled"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil || !ratio_setting.ContainsGroupRatio(req.Name) {
+	if err := c.ShouldBindJSON(&req); err != nil || req.Enabled == nil || req.Name == "" || !ratio_setting.ContainsGroupRatio(req.Name) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "message": "Invalid group status request"})
 		return
 	}

@@ -16,7 +16,10 @@
 ## Commercial candidate: group state and admin origin
 
 Group enable/disable uses one existing `options` row per group, prefixed
-`GroupDisabled:`. Missing rows mean enabled. No schema rewrite, group renaming,
+`GroupStatus:` followed by the SHA256 of the exact group name. Values contain
+the original name and explicit enabled boolean as JSON. This avoids aliasing
+distinct names under case/accent-insensitive database collations. Missing rows
+mean enabled. No schema rewrite, group renaming,
 binding deletion or historical accounting migration is required. Preserve these
 rows in backup and restore. Live admissions read the primary database; already
 admitted work retains its ordinary usage settlement.

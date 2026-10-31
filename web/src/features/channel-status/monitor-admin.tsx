@@ -177,6 +177,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
       {(catalog.isError || targets.isError) && (
         <ErrorState
           title={t('console.loadFailed')}
+          description={getServerErrorMessage(catalog.error || targets.error)}
           onRetry={() => {
             void catalog.refetch()
             void targets.refetch()

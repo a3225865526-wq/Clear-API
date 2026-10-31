@@ -23,6 +23,33 @@ import i18next from 'i18next'
 export const safeServerErrorMessage = Symbol('safeServerErrorMessage')
 
 const serverErrorMessageKeys = {
+  GROUP_DISABLED:
+    'Your group is temporarily unavailable. Contact an administrator.',
+  GROUP_STATUS_UNAVAILABLE: 'Please try again later.',
+  MONITOR_NOT_INITIALIZED:
+    'Monitoring storage is not initialized. Ask the deployment administrator to run the opt-in monitoring migration; it starts paused.',
+  MONITOR_INVALID:
+    'The monitoring protocol or request configuration is invalid.',
+  MONITOR_TARGET_DENIED:
+    'The channel is disabled, unavailable, or requires the account-pool integration.',
+  MONITOR_BUDGET_OR_CONCURRENCY:
+    'Budget, concurrency or minimum interval limit reached',
+  MONITOR_PAUSED:
+    'Monitoring must be allowlisted, published, enabled, and not archived before a probe can run.',
+  MONITOR_INTEGRATION_PENDING:
+    'This target requires a monitoring adapter that is not available yet.',
+  MONITOR_LEASE_UNRESOLVED:
+    'An unfinished monitoring attempt must be resolved before this operation.',
+  MONITOR_COST_UNVERIFIED:
+    'Configure a valid upstream cost contract in this monitor’s execution settings.',
+  MONITOR_COST_EXCEEDED:
+    'The upstream worst-case cost exceeds the approved per-probe ceiling.',
+  MONITOR_DELETE_REQUIRES_ARCHIVE:
+    'Only archived, disabled, unpublished monitoring entries without unfinished probes can be deleted.',
+  MONITOR_REQUEST_FORBIDDEN:
+    'You do not have permission to perform this action.',
+  MONITOR_INTERNAL: 'Please try again later.',
+
   REFERRAL_STOCK_CHANGED: 'Inventory changed. Check again before confirming.',
   STORE_CATALOG_CHANGED:
     'The product catalog changed. Reload the page and try again.',
