@@ -13,3 +13,10 @@
 历史报告中的旧工作区路径只表示当时证据来源。已移除的源码从归档Git bundle及工作区差异恢复，不要把不同支线未经审查拼入当前候选。运行数据、数据库、密钥、Docker卷和仍有绑定依赖的历史目录不因清理自动删除。
 
 有界OFFLINE_DEPLOYMENT_READY不等于生产上线授权；真实新机SSH/资源/网络、真实厂商Usage和费用验收、生产迁移及启池仍分开执行。
+
+## 2026-10-31 深度清理后的开发入口
+
+- 固定正式 v2 源码基线：`c8e4c06fe9bbd282a48deb16d6714b9688f08bf6`；本地正式候选分支 `codex/new-vps-six-service-helper-20261031` 和 GitHub 备份分支保持此 SHA。与 `ff560c159f` 仅差本索引，不改变验收应用/helper。
+- 当前目录进入独立实验分支 `codex/shared-infrastructure-optimization-20261031`，从上述基线创建；本轮只有索引/清理报告的本地文档提交，不含数据库或 Redis 优化，不推送。
+- 清理报告：`CLEARAPI_WORKSPACE_DEEP_CLEAN_FINAL.md`。提交后的精确 HEAD、分支 SHA 和体积见 `D:/AI/API/runtime/workspace-deep-clean-20261031/final-receipt.json`，唯一权威总控另追加精确 SHA。
+- 回退应用/helper：固定使用 `c8e4c06fe9bbd282a48deb16d6714b9688f08bf6`，勿将后续实验当成已验收部署候选；正式 `release-v2.tar` 路径和 SHA 不变。
