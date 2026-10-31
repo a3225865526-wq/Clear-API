@@ -62,7 +62,15 @@ func monitorAdminError(c *gin.Context, err error) {
 	if message == "" {
 		message = code
 	}
-	c.JSON(status, gin.H{"success": false, "code": code, "message": message})
+	response := gin.H{"success": false, "code": code, "message": message}
+	if id, parseErr := strconv.Atoi(c.Param("id")); parseErr == nil && id > 0 && model.ConsoleMonitoringReady(model.DB) {
+		var monitor model.ConsoleMonitor
+		var policy model.ConsoleMonitorPolicy
+		if model.DB.WithContext(c.Request.Context()).First(&monitor, id).Error == nil && model.DB.WithContext(c.Request.Context()).First(&policy, 1).Error == nil {
+			response["readiness"] = service.DiagnoseConsoleMonitor(c.Request.Context(), model.DB, monitor, policy)
+		}
+	}
+	c.JSON(status, response)
 }
 
 // Discovery never serializes Channel, credentials, endpoints or pool identities.
@@ -113,7 +121,34 @@ func ListConsoleMonitorAdmin(c *gin.Context) {
 			}
 		}
 	}
-	c.JSON(200, gin.H{"success": true, "data": gin.H{"monitors": monitors, "policy": policy, "real_probe_ready": ready}})
+	var channels []struct {
+		ID     int    `json:"id"`
+		Name   string `json:"name"`
+		Type   int    `json:"type"`
+		Models string `json:"models"`
+		Status int    `json:"status"`
+	}
+	if err := model.DB.WithContext(c.Request.Context()).Model(&model.Channel{}).Select("id", "name", "type", "models", "status").Order("id").Find(&channels).Error; err != nil {
+		monitorAdminError(c, err)
+		return
+	}
+	configuredChannels := make(map[int]bool, len(monitors))
+	for _, m := range monitors {
+		if m.TargetKind == "channel" {
+			configuredChannels[m.ChannelID] = true
+		}
+	}
+	unconfigured := make([]any, 0)
+	for _, channel := range channels {
+		if !configuredChannels[channel.ID] {
+			unconfigured = append(unconfigured, channel)
+		}
+	}
+	readiness := make(map[int]service.ConsoleMonitorReadiness, len(monitors))
+	for _, m := range monitors {
+		readiness[m.ID] = service.DiagnoseConsoleMonitor(c.Request.Context(), model.DB, m, policy)
+	}
+	c.JSON(200, gin.H{"success": true, "data": gin.H{"monitors": monitors, "policy": policy, "real_probe_ready": ready, "readiness": readiness, "scheduler": service.SystemTaskRunnerObservation(), "unconfigured_channels": unconfigured}})
 }
 
 func SaveConsoleMonitorAdmin(c *gin.Context) {

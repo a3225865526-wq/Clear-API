@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { CopyButton } from '@/components/copy-button'
 import { Dialog } from '@/components/dialog'
 import { ErrorState } from '@/components/error-state'
 import { LoadingState } from '@/components/loading-state'
@@ -19,6 +20,31 @@ import {
 import type { Monitor, MonitorTargets } from './lib/monitor-admin-schema'
 import { MonitorAdminForm } from './monitor-admin-form'
 import { MonitorDeleteDialog } from './monitor-delete-dialog'
+import { MonitorExecutionSettings } from './monitor-execution-settings'
+
+const blockerMessages: Record<string, string> = {
+  MONITOR_NOT_ALLOWLISTED:
+    'Add this target in Monitoring targets before enabling probes.',
+  MONITOR_NOT_PUBLISHED: 'Publish this monitor in Monitor administration.',
+  MONITOR_DISABLED:
+    'Enable this monitor after completing the other requirements.',
+  MONITOR_ARCHIVED:
+    'This monitor is archived. Create a new entry to resume monitoring.',
+  MONITOR_POLICY_DISABLED:
+    'Review and enable the global monitoring budget policy.',
+  MONITOR_BUDGET_UNCONFIGURED:
+    'Set positive request limits and budgets in the monitor and global policy.',
+  MONITOR_COST_UNVERIFIED:
+    'Configure a valid upstream cost contract in this monitor’s execution settings.',
+  MONITOR_COST_EXCEEDED:
+    'The upstream worst-case cost exceeds the approved per-probe ceiling.',
+  MONITOR_INVALID:
+    'The monitoring protocol or request configuration is invalid.',
+  MONITOR_TARGET_DENIED:
+    'The channel is disabled, unavailable, or requires the account-pool integration.',
+  MONITOR_INTEGRATION_PENDING:
+    'This target requires a monitoring adapter that is not available yet.',
+}
 
 export function MonitorAdmin(props: { allowlist?: boolean }) {
   const { t, i18n } = useTranslation()
@@ -62,7 +88,31 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
             success: boolean
             data: {
               monitors: Monitor[]
-              policy?: { max_concurrent: number; daily_cost_micros: number }
+              policy?: {
+                id: number
+                enabled: boolean
+                max_concurrent: number
+                daily_requests: number
+                daily_cost_micros: number
+                retention_days: number
+              }
+              readiness?: Record<
+                number,
+                {
+                  configuration_ready: boolean
+                  blockers: string[]
+                  channel_id: number
+                  allowlisted: boolean
+                }
+              >
+              scheduler?: { local_status: string }
+              unconfigured_channels?: {
+                id: number
+                name: string
+                type: number
+                models: string
+                status: number
+              }[]
             }
           }>(base)
         ).data
@@ -135,6 +185,43 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
       )}
       {catalog.data && targets.data && (
         <>
+          {!props.allowlist && (
+            <CopyButton
+              size='sm'
+              variant='outline'
+              value={JSON.stringify(
+                { ...catalog.data, targets: targets.data },
+                null,
+                2
+              )}
+              aria-label={t('Copy monitoring readiness matrix')}
+            >
+              {t('Copy monitoring readiness matrix')}
+            </CopyButton>
+          )}
+          {!props.allowlist &&
+            catalog.data.unconfigured_channels?.map((channel) => (
+              <p key={channel.id} className='text-muted-foreground text-sm'>
+                {t('Channel')} {channel.id} · {channel.name}:{' '}
+                {t(
+                  'No monitor configuration exists for this channel. Add a target before publishing or enabling it.'
+                )}
+              </p>
+            ))}
+          {!props.allowlist && catalog.data.policy && (
+            <MonitorExecutionSettings policy={catalog.data.policy} />
+          )}
+          {!props.allowlist && catalog.data.scheduler && (
+            <p role='status'>
+              {t('Local scheduler state')}:{' '}
+              {t(
+                catalog.data.scheduler.local_status === 'running'
+                  ? 'Running'
+                  : 'No recent scheduler heartbeat on this node. Check the master node and system tasks.'
+              )}{' '}
+              {t('Manual probes use separate admission checks.')}
+            </p>
+          )}
           {props.allowlist && catalog.data.policy && (
             <div className='rounded border p-3 text-sm'>
               <p>{t('Global monitoring policy (read only)')}</p>
@@ -179,6 +266,23 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
                         ? formatTimestamp(item.created_at)
                         : t('Unknown')}
                     </p>
+                  )}
+                  {!props.allowlist && catalog.data.readiness?.[item.id] && (
+                    <div className='space-y-1 text-sm' role='status'>
+                      <p>
+                        {t('Channel')}: {item.channel_id} · {item.protocol}
+                      </p>
+                      {[
+                        ...new Set(catalog.data.readiness[item.id].blockers),
+                      ].map((code) => (
+                        <p key={code}>
+                          {t(
+                            blockerMessages[code] ??
+                              'Monitoring configuration is incomplete.'
+                          )}
+                        </p>
+                      ))}
+                    </div>
                   )}
                   <p className='text-muted-foreground text-sm'>
                     {item.target_kind || 'channel'} ·{' '}
@@ -247,7 +351,8 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
                       item.archived ||
                       !item.enabled ||
                       !item.published ||
-                      probe.isPending
+                      probe.isPending ||
+                      !catalog.data.readiness?.[item.id]?.configuration_ready
                     }
                     variant='outline'
                     onClick={() =>
@@ -289,6 +394,9 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
               'Monitoring requires an upstream cost contract and an enabled budget policy.'
             )}
           >
+            {edit && !props.allowlist && (
+              <MonitorExecutionSettings monitorId={edit.id} />
+            )}
             {edit && (
               <MonitorAdminForm
                 key={edit.id}
@@ -319,7 +427,7 @@ export function MonitorAdmin(props: { allowlist?: boolean }) {
       >
         {(toggle.isError || probe.isError) && (
           <p role='alert'>
-            {getServerErrorMessage(toggle.error || probe.error)}
+            {t(getServerErrorMessage(toggle.error || probe.error))}
           </p>
         )}
       </ConfirmDialog>

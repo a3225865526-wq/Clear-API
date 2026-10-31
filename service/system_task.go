@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -120,6 +121,22 @@ func notifySystemTaskRunner() {
 	}
 }
 
+// Local worker observation; another node may be the active master. This does
+// not claim cluster-wide health from the absence of a heartbeat on this node.
+var systemTaskLastPass atomic.Int64
+
+func SystemTaskRunnerObservation() map[string]any {
+	last := systemTaskLastPass.Load()
+	status := "not_started_on_this_node"
+	if last != 0 {
+		status = "running"
+		if time.Now().Unix()-last > 60 {
+			status = "stale_on_this_node"
+		}
+	}
+	return map[string]any{"local_status": status, "last_pass_unix": last, "master_node": common.IsMasterNode, "monitor_cadence_seconds": int64(model.ConsoleMonitorDailyInterval / time.Second)}
+}
+
 func StartSystemTaskRunner() {
 	systemTaskRunnerOnce.Do(func() {
 		if !common.IsMasterNode {
@@ -136,6 +153,7 @@ func StartSystemTaskRunner() {
 			var lastScheduler time.Time
 			var lastStaleLockCleanup time.Time
 			runPass := func() {
+				systemTaskLastPass.Store(time.Now().Unix())
 				// The scheduler/stale-lock pass is throttled independently of the
 				// claim pass: wakeups (e.g. a manual log cleanup) should claim
 				// immediately without re-running the scheduler every time.

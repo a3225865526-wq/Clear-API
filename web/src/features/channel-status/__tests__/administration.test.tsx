@@ -336,13 +336,22 @@ describe('monitor administration', () => {
     vi.mocked(api.get).mockImplementation(async (...args) => {
       const response = (await original(...args)) as {
         data: {
-          data: { monitors?: Array<{ enabled: boolean; published: boolean }> }
+          data: {
+            monitors?: Array<{ enabled: boolean; published: boolean }>
+            readiness?: Record<
+              number,
+              { configuration_ready: boolean; blockers: string[] }
+            >
+          }
         }
       }
       const item = response.data.data.monitors?.[0]
       if (item) {
         item.enabled = true
         item.published = true
+        response.data.data.readiness = {
+          1: { configuration_ready: true, blockers: [] },
+        }
       }
       return response
     })
@@ -392,4 +401,100 @@ describe('monitor administration', () => {
       'Updated monitor'
     )
   })
+})
+
+describe('monitor readiness diagnostics', () => {
+  it('shows channel-specific blockers while an independently ready channel remains testable', async () => {
+    client.setQueryData(['monitor-admin-catalog'], {
+      monitors: [
+        {
+          id: 16,
+          channel_id: 16,
+          display_name: 'DeepSeek control',
+          model: 'deepseek-chat',
+          protocol: 'openai_chat',
+          target_kind: 'channel',
+          published: true,
+          enabled: false,
+          archived: false,
+        },
+        {
+          id: 17,
+          channel_id: 17,
+          display_name: 'Other control',
+          model: 'other-model',
+          protocol: 'anthropic',
+          target_kind: 'channel',
+          published: true,
+          enabled: true,
+          archived: false,
+        },
+      ],
+      readiness: {
+        16: {
+          configuration_ready: false,
+          channel_id: 16,
+          allowlisted: false,
+          blockers: [
+            'MONITOR_NOT_ALLOWLISTED',
+            'MONITOR_COST_UNVERIFIED',
+            'MONITOR_POLICY_DISABLED',
+          ],
+        },
+        17: {
+          configuration_ready: true,
+          channel_id: 17,
+          allowlisted: true,
+          blockers: [],
+        },
+      },
+      scheduler: { local_status: 'stale_on_this_node' },
+    })
+    client.setQueryDefaults(['monitor-admin-catalog'], { staleTime: Infinity })
+    const post = vi.spyOn(api, 'post')
+    renderAdmin()
+    const channel = await screen.findByText('DeepSeek control · deepseek-chat')
+    const blocked = channel.closest('article')
+    if (!blocked) throw new Error('missing channel row')
+    expect(within(blocked).getByRole('button', { name: 'Test' })).toBeDisabled()
+    expect(
+      within(blocked).getByText(
+        'Add this target in Monitoring targets before enabling probes.'
+      )
+    ).toBeInTheDocument()
+    expect(
+      within(blocked).getByText(
+        'Review and enable the global monitoring budget policy.'
+      )
+    ).toBeInTheDocument()
+    const other = screen
+      .getByText('Other control · other-model')
+      .closest('article')
+    if (!other) throw new Error('missing channel row')
+    expect(within(other).getByRole('button', { name: 'Test' })).toBeEnabled()
+    expect(
+      screen.getByText(/No recent scheduler heartbeat on this node/)
+    ).toBeInTheDocument()
+    expect(post).not.toHaveBeenCalled()
+  })
+})
+
+
+it('requires explicit policy confirmation and never dispatches a probe while saving budgets', async () => {
+  const policy = { id: 1, enabled: true, max_concurrent: 1, daily_requests: 2, daily_cost_micros: 1000, retention_days: 90 }
+  client.setQueryData(['monitor-admin-catalog'], { policy, monitors: [] })
+  client.setQueryDefaults(['monitor-admin-catalog'], { staleTime: Infinity })
+  const put = vi.spyOn(api, 'put').mockResolvedValue({ data: { success: true } })
+  const post = vi.spyOn(api, 'post')
+  renderAdmin()
+  const summary = await screen.findByText('Global monitoring budget policy')
+  await userEvent.click(summary)
+  const details = summary.closest('details')
+  if (!details) throw new Error('missing policy editor')
+  await userEvent.click(within(details).getByRole('button', { name: 'Save' }))
+  expect(put).not.toHaveBeenCalled()
+  expect(screen.getByText('Enabling this policy permits scheduled probes for eligible monitors within the saved budgets.')).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+  await waitFor(() => expect(put).toHaveBeenCalledWith('/api/console/monitor-admin/policy', { confirm: true, policy }, { headers: { 'X-ClearAPI-Monitor': '1' } }))
+  expect(post).not.toHaveBeenCalled()
 })

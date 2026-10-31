@@ -737,3 +737,26 @@ func TestConsoleProbeCostExecutorMatrix(t *testing.T) {
 		})
 	}
 }
+
+func TestConsoleMonitorReadinessExplainsIndependentGates(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, sqlDB.Close()) })
+	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Option{}))
+	require.NoError(t, db.Create(&model.Channel{Id: 16, Name: "DeepSeek synthetic control", Key: "fixture-only", Status: common.ChannelStatusEnabled}).Error)
+	m := model.ConsoleMonitor{ID: 1, ChannelID: 16, TargetKind: "channel", TargetRef: "16", Model: "deepseek-chat", Protocol: "openai_chat"}
+	r := DiagnoseConsoleMonitor(context.Background(), db, m, model.ConsoleMonitorPolicy{})
+	assert.Equal(t, 16, r.ChannelID)
+	assert.False(t, r.ConfigurationReady)
+	assert.ElementsMatch(t, []string{"MONITOR_NOT_ALLOWLISTED", "MONITOR_NOT_PUBLISHED", "MONITOR_DISABLED", "MONITOR_POLICY_DISABLED", "MONITOR_BUDGET_UNCONFIGURED", "MONITOR_COST_UNVERIFIED"}, r.Blockers)
+	m.Allowlisted, m.Published, m.Enabled, m.Archived = true, true, true, true
+	m.DailyRequests, m.RequestCostMicros = 2, 100
+	p := model.ConsoleMonitorPolicy{Enabled: true, MaxConcurrent: 1, DailyRequests: 2, DailyCostMicros: 1000}
+	r = DiagnoseConsoleMonitor(context.Background(), db, m, p)
+	assert.ElementsMatch(t, []string{"MONITOR_ARCHIVED", "MONITOR_COST_UNVERIFIED"}, r.Blockers)
+	var count int64
+	require.NoError(t, db.Model(&model.Option{}).Count(&count).Error)
+	assert.Zero(t, count, "diagnostics must not manufacture a supplier contract")
+}
