@@ -489,7 +489,10 @@ func TokenAuth() func(c *gin.Context) {
 
 		userGroup := userCache.Group
 		tokenGroup := token.Group
-		groupsToCheck := []string{userGroup, tokenGroup}
+		groupsToCheck := []string{userGroup}
+		if tokenGroup != "" {
+			groupsToCheck = []string{tokenGroup}
+		}
 		if tokenGroup == "auto" {
 			autoGroups, err := token.GetAutoGroups()
 			if err != nil {
@@ -499,6 +502,7 @@ func TokenAuth() func(c *gin.Context) {
 			if autoGroups == nil {
 				autoGroups = setting.GetAutoGroups()
 			}
+			groupsToCheck = append(groupsToCheck, userGroup)
 			groupsToCheck = append(groupsToCheck, autoGroups...)
 		}
 		if rejectDisabledGroups(c, groupsToCheck...) {

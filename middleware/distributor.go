@@ -22,6 +22,7 @@ import (
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/imageexecution"
 	"github.com/QuantumNous/new-api/service/routechain"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
@@ -100,9 +101,17 @@ func Distribute() func(c *gin.Context) {
 			}
 		}
 		// Check before channel selection and billing. Admitted streams finish normally.
-		groupsToCheck := []string{common.GetContextKeyString(c, constant.ContextKeyUserGroup), common.GetContextKeyString(c, constant.ContextKeyUsingGroup), modelRequest.Group}
+		groupsToCheck := []string{common.GetContextKeyString(c, constant.ContextKeyTokenGroup), common.GetContextKeyString(c, constant.ContextKeyUsingGroup), modelRequest.Group}
 		if common.GetContextKeyString(c, constant.ContextKeyUsingGroup) == "auto" {
-			groupsToCheck = append(groupsToCheck, service.GetRequestAutoGroups(c, common.GetContextKeyString(c, constant.ContextKeyUserGroup))...)
+			// Recheck the unfiltered snapshot so a concurrent disable cannot be
+			// mistaken for permission filtering and silently select another group.
+			value, custom := common.GetContextKey(c, constant.ContextKeyTokenAutoGroups)
+			autoGroups, _ := value.([]string)
+			if !custom {
+				autoGroups = setting.GetAutoGroups()
+			}
+			groupsToCheck = append(groupsToCheck, common.GetContextKeyString(c, constant.ContextKeyUserGroup))
+			groupsToCheck = append(groupsToCheck, autoGroups...)
 		}
 		if rejectDisabledGroups(c, groupsToCheck...) {
 			return

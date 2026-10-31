@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"github.com/QuantumNous/new-api/constant"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
@@ -116,6 +118,17 @@ func TestDisabledGroupRejectsExistingKeysBeforeDownstream(t *testing.T) {
 			}
 		}
 	}
+	// An explicit enabled group is not an automatic fallback from a disabled one.
+	require.NoError(t, model.SetGroupEnabled("vip", false))
+	token.Group = "default"
+	require.NoError(t, model.DB.Save(&token).Error)
+	engine := gin.New()
+	engine.POST("/v1/chat/completions", TokenAuth(), func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	req.Header.Set("Authorization", "Bearer "+token.Key)
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusNoContent, w.Code, w.Body.String())
 	var afterUser model.User
 	var afterToken model.Token
 	require.NoError(t, model.DB.First(&afterUser, user.Id).Error)
@@ -124,4 +137,23 @@ func TestDisabledGroupRejectsExistingKeysBeforeDownstream(t *testing.T) {
 	assert.Equal(t, 12345, afterUser.Quota)
 	assert.Equal(t, 2345, afterToken.RemainQuota)
 	assert.Zero(t, afterToken.UsedQuota)
+}
+
+func TestAutoAdmissionRechecksUnfilteredSnapshotAfterDisable(t *testing.T) {
+	setupDashboardAuthMiddlewareTest(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.Option{}))
+	require.NoError(t, model.SetGroupEnabled("vip", false))
+	engine := gin.New()
+	engine.POST("/v1/chat/completions", func(c *gin.Context) {
+		common.SetContextKey(c, constant.ContextKeyUsingGroup, "auto")
+		common.SetContextKey(c, constant.ContextKeyUserGroup, "default")
+		common.SetContextKey(c, constant.ContextKeyTokenGroup, "auto")
+		common.SetContextKey(c, constant.ContextKeyTokenAutoGroups, []string{"vip", "default"})
+	}, Distribute())
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"group-guard-model","messages":[{"role":"user","content":"fixture"}]}`))
+	req.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), "GROUP_DISABLED")
 }
