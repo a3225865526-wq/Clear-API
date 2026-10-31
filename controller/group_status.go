@@ -44,6 +44,7 @@ func UpdateGroupStatus(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	recordManageAudit(c, "group.status", map[string]any{"group": req.Name, "enabled": *req.Enabled})
 	common.ApiSuccess(c, nil)
 }
 
