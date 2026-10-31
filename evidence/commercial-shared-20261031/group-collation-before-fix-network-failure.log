@@ -1,0 +1,12 @@
+
+2026/10/31 14:55:33 [35m/src/middleware/group_status_test.go:34
+[0m[31m[error] [0mfailed to initialize database, got error dial tcp 172.17.0.4:3306: connect: network is unreachable
+--- FAIL: TestGroupStatusAdmissionDatabase (0.00s)
+    group_status_test.go:35: 
+        	Error Trace:	/src/middleware/group_status_test.go:35
+        	Error:      	Received unexpected error:
+        	            	dial tcp 172.17.0.4:3306: connect: network is unreachable
+        	Test:       	TestGroupStatusAdmissionDatabase
+FAIL
+FAIL	github.com/QuantumNous/new-api/middleware	0.063s
+FAIL

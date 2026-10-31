@@ -1,0 +1,52 @@
+{
+  "result": "DRY_RUN_NO_REMOTE_WRITES",
+  "target_id": "clearapi-commercial-v3",
+  "bundle_sha256": "5aa8e92b97dc76c7a122c4872baf4f4dba0b0bb207a727880ca632dc8f5153e2",
+  "generation": "d0dbb6c37fdca9b6dde77da9121310b01988a9bd8a4299627bc08b8ae64ac72a",
+  "services": {
+    "edge": {
+      "config_hash": "f4fe384d40a9fcfe97fe25ab8448f94440ab0b1b92ad097ceb980b18d8a4245f",
+      "container_id": "2990c212876f58638207bacc32423216f7501b2afbcf0b4ff569d9bd419b53de",
+      "health": "healthy",
+      "image_id": "sha256:5253dc86cc93ac6249902934655c6f7c959d8caa45a8c2ecc0b95953834d8ee8",
+      "restart_count": 0
+    },
+    "gateway-postgres": {
+      "config_hash": "8d1735d2bf450e003f999e3d1da1b4f1a84304024b8d880c11e256aa1c8198a1",
+      "container_id": "64057f08ae06b1050a7fbb428592bf919968758be26da3e040b902de0b316715",
+      "health": "healthy",
+      "image_id": "sha256:d741b376874687de90374fd34f55c6b2760e8f7bd7e4ae5cd47f50757fc08cf8",
+      "restart_count": 0
+    },
+    "new-api": {
+      "config_hash": "0748abd8e98207f34ab575325efcdee5aa73295ff7a6d7edb1ee2a64b3632230",
+      "container_id": "f7664daf99e419f78d0fda95c939af853325c394531e07dbfffb54d96d32dd55",
+      "frontend_sha256": "5b0391cd87e09884250194a3b2dd301a73d63f231fc6556e4ca58d2ce9089cb9",
+      "health": "healthy",
+      "image_id": "sha256:f027e3053cdb73699d25ee84e74060fbd98fd8ccf0e216502f93ca16a0ae56ae",
+      "restart_count": 0
+    },
+    "sub2api": {
+      "config_hash": "7dbfb65d08a209a680b3bea8e9f0def97e70a598d92cbd8f6481ee3abdd036e4",
+      "container_id": "1d878acede0307de6dbb785a5014b485f86aa4b5c01ac82143834ea292472f26",
+      "frontend_sha256": "50b1c82db1905ca7fc59a642dfab67598b6c23098d675aee99a2be36004e536a",
+      "health": "healthy",
+      "image_id": "sha256:62cb3769069c6a9c3c7fa708defd71229fe2befe396fc7cda32720ec69631f82",
+      "restart_count": 0
+    },
+    "sub2api-postgres": {
+      "config_hash": "90be7268b7a60ccf0a8fff3a75ee25c62ecfa0ab5113ca623a48f6f7e07ebfca",
+      "container_id": "b03c17c324cf063e260f01e312cb3ca181f04ed016024883c5b13c62346cc4df",
+      "health": "healthy",
+      "image_id": "sha256:ab20e934b27ba3ff927c1b4c9ff8cf6c32f315f743efe68dd3441182a87fb085",
+      "restart_count": 0
+    },
+    "sub2api-redis": {
+      "config_hash": "1e06e6fcc7097ea13f3ba01de9ed0d1a6c294b00e44a97f3e01e68627ed8fe40",
+      "container_id": "4efc73181bf45a845a17f39c7b24e1642aaab30a1233feda530c1285e77ea561",
+      "health": "healthy",
+      "image_id": "sha256:f84b0c4678011602b9b98c227a4dcd5468bf8b088b02fdd4165cb7758bad8058",
+      "restart_count": 0
+    }
+  }
+}

@@ -1,0 +1,149 @@
+{
+  "all_channels_disabled": true,
+  "all_relay_tokens_disabled": true,
+  "monitor_policy_paused": true,
+  "no_real_monitor_targets_or_contracts_created": true,
+  "ledger": {
+    "quota": 999636,
+    "token_used": 378,
+    "applied": 378,
+    "reservations": 27,
+    "logs": 27,
+    "unique_logs": 27,
+    "log_quota": 378,
+    "pending_outbox": 0
+  },
+  "resource": {
+    "cgroup": "1581146112\n1611083776\nlow 0\nhigh 0\nmax 431208\noom 1\noom_kill 1\noom_group_kill 0\nlow 0\nhigh 0\nmax 430996\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 1193380356\nuser_usec 606599758\nsystem_usec 586780598\nnice_usec 0\nnr_periods 69083\nnr_throttled 234\nthrottled_usec 21830365\nnr_bursts 0\nburst_usec 0\n",
+    "services": [
+      {
+        "BlockIO": "24MB / 20.5kB",
+        "CPUPerc": "0.00%",
+        "Container": "7f239851510379dabebdeb7bf2d3f357e7e3d19ba44dd31e2d64d8b24d62109e",
+        "ID": "7f2398515103",
+        "MemPerc": "20.13%",
+        "MemUsage": "90.16MiB / 448MiB",
+        "Name": "clearapi-commercial-v3-new-api-1",
+        "NetIO": "635kB / 793kB",
+        "PIDs": "8"
+      },
+      {
+        "BlockIO": "11MB / 4.1kB",
+        "CPUPerc": "0.00%",
+        "Container": "859af30a09010512cd5e06474a9e6f444e5664f08d4785d38c6ce71659d0fc95",
+        "ID": "859af30a0901",
+        "MemPerc": "13.87%",
+        "MemUsage": "8.875MiB / 64MiB",
+        "Name": "clearapi-commercial-v3-edge-1",
+        "NetIO": "60.2kB / 16.7kB",
+        "PIDs": "2"
+      },
+      {
+        "BlockIO": "14.4MB / 508kB",
+        "CPUPerc": "0.61%",
+        "Container": "53a11ffd101cbe319519cc1762df98ec4302cfe1aa904d087797b3199fc09d7c",
+        "ID": "53a11ffd101c",
+        "MemPerc": "13.30%",
+        "MemUsage": "12.77MiB / 96MiB",
+        "Name": "clearapi-commercial-v3-sub2api-redis-1",
+        "NetIO": "885kB / 366kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "141MB / 5.47MB",
+        "CPUPerc": "0.00%",
+        "Container": "4a6e2f3cf663a7f7b02d9aeae426b235213e744855f65f66a8cc8db973071e91",
+        "ID": "4a6e2f3cf663",
+        "MemPerc": "18.00%",
+        "MemUsage": "46.08MiB / 256MiB",
+        "Name": "clearapi-commercial-v3-gateway-postgres-1",
+        "NetIO": "7.14MB / 5.87MB",
+        "PIDs": "8"
+      },
+      {
+        "BlockIO": "12.2MB / 0B",
+        "CPUPerc": "0.60%",
+        "Container": "c1d819f2651cb96cd81ab0e93b22d3f488a727e89ebc1275baa56b66d284d144",
+        "ID": "c1d819f2651c",
+        "MemPerc": "8.78%",
+        "MemUsage": "33.73MiB / 384MiB",
+        "Name": "clearapi-commercial-v3-sub2api-1",
+        "NetIO": "603kB / 1MB",
+        "PIDs": "7"
+      },
+      {
+        "BlockIO": "121MB / 320MB",
+        "CPUPerc": "0.40%",
+        "Container": "b9963f705aa3017651f6df9ccf72b39570e74aa0f09d4db07167b039d205cf5e",
+        "ID": "b9963f705aa3",
+        "MemPerc": "22.72%",
+        "MemUsage": "58.17MiB / 256MiB",
+        "Name": "clearapi-commercial-v3-sub2api-postgres-1",
+        "NetIO": "9.24MB / 5.94MB",
+        "PIDs": "8"
+      }
+    ],
+    "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 21627023360 27247570944  44% /vps\n"
+  },
+  "preflight": {
+    "arch": "amd64",
+    "config_sha256": "c03f41dfbb03db3f425c98edb006829a7ca6eedd946ffd255dd3fb4f093703e6",
+    "generation": "83c236c74b30a0af29d8f7035acfa7d6528e923c609fedde296de2a2561ec030",
+    "healthy": true,
+    "helper_files": {
+      "local-deploy-stack.py": "6850b6ee53b9220cea968ecbc55e6068b9fb4b7d688d92927a896b8bafe9aa49",
+      "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+    },
+    "isolated": true,
+    "pending": false,
+    "services": {
+      "edge": {
+        "config_hash": "f4fe384d40a9fcfe97fe25ab8448f94440ab0b1b92ad097ceb980b18d8a4245f",
+        "container_id": "859af30a09010512cd5e06474a9e6f444e5664f08d4785d38c6ce71659d0fc95",
+        "health": "healthy",
+        "image_id": "sha256:5253dc86cc93ac6249902934655c6f7c959d8caa45a8c2ecc0b95953834d8ee8",
+        "restart_count": 0
+      },
+      "gateway-postgres": {
+        "config_hash": "b4e64359ff78549f3301668085ebc36e7acdf5f0ddd3ef2af584edd1e9dbb1e7",
+        "container_id": "4a6e2f3cf663a7f7b02d9aeae426b235213e744855f65f66a8cc8db973071e91",
+        "health": "healthy",
+        "image_id": "sha256:d741b376874687de90374fd34f55c6b2760e8f7bd7e4ae5cd47f50757fc08cf8",
+        "restart_count": 0
+      },
+      "new-api": {
+        "config_hash": "6621d454a3b9265f7cf3c424088dbbf4d1c2645c5917665fb16c9102606eaf2c",
+        "container_id": "7f239851510379dabebdeb7bf2d3f357e7e3d19ba44dd31e2d64d8b24d62109e",
+        "frontend_sha256": "3822618cd72f318582093a956e682b390228229b3764847dec5137a79fd234a7",
+        "health": "healthy",
+        "image_id": "sha256:a97ded8dc68021c352f444a86639678ee3e1c9c2ab113c66d4460a97aa8c3855",
+        "restart_count": 0
+      },
+      "sub2api": {
+        "config_hash": "6c521776231826211e6fa95249a3245f179b3465150fdd88e2f384171dfe043b",
+        "container_id": "c1d819f2651cb96cd81ab0e93b22d3f488a727e89ebc1275baa56b66d284d144",
+        "frontend_sha256": "ea4d0002efcc91e781506f0368f5686906cf333b8516c17251680413d4cbd801",
+        "health": "healthy",
+        "image_id": "sha256:62cb3769069c6a9c3c7fa708defd71229fe2befe396fc7cda32720ec69631f82",
+        "restart_count": 0
+      },
+      "sub2api-postgres": {
+        "config_hash": "4edf1f79155921aecfa05b7d9a17ecad180c59f8012c7b867b4fb3c2c21b960a",
+        "container_id": "b9963f705aa3017651f6df9ccf72b39570e74aa0f09d4db07167b039d205cf5e",
+        "health": "healthy",
+        "image_id": "sha256:ab20e934b27ba3ff927c1b4c9ff8cf6c32f315f743efe68dd3441182a87fb085",
+        "restart_count": 0
+      },
+      "sub2api-redis": {
+        "config_hash": "d9391eb5a554ea0af41ab9d84a1b030d1fe703f39422ef3a97d1bcfd14765318",
+        "container_id": "53a11ffd101cbe319519cc1762df98ec4302cfe1aa904d087797b3199fc09d7c",
+        "health": "healthy",
+        "image_id": "sha256:f84b0c4678011602b9b98c227a4dcd5468bf8b088b02fdd4165cb7758bad8058",
+        "restart_count": 0
+      }
+    },
+    "target_id": "clearapi-commercial-v3",
+    "target_mode": "six-service-v1"
+  }
+}

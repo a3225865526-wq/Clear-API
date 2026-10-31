@@ -1,0 +1,7 @@
+{
+  "scope": "synthetic database-only shared PostgreSQL experiment",
+  "method": "pg_dumpall --clean --if-exists; restore into separately initialized PostgreSQL 17.11 instance",
+  "both_database_rows_and_sums_preserved": true,
+  "source_instances_untouched": true,
+  "production_data": false
+}

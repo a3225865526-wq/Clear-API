@@ -1,0 +1,10 @@
+$ vitest run src/features/channel-status/__tests__/administration.test.tsx "--maxWorkers=2"
+
+ RUN  v4.1.10 D:/AI/API/worktrees/clearapi-new-vps-six-service-helper-20261031/web
+
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  23:10:23
+   Duration  34.16s (transform 5.13s, setup 869ms, import 27.10s, tests 3.62s, environment 2.31s)
+

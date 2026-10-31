@@ -1,0 +1,460 @@
+{
+  "idle": {
+    "unix": 1793460241.7709124,
+    "current": 1581211648,
+    "working_set": 1254608896,
+    "anon": 158068736,
+    "cpu": "usage_usec 659355682\nuser_usec 340177816\nsystem_usec 319177866\nnice_usec 0\nnr_periods 52663\nnr_throttled 151\nthrottled_usec 7248764\nnr_bursts 0\nburst_usec 0\n",
+    "events": "low 0\nhigh 0\nmax 203253\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "swap": 0,
+    "host_meminfo": "MemTotal:       16115852 kB\nMemFree:          690512 kB\nMemAvailable:   11622384 kB\nBuffers:         1367440 kB\nCached:          8925344 kB\nSwapCached:            0 kB\nActive:          6290672 kB\nInactive:        7356596 kB\nActive(anon):      84860 kB\nInactive(anon):  3427728 kB\nActive(file):    6205812 kB\nInactive(file):  3928868 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       4194304 kB\nSwapFree:        4194080 kB\nDirty:              1076 kB\nWriteback:             0 kB\nAnonPages:       3354952 kB\nMapped:          1206588 kB\nShmem:            158184 kB\nKReclaimable:    1044348 kB\nSlab:            1252408 kB\nSReclaimable:    1044348 kB\nSUnreclaim:       208060 kB\nKernelStack:       20832 kB\nPageTables:        35036 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    12252228 kB\nCommitted_AS:   13024492 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       52172 kB\nVmallocChunk:          0 kB\nPercpu:            11392 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    137216 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:       66560 kB\nDirectMap2M:     8056832 kB\nDirectMap1G:    16777216 kB\n",
+    "process_rss_kib_including_shared_pages": 501412,
+    "docker": [
+      {
+        "BlockIO": "4.16MB / 8.19kB",
+        "CPUPerc": "0.00%",
+        "Container": "73ff4d76219932a3c8bd375c66f0dee951bbbe9e9ea7b106cccb157186d813ae",
+        "ID": "73ff4d762199",
+        "MemPerc": "8.26%",
+        "MemUsage": "5.285MiB / 64MiB",
+        "Name": "clearapi-commercial-shared-edge-1",
+        "NetIO": "16.6kB / 6.5kB",
+        "PIDs": "2"
+      },
+      {
+        "BlockIO": "680kB / 0B",
+        "CPUPerc": "0.40%",
+        "Container": "b81a687d1a62d8a4a228e5b63c951476780f765cf40f4ff74598bd1526f6dcbe",
+        "ID": "b81a687d1a62",
+        "MemPerc": "6.29%",
+        "MemUsage": "24.15MiB / 384MiB",
+        "Name": "clearapi-commercial-shared-sub2api-1",
+        "NetIO": "302kB / 451kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "17.5MB / 0B",
+        "CPUPerc": "0.12%",
+        "Container": "fa2c1d2985905c613b756e5514442ceac533cb7399d96143573a1f40140f04cb",
+        "ID": "fa2c1d298590",
+        "MemPerc": "10.54%",
+        "MemUsage": "47.24MiB / 448MiB",
+        "Name": "clearapi-commercial-shared-new-api-1",
+        "NetIO": "429kB / 639kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "9.85MB / 0B",
+        "CPUPerc": "2.36%",
+        "Container": "737e8f5dcf7dbbe36ddfee212d61ffe89836a9198afd0c86c24f2b0518dac239",
+        "ID": "737e8f5dcf7d",
+        "MemPerc": "7.74%",
+        "MemUsage": "7.426MiB / 96MiB",
+        "Name": "clearapi-commercial-shared-sub2api-redis-1",
+        "NetIO": "71.5kB / 27.6kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "68.9MB / 173MB",
+        "CPUPerc": "0.42%",
+        "Container": "aa1223256e2f46c2cb5aab5a9fd9c0598d4d0c03a4bd241da44be548646e4578",
+        "ID": "aa1223256e2f",
+        "MemPerc": "21.90%",
+        "MemUsage": "84.09MiB / 384MiB",
+        "Name": "clearapi-commercial-shared-gateway-postgres-1",
+        "NetIO": "1MB / 692kB",
+        "PIDs": "10"
+      }
+    ],
+    "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 9148157952 39726436352  19% /vps\n",
+    "connections_gateway": 10,
+    "connections_sub": 10,
+    "redis": "# Memory\r\nused_memory:1799584\r\nused_memory_human:1.72M\r\nused_memory_rss:8732672\r\nused_memory_rss_human:8.33M\r\nused_memory_peak:1824216\r\nused_memory_peak_human:1.74M\r\nused_memory_peak_perc:98.65%\r\nused_memory_overhead:1109448\r\nused_memory_startup:948936\r\nused_memory_dataset:690136\r\nused_memory_dataset_perc:81.13%\r\nallocator_allocated:2803928\r\nallocator_active:3166208\r\nallocator_resident:8007680\r\nallocator_muzzy:0\r\ntotal_system_memory:16502632448\r\ntotal_system_memory_human:15.37G\r\nused_memory_lua:44032\r\nused_memory_vm_eval:44032\r\nused_memory_lua_human:43.00K\r\nused_memory_scripts_eval:6280\r\nnumber_of_cached_scripts:9\r\nnumber_of_functions:0\r\nnumber_of_libraries:0\r\nused_memory_vm_functions:33792\r\nused_memory_vm_total:77824\r\nused_memory_vm_total_human:76.00K\r\nused_memory_functions:192\r\nused_memory_scripts:6472\r\nused_memory_scripts_human:6.32K\r\nmaxmemory:50331648\r\nmaxmemory_human:48.00M\r\nmaxmemory_policy:noeviction\r\nallocator_frag_ratio:1.12\r\nallocator_frag_bytes:266408\r\nallocator_rss_ratio:2.53\r\nallocator_rss_bytes:4841472\r\nrss_overhead_ratio:1.09\r\nrss_overhead_bytes:724992\r\nmem_fragmentation_ratio:5.02\r\nmem_fragmentation_bytes:6991944\r\nmem_not_counted_for_evict:768\r\nmem_replication_backlog:0\r\nmem_total_replication_buffers:0\r\nmem_clients_slaves:0\r\nmem_clients_normal:144376\r\nmem_cluster_links:0\r\nmem_aof_buffer:768\r\nmem_allocator:jemalloc-5.3.0\r\nmem_overhead_db_hashtable_rehashing:0\r\nactive_defrag_running:0\r\nlazyfree_pending_objects:0\r\nlazyfreed_objects:0\r\n"
+  },
+  "samples": [
+    {
+      "unix": 1793460246.0281441,
+      "current": 1610612736,
+      "working_set": 1298325504,
+      "anon": 202231808,
+      "cpu": "usage_usec 660296358\nuser_usec 340707599\nsystem_usec 319588758\nnice_usec 0\nnr_periods 52706\nnr_throttled 151\nthrottled_usec 7248764\nnr_bursts 0\nburst_usec 0\n",
+      "events": "low 0\nhigh 0\nmax 203324\noom 0\noom_kill 0\noom_group_kill 0\n",
+      "swap": 0,
+      "host_meminfo": "MemTotal:       16115852 kB\nMemFree:          653164 kB\nMemAvailable:   11567728 kB\nBuffers:         1367456 kB\nCached:          8908596 kB\nSwapCached:            0 kB\nActive:          6278008 kB\nInactive:        7377460 kB\nActive(anon):      80544 kB\nInactive(anon):  3457556 kB\nActive(file):    6197464 kB\nInactive(file):  3919904 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       4194304 kB\nSwapFree:        4194080 kB\nDirty:               784 kB\nWriteback:             0 kB\nAnonPages:       3379016 kB\nMapped:          1235708 kB\nShmem:            158184 kB\nKReclaimable:    1044352 kB\nSlab:            1252540 kB\nSReclaimable:    1044352 kB\nSUnreclaim:       208188 kB\nKernelStack:       21816 kB\nPageTables:        37896 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    12252228 kB\nCommitted_AS:   14502332 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       53340 kB\nVmallocChunk:          0 kB\nPercpu:            11392 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    137216 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:       66560 kB\nDirectMap2M:     8056832 kB\nDirectMap1G:    16777216 kB\n",
+      "process_rss_kib_including_shared_pages": 646236,
+      "docker": [
+        {
+          "BlockIO": "4.16MB / 8.19kB",
+          "CPUPerc": "0.03%",
+          "Container": "73ff4d76219932a3c8bd375c66f0dee951bbbe9e9ea7b106cccb157186d813ae",
+          "ID": "73ff4d762199",
+          "MemPerc": "13.92%",
+          "MemUsage": "8.906MiB / 64MiB",
+          "Name": "clearapi-commercial-shared-edge-1",
+          "NetIO": "29kB / 19kB",
+          "PIDs": "4"
+        },
+        {
+          "BlockIO": "2.25MB / 0B",
+          "CPUPerc": "0.64%",
+          "Container": "b81a687d1a62d8a4a228e5b63c951476780f765cf40f4ff74598bd1526f6dcbe",
+          "ID": "b81a687d1a62",
+          "MemPerc": "7.12%",
+          "MemUsage": "27.36MiB / 384MiB",
+          "Name": "clearapi-commercial-shared-sub2api-1",
+          "NetIO": "421kB / 565kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "17.7MB / 0B",
+          "CPUPerc": "2.03%",
+          "Container": "fa2c1d2985905c613b756e5514442ceac533cb7399d96143573a1f40140f04cb",
+          "ID": "fa2c1d298590",
+          "MemPerc": "11.79%",
+          "MemUsage": "52.82MiB / 448MiB",
+          "Name": "clearapi-commercial-shared-new-api-1",
+          "NetIO": "671kB / 861kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "33.1MB / 0B",
+          "CPUPerc": "2.74%",
+          "Container": "737e8f5dcf7dbbe36ddfee212d61ffe89836a9198afd0c86c24f2b0518dac239",
+          "ID": "737e8f5dcf7d",
+          "MemPerc": "11.83%",
+          "MemUsage": "11.36MiB / 96MiB",
+          "Name": "clearapi-commercial-shared-sub2api-redis-1",
+          "NetIO": "99.6kB / 78.9kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "68.9MB / 175MB",
+          "CPUPerc": "11.21%",
+          "Container": "aa1223256e2f46c2cb5aab5a9fd9c0598d4d0c03a4bd241da44be548646e4578",
+          "ID": "aa1223256e2f",
+          "MemPerc": "22.32%",
+          "MemUsage": "85.72MiB / 384MiB",
+          "Name": "clearapi-commercial-shared-gateway-postgres-1",
+          "NetIO": "1.25MB / 938kB",
+          "PIDs": "10"
+        }
+      ],
+      "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 9148358656 39726235648  19% /vps\n",
+      "connections_gateway": 10,
+      "connections_sub": 10,
+      "redis": "# Memory\r\nused_memory:1935952\r\nused_memory_human:1.85M\r\nused_memory_rss:8011776\r\nused_memory_rss_human:7.64M\r\nused_memory_peak:1935952\r\nused_memory_peak_human:1.85M\r\nused_memory_peak_perc:100.00%\r\nused_memory_overhead:1152080\r\nused_memory_startup:948936\r\nused_memory_dataset:783872\r\nused_memory_dataset_perc:79.42%\r\nallocator_allocated:3080344\r\nallocator_active:3493888\r\nallocator_resident:8306688\r\nallocator_muzzy:0\r\ntotal_system_memory:16502632448\r\ntotal_system_memory_human:15.37G\r\nused_memory_lua:57344\r\nused_memory_vm_eval:57344\r\nused_memory_lua_human:56.00K\r\nused_memory_scripts_eval:8376\r\nnumber_of_cached_scripts:11\r\nnumber_of_functions:0\r\nnumber_of_libraries:0\r\nused_memory_vm_functions:33792\r\nused_memory_vm_total:91136\r\nused_memory_vm_total_human:89.00K\r\nused_memory_functions:192\r\nused_memory_scripts:8568\r\nused_memory_scripts_human:8.37K\r\nmaxmemory:50331648\r\nmaxmemory_human:48.00M\r\nmaxmemory_policy:noeviction\r\nallocator_frag_ratio:1.13\r\nallocator_frag_bytes:317672\r\nallocator_rss_ratio:2.38\r\nallocator_rss_bytes:4812800\r\nrss_overhead_ratio:0.96\r\nrss_overhead_bytes:-294912\r\nmem_fragmentation_ratio:4.22\r\nmem_fragmentation_bytes:6114208\r\nmem_not_counted_for_evict:256\r\nmem_replication_backlog:0\r\nmem_total_replication_buffers:0\r\nmem_clients_slaves:0\r\nmem_clients_normal:185320\r\nmem_cluster_links:0\r\nmem_aof_buffer:256\r\nmem_allocator:jemalloc-5.3.0\r\nmem_overhead_db_hashtable_rehashing:0\r\nactive_defrag_running:0\r\nlazyfree_pending_objects:0\r\nlazyfreed_objects:0\r\n"
+    },
+    {
+      "unix": 1793460250.1802132,
+      "current": 1582149632,
+      "working_set": 1251348480,
+      "anon": 187432960,
+      "cpu": "usage_usec 662158717\nuser_usec 341708699\nsystem_usec 320450018\nnice_usec 0\nnr_periods 52747\nnr_throttled 152\nthrottled_usec 7646636\nnr_bursts 0\nburst_usec 0\n",
+      "events": "low 0\nhigh 0\nmax 203555\noom 0\noom_kill 0\noom_group_kill 0\n",
+      "swap": 0,
+      "host_meminfo": "MemTotal:       16115852 kB\nMemFree:          629888 kB\nMemAvailable:   11533180 kB\nBuffers:         1367632 kB\nCached:          8896584 kB\nSwapCached:            0 kB\nActive:          6254380 kB\nInactive:        7368264 kB\nActive(anon):      81512 kB\nInactive(anon):  3435020 kB\nActive(file):    6172868 kB\nInactive(file):  3933244 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       4194304 kB\nSwapFree:        4194080 kB\nDirty:              1140 kB\nWriteback:             0 kB\nAnonPages:       3358724 kB\nMapped:          1233780 kB\nShmem:            158200 kB\nKReclaimable:    1044336 kB\nSlab:            1252760 kB\nSReclaimable:    1044336 kB\nSUnreclaim:       208424 kB\nKernelStack:       21156 kB\nPageTables:        35740 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    12252228 kB\nCommitted_AS:   13227176 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       52700 kB\nVmallocChunk:          0 kB\nPercpu:            11392 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    137216 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:       66560 kB\nDirectMap2M:     8056832 kB\nDirectMap1G:    16777216 kB\n",
+      "process_rss_kib_including_shared_pages": 599944,
+      "docker": [
+        {
+          "BlockIO": "4.16MB / 8.19kB",
+          "CPUPerc": "0.04%",
+          "Container": "73ff4d76219932a3c8bd375c66f0dee951bbbe9e9ea7b106cccb157186d813ae",
+          "ID": "73ff4d762199",
+          "MemPerc": "13.46%",
+          "MemUsage": "8.613MiB / 64MiB",
+          "Name": "clearapi-commercial-shared-edge-1",
+          "NetIO": "29.6kB / 20.1kB",
+          "PIDs": "4"
+        },
+        {
+          "BlockIO": "2.28MB / 0B",
+          "CPUPerc": "0.61%",
+          "Container": "b81a687d1a62d8a4a228e5b63c951476780f765cf40f4ff74598bd1526f6dcbe",
+          "ID": "b81a687d1a62",
+          "MemPerc": "7.25%",
+          "MemUsage": "27.85MiB / 384MiB",
+          "Name": "clearapi-commercial-shared-sub2api-1",
+          "NetIO": "431kB / 583kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "17.7MB / 0B",
+          "CPUPerc": "2.26%",
+          "Container": "fa2c1d2985905c613b756e5514442ceac533cb7399d96143573a1f40140f04cb",
+          "ID": "fa2c1d298590",
+          "MemPerc": "11.86%",
+          "MemUsage": "53.14MiB / 448MiB",
+          "Name": "clearapi-commercial-shared-new-api-1",
+          "NetIO": "673kB / 864kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "33.1MB / 0B",
+          "CPUPerc": "0.51%",
+          "Container": "737e8f5dcf7dbbe36ddfee212d61ffe89836a9198afd0c86c24f2b0518dac239",
+          "ID": "737e8f5dcf7d",
+          "MemPerc": "11.91%",
+          "MemUsage": "11.44MiB / 96MiB",
+          "Name": "clearapi-commercial-shared-sub2api-redis-1",
+          "NetIO": "101kB / 79.7kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "68.9MB / 176MB",
+          "CPUPerc": "0.47%",
+          "Container": "aa1223256e2f46c2cb5aab5a9fd9c0598d4d0c03a4bd241da44be548646e4578",
+          "ID": "aa1223256e2f",
+          "MemPerc": "22.24%",
+          "MemUsage": "85.39MiB / 384MiB",
+          "Name": "clearapi-commercial-shared-gateway-postgres-1",
+          "NetIO": "1.31MB / 992kB",
+          "PIDs": "10"
+        }
+      ],
+      "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 9148370944 39726223360  19% /vps\n",
+      "connections_gateway": 10,
+      "connections_sub": 10,
+      "redis": "# Memory\r\nused_memory:1915480\r\nused_memory_human:1.83M\r\nused_memory_rss:8011776\r\nused_memory_rss_human:7.64M\r\nused_memory_peak:1935952\r\nused_memory_peak_human:1.85M\r\nused_memory_peak_perc:98.94%\r\nused_memory_overhead:1131608\r\nused_memory_startup:948936\r\nused_memory_dataset:783872\r\nused_memory_dataset_perc:81.10%\r\nallocator_allocated:3059224\r\nallocator_active:3493888\r\nallocator_resident:8306688\r\nallocator_muzzy:0\r\ntotal_system_memory:16502632448\r\ntotal_system_memory_human:15.37G\r\nused_memory_lua:57344\r\nused_memory_vm_eval:57344\r\nused_memory_lua_human:56.00K\r\nused_memory_scripts_eval:8376\r\nnumber_of_cached_scripts:11\r\nnumber_of_functions:0\r\nnumber_of_libraries:0\r\nused_memory_vm_functions:33792\r\nused_memory_vm_total:91136\r\nused_memory_vm_total_human:89.00K\r\nused_memory_functions:192\r\nused_memory_scripts:8568\r\nused_memory_scripts_human:8.37K\r\nmaxmemory:50331648\r\nmaxmemory_human:48.00M\r\nmaxmemory_policy:noeviction\r\nallocator_frag_ratio:1.14\r\nallocator_frag_bytes:338792\r\nallocator_rss_ratio:2.38\r\nallocator_rss_bytes:4812800\r\nrss_overhead_ratio:0.96\r\nrss_overhead_bytes:-294912\r\nmem_fragmentation_ratio:4.27\r\nmem_fragmentation_bytes:6134680\r\nmem_not_counted_for_evict:256\r\nmem_replication_backlog:0\r\nmem_total_replication_buffers:0\r\nmem_clients_slaves:0\r\nmem_clients_normal:164848\r\nmem_cluster_links:0\r\nmem_aof_buffer:256\r\nmem_allocator:jemalloc-5.3.0\r\nmem_overhead_db_hashtable_rehashing:0\r\nactive_defrag_running:0\r\nlazyfree_pending_objects:0\r\nlazyfreed_objects:0\r\n"
+    },
+    {
+      "unix": 1793460254.3185744,
+      "current": 1581674496,
+      "working_set": 1250856960,
+      "anon": 187396096,
+      "cpu": "usage_usec 662893910\nuser_usec 342071461\nsystem_usec 320822449\nnice_usec 0\nnr_periods 52789\nnr_throttled 152\nthrottled_usec 7646636\nnr_bursts 0\nburst_usec 0\n",
+      "events": "low 0\nhigh 0\nmax 203555\noom 0\noom_kill 0\noom_group_kill 0\n",
+      "swap": 0,
+      "host_meminfo": "MemTotal:       16115852 kB\nMemFree:          635084 kB\nMemAvailable:   11538564 kB\nBuffers:         1367668 kB\nCached:          8896700 kB\nSwapCached:            0 kB\nActive:          6254416 kB\nInactive:        7376144 kB\nActive(anon):      81508 kB\nInactive(anon):  3442784 kB\nActive(file):    6172908 kB\nInactive(file):  3933360 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       4194304 kB\nSwapFree:        4194080 kB\nDirty:              1020 kB\nWriteback:             0 kB\nAnonPages:       3366268 kB\nMapped:          1233532 kB\nShmem:            158196 kB\nKReclaimable:    1044368 kB\nSlab:            1252928 kB\nSReclaimable:    1044368 kB\nSUnreclaim:       208560 kB\nKernelStack:       21140 kB\nPageTables:        35772 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    12252228 kB\nCommitted_AS:   13140032 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       52620 kB\nVmallocChunk:          0 kB\nPercpu:            11392 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    137216 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:       66560 kB\nDirectMap2M:     8056832 kB\nDirectMap1G:    16777216 kB\n",
+      "process_rss_kib_including_shared_pages": 600548,
+      "docker": [
+        {
+          "BlockIO": "4.16MB / 12.3kB",
+          "CPUPerc": "0.00%",
+          "Container": "73ff4d76219932a3c8bd375c66f0dee951bbbe9e9ea7b106cccb157186d813ae",
+          "ID": "73ff4d762199",
+          "MemPerc": "8.03%",
+          "MemUsage": "5.137MiB / 64MiB",
+          "Name": "clearapi-commercial-shared-edge-1",
+          "NetIO": "35.4kB / 22.3kB",
+          "PIDs": "2"
+        },
+        {
+          "BlockIO": "2.28MB / 0B",
+          "CPUPerc": "0.46%",
+          "Container": "b81a687d1a62d8a4a228e5b63c951476780f765cf40f4ff74598bd1526f6dcbe",
+          "ID": "b81a687d1a62",
+          "MemPerc": "7.24%",
+          "MemUsage": "27.79MiB / 384MiB",
+          "Name": "clearapi-commercial-shared-sub2api-1",
+          "NetIO": "440kB / 598kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "17.7MB / 0B",
+          "CPUPerc": "0.00%",
+          "Container": "fa2c1d2985905c613b756e5514442ceac533cb7399d96143573a1f40140f04cb",
+          "ID": "fa2c1d298590",
+          "MemPerc": "11.86%",
+          "MemUsage": "53.14MiB / 448MiB",
+          "Name": "clearapi-commercial-shared-new-api-1",
+          "NetIO": "696kB / 895kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "33.1MB / 0B",
+          "CPUPerc": "0.45%",
+          "Container": "737e8f5dcf7dbbe36ddfee212d61ffe89836a9198afd0c86c24f2b0518dac239",
+          "ID": "737e8f5dcf7d",
+          "MemPerc": "11.46%",
+          "MemUsage": "11MiB / 96MiB",
+          "Name": "clearapi-commercial-shared-sub2api-redis-1",
+          "NetIO": "103kB / 80.5kB",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "68.9MB / 176MB",
+          "CPUPerc": "1.72%",
+          "Container": "aa1223256e2f46c2cb5aab5a9fd9c0598d4d0c03a4bd241da44be548646e4578",
+          "ID": "aa1223256e2f",
+          "MemPerc": "22.13%",
+          "MemUsage": "84.98MiB / 384MiB",
+          "Name": "clearapi-commercial-shared-gateway-postgres-1",
+          "NetIO": "1.35MB / 1.02MB",
+          "PIDs": "10"
+        }
+      ],
+      "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 9148399616 39726194688  19% /vps\n",
+      "connections_gateway": 10,
+      "connections_sub": 10,
+      "redis": "# Memory\r\nused_memory:1915480\r\nused_memory_human:1.83M\r\nused_memory_rss:8011776\r\nused_memory_rss_human:7.64M\r\nused_memory_peak:1935952\r\nused_memory_peak_human:1.85M\r\nused_memory_peak_perc:98.94%\r\nused_memory_overhead:1131608\r\nused_memory_startup:948936\r\nused_memory_dataset:783872\r\nused_memory_dataset_perc:81.10%\r\nallocator_allocated:3048088\r\nallocator_active:3489792\r\nallocator_resident:8265728\r\nallocator_muzzy:0\r\ntotal_system_memory:16502632448\r\ntotal_system_memory_human:15.37G\r\nused_memory_lua:57344\r\nused_memory_vm_eval:57344\r\nused_memory_lua_human:56.00K\r\nused_memory_scripts_eval:8376\r\nnumber_of_cached_scripts:11\r\nnumber_of_functions:0\r\nnumber_of_libraries:0\r\nused_memory_vm_functions:33792\r\nused_memory_vm_total:91136\r\nused_memory_vm_total_human:89.00K\r\nused_memory_functions:192\r\nused_memory_scripts:8568\r\nused_memory_scripts_human:8.37K\r\nmaxmemory:50331648\r\nmaxmemory_human:48.00M\r\nmaxmemory_policy:noeviction\r\nallocator_frag_ratio:1.14\r\nallocator_frag_bytes:345832\r\nallocator_rss_ratio:2.37\r\nallocator_rss_bytes:4775936\r\nrss_overhead_ratio:0.97\r\nrss_overhead_bytes:-253952\r\nmem_fragmentation_ratio:4.27\r\nmem_fragmentation_bytes:6134680\r\nmem_not_counted_for_evict:256\r\nmem_replication_backlog:0\r\nmem_total_replication_buffers:0\r\nmem_clients_slaves:0\r\nmem_clients_normal:164848\r\nmem_cluster_links:0\r\nmem_aof_buffer:256\r\nmem_allocator:jemalloc-5.3.0\r\nmem_overhead_db_hashtable_rehashing:0\r\nactive_defrag_running:0\r\nlazyfree_pending_objects:0\r\nlazyfreed_objects:0\r\n"
+    }
+  ],
+  "calls": [
+    {
+      "model": "six-ordinary",
+      "stream": false,
+      "curl_seconds": 0.054903,
+      "driver_seconds": 0.7959999999729916,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-ordinary",
+      "stream": false,
+      "curl_seconds": 0.104224,
+      "driver_seconds": 0.75,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-ordinary",
+      "stream": false,
+      "curl_seconds": 0.104124,
+      "driver_seconds": 0.75,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-ordinary",
+      "stream": false,
+      "curl_seconds": 0.111665,
+      "driver_seconds": 0.75,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-pool",
+      "stream": false,
+      "curl_seconds": 0.102246,
+      "driver_seconds": 0.5,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-pool",
+      "stream": false,
+      "curl_seconds": 0.031023,
+      "driver_seconds": 0.5929999999934807,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-pool",
+      "stream": false,
+      "curl_seconds": 0.100259,
+      "driver_seconds": 0.5929999999934807,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-pool",
+      "stream": false,
+      "curl_seconds": 0.083954,
+      "driver_seconds": 0.6410000000032596,
+      "sha256": "7db04836087f1fad452af9143ac7b505bf4700fee724572006c548d7fb440f28"
+    },
+    {
+      "model": "six-sse",
+      "stream": true,
+      "curl_seconds": 8.052506,
+      "driver_seconds": 8.311999999976251,
+      "sha256": "fa29ad29d6bda69f4843e918adc5f473eab4314f354846e044fcc16ab1a5131c"
+    },
+    {
+      "model": "six-sse",
+      "stream": true,
+      "curl_seconds": 8.036449,
+      "driver_seconds": 8.327999999979511,
+      "sha256": "fa29ad29d6bda69f4843e918adc5f473eab4314f354846e044fcc16ab1a5131c"
+    }
+  ],
+  "before": {
+    "quota": 999818,
+    "token_used": 196,
+    "applied": 196,
+    "reservations": 14,
+    "logs": 14,
+    "unique_logs": 14,
+    "log_quota": 196,
+    "pending_outbox": 0
+  },
+  "after": {
+    "quota": 999678,
+    "token_used": 336,
+    "applied": 336,
+    "reservations": 24,
+    "logs": 24,
+    "unique_logs": 24,
+    "log_quota": 336,
+    "pending_outbox": 0
+  },
+  "cost_delta": 140,
+  "sub_usage_delta": 4,
+  "sub_wallets_unchanged": true,
+  "startup_sample": {
+    "unix": 1793460233.454623,
+    "current": 1585729536,
+    "working_set": 1249165312,
+    "anon": 153309184,
+    "cpu": "usage_usec 657162689\nuser_usec 338884320\nsystem_usec 318278368\nnice_usec 0\nnr_periods 52580\nnr_throttled 151\nthrottled_usec 7248764\nnr_bursts 0\nburst_usec 0\n",
+    "events": "low 0\nhigh 0\nmax 203215\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "swap": 0,
+    "host_meminfo": "MemTotal:       16115852 kB\nMemFree:          726792 kB\nMemAvailable:   11667448 kB\nBuffers:         1367336 kB\nCached:          8934232 kB\nSwapCached:            0 kB\nActive:          6290508 kB\nInactive:        7350420 kB\nActive(anon):      85048 kB\nInactive(anon):  3412416 kB\nActive(file):    6205460 kB\nInactive(file):  3938004 kB\nUnevictable:           0 kB\nMlocked:               0 kB\nSwapTotal:       4194304 kB\nSwapFree:        4194080 kB\nDirty:              1656 kB\nWriteback:             8 kB\nAnonPages:       3339504 kB\nMapped:          1202776 kB\nShmem:            158184 kB\nKReclaimable:    1044348 kB\nSlab:            1252432 kB\nSReclaimable:    1044348 kB\nSUnreclaim:       208084 kB\nKernelStack:       20656 kB\nPageTables:        35136 kB\nSecPageTables:         0 kB\nNFS_Unstable:          0 kB\nBounce:                0 kB\nWritebackTmp:          0 kB\nCommitLimit:    12252228 kB\nCommitted_AS:   13018416 kB\nVmallocTotal:   34359738367 kB\nVmallocUsed:       52140 kB\nVmallocChunk:          0 kB\nPercpu:            11392 kB\nHardwareCorrupted:     0 kB\nAnonHugePages:         0 kB\nShmemHugePages:        0 kB\nShmemPmdMapped:        0 kB\nFileHugePages:    137216 kB\nFilePmdMapped:         0 kB\nUnaccepted:            0 kB\nBalloon:               0 kB\nHugePages_Total:       0\nHugePages_Free:        0\nHugePages_Rsvd:        0\nHugePages_Surp:        0\nHugepagesize:       2048 kB\nHugetlb:               0 kB\nDirectMap4k:       66560 kB\nDirectMap2M:     8056832 kB\nDirectMap1G:    16777216 kB\n",
+    "process_rss_kib_including_shared_pages": 490176,
+    "docker": [
+      {
+        "BlockIO": "4.16MB / 8.19kB",
+        "CPUPerc": "0.00%",
+        "Container": "73ff4d76219932a3c8bd375c66f0dee951bbbe9e9ea7b106cccb157186d813ae",
+        "ID": "73ff4d762199",
+        "MemPerc": "7.79%",
+        "MemUsage": "4.984MiB / 64MiB",
+        "Name": "clearapi-commercial-shared-edge-1",
+        "NetIO": "3.84kB / 708B",
+        "PIDs": "2"
+      },
+      {
+        "BlockIO": "680kB / 0B",
+        "CPUPerc": "0.40%",
+        "Container": "b81a687d1a62d8a4a228e5b63c951476780f765cf40f4ff74598bd1526f6dcbe",
+        "ID": "b81a687d1a62",
+        "MemPerc": "6.05%",
+        "MemUsage": "23.23MiB / 384MiB",
+        "Name": "clearapi-commercial-shared-sub2api-1",
+        "NetIO": "257kB / 388kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "17.4MB / 0B",
+        "CPUPerc": "0.00%",
+        "Container": "fa2c1d2985905c613b756e5514442ceac533cb7399d96143573a1f40140f04cb",
+        "ID": "fa2c1d298590",
+        "MemPerc": "10.41%",
+        "MemUsage": "46.64MiB / 448MiB",
+        "Name": "clearapi-commercial-shared-new-api-1",
+        "NetIO": "406kB / 623kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "9.73MB / 0B",
+        "CPUPerc": "0.47%",
+        "Container": "737e8f5dcf7dbbe36ddfee212d61ffe89836a9198afd0c86c24f2b0518dac239",
+        "ID": "737e8f5dcf7d",
+        "MemPerc": "6.75%",
+        "MemUsage": "6.48MiB / 96MiB",
+        "Name": "clearapi-commercial-shared-sub2api-redis-1",
+        "NetIO": "64kB / 24kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "68.8MB / 171MB",
+        "CPUPerc": "0.35%",
+        "Container": "aa1223256e2f46c2cb5aab5a9fd9c0598d4d0c03a4bd241da44be548646e4578",
+        "ID": "aa1223256e2f",
+        "MemPerc": "21.74%",
+        "MemUsage": "83.48MiB / 384MiB",
+        "Name": "clearapi-commercial-shared-gateway-postgres-1",
+        "NetIO": "944kB / 633kB",
+        "PIDs": "10"
+      }
+    ],
+    "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 9148014592 39726579712  19% /vps\n",
+    "connections_gateway": 10,
+    "connections_sub": 10,
+    "redis": "# Memory\r\nused_memory:1647704\r\nused_memory_human:1.57M\r\nused_memory_rss:8732672\r\nused_memory_rss_human:8.33M\r\nused_memory_peak:1824216\r\nused_memory_peak_human:1.74M\r\nused_memory_peak_perc:90.32%\r\nused_memory_overhead:1129352\r\nused_memory_startup:948936\r\nused_memory_dataset:518352\r\nused_memory_dataset_perc:74.18%\r\nallocator_allocated:2728152\r\nallocator_active:3088384\r\nallocator_resident:7880704\r\nallocator_muzzy:0\r\ntotal_system_memory:16502632448\r\ntotal_system_memory_human:15.37G\r\nused_memory_lua:40960\r\nused_memory_vm_eval:40960\r\nused_memory_lua_human:40.00K\r\nused_memory_scripts_eval:5712\r\nnumber_of_cached_scripts:8\r\nnumber_of_functions:0\r\nnumber_of_libraries:0\r\nused_memory_vm_functions:33792\r\nused_memory_vm_total:74752\r\nused_memory_vm_total_human:73.00K\r\nused_memory_functions:192\r\nused_memory_scripts:5904\r\nused_memory_scripts_human:5.77K\r\nmaxmemory:50331648\r\nmaxmemory_human:48.00M\r\nmaxmemory_policy:noeviction\r\nallocator_frag_ratio:1.12\r\nallocator_frag_bytes:264360\r\nallocator_rss_ratio:2.55\r\nallocator_rss_bytes:4792320\r\nrss_overhead_ratio:1.11\r\nrss_overhead_bytes:851968\r\nmem_fragmentation_ratio:5.43\r\nmem_fragmentation_bytes:7123352\r\nmem_not_counted_for_evict:768\r\nmem_replication_backlog:0\r\nmem_total_replication_buffers:0\r\nmem_clients_slaves:0\r\nmem_clients_normal:164848\r\nmem_cluster_links:0\r\nmem_aof_buffer:768\r\nmem_allocator:jemalloc-5.3.0\r\nmem_overhead_db_hashtable_rehashing:0\r\nactive_defrag_running:0\r\nlazyfree_pending_objects:0\r\nlazyfreed_objects:0\r\n"
+  },
+  "startup_seconds": 66.16820096969604
+}

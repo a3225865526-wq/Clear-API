@@ -1,0 +1,2 @@
+# Preserve raw terminal evidence bytes; do not normalize or whitespace-check logs.
+*.log -text -diff

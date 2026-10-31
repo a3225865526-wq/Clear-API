@@ -1,0 +1,9 @@
+{
+  "original_protected_config_restored": true,
+  "native_html": true,
+  "native_asset_bytes": 193223,
+  "native_login_after_restore": true,
+  "admin_origin_api": "https://admin.example.invalid",
+  "TLS_verified_with_explicit_isolated_CA": true,
+  "mock_server_removed": true
+}

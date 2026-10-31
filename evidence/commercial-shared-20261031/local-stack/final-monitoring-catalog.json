@@ -1,0 +1,50 @@
+{
+  "monitors": [],
+  "policy": {
+    "id": 1,
+    "schema_version": 1,
+    "enabled": false,
+    "max_concurrent": 1,
+    "daily_requests": 0,
+    "daily_cost_micros": 0,
+    "retention_days": 90
+  },
+  "readiness": {},
+  "real_probe_ready": false,
+  "scheduler": {
+    "last_pass_unix": 1793461881,
+    "local_status": "running",
+    "master_node": true,
+    "monitor_cadence_seconds": 86400
+  },
+  "unconfigured_channels": [
+    {
+      "id": 1,
+      "name": "six-ordinary",
+      "type": 1,
+      "models": "six-ordinary",
+      "status": 2
+    },
+    {
+      "id": 2,
+      "name": "six-pool",
+      "type": 59,
+      "models": "six-pool",
+      "status": 2
+    },
+    {
+      "id": 3,
+      "name": "six-sse",
+      "type": 1,
+      "models": "six-sse",
+      "status": 2
+    },
+    {
+      "id": 4,
+      "name": "six-vip",
+      "type": 1,
+      "models": "six-ordinary",
+      "status": 2
+    }
+  ]
+}

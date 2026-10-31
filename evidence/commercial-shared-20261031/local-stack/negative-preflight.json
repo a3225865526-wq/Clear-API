@@ -1,0 +1,40 @@
+[
+  {
+    "case": "image-config-digest-mismatch",
+    "exit": 2,
+    "stopped_before_switch": true
+  },
+  {
+    "case": "missing-image",
+    "exit": 2,
+    "stopped_before_switch": true
+  },
+  {
+    "case": "ssh-upload-interrupted",
+    "exit": 2,
+    "state_unchanged": true
+  },
+  {
+    "case": "corrupt-upload",
+    "exit": 2,
+    "state_unchanged": true
+  },
+  {
+    "case": "insufficient-disk",
+    "exit": 2,
+    "actual_free_below_reserve": true
+  },
+  {
+    "case": "insufficient-memory-preflight",
+    "exit": 2,
+    "synthetic_threshold_not_actual_oom": true
+  },
+  {
+    "case": "new-user-cannot-invoke-legacy-mode",
+    "exit": 1
+  },
+  {
+    "case": "sudo-cannot-select-alternate-config",
+    "exit": 1
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "synthetic_domain": true,
+  "public_dns_changed": false,
+  "tls_validation": "self-signed isolated certificate explicitly trusted; no insecure verification flag",
+  "native_html": true,
+  "native_asset_bytes": 193223,
+  "native_login": true,
+  "wrong_host_status": 421,
+  "unallowlisted_peer_status": 403,
+  "database_public_ports": false
+}

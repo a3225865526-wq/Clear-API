@@ -1,0 +1,21 @@
+{
+  "root_installer": "PASS",
+  "bundle_sha256": "3bf48f10348dfcf564e138bd891ef0b9a5dfb0731fe2846cbf29ffe098923740",
+  "preflight": {
+    "arch": "amd64",
+    "config_sha256": "2c949f6484c6394e60dc7c720997c8a53fc796d4cc87b9070cd0a5f41edec9ee",
+    "generation": "EMPTY",
+    "healthy": false,
+    "helper_files": {
+      "local-deploy-stack.py": "6850b6ee53b9220cea968ecbc55e6068b9fb4b7d688d92927a896b8bafe9aa49",
+      "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+    },
+    "isolated": true,
+    "pending": false,
+    "services": null,
+    "target_id": "clearapi-commercial-v3",
+    "target_mode": "six-service-v1"
+  },
+  "fixture_db_sha256": "4a5ce4942d68d0560e61019f49408c2bc408fcca9d892355d3ec844edaa4ff21"
+}

@@ -1,0 +1,5 @@
+{
+  "base_test_sha256": "5b2281c0eb235984d27518951f00e5746f96d68dfcbb4fd7d56ed46b0ed1fcf1",
+  "scope": "Go test overlay of existing service/system_task_test.go with appended acceptance test; no production source or binary changes",
+  "command": "go test -overlay /verify/heartbeat-overlay.json ./service -run TestSystemTaskRunnerObservationAcceptance -count=1"
+}

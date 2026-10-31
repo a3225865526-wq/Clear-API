@@ -1,0 +1,21 @@
+=== RUN   TestGroupStatusAdmissionDatabase
+=== RUN   TestGroupStatusAdmissionDatabase//v1/chat/completions
+=== RUN   TestGroupStatusAdmissionDatabase//v1/responses
+=== RUN   TestGroupStatusAdmissionDatabase//v1/messages
+=== RUN   TestGroupStatusAdmissionDatabase//v1beta/models/gemini:generateContent
+=== RUN   TestGroupStatusAdmissionDatabase//v1/images/generations
+=== RUN   TestGroupStatusAdmissionDatabase//mj/submit/imagine
+=== RUN   TestGroupStatusAdmissionDatabase//pg/chat/completions
+
+2026/10/31 13:10:21 [31;1m/src/model/group_status.go:49 [35;1msql: database is closed
+[0m[33m[0.012ms] [34;1m[rows:0][0m SELECT * FROM "options" WHERE "key" = 'GroupDisabled:legacy-group'
+--- PASS: TestGroupStatusAdmissionDatabase (0.11s)
+    --- PASS: TestGroupStatusAdmissionDatabase//v1/chat/completions (0.00s)
+    --- PASS: TestGroupStatusAdmissionDatabase//v1/responses (0.00s)
+    --- PASS: TestGroupStatusAdmissionDatabase//v1/messages (0.00s)
+    --- PASS: TestGroupStatusAdmissionDatabase//v1beta/models/gemini:generateContent (0.00s)
+    --- PASS: TestGroupStatusAdmissionDatabase//v1/images/generations (0.00s)
+    --- PASS: TestGroupStatusAdmissionDatabase//mj/submit/imagine (0.00s)
+    --- PASS: TestGroupStatusAdmissionDatabase//pg/chat/completions (0.00s)
+PASS
+ok  	github.com/QuantumNous/new-api/middleware	0.204s

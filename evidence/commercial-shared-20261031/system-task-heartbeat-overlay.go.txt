@@ -1,0 +1,19 @@
+
+// External acceptance overlay: no production source changes.
+func TestSystemTaskRunnerObservationAcceptance(t *testing.T) {
+ saved, master := systemTaskLastPass.Load(), common.IsMasterNode
+ t.Cleanup(func(){systemTaskLastPass.Store(saved);common.IsMasterNode=master})
+ common.IsMasterNode = false
+ systemTaskLastPass.Store(0)
+ observation := SystemTaskRunnerObservation()
+ assert.Equal(t,"not_started_on_this_node",observation["local_status"])
+ assert.Equal(t,false,observation["master_node"])
+ common.IsMasterNode = true
+ systemTaskLastPass.Store(time.Now().Add(-2*time.Minute).Unix())
+ assert.Equal(t,"stale_on_this_node",SystemTaskRunnerObservation()["local_status"])
+ systemTaskLastPass.Store(time.Now().Unix())
+ observation=SystemTaskRunnerObservation()
+ assert.Equal(t,"running",observation["local_status"])
+ assert.Equal(t,true,observation["master_node"])
+ assert.Equal(t,int64(86400),observation["monitor_cadence_seconds"])
+}

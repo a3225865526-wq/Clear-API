@@ -1,0 +1,25 @@
+
+2026/10/31 14:57:29 [31;1m/src/model/group_status.go:52 [35;1msql: database is closed
+[0m[33m[0.028ms] [34;1m[rows:0][0m SELECT * FROM `options` WHERE `key` = 'GroupDisabled:legacy-group'
+--- FAIL: TestGroupStatusAdmissionDatabase (0.06s)
+    group_status_test.go:74: 
+        	Error Trace:	/src/middleware/group_status_test.go:74
+        	Error:      	Expected error with "GROUP_DISABLED: group temporarily unavailable" in chain but got nil.
+        	Test:       	TestGroupStatusAdmissionDatabase
+        	Messages:   	distinct group identifiers must retain independent state: "CASE-GROUP" vs "case-group"
+    group_status_test.go:78: 
+        	Error Trace:	/src/middleware/group_status_test.go:78
+        	Error:      	Should be true
+        	Test:       	TestGroupStatusAdmissionDatabase
+    group_status_test.go:74: 
+        	Error Trace:	/src/middleware/group_status_test.go:74
+        	Error:      	Expected error with "GROUP_DISABLED: group temporarily unavailable" in chain but got nil.
+        	Test:       	TestGroupStatusAdmissionDatabase
+        	Messages:   	distinct group identifiers must retain independent state: "café-group" vs "cafe-group"
+    group_status_test.go:78: 
+        	Error Trace:	/src/middleware/group_status_test.go:78
+        	Error:      	Should be true
+        	Test:       	TestGroupStatusAdmissionDatabase
+FAIL
+FAIL	github.com/QuantumNous/new-api/middleware	0.111s
+FAIL

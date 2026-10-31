@@ -1,0 +1,15 @@
+{
+  "scope": "Windows private synthetic runtime; no provider/production credentials",
+  "runtime": "D:\\AI\\API\\runtime\\commercial-shared-20261031",
+  "scripts": {
+    "group-acceptance.py": "e42e69a109a822b08e4d5f9eef63335814236dd6000a9749cd6300fbfd91abdf",
+    "compare-stacks.py": "39ca3619d5795fca3838cab460d69fc0d5ff6b4e0484db90d3d0410975ab837c",
+    "fault-runtime.py": "22d18ecd1307c193f9565632d895d5127fbbdc621ac65662759ddc8458704266",
+    "business-commercial.py": "70673851e99cb9ed38d0114164a6e924dce389f25ec64a22915cd6899d3202cb",
+    "faults-commercial.py": "032467c3b7ba8eeb3f1bee2c5b57a833e3a42bd411694d9d42d40e4e97dd15d4",
+    "final-checks-commercial.py": "db9b5d98e072c8d6e3ec6268ad841f56ab6878f65d865bd795f7f8a16941505b",
+    "upgrade-final2.py": "3525b0c188d43821fa8a5c4712a9bdc7a4411891626c2cb43c68b84a94773f74",
+    "tls-final.py": "3c19b23384490718875420cbfe621ef499de6d1fb659d2c088854de15ba472e2",
+    "shared-role-final.py": "2bff42a85f94b2933cd7e0d4c847ef8c50c1f9ab890050603354146dadb48eb9"
+  }
+}

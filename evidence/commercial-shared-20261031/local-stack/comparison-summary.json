@@ -1,0 +1,51 @@
+{
+  "A-six-services": {
+    "idle_rss_MiB_shared_pages_counted": 562.4609375,
+    "idle_working_set_MiB": 1163.13671875,
+    "idle_current_MiB": 1476.3125,
+    "idle_anon_MiB": 159.8515625,
+    "request_peak_working_set_MiB": 1209.5859375,
+    "request_peak_current_MiB": 1524.35546875,
+    "curl_nonstream_median_ms": 96.0395,
+    "curl_SSE_seconds": [
+      8.071063,
+      8.069323
+    ],
+    "container_count": 6,
+    "cpu_seconds_during_sample_window": 3.920881,
+    "sample_wall_seconds": 14.964791536331177,
+    "gateway_connections": 8,
+    "sub_connections": 8,
+    "redis_used_bytes": 1983240,
+    "normal_events": "low 0\nhigh 0\nmax 202260\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "swap_bytes": 0,
+    "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 9061732352 39812861952  19% /vps\n",
+    "whole_host_MemAvailable_MiB": 11257.80078125,
+    "whole_host_nonavailable_MiB": 4480.3359375
+  },
+  "B-shared-postgres": {
+    "idle_rss_MiB_shared_pages_counted": 489.66015625,
+    "idle_working_set_MiB": 1196.48828125,
+    "idle_current_MiB": 1507.9609375,
+    "idle_anon_MiB": 150.74609375,
+    "request_peak_working_set_MiB": 1238.1796875,
+    "request_peak_current_MiB": 1536.0,
+    "curl_nonstream_median_ms": 101.2525,
+    "curl_SSE_seconds": [
+      8.052506,
+      8.036449
+    ],
+    "container_count": 5,
+    "cpu_seconds_during_sample_window": 3.538228,
+    "sample_wall_seconds": 12.547662019729614,
+    "gateway_connections": 10,
+    "sub_connections": 10,
+    "redis_used_bytes": 1799584,
+    "normal_events": "low 0\nhigh 0\nmax 203555\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "swap_bytes": 0,
+    "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 9148157952 39726436352  19% /vps\n",
+    "startup_to_workload_complete_seconds": 66.16820096969604,
+    "whole_host_MemAvailable_MiB": 11349.984375,
+    "whole_host_nonavailable_MiB": 4388.15234375
+  }
+}

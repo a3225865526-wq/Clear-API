@@ -1,0 +1,22 @@
+{
+  "app_source": "fa96a74df2b46c0f3617068e0f77fbdc2fae67fe",
+  "image_tag": "clearapi-local:fa96a74df2b46c0f3617068e0f77fbdc2fae67fe",
+  "engine_id": "sha256:f79eee256d3f22768a6aa0bfaa6ac5a796d8ac6f4a4ec7c45bfdd8811aff4c2c",
+  "config_id": "sha256:a97ded8dc68021c352f444a86639678ee3e1c9c2ab113c66d4460a97aa8c3855",
+  "go": "1.26.1 linux/amd64",
+  "go_image": "golang:1.26.1-alpine@sha256:2389ebfa5b7f43eeafbd6be0c3700cc46690ef842ad962f6c5bd6be49ed82039",
+  "bun": "1.4.4 Windows",
+  "rsbuild": "2.1.6",
+  "version_source_bytes": 0,
+  "binaries": {
+    "billing-migrate": "f7b4cbfde87b8c6e644372ec654e931f220fed283e348ac2c689b93e1ab1544b",
+    "finance-migrate": "04cfc03cc59c151a831911a68c8fbf21ce038279557c8b69fb6ff37bdc3e3440",
+    "legacy-store-retire": "d915908644d51e54227e6dea1204f6148aec51c1277dcf09a9f04bde81910031",
+    "monitor-init": "66f5df5e6ad1b9239961a47e7a00e2fb17a07eddba5ac465dd9ffce0bd45cb6b",
+    "new-api": "e524819ecee74818b3f3cf4b0c6f6f6545e2ea71b0820e1051ee447b46d9a6f6",
+    "production-bootstrap": "e0b3c5bdff121cc8bb48637cc82e5be3fa3f084eb884192ba67e21a0c905936c"
+  },
+  "runtime_base": "clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874",
+  "original_Dockerfile_offline_attempt": "failed: uncached go mod download requires network",
+  "fallback": "verified existing module cache; pinned compiler; all six new binaries copied into approved runtime base; no TLS or checksum checks disabled"
+}

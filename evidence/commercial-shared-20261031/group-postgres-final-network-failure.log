@@ -1,0 +1,13 @@
+=== RUN   TestGroupStatusAdmissionDatabase
+
+2026/10/31 14:55:40 [35m/src/middleware/group_status_test.go:34
+[0m[31m[error] [0mfailed to initialize database, got error failed to connect to `user=postgres database=group_status`: 172.17.0.3:5432 (172.17.0.3): dial error: dial tcp 172.17.0.3:5432: connect: network is unreachable
+    group_status_test.go:35: 
+        	Error Trace:	/src/middleware/group_status_test.go:35
+        	Error:      	Received unexpected error:
+        	            	failed to connect to `user=postgres database=group_status`: 172.17.0.3:5432 (172.17.0.3): dial error: dial tcp 172.17.0.3:5432: connect: network is unreachable
+        	Test:       	TestGroupStatusAdmissionDatabase
+--- FAIL: TestGroupStatusAdmissionDatabase (0.00s)
+FAIL
+FAIL	github.com/QuantumNous/new-api/middleware	0.048s
+FAIL

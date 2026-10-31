@@ -1,0 +1,33 @@
+$ vitest run src/lib/server-error-message.test.ts src/features/channel-status/__tests__/administration.test.tsx "--pool=threads" "--maxWorkers=2"
+
+ RUN  v4.1.10 D:/AI/API/worktrees/clearapi-new-vps-six-service-helper-20261031/web
+
+ ❯ src/features/channel-status/__tests__/administration.test.tsx (14 tests | 1 failed) 3550ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/features/channel-status/__tests__/administration.test.tsx > monitor administration > keeps the enable confirmation open and explains a missing cost contract
+Error: expect(element).toHaveTextContent()
+
+Expected element to have text content:
+  The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.
+Received:
+  Configure a valid upstream cost contract in this monitor’s execution settings.
+ ❯ src/features/channel-status/__tests__/administration.test.tsx:231:46
+    229|     await userEvent.click(screen.getByRole('button', { name: 'Enable' …
+    230|     await userEvent.click(screen.getByRole('button', { name: 'Continue…
+    231|     expect(await screen.findByRole('alert')).toHaveTextContent(message)
+       |                                              ^
+    232|     expect(screen.getByRole('alertdialog')).toBeVisible()
+    233|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+     × keeps the enable confirmation open and explains a missing cost contract 205ms
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 19 passed (20)
+   Start at  23:08:50
+   Duration  30.13s (transform 3.59s, setup 1.85s, import 23.51s, tests 3.57s, environment 5.05s)
+
+error: script "test" exited with code 1

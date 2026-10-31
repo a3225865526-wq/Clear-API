@@ -1,0 +1,10 @@
+$ vitest run src/features/channel-status/__tests__/administration.test.tsx
+
+ RUN  v4.1.10 D:/AI/API/worktrees/clearapi-new-vps-six-service-helper-20261031/web
+
+
+ Test Files  1 passed (1)
+      Tests  14 passed (14)
+   Start at  21:44:06
+   Duration  32.72s (transform 4.70s, setup 777ms, import 25.99s, tests 3.43s, environment 2.26s)
+

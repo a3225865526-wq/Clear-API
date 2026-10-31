@@ -1,0 +1,41 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 412B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 ...
+
+#5 [1/2] FROM docker.io/library/clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874@sha256:1f8c11550fce8c05d501b47314472e4d1b4790b800500423d5d07992b1793607
+#5 resolve docker.io/library/clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874@sha256:1f8c11550fce8c05d501b47314472e4d1b4790b800500423d5d07992b1793607 0.0s done
+#5 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 71.55MB 5.1s
+#4 transferring context: 148.80MB 10.2s
+#4 transferring context: 230.27MB 15.3s
+#4 transferring context: 308.28MB 20.4s
+#4 transferring context: 351.49MB 23.1s done
+#4 DONE 23.1s
+
+#6 [2/2] COPY new-api production-bootstrap finance-migrate billing-migrate legacy-store-retire monitor-init /
+#6 CACHED
+
+#7 exporting to image
+#7 exporting layers 0.0s done
+#7 exporting manifest sha256:79bcd74a17ddebedd4adac4355472e6c1f3f496b2da844c698d4306dc6ea57c5 0.0s done
+#7 exporting config sha256:a97ded8dc68021c352f444a86639678ee3e1c9c2ab113c66d4460a97aa8c3855 0.0s done
+#7 exporting attestation manifest sha256:619e147ad4f28a413d38d3a879480a46898b229bf7dc9667fabdca0b87fcf6e9
+#7 exporting attestation manifest sha256:619e147ad4f28a413d38d3a879480a46898b229bf7dc9667fabdca0b87fcf6e9 0.0s done
+#7 exporting manifest list sha256:f79eee256d3f22768a6aa0bfaa6ac5a796d8ac6f4a4ec7c45bfdd8811aff4c2c 0.0s done
+#7 naming to docker.io/library/clearapi-local:fa96a74df2b46c0f3617068e0f77fbdc2fae67fe done
+#7 unpacking to docker.io/library/clearapi-local:fa96a74df2b46c0f3617068e0f77fbdc2fae67fe 0.0s done
+#7 DONE 0.2s

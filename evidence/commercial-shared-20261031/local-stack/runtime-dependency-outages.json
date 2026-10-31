@@ -1,0 +1,37 @@
+{
+  "cases": [
+    {
+      "dependency": "sub2api-postgres",
+      "health_preflight_rejected": true,
+      "ordinary_gateway_mock_survived": true,
+      "pool_requests_not_sent_during_fault": true
+    },
+    {
+      "dependency": "sub2api-redis",
+      "health_preflight_rejected": true,
+      "ordinary_gateway_mock_survived": true,
+      "pool_requests_not_sent_during_fault": true
+    }
+  ],
+  "before": {
+    "quota": 999678,
+    "token_used": 336,
+    "applied": 336,
+    "reservations": 24,
+    "logs": 24,
+    "unique_logs": 24,
+    "log_quota": 336,
+    "pending_outbox": 0
+  },
+  "after": {
+    "quota": 999650,
+    "token_used": 364,
+    "applied": 364,
+    "reservations": 26,
+    "logs": 26,
+    "unique_logs": 26,
+    "log_quota": 364,
+    "pending_outbox": 0
+  },
+  "only_two_successful_mock_calls_charged_28": true
+}

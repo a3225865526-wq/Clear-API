@@ -1,0 +1,13 @@
+{
+  "parent_memory_limit": 1610612736,
+  "parent_cpu_nano": 2000000000,
+  "parent_memory_swap_total": 1610612736,
+  "cgroup_final": "1438756864\n1611083776\nlow 0\nhigh 0\nmax 458826\noom 1\noom_kill 1\noom_group_kill 0\n0\n200000 100000\n",
+  "all_nested_services_stopped": true,
+  "data_volumes_preserved": true,
+  "encrypted_backup_copied_to_private_windows_runtime": true,
+  "backup_sha256": "821855fd0e373be804e2511b720c05b3575640d1cf11f96e119ea106c1707928",
+  "resource_sample_sha256": "9d10ee181eb080325d7b337a3acad17a5a247a24255bb73ba70ecd6e743d58a8",
+  "resource_samples_private_runtime": "D:\\AI\\API\\runtime\\commercial-shared-20261031\\resource-samples.jsonl",
+  "disk_after_tests": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 21629235200 27245359104  44% /vps\n"
+}

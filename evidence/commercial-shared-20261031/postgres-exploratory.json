@@ -1,0 +1,213 @@
+{
+  "scope": "EXPLORATORY_DATABASE_ONLY; not six-service Mock acceptance",
+  "parent_cpus": 2,
+  "parent_memory_bytes": 1610612736,
+  "vps_disk_bytes": 50000000000,
+  "host_budget_reserved_in_plan_bytes": 536870912,
+  "A": {
+    "sample_before": {
+      "memory_current": 1590669312,
+      "memory_peak": 1610616832,
+      "memory_stat": "anon 41451520\nfile 1470320640\nkernel 77684736\nkernel_stack 835584\npagetables 2248704\nsec_pagetables 0\npercpu 149248\nsock 0\nvmalloc 40960\nshmem 17420288\nfile_mapped 101355520\nfile_dirty 131072\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 46137344\nshmem_thp 0\ninactive_anon 50458624\nactive_anon 8273920\ninactive_file 1260138496\nactive_file 192765952\nunevictable 0\nslab_reclaimable 72078360\nslab_unreclaimable 2236976\nslab 74315336\nworkingset_refault_anon 0\nworkingset_refault_file 260737\nworkingset_activate_anon 0\nworkingset_activate_file 5373\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgscan 948128\npgsteal 925316\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 948128\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 925316\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 328079\npgmajfault 1019\npgrefill 57\npgactivate 47667\npgdeactivate 56\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nthp_fault_alloc 5\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n",
+      "events": "low 0\nhigh 0\nmax 14130\noom 0\noom_kill 0\noom_group_kill 0\n",
+      "cpu": "usage_usec 26714278\nuser_usec 13738558\nsystem_usec 12975720\nnice_usec 0\nnr_periods 749\nnr_throttled 50\nthrottled_usec 1305302\nnr_bursts 0\nburst_usec 0\n",
+      "swap": "0\n",
+      "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 1508454400 47366139904   3% /vps\n",
+      "containers": [
+        {
+          "BlockIO": "121MB / 62.2MB",
+          "CPUPerc": "0.00%",
+          "Container": "449d8e69eb5d1886d25d967607c7d74965a93ed651d92952de099e24f94e391d",
+          "ID": "449d8e69eb5d",
+          "MemPerc": "22.24%",
+          "MemUsage": "56.93MiB / 256MiB",
+          "Name": "pg-b",
+          "NetIO": "1.37kB / 126B",
+          "PIDs": "6"
+        },
+        {
+          "BlockIO": "91.2MB / 114MB",
+          "CPUPerc": "0.02%",
+          "Container": "a7a899ffb4117c401cd855b49786199dd8b7de219820b1bab83c2a58d99cafe1",
+          "ID": "a7a899ffb411",
+          "MemPerc": "21.13%",
+          "MemUsage": "54.1MiB / 256MiB",
+          "Name": "pg-a",
+          "NetIO": "1.52kB / 126B",
+          "PIDs": "6"
+        }
+      ]
+    },
+    "pg-a": {
+      "version": "PostgreSQL 17.6 on x86_64-pc-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit\n",
+      "extensions": "plpgsql|1.0\n",
+      "roles": "clearapi|t|t|t\n",
+      "settings": "data_directory|/var/lib/postgresql/data|\nmaintenance_work_mem|16384|kB\nmax_connections|20|\nmax_wal_size|256|MB\nshared_buffers|4096|8kB\nwork_mem|1024|kB\n"
+    },
+    "pg-b": {
+      "version": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit\n",
+      "extensions": "plpgsql|1.0\n",
+      "roles": "sub2api|t|t|t\n",
+      "settings": "data_directory|/var/lib/postgresql/data|\nmaintenance_work_mem|16384|kB\nmax_connections|20|\nmax_wal_size|256|MB\nshared_buffers|4096|8kB\nwork_mem|1024|kB\n"
+    },
+    "load": {
+      "before": {
+        "memory_current": 1592631296,
+        "memory_peak": 1610616832,
+        "memory_stat": "anon 44142592\nfile 1466675200\nkernel 77746176\nkernel_stack 851968\npagetables 2256896\nsec_pagetables 0\npercpu 149248\nsock 0\nvmalloc 40960\nshmem 19525632\nfile_mapped 102252544\nfile_dirty 212992\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 46137344\nshmem_thp 0\ninactive_anon 53608448\nactive_anon 10002432\ninactive_file 1252823040\nactive_file 194330624\nunevictable 0\nslab_reclaimable 72041816\nslab_unreclaimable 2311392\nslab 74353208\nworkingset_refault_anon 0\nworkingset_refault_file 260737\nworkingset_activate_anon 0\nworkingset_activate_file 5373\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgscan 949577\npgsteal 926765\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 949577\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 926765\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 394213\npgmajfault 1019\npgrefill 77\npgactivate 48526\npgdeactivate 72\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nthp_fault_alloc 5\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n",
+        "events": "low 0\nhigh 0\nmax 14156\noom 0\noom_kill 0\noom_group_kill 0\n",
+        "cpu": "usage_usec 27538334\nuser_usec 14175159\nsystem_usec 13363175\nnice_usec 0\nnr_periods 798\nnr_throttled 50\nthrottled_usec 1305302\nnr_bursts 0\nburst_usec 0\n",
+        "swap": "0\n",
+        "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 1508634624 47365959680   3% /vps\n",
+        "containers": [
+          {
+            "BlockIO": "121MB / 63.3MB",
+            "CPUPerc": "0.03%",
+            "Container": "449d8e69eb5d1886d25d967607c7d74965a93ed651d92952de099e24f94e391d",
+            "ID": "449d8e69eb5d",
+            "MemPerc": "22.94%",
+            "MemUsage": "58.73MiB / 256MiB",
+            "Name": "pg-b",
+            "NetIO": "1.37kB / 126B",
+            "PIDs": "6"
+          },
+          {
+            "BlockIO": "91.2MB / 114MB",
+            "CPUPerc": "0.00%",
+            "Container": "a7a899ffb4117c401cd855b49786199dd8b7de219820b1bab83c2a58d99cafe1",
+            "ID": "a7a899ffb411",
+            "MemPerc": "21.77%",
+            "MemUsage": "55.72MiB / 256MiB",
+            "Name": "pg-a",
+            "NetIO": "1.52kB / 126B",
+            "PIDs": "6"
+          }
+        ]
+      },
+      "after": {
+        "memory_current": 1546158080,
+        "memory_peak": 1610616832,
+        "memory_stat": "anon 47796224\nfile 1418506240\nkernel 77045760\nkernel_stack 901120\npagetables 2363392\nsec_pagetables 0\npercpu 149248\nsock 0\nvmalloc 40960\nshmem 19705856\nfile_mapped 102318080\nfile_dirty 397312\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 46137344\nshmem_thp 0\ninactive_anon 56705024\nactive_anon 10584064\ninactive_file 1204158464\nactive_file 194646016\nunevictable 0\nslab_reclaimable 71084184\nslab_unreclaimable 2418952\nslab 73503136\nworkingset_refault_anon 0\nworkingset_refault_file 260737\nworkingset_activate_anon 0\nworkingset_activate_file 5373\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgscan 961381\npgsteal 938569\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 961381\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 938569\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 423320\npgmajfault 1019\npgrefill 77\npgactivate 48747\npgdeactivate 72\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nthp_fault_alloc 5\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n",
+        "events": "low 0\nhigh 0\nmax 14358\noom 0\noom_kill 0\noom_group_kill 0\n",
+        "cpu": "usage_usec 27984024\nuser_usec 14434865\nsystem_usec 13549158\nnice_usec 0\nnr_periods 823\nnr_throttled 51\nthrottled_usec 1575400\nnr_bursts 0\nburst_usec 0\n",
+        "swap": "0\n",
+        "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 1508634624 47365959680   3% /vps\n",
+        "containers": [
+          {
+            "BlockIO": "121MB / 63.3MB",
+            "CPUPerc": "0.85%",
+            "Container": "449d8e69eb5d1886d25d967607c7d74965a93ed651d92952de099e24f94e391d",
+            "ID": "449d8e69eb5d",
+            "MemPerc": "23.09%",
+            "MemUsage": "59.1MiB / 256MiB",
+            "Name": "pg-b",
+            "NetIO": "1.37kB / 126B",
+            "PIDs": "6"
+          },
+          {
+            "BlockIO": "91.2MB / 114MB",
+            "CPUPerc": "0.03%",
+            "Container": "a7a899ffb4117c401cd855b49786199dd8b7de219820b1bab83c2a58d99cafe1",
+            "ID": "a7a899ffb411",
+            "MemPerc": "21.87%",
+            "MemUsage": "55.98MiB / 256MiB",
+            "Name": "pg-a",
+            "NetIO": "1.52kB / 126B",
+            "PIDs": "6"
+          }
+        ]
+      },
+      "four_concurrent_psql_elapsed_ms": 4172.79260000214,
+      "results": [
+        "1000|1501500\n",
+        "1000|1501500\n",
+        "1000|1501500\n",
+        "1000|1501500\n"
+      ]
+    }
+  },
+  "B": {
+    "load": {
+      "before": {
+        "memory_current": 1591083008,
+        "memory_peak": 1610616832,
+        "memory_stat": "anon 39890944\nfile 1469591552\nkernel 79220736\nkernel_stack 622592\npagetables 1437696\nsec_pagetables 0\npercpu 156032\nsock 0\nvmalloc 20480\nshmem 28377088\nfile_mapped 84754432\nfile_dirty 5464064\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 46137344\nshmem_thp 0\ninactive_anon 48185344\nactive_anon 20017152\ninactive_file 1228124160\nactive_file 213094400\nunevictable 0\nslab_reclaimable 75413104\nslab_unreclaimable 1501048\nslab 76914152\nworkingset_refault_anon 0\nworkingset_refault_file 262534\nworkingset_activate_anon 0\nworkingset_activate_file 5560\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgscan 985749\npgsteal 962937\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 985749\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 962937\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 632942\npgmajfault 1059\npgrefill 117\npgactivate 62976\npgdeactivate 108\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nthp_fault_alloc 5\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n",
+        "events": "low 0\nhigh 0\nmax 14589\noom 0\noom_kill 0\noom_group_kill 0\n",
+        "cpu": "usage_usec 30384637\nuser_usec 15542927\nsystem_usec 14841710\nnice_usec 0\nnr_periods 902\nnr_throttled 51\nthrottled_usec 1575400\nnr_bursts 0\nburst_usec 0\n",
+        "swap": "0\n",
+        "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 1578184704 47296409600   3% /vps\n",
+        "containers": [
+          {
+            "BlockIO": "5.07MB / 151MB",
+            "CPUPerc": "0.02%",
+            "Container": "74ae1ae39629a5c72f1658b1dceb8ba759b3121098db350d275554a8bd561d61",
+            "ID": "74ae1ae39629",
+            "MemPerc": "12.81%",
+            "MemUsage": "49.19MiB / 384MiB",
+            "Name": "pg-shared",
+            "NetIO": "806B / 126B",
+            "PIDs": "6"
+          }
+        ]
+      },
+      "after": {
+        "memory_current": 1541242880,
+        "memory_peak": 1610616832,
+        "memory_stat": "anon 40431616\nfile 1419706368\nkernel 78065664\nkernel_stack 622592\npagetables 1437696\nsec_pagetables 0\npercpu 156032\nsock 0\nvmalloc 20480\nshmem 28393472\nfile_mapped 85078016\nfile_dirty 5464064\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 46137344\nshmem_thp 0\ninactive_anon 56053760\nactive_anon 12566528\ninactive_file 1177837568\nactive_file 213479424\nunevictable 0\nslab_reclaimable 74239296\nslab_unreclaimable 1518400\nslab 75757696\nworkingset_refault_anon 0\nworkingset_refault_file 262534\nworkingset_activate_anon 0\nworkingset_activate_file 5560\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgscan 997934\npgsteal 975120\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 997934\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 975120\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 661741\npgmajfault 1059\npgrefill 2997\npgactivate 64131\npgdeactivate 2988\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nthp_fault_alloc 5\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n",
+        "events": "low 0\nhigh 0\nmax 14753\noom 0\noom_kill 0\noom_group_kill 0\n",
+        "cpu": "usage_usec 30791899\nuser_usec 15742579\nsystem_usec 15049320\nnice_usec 0\nnr_periods 927\nnr_throttled 52\nthrottled_usec 1642434\nnr_bursts 0\nburst_usec 0\n",
+        "swap": "0\n",
+        "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 1578184704 47296409600   3% /vps\n",
+        "containers": [
+          {
+            "BlockIO": "5.07MB / 151MB",
+            "CPUPerc": "0.02%",
+            "Container": "74ae1ae39629a5c72f1658b1dceb8ba759b3121098db350d275554a8bd561d61",
+            "ID": "74ae1ae39629",
+            "MemPerc": "12.82%",
+            "MemUsage": "49.25MiB / 384MiB",
+            "Name": "pg-shared",
+            "NetIO": "806B / 126B",
+            "PIDs": "6"
+          }
+        ]
+      },
+      "four_concurrent_psql_elapsed_ms": 3289.3251999630593,
+      "results": [
+        "1000|1501500\n",
+        "1000|1501500\n",
+        "1000|1501500\n",
+        "1000|1501500\n"
+      ]
+    },
+    "cross_database_denied": {
+      "clearapi": true,
+      "sub2api": true
+    },
+    "roles": "clearapi|f|f|f\nsub2api|f|f|f\n",
+    "logical_backup_restore": "PASS: both independent synthetic databases",
+    "restart": "PASS"
+  },
+  "final": {
+    "memory_current": 1576361984,
+    "memory_peak": 1610616832,
+    "memory_stat": "anon 40255488\nfile 1452023808\nkernel 80437248\nkernel_stack 622592\npagetables 1392640\nsec_pagetables 0\npercpu 180352\nsock 0\nvmalloc 20480\nshmem 7159808\nfile_mapped 85069824\nfile_dirty 1372160\nfile_writeback 0\nswapcached 0\nanon_thp 0\nfile_thp 46137344\nshmem_thp 0\ninactive_anon 45559808\nactive_anon 1851392\ninactive_file 1225089024\nactive_file 219779072\nunevictable 0\nslab_reclaimable 76657296\nslab_unreclaimable 1509520\nslab 78166816\nworkingset_refault_anon 0\nworkingset_refault_file 264177\nworkingset_activate_anon 0\nworkingset_activate_file 6379\nworkingset_restore_anon 0\nworkingset_restore_file 0\nworkingset_nodereclaim 0\npgdemote_kswapd 0\npgdemote_direct 0\npgdemote_khugepaged 0\npgdemote_proactive 0\npgscan 1000701\npgsteal 977885\npswpin 0\npswpout 0\npgscan_kswapd 0\npgscan_direct 1000701\npgscan_khugepaged 0\npgscan_proactive 0\npgsteal_kswapd 0\npgsteal_direct 977885\npgsteal_khugepaged 0\npgsteal_proactive 0\npgfault 850464\npgmajfault 1099\npgrefill 3559\npgactivate 71310\npgdeactivate 3548\npglazyfree 0\npglazyfreed 0\nswpin_zero 0\nswpout_zero 0\nthp_fault_alloc 5\nthp_collapse_alloc 0\nthp_swpout 0\nthp_swpout_fallback 0\n",
+    "events": "low 0\nhigh 0\nmax 14791\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "cpu": "usage_usec 32957583\nuser_usec 16745689\nsystem_usec 16211894\nnice_usec 0\nnr_periods 1002\nnr_throttled 52\nthrottled_usec 1642434\nnr_bursts 0\nburst_usec 0\n",
+    "swap": "0\n",
+    "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 1604366336 47270227968   3% /vps\n",
+    "containers": [
+      {
+        "BlockIO": "3.8MB / 61.4kB",
+        "CPUPerc": "0.05%",
+        "Container": "74ae1ae39629a5c72f1658b1dceb8ba759b3121098db350d275554a8bd561d61",
+        "ID": "74ae1ae39629",
+        "MemPerc": "4.00%",
+        "MemUsage": "15.36MiB / 384MiB",
+        "Name": "pg-shared",
+        "NetIO": "736B / 126B",
+        "PIDs": "6"
+      }
+    ]
+  }
+}

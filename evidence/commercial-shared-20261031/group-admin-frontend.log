@@ -1,0 +1,10 @@
+$ vitest run "src/components/layout/components/__tests__/sub2api-admin-link.test.tsx" src/features/system-settings/models/__tests__/group-status.test.tsx
+
+ RUN  v4.1.10 D:/AI/API/worktrees/clearapi-new-vps-six-service-helper-20261031/web
+
+
+ Test Files  2 passed (2)
+      Tests  5 passed (5)
+   Start at  21:36:11
+   Duration  14.95s (transform 328ms, setup 1.67s, import 13.58s, tests 501ms, environment 4.53s)
+

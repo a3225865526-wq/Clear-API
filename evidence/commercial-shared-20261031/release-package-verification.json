@@ -1,0 +1,10 @@
+{
+  "candidate_sha256": "d7125e8bcb40fd98c62ed575860ab551ee3a67b796f144f1e84e2fa5f3966131",
+  "bytes": 684103680,
+  "manifest_count": 28,
+  "runtime_secret_patterns_checked": 19,
+  "candidate_and_evidence_no_runtime_secret_matches": true,
+  "source_archive_forbidden_runtime_files": [],
+  "original_release_v2_sha256": "ed0c3dba06d435852892483ca3647f635d3308f35536673bc62c1a2600a1f01d",
+  "original_release_v2_preserved": true
+}

@@ -1,0 +1,15 @@
+{
+  "A_new_writes_preserved": true,
+  "A_ledger": {
+    "quota": 999678,
+    "token_used": 336,
+    "applied": 336,
+    "reservations": 24,
+    "logs": 24,
+    "unique_logs": 24,
+    "log_quota": 336,
+    "pending_outbox": 0
+  },
+  "B_fork_preserved": "/vps/shared-commercial",
+  "no_snapshot_overlaid_on_A": true
+}

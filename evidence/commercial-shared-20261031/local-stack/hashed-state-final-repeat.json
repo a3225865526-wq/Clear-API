@@ -1,0 +1,58 @@
+{
+  "at": "2026-10-31T23:18:25.927668+08:00",
+  "bundle_sha256": "d7125e8bcb40fd98c62ed575860ab551ee3a67b796f144f1e84e2fa5f3966131",
+  "config_sha256": "d2ad0ee5f9e2db6ff8a32fce3d7689bb5ce120007c2576d3aab40e1f81d66ae7",
+  "helper_files": {
+    "local-deploy-stack.py": "6850b6ee53b9220cea968ecbc55e6068b9fb4b7d688d92927a896b8bafe9aa49",
+    "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+    "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+  },
+  "result": "already_applied",
+  "services": {
+    "edge": {
+      "config_hash": "f4fe384d40a9fcfe97fe25ab8448f94440ab0b1b92ad097ceb980b18d8a4245f",
+      "container_id": "2990c212876f58638207bacc32423216f7501b2afbcf0b4ff569d9bd419b53de",
+      "health": "healthy",
+      "image_id": "sha256:5253dc86cc93ac6249902934655c6f7c959d8caa45a8c2ecc0b95953834d8ee8",
+      "restart_count": 0
+    },
+    "gateway-postgres": {
+      "config_hash": "8d1735d2bf450e003f999e3d1da1b4f1a84304024b8d880c11e256aa1c8198a1",
+      "container_id": "64057f08ae06b1050a7fbb428592bf919968758be26da3e040b902de0b316715",
+      "health": "healthy",
+      "image_id": "sha256:d741b376874687de90374fd34f55c6b2760e8f7bd7e4ae5cd47f50757fc08cf8",
+      "restart_count": 0
+    },
+    "new-api": {
+      "config_hash": "8a71e2157f4d1f63d0556539c5d480d42c73698eb630a9863947eb57683e8f98",
+      "container_id": "4541246083dd70266d1b233cd30546202cbe074533efd147355ccbcecbfa3d7d",
+      "frontend_sha256": "3822618cd72f318582093a956e682b390228229b3764847dec5137a79fd234a7",
+      "health": "healthy",
+      "image_id": "sha256:a97ded8dc68021c352f444a86639678ee3e1c9c2ab113c66d4460a97aa8c3855",
+      "restart_count": 0
+    },
+    "sub2api": {
+      "config_hash": "7dbfb65d08a209a680b3bea8e9f0def97e70a598d92cbd8f6481ee3abdd036e4",
+      "container_id": "1d878acede0307de6dbb785a5014b485f86aa4b5c01ac82143834ea292472f26",
+      "frontend_sha256": "f000476d76b5eda2ac05efb2309e15b548ad35f1b13a3f0e6a5d11e441bcc8ca",
+      "health": "healthy",
+      "image_id": "sha256:62cb3769069c6a9c3c7fa708defd71229fe2befe396fc7cda32720ec69631f82",
+      "restart_count": 0
+    },
+    "sub2api-postgres": {
+      "config_hash": "90be7268b7a60ccf0a8fff3a75ee25c62ecfa0ab5113ca623a48f6f7e07ebfca",
+      "container_id": "b03c17c324cf063e260f01e312cb3ca181f04ed016024883c5b13c62346cc4df",
+      "health": "healthy",
+      "image_id": "sha256:ab20e934b27ba3ff927c1b4c9ff8cf6c32f315f743efe68dd3441182a87fb085",
+      "restart_count": 0
+    },
+    "sub2api-redis": {
+      "config_hash": "1e06e6fcc7097ea13f3ba01de9ed0d1a6c294b00e44a97f3e01e68627ed8fe40",
+      "container_id": "4efc73181bf45a845a17f39c7b24e1642aaab30a1233feda530c1285e77ea561",
+      "health": "healthy",
+      "image_id": "sha256:f84b0c4678011602b9b98c227a4dcd5468bf8b088b02fdd4165cb7758bad8058",
+      "restart_count": 0
+    }
+  },
+  "target_id": "clearapi-commercial-v3"
+}

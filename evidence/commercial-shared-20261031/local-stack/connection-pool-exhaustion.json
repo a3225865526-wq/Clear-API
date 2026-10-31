@@ -1,0 +1,22 @@
+{
+  "requests": 12,
+  "configured_app_pool": 10,
+  "observed_blocked_database_queries": 10,
+  "client_timeouts": [
+    28,
+    28,
+    28,
+    28,
+    28,
+    28,
+    28,
+    28,
+    28,
+    28,
+    28,
+    28
+  ],
+  "disabled_group_prevented_late_dispatch": true,
+  "ledger_unchanged": true,
+  "lock_released_normally": true
+}

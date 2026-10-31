@@ -1,0 +1,25 @@
+{
+  "scope": "complete final candidate deployment window, including upload/hash/cache/startup; not isolated process startup",
+  "start_unix": 1793459710.9728403,
+  "end_unix": 1793459828.8550003,
+  "samples": 586,
+  "memory_current_peak": 1610768384,
+  "working_set_peak": 1350037504,
+  "anon_peak": 215781376,
+  "kernel_peak": 105226240,
+  "swap_peak": 0,
+  "host_meminfo_first": {
+    "MemTotal": "16115852 kB",
+    "MemAvailable": "11734072 kB",
+    "SwapTotal": "4194304 kB",
+    "SwapFree": "4194080 kB"
+  },
+  "host_meminfo_last": {
+    "MemTotal": "16115852 kB",
+    "MemAvailable": "11468060 kB",
+    "SwapTotal": "4194304 kB",
+    "SwapFree": "4194080 kB"
+  },
+  "events_before": "low 0\nhigh 0\nmax 157175\noom 0\noom_kill 0\noom_group_kill 0\n",
+  "events_after": "low 0\nhigh 0\nmax 190795\noom 0\noom_kill 0\noom_group_kill 0\n"
+}

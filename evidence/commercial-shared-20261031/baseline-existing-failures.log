@@ -1,0 +1,429 @@
+[SYS] 2026/10/31 - 13:28:14 | SQL_DSN not set, using SQLite as database 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 1 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 2 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 3 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 4 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 5 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 6 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 7 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 8 需要预扣费 ＄0.003000 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 9 需要预扣费 ＄0.001500 (funding=wallet) 
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[INFO] 2026/10/31 - 13:28:14 | SYSTEM | 用户 10 需要预扣费 ＄0.007500 (funding=wallet) 
+--- FAIL: TestPreConsumePolicyDatabaseMatrix (0.50s)
+    --- FAIL: TestPreConsumePolicyDatabaseMatrix/sqlite (0.50s)
+        billing_option_test.go:207: database version: 3.50.4
+        --- FAIL: TestPreConsumePolicyDatabaseMatrix/sqlite/fractional_multiple_retains_minimum_input_reserve (0.03s)
+            billing_option_test.go:286: 
+                	Error Trace:	/src/controller/billing_option_test.go:286
+                	Error:      	Not equal: 
+                	            	expected: 1500
+                	            	actual  : 750
+                	Test:       	TestPreConsumePolicyDatabaseMatrix/sqlite/fractional_multiple_retains_minimum_input_reserve
+            billing_option_test.go:288: 
+                	Error Trace:	/src/controller/billing_option_test.go:288
+                	Error:      	Not equal: 
+                	            	expected: 98500
+                	            	actual  : 99250
+                	Test:       	TestPreConsumePolicyDatabaseMatrix/sqlite/fractional_multiple_retains_minimum_input_reserve
+            billing_option_test.go:291: 
+                	Error Trace:	/src/controller/billing_option_test.go:291
+                	Error:      	Not equal: 
+                	            	expected: 98500
+                	            	actual  : 99250
+                	Test:       	TestPreConsumePolicyDatabaseMatrix/sqlite/fractional_multiple_retains_minimum_input_reserve
+FAIL
+FAIL	github.com/QuantumNous/new-api/controller	0.566s
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+--- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault (0.00s)
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault//inherit (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault//inherit
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault//override-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault//override-prefer
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault//override-off (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault//override-off
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault//legacy-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault//legacy-prefer
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/off/inherit (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/off/inherit
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/off/override-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/off/override-prefer
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/off/override-off (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/off/override-off
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/off/legacy-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/off/legacy-prefer
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/prefer/inherit (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/prefer/inherit
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/prefer/override-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/prefer/override-prefer
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/prefer/override-off (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/prefer/override-off
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/prefer/legacy-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/prefer/legacy-prefer
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/strict/override-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/strict/override-prefer
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/strict/override-off (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/strict/override-off
+    --- FAIL: TestSessionRulesInheritOrOverrideGlobalDefault/strict/legacy-prefer (0.00s)
+        channel_affinity_template_test.go:441: 
+            	Error Trace:	/src/service/channel_affinity_template_test.go:441
+            	Error:      	Not equal: 
+            	            	expected: "retry"
+            	            	actual  : "stop"
+            	            	
+            	            	Diff:
+            	            	--- Expected
+            	            	+++ Actual
+            	            	@@ -1 +1 @@
+            	            	-retry
+            	            	+stop
+            	Test:       	TestSessionRulesInheritOrOverrideGlobalDefault/strict/legacy-prefer
+FAIL
+FAIL	github.com/QuantumNous/new-api/service	0.075s
+FAIL

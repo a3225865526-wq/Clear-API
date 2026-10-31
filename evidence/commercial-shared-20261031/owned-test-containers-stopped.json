@@ -1,0 +1,26 @@
+{
+  "containers": [
+    {
+      "name": "clearapi-commercial-ssh-forward",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "clearapi-commercial-infra-lab",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "clearapi-commercial-groups-mysql",
+      "running": false,
+      "status": "exited"
+    },
+    {
+      "name": "clearapi-commercial-groups-pg",
+      "running": false,
+      "status": "exited"
+    }
+  ],
+  "containers_and_data_preserved": true,
+  "unrelated_services_not_stopped": true
+}

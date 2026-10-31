@@ -1,0 +1,399 @@
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /test                     --> github.com/QuantumNous/new-api/middleware.TestCORSAllowsOnlyTrustedOrigins.func2 (2 handlers)
+
+2026/10/31 13:15:47 [31;1m/src/model/user.go:1237 [35;1mrecord not found
+[0m[33m[0.195ms] [34;1m[rows:0][0m SELECT * FROM `users` WHERE access_token = "opaque-relay-key" AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT 1
+
+2026/10/31 13:15:47 [31;1m/src/model/user.go:1237 [35;1mrecord not found
+[0m[33m[0.133ms] [34;1m[rows:0][0m SELECT * FROM `users` WHERE access_token = "ordinary.key.with-dots" AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT 1
+
+2026/10/31 13:15:47 [31;1m/src/model/user.go:1237 [35;1mrecord not found
+[0m[33m[0.091ms] [34;1m[rows:0][0m SELECT * FROM `users` WHERE access_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJleHRlcm5hbC1hdWRpZW5jZSIsImV4cCI6MTc5MzQ1MjYwNywiaXNzIjoiZXh0ZXJuYWwtaXNzdWVyIn0.jZXERMGmnAbsXYUcw3Q7L46AIvG_rpnrQTkgqxnNVI0" AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT 1
+
+2026/10/31 13:15:47 [31;1m/src/model/user.go:1237 [35;1mrecord not found
+[0m[33m[0.261ms] [34;1m[rows:0][0m SELECT * FROM `users` WHERE access_token = "ordinary-unmatched-key" AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | dashboard authentication error: forced PAT user cache lookup failure 
+
+2026/10/31 13:15:47 [34;1m/src/middleware/auth_test.go:244
+[0m[35m[warn] [0mremoving callback `test:optional-auth-pat-user-cache-failure` from /src/middleware/auth_test.go:244
+
+2026/10/31 13:15:47 [31;1m/src/model/user.go:1237 [35;1msql: database is closed
+[0m[33m[0.006ms] [34;1m[rows:0][0m SELECT * FROM `users` WHERE access_token = "database-failure-key" AND `users`.`deleted_at` IS NULL ORDER BY `users`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | dashboard authentication error: database error: sql: database is closed 
+
+
+[31m2026/10/31 13:15:47 [Recovery] 2026/10/31 - 13:15:47 panic recovered:
+synthetic execution panic
+/src/middleware/billing_execution_test.go:49 (0x1929d85)
+	TestBillingExecutionCleanupIncludesAllWebSocketReservations.func2: panic("synthetic execution panic")
+/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/context.go:174 (0xa7ad0a)
+	(*Context).Next: c.handlers[c.index](c)
+/src/middleware/billing_execution.go:17 (0x19578de)
+	TestBillingExecutionCleanupIncludesAllWebSocketReservations.BillingRequestExecution.func3: c.Next()
+/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/context.go:174 (0xa8762e)
+	(*Context).Next: c.handlers[c.index](c)
+/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/recovery.go:102 (0xa8761b)
+	CustomRecoveryWithWriter.func1: c.Next()
+/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/context.go:174 (0xa85cba)
+	(*Context).Next: c.handlers[c.index](c)
+/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/gin.go:620 (0xa85947)
+	(*Engine).handleHTTPRequest: c.Next()
+/go/pkg/mod/github.com/gin-gonic/gin@v1.9.1/gin.go:576 (0xa8548c)
+	(*Engine).ServeHTTP: engine.handleHTTPRequest(c)
+/src/middleware/billing_execution_test.go:52 (0x1929991)
+	TestBillingExecutionCleanupIncludesAllWebSocketReservations: api.ServeHTTP(response, httptest.NewRequest("POST", "/test", nil))
+/usr/local/go/src/testing/testing.go:2036 (0x568909)
+	tRunner: fn(t)
+/usr/local/go/src/runtime/asm_amd64.s:1771 (0x498a60)
+	goexit: BYTE	$0x90	// NOP
+[0m
+
+2026/10/31 13:15:47 [31;1m/src/model/group_status.go:52 [35;1msql: database is closed
+[0m[33m[0.005ms] [34;1m[rows:0][0m SELECT * FROM `options` WHERE `key` = "GroupDisabled:legacy-group"
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.024ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.008ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.005ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.005ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.005ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.007ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.009ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.012ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.006ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.006ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.008ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.007ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.005ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.010ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+
+2026/10/31 13:15:47 [31;1m/src/model/token.go:302 [35;1mSQL logic error: near "=": syntax error (1)
+[0m[33m[0.008ms] [34;1m[rows:0][0m SELECT * FROM `tokens` WHERE  = "existingcommercialkey" AND `tokens`.`deleted_at` IS NULL ORDER BY `tokens`.`id` LIMIT 1
+[SYS] 2026/10/31 - 13:15:47 | ValidateUserToken: failed to get token: SQL logic error: near "=": syntax error (1) 
+[SYS] 2026/10/31 - 13:15:47 | TokenAuth ValidateUserToken database error: database error: SQL logic error: near "=": syntax error (1) 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Database error, please contact the administrator 
+--- FAIL: TestDisabledGroupRejectsExistingKeysBeforeDownstream (0.00s)
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:109: 
+        	Error Trace:	/src/middleware/group_status_test.go:109
+        	Error:      	Not equal: 
+        	            	expected: 403
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	/v1/chat/completions
+    group_status_test.go:110: 
+        	Error Trace:	/src/middleware/group_status_test.go:110
+        	Error:      	"{\"error\":{\"code\":\"\",\"message\":\"Database error, please contact the administrator (request id: )\",\"type\":\"new_api_error\"}}" does not contain "GROUP_DISABLED"
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:109: 
+        	Error Trace:	/src/middleware/group_status_test.go:109
+        	Error:      	Not equal: 
+        	            	expected: 403
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	/v1/responses
+    group_status_test.go:110: 
+        	Error Trace:	/src/middleware/group_status_test.go:110
+        	Error:      	"{\"error\":{\"code\":\"\",\"message\":\"Database error, please contact the administrator (request id: )\",\"type\":\"new_api_error\"}}" does not contain "GROUP_DISABLED"
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:109: 
+        	Error Trace:	/src/middleware/group_status_test.go:109
+        	Error:      	Not equal: 
+        	            	expected: 403
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	/v1/messages
+    group_status_test.go:110: 
+        	Error Trace:	/src/middleware/group_status_test.go:110
+        	Error:      	"{\"error\":{\"code\":\"\",\"message\":\"Database error, please contact the administrator (request id: )\",\"type\":\"new_api_error\"}}" does not contain "GROUP_DISABLED"
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:109: 
+        	Error Trace:	/src/middleware/group_status_test.go:109
+        	Error:      	Not equal: 
+        	            	expected: 403
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	/v1beta/models/gemini:generateContent
+    group_status_test.go:110: 
+        	Error Trace:	/src/middleware/group_status_test.go:110
+        	Error:      	"{\"error\":{\"code\":\"\",\"message\":\"Database error, please contact the administrator (request id: )\",\"type\":\"new_api_error\"}}" does not contain "GROUP_DISABLED"
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:109: 
+        	Error Trace:	/src/middleware/group_status_test.go:109
+        	Error:      	Not equal: 
+        	            	expected: 403
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	/mj/submit/imagine
+    group_status_test.go:110: 
+        	Error Trace:	/src/middleware/group_status_test.go:110
+        	Error:      	"{\"error\":{\"code\":\"\",\"message\":\"Database error, please contact the administrator (request id: )\",\"type\":\"new_api_error\"}}" does not contain "GROUP_DISABLED"
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+    group_status_test.go:113: 
+        	Error Trace:	/src/middleware/group_status_test.go:113
+        	Error:      	Not equal: 
+        	            	expected: 204
+        	            	actual  : 500
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+        	Messages:   	{"error":{"code":"","message":"Database error, please contact the administrator (request id: )","type":"new_api_error"}}
+    group_status_test.go:114: 
+        	Error Trace:	/src/middleware/group_status_test.go:114
+        	Error:      	Should be true
+        	Test:       	TestDisabledGroupRejectsExistingKeysBeforeDownstream
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | audit log write failed (request_id=202610311315476891509738268d9d6K6ED65e0): log database unavailable 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 7200003 | 您已达到请求数限制：1分钟内最多请求1次 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 7200004 | 您已达到总请求数限制：1分钟内最多请求2次，包括失败次数，请检查您的请求是否正确 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | rate limit check failed (mark=FAIL-IP): redis: client is closed 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | rate limit check failed (key=rateLimit:v2:user:FAIL-USER:7): redis: client is closed 
+
+2026/10/31 13:15:47 [31;1m/src/model/task.go:451 [35;1mrecord not found
+[0m[33m[0.034ms] [34;1m[rows:0][0m SELECT * FROM `tasks` WHERE user_id = 7 and task_id = "task-missing" ORDER BY `tasks`.`id` LIMIT 1
+
+2026/10/31 13:15:47 [31;1m/src/model/task.go:451 [35;1mrecord not found
+[0m[33m[0.047ms] [34;1m[rows:0][0m SELECT * FROM `tasks` WHERE user_id = 7 and task_id = "task-foreign" ORDER BY `tasks`.`id` LIMIT 1
+
+2026/10/31 13:15:47 [31;1m/src/model/task.go:451 [35;1mrecord not found
+[0m[33m[0.046ms] [34;1m[rows:0][0m SELECT * FROM `tasks` WHERE user_id = 7 and task_id = "missing" ORDER BY `tasks`.`id` LIMIT 1
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="origin-route-missing" stage=origin_task reason=origin_task_not_found 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="origin-route-missing" renderer=host_fallback status=400 code="invalid_request" 
+
+2026/10/31 13:15:47 [31;1m/src/model/task.go:451 [35;1mrecord not found
+[0m[33m[0.070ms] [34;1m[rows:0][0m SELECT * FROM `tasks` WHERE user_id = 7 and task_id = "missing" ORDER BY `tasks`.`id` LIMIT 1
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=13 plugin="origin-endpoint-missing" stage=origin_task reason=origin_task_not_found 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 7 | origin task not found or not owned by you 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | No available channel for model resolved-model under group  (distributor) 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-multipart-test" stage=request_decode reason=body_kind_mismatch body_kind="multipart" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-multipart-test" renderer=host_fallback status=415 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-model-scope-test" stage=resolve_request reason=model_not_allowed model="gpt-5.6" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-model-scope-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-model-scope-test" stage=resolve_request reason=model_not_allowed model="" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-model-scope-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-model-scope-test" stage=resolve_request reason=model_not_allowed model="" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-model-scope-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-resolved-scope-test" stage=resolve_request reason=resolved_model_not_allowed model="gpt-5.6" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-resolved-scope-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=22 plugin="endpoint-stream-test" stage=request_decode reason=invalid_stream_flag 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | stream must be a boolean 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=22 plugin="endpoint-stream-test" stage=request_decode reason=invalid_stream_flag 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | stream must be a boolean 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=22 plugin="endpoint-stream-test" stage=request_decode reason=invalid_stream_flag 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | stream must be a boolean 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=22 plugin="endpoint-stream-test" stage=request_decode reason=invalid_stream_flag 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | stream must be a boolean 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Invalid task protocol request 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Invalid task protocol request 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=28 plugin="endpoint-drift-test" stage=parse_request reason=resolved_model_not_owned err="model \"outside-model\" is not served by this plugin" elapsed_ms=0 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | model "outside-model" is not served by this plugin 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-binary-test" stage=request_decode reason=invalid_request 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-binary-test" renderer=host_fallback status=415 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="dynamic-renderer" stage=resolve_request reason=forbidden_renderer 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="dynamic-renderer" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="submit-renderer" stage=resolve_request reason=forbidden_renderer 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="submit-renderer" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | fallback-req | task_plugin subsystem=route event=error_rendered plugin="generic-entry-test" renderer=host_fallback status=502 code="server_error" 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | https://user:password@upstream.invalid?token=secret 
+[WARN] 2026/10/31 - 13:15:47 | fallback-req | task_plugin subsystem=route event=error_renderer_failed plugin="generic-entry-test" reason=hook_failed status=502 err="plugin generic-entry-test@1.0.0 hook native.error failed: Error: renderer secret at error (.js:8:50(3))" 
+[WARN] 2026/10/31 - 13:15:47 | fallback-req | task_plugin subsystem=route event=error_rendered plugin="generic-entry-test" renderer=host_fallback status=502 code="server_error" 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | https://user:password@upstream.invalid?token=secret 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-decode-detail-test" stage=resolve_request reason=hook_failed err="plugin route-decode-detail-test@1.0.0 hook native.createTask failed: Error: model is required at createTask (.js:8:55(3))" elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-decode-detail-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | native-error-req | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-error-detail-test" stage=resolve_request reason=hook_failed err="plugin route-error-detail-test@1.0.0 hook native.createTask failed: Error: model is required at createTask (.js:9:34(3))" elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-result-object-test" stage=resolve_request reason=result_not_object elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-result-object-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=prepare_rejected generation=0 plugin="route-decode-body-test" stage=request_decode reason=invalid_request 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=route event=error_rendered plugin="route-decode-body-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | req-fallback-1 | task_plugin subsystem=route event=error_rendered plugin="generic-entry-test" renderer=host_fallback status=400 code="invalid_request" 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=36 plugin="endpoint-decode-detail-test" stage=parse_request reason=hook_failed err="model is required" elapsed_ms=0 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | model is required 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Streaming is not supported for this model. Set "stream": false, or use "background": true and retrieve the response later. 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Synchronous non-streaming requests are not supported for this model. Set "stream": true. 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Background mode is not supported for this model. Remove "background": true. 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | Streaming is not supported for this model. Set "stream": false, or use "background": true and retrieve the response later. 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=46 plugin="form-gate-malformed-stream" stage=request_decode reason=invalid_stream_flag 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | stream must be a boolean 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=53 plugin="decode-alpha" stage=parse_request reason=hook_failed err="alpha only accepts 720p" elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=57 plugin="decode-beta" stage=parse_request reason=hook_failed err="beta rejects" elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=65 plugin="decode-alpha" stage=parse_request reason=hook_failed err="alpha rejects first" elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=65 plugin="decode-beta" stage=parse_request reason=hook_failed err="beta rejects second" elapsed_ms=0 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | decode-alpha: alpha rejects first; decode-beta: beta rejects second 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=69 plugin="decode-alpha" stage=parse_request reason=hook_failed err="unsupported resolution" elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=69 plugin="decode-beta" stage=parse_request reason=hook_failed err="unsupported resolution" elapsed_ms=0 
+[ERR] 2026/10/31 - 13:15:47 | SYSTEM | user 0 | decode-alpha, decode-beta: unsupported resolution 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=73 plugin="decode-alpha" stage=parse_request reason=unsupported_kind err="plugin returned an invalid route result" elapsed_ms=0 
+[WARN] 2026/10/31 - 13:15:47 | SYSTEM | task_plugin subsystem=endpoint event=prepare_rejected generation=77 plugin="decode-alpha" stage=parse_request reason=resolved_model_not_owned err="model \"another-model\" is not served by this plugin" elapsed_ms=0 
+[SYS] 2026/10/31 - 13:15:47 | failed to parse auto groups for token 1: invalid character 'o' in literal null (expecting 'u') 
+2026/10/31 13:15:47 WARNING: TRUSTED_PROXIES is unset or blank; trusting loopback, RFC 1918, and IPv6 ULA proxy addresses for compatibility. Set TRUSTED_PROXIES=none to trust no proxies, or configure explicit proxy IPs/CIDRs to replace these defaults.
+2026/10/31 13:15:47 WARNING: TRUSTED_PROXIES is unset or blank; trusting loopback, RFC 1918, and IPv6 ULA proxy addresses for compatibility. Set TRUSTED_PROXIES=none to trust no proxies, or configure explicit proxy IPs/CIDRs to replace these defaults.
+2026/10/31 13:15:47 WARNING: TRUSTED_PROXIES is unset or blank; trusting loopback, RFC 1918, and IPv6 ULA proxy addresses for compatibility. Set TRUSTED_PROXIES=none to trust no proxies, or configure explicit proxy IPs/CIDRs to replace these defaults.
+FAIL
+FAIL	github.com/QuantumNous/new-api/middleware	0.857s
+FAIL

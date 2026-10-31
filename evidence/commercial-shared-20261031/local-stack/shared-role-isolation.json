@@ -1,0 +1,11 @@
+{
+  "roles_non_superuser": "[{\"rolname\":\"clearapi\",\"rolsuper\":false}, \n {\"rolname\":\"sub2api\",\"rolsuper\":false}]",
+  "cross_database_connections_denied": [
+    "clearapi",
+    "sub2api"
+  ],
+  "connection_budget": 32,
+  "both_app_open_connection_limits": 20,
+  "shared_fault_domain": true,
+  "isolated_fork_no_production_data": true
+}

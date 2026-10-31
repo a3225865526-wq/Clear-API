@@ -1,0 +1,7 @@
+{
+  "scope": "clarification of harness label, original proof retained",
+  "original_result_label": "helper_completed_before_disconnect",
+  "actual_observation": "Client was killed after switching phase and running app were observed; subsequent preflight found healthy completion and no pending journal. The completion result label does not prove that server completion preceded client disconnect.",
+  "database_snapshot_restored": false,
+  "ledger_unchanged": true
+}

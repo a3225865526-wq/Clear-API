@@ -1,0 +1,57 @@
+{
+  "old_key_protocol_denials": [
+    {
+      "path": "/v1/chat/completions",
+      "status": 403,
+      "code": "GROUP_DISABLED"
+    },
+    {
+      "path": "/v1/responses",
+      "status": 403,
+      "code": "GROUP_DISABLED"
+    },
+    {
+      "path": "/v1/messages",
+      "status": 403,
+      "code": "GROUP_DISABLED"
+    },
+    {
+      "path": "/v1beta/models/six-ordinary:generateContent",
+      "status": 403,
+      "code": "GROUP_DISABLED"
+    },
+    {
+      "path": "/v1/images/generations",
+      "status": 403,
+      "code": "GROUP_DISABLED"
+    },
+    {
+      "path": "/mj/submit/imagine",
+      "status": 403,
+      "code": "GROUP_DISABLED"
+    }
+  ],
+  "no_new_reservations_or_debits_on_denial": true,
+  "no_upstream_dispatch_on_denial": true,
+  "public_and_user_lists_hide_disabled_group": true,
+  "bound_user_unavailable_notice_api": true,
+  "ordinary_user_admin_entry_denied": true,
+  "inflight_SSE_finished_and_settled_once": true,
+  "other_enabled_group_success": true,
+  "reenable_original_key_and_binding_success": true,
+  "original_bindings_unchanged": true,
+  "existing_consume_history_unchanged": true,
+  "admin_group_status_audit_delta": 2,
+  "ledger": {
+    "quota": 999818,
+    "token_used": 196,
+    "applied": 196,
+    "reservations": 14,
+    "logs": 14,
+    "unique_logs": 14,
+    "log_quota": 196,
+    "pending_outbox": 0
+  },
+  "total_synthetic_wallets": 1099804,
+  "all_channels_disabled_after_test": true
+}
