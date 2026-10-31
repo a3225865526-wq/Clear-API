@@ -185,9 +185,9 @@ class StackTarget:
             if len(calculated) != 2 or labels.get('com.docker.compose.config-hash') != calculated[1]:
                 raise self.h.DeployError('running Compose configuration differs: ' + name)
             host = info['HostConfig']
-            if (host['Memory'] != service['mem_limit'] or host['PidsLimit'] != service['pids_limit']
+            if (host['Memory'] != int(service['mem_limit']) or host['PidsLimit'] != service['pids_limit']
                     or host['NanoCpus'] != int(float(service['cpus']) * 1_000_000_000)
-                    or 'memswap_limit' in service and host['MemorySwap'] != service['memswap_limit']):
+                    or 'memswap_limit' in service and host['MemorySwap'] != int(service['memswap_limit'])):
                 raise self.h.DeployError('running resource limits differ: ' + name)
             actual_env = dict(item.split('=', 1) for item in info['Config']['Env'])
             if any(actual_env.get(key) != str(value) for key, value in service.get('environment', {}).items()):
