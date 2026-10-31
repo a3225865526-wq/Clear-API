@@ -99,6 +99,14 @@ func Distribute() func(c *gin.Context) {
 				}
 			}
 		}
+		// Check before channel selection and billing. Admitted streams finish normally.
+		groupsToCheck := []string{common.GetContextKeyString(c, constant.ContextKeyUserGroup), common.GetContextKeyString(c, constant.ContextKeyUsingGroup), modelRequest.Group}
+		if common.GetContextKeyString(c, constant.ContextKeyUsingGroup) == "auto" {
+			groupsToCheck = append(groupsToCheck, service.GetRequestAutoGroups(c, common.GetContextKeyString(c, constant.ContextKeyUserGroup))...)
+		}
+		if rejectDisabledGroups(c, groupsToCheck...) {
+			return
+		}
 		chainBound := false
 		if pinned || shouldSelectChannel {
 			usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)

@@ -17,6 +17,7 @@ import (
 	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/service/authz"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
@@ -488,6 +489,21 @@ func TokenAuth() func(c *gin.Context) {
 
 		userGroup := userCache.Group
 		tokenGroup := token.Group
+		groupsToCheck := []string{userGroup, tokenGroup}
+		if tokenGroup == "auto" {
+			autoGroups, err := token.GetAutoGroups()
+			if err != nil {
+				abortWithOpenAiMessage(c, http.StatusForbidden, "Invalid token groups")
+				return
+			}
+			if autoGroups == nil {
+				autoGroups = setting.GetAutoGroups()
+			}
+			groupsToCheck = append(groupsToCheck, autoGroups...)
+		}
+		if rejectDisabledGroups(c, groupsToCheck...) {
+			return
+		}
 		if tokenGroup != "" {
 			// check common.UserUsableGroups[userGroup]
 			if _, ok := service.GetUserUsableGroups(userGroup)[tokenGroup]; !ok {

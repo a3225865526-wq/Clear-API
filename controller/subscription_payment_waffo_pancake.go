@@ -38,6 +38,10 @@ func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if err := model.CheckGroupsEnabled(model.DB, plan.UpgradeGroup); err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	if !plan.Enabled {
 		common.ApiErrorMsg(c, "套餐未启用")
 		return

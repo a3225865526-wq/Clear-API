@@ -41,7 +41,15 @@ func GetSubscriptionPlans(c *gin.Context) {
 		return
 	}
 	result := make([]SubscriptionPlanDTO, 0, len(plans))
+	disabled, err := model.GetDisabledGroups()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	for _, p := range plans {
+		if disabled[p.UpgradeGroup] {
+			continue
+		}
 		p.NormalizeDefaults()
 		result = append(result, SubscriptionPlanDTO{
 			Plan: p,

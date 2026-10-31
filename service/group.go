@@ -37,6 +37,16 @@ func GetUserUsableGroups(userGroup string) map[string]string {
 			groupsCopy[userGroup] = "用户分组"
 		}
 	}
+	disabled, err := model.GetDisabledGroups()
+	if err != nil {
+		common.SysError("group availability query failed: " + err.Error())
+		return map[string]string{}
+	}
+	for name, isDisabled := range disabled {
+		if isDisabled {
+			delete(groupsCopy, name)
+		}
+	}
 	return groupsCopy
 }
 

@@ -25,6 +25,7 @@ import { MOTION_TRANSITION, MOTION_VARIANTS } from '@/lib/motion'
 
 import { NavGroup } from './nav-group'
 import { SidebarViewHeader } from './sidebar-view-header'
+import { Sub2APIAdminLink } from './sub2api-admin-link'
 
 /**
  * Application sidebar.
@@ -53,6 +54,7 @@ export function AppSidebar() {
       {view && <SidebarViewHeader view={view} />}
 
       <SidebarContent className='py-2'>
+        <Sub2APIAdminLink />
         <AnimatePresence mode='wait' initial={false}>
           <motion.div
             key={key}

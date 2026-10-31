@@ -782,6 +782,9 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		if err != nil {
 			return err
 		}
+		if err := CheckGroupsEnabled(tx, plan.UpgradeGroup); err != nil {
+			return err
+		}
 		if !plan.Enabled {
 			return errors.New("套餐未启用")
 		}

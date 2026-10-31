@@ -145,6 +145,7 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.DELETE("/sessions/:sid", middleware.DisableCache(), controller.DeleteLoginSession)
 				selfRoute.POST("/sessions/revoke-others", middleware.DisableCache(), controller.RevokeOtherLoginSessions)
 				selfRoute.GET("/self/groups", controller.GetUserGroups)
+				selfRoute.GET("/self/group-availability", controller.GetOwnGroupAvailability)
 				selfRoute.GET("/self", controller.GetSelf)
 				selfRoute.GET("/models", controller.GetUserModels)
 				selfRoute.PUT("/self", middleware.CriticalRateLimit(), middleware.DisableCache(), controller.UpdateSelf)
@@ -461,6 +462,9 @@ func SetApiRouter(router *gin.Engine) {
 		groupRoute.Use(middleware.AdminAuth())
 		{
 			groupRoute.GET("/", controller.GetGroups)
+			groupRoute.GET("/statuses", controller.GetGroupStatuses)
+			groupRoute.PUT("/status", middleware.SessionCookieOriginGuard(), controller.UpdateGroupStatus)
+			groupRoute.GET("/sub2api-admin", controller.GetSub2APIAdminAccess)
 		}
 
 		prefillGroupRoute := apiRouter.Group("/prefill_group")

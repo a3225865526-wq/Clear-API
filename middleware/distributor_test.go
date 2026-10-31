@@ -182,6 +182,8 @@ func TestTokenModelLimitAllowsExemptAtNameByFullName(t *testing.T) {
 }
 
 func TestDistributeHidesTaskPluginDetailsButLogsDiagnostics(t *testing.T) {
+	setupDashboardAuthMiddlewareTest(t)
+	require.NoError(t, model.DB.AutoMigrate(&model.Option{}))
 	require.NoError(t, i18n.Init())
 	previousCacheEnabled := common.MemoryCacheEnabled
 	common.MemoryCacheEnabled = true
