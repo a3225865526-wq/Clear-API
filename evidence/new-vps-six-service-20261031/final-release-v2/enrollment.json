@@ -1,0 +1,21 @@
+{
+  "root_installer": "PASS",
+  "bundle_sha256": "ed0c3dba06d435852892483ca3647f635d3308f35536673bc62c1a2600a1f01d",
+  "preflight": {
+    "arch": "amd64",
+    "config_sha256": "e455916804c72f517cc34405b5b6965868c1c194455eab7bf439767df61e56be",
+    "generation": "EMPTY",
+    "healthy": false,
+    "helper_files": {
+      "local-deploy-stack.py": "3756af494233c75d1e73a698429ac60d1accd9561cdac427024abf7a724ead01",
+      "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+    },
+    "isolated": true,
+    "pending": false,
+    "services": null,
+    "target_id": "clearapi-six-release-v2",
+    "target_mode": "six-service-v1"
+  },
+  "fixture_db_sha256": "4a5ce4942d68d0560e61019f49408c2bc408fcca9d892355d3ec844edaa4ff21"
+}

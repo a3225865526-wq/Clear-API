@@ -1,0 +1,26 @@
+{
+  "cases": [
+    {
+      "case": "real resource drift",
+      "result": "rejected",
+      "reason": "BLOCKED: running resource limits differ: edge"
+    },
+    {
+      "case": "real extra network",
+      "result": "rejected",
+      "reason": "BLOCKED: running network membership differs: edge"
+    },
+    {
+      "case": "actual release config change",
+      "result": "rejected",
+      "reason": "BLOCKED: deployed configuration drift: nginx.conf"
+    }
+  ],
+  "restored_healthy": true,
+  "ledger_unchanged": true,
+  "helper_files": {
+    "local-deploy-stack.py": "3756af494233c75d1e73a698429ac60d1accd9561cdac427024abf7a724ead01",
+    "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+    "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+  }
+}

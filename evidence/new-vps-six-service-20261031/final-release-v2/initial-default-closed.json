@@ -1,0 +1,87 @@
+{
+  "ledger": {
+    "quota": 0,
+    "token_used": 0,
+    "applied": 0,
+    "reservations": 0,
+    "logs": 0,
+    "unique_logs": 0,
+    "log_quota": 0,
+    "pending_outbox": 0
+  },
+  "active_pool_channels": 0,
+  "sub2api_accounts": 0,
+  "sub2api_keys": 0,
+  "resource": {
+    "cgroup": "1545355264\n1610928128\nlow 0\nhigh 0\nmax 33293\noom 0\noom_kill 0\noom_group_kill 0\nlow 0\nhigh 0\nmax 33293\noom 0\noom_kill 0\noom_group_kill 0\nusage_usec 87917484\nuser_usec 46382977\nsystem_usec 41534507\nnice_usec 0\nnr_periods 2562\nnr_throttled 63\nthrottled_usec 2887890\nnr_bursts 0\nburst_usec 0\n",
+    "services": [
+      {
+        "BlockIO": "49.2MB / 12.3kB",
+        "CPUPerc": "2.61%",
+        "Container": "1f73239dbc21caca543f790777bfd33bf04b9975fdd58ddac54cb1facd0d4b6b",
+        "ID": "1f73239dbc21",
+        "MemPerc": "67.94%",
+        "MemUsage": "43.48MiB / 64MiB",
+        "Name": "clearapi-six-release-v2-edge-1",
+        "NetIO": "66.5kB / 12.5kB",
+        "PIDs": "2"
+      },
+      {
+        "BlockIO": "175MB / 36.9kB",
+        "CPUPerc": "2.17%",
+        "Container": "fe9d990ebd477459257a76e67c1b7e337b3af27df461ebdc38fdd5607782d2a4",
+        "ID": "fe9d990ebd47",
+        "MemPerc": "19.06%",
+        "MemUsage": "85.4MiB / 448MiB",
+        "Name": "clearapi-six-release-v2-new-api-1",
+        "NetIO": "672kB / 840kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "195MB / 250kB",
+        "CPUPerc": "3.54%",
+        "Container": "bf99f53a0234cb219571e5bcfcfffea14eb29a9e8d0df8ebc8eb8db5f7a4d481",
+        "ID": "bf99f53a0234",
+        "MemPerc": "19.73%",
+        "MemUsage": "75.78MiB / 384MiB",
+        "Name": "clearapi-six-release-v2-sub2api-1",
+        "NetIO": "786kB / 1.54MB",
+        "PIDs": "7"
+      },
+      {
+        "BlockIO": "114MB / 236MB",
+        "CPUPerc": "2.36%",
+        "Container": "a2d6b1ce21336fe9c947c0c68a6827eadfc9fa30b812254d111770985c589c96",
+        "ID": "a2d6b1ce2133",
+        "MemPerc": "28.99%",
+        "MemUsage": "74.21MiB / 256MiB",
+        "Name": "clearapi-six-release-v2-gateway-postgres-1",
+        "NetIO": "1.62MB / 1.13MB",
+        "PIDs": "8"
+      },
+      {
+        "BlockIO": "23.7MB / 69.6kB",
+        "CPUPerc": "0.68%",
+        "Container": "08347ec7376b08d7caff3baefeef467c33bc447c8e71f15a7d9cb8c6ecd250dc",
+        "ID": "08347ec7376b",
+        "MemPerc": "10.65%",
+        "MemUsage": "10.22MiB / 96MiB",
+        "Name": "clearapi-six-release-v2-sub2api-redis-1",
+        "NetIO": "120kB / 49.1kB",
+        "PIDs": "6"
+      },
+      {
+        "BlockIO": "118MB / 109MB",
+        "CPUPerc": "5.28%",
+        "Container": "e0c733168ad384e41207fdb4c631799ddd59da7bf710e9b74b559458fc11bd38",
+        "ID": "e0c733168ad3",
+        "MemPerc": "31.70%",
+        "MemUsage": "81.16MiB / 256MiB",
+        "Name": "clearapi-six-release-v2-sub2api-postgres-1",
+        "NetIO": "1.42MB / 721kB",
+        "PIDs": "8"
+      }
+    ],
+    "disk": "Filesystem           1-blocks       Used Available Use% Mounted on\n/dev/loop2           48891371520 3207680000 45666914304   7% /vps\n"
+  }
+}

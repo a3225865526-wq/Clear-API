@@ -1,0 +1,12 @@
+{
+  "operator_commit": "8839580ed5989b1b0ce679babf7e3f35f2babd8b",
+  "bundle_sha256": "ed0c3dba06d435852892483ca3647f635d3308f35536673bc62c1a2600a1f01d",
+  "bytes": 560998400,
+  "manifest": "26 files PASS",
+  "helper_source_identity": "PASS",
+  "focused_tests": "2 PASS",
+  "known_credential_literal_scan": "PASS",
+  "literals_checked": 24,
+  "final_live_replay": "PASS",
+  "offline_deployment_ready": true
+}

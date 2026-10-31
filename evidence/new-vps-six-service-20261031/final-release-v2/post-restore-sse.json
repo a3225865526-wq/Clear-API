@@ -1,0 +1,14 @@
+{
+  "complete": true,
+  "driver_seconds": 12.48399999999674,
+  "ledger": {
+    "quota": 999846,
+    "token_used": 154,
+    "applied": 154,
+    "reservations": 11,
+    "logs": 11,
+    "unique_logs": 11,
+    "log_quota": 154,
+    "pending_outbox": 0
+  }
+}

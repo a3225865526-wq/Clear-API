@@ -1,0 +1,34 @@
+{
+  "parents": [
+    {
+      "name": "clearapi-six-helper-lab-20261031",
+      "id": "e3c5a032dc12f7f87974b76696a7323a9ea6c787ea96e0c5852803e4c6469f77",
+      "running": false,
+      "status": "exited",
+      "exit_code": 255
+    },
+    {
+      "name": "clearapi-six-helper-final-20261031",
+      "id": "5a5ce71a450b4348416e56b9db3cfd841f5cd8bfe7a4cf7d6271833dd7be0391",
+      "running": false,
+      "status": "exited",
+      "exit_code": 255
+    },
+    {
+      "name": "clearapi-six-helper-release-20261031",
+      "id": "3f371ae6bc8a853addee052f90fb54b417ba1c983e99d62c75262033138841c1",
+      "running": false,
+      "status": "exited",
+      "exit_code": 0
+    },
+    {
+      "name": "clearapi-six-helper-release-v2-20261031",
+      "id": "fbd41d087a58f6e3b08744d9ca2ee25d2af29b8e61cc5b148264610d27ef0f35",
+      "running": false,
+      "status": "exited",
+      "exit_code": 0
+    }
+  ],
+  "containers_deleted": false,
+  "volumes_deleted": false
+}

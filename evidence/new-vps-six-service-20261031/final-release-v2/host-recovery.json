@@ -1,0 +1,16 @@
+{
+  "user_authorized_docker_restart": true,
+  "normal_restart": "stop timed out",
+  "recovery_scope": "Docker Desktop processes and docker-desktop distro only; Ubuntu not terminated",
+  "initial_restart_result": "data device /dev/sde unavailable; stopped automatic retry",
+  "observed_C_free_before": 604577792,
+  "subsequent_C_free": 183985512448,
+  "subsequent_D_free": 180232695808,
+  "engine_recovered": "Docker Desktop 4.87.0, Engine29.7.2/API1.55",
+  "agent_moved_docker_data_disk": false,
+  "root_cause": "not proven; low host C free space and block I/O failure observed",
+  "new_isolated_parent": "clearapi-six-helper-release-v2-20261031",
+  "production_access": false,
+  "manual_factory_reset_format_or_delete": false,
+  "automatic_format_attempt": "Docker bootstrap attempted formatting an unavailable device and failed; automatic retry stopped"
+}

@@ -1,0 +1,7 @@
+{
+  "result": "DRY_RUN_NO_REMOTE_WRITES",
+  "target_id": "clearapi-six-release",
+  "bundle_sha256": "5df0ea860d9ae1f65c640a3e95924bb1619b1fe7938035b696e5002290f16180",
+  "generation": "EMPTY",
+  "services": null
+}

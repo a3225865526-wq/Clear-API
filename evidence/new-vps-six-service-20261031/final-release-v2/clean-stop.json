@@ -1,0 +1,83 @@
+{
+  "all_six_stopped": true,
+  "new_encrypted_backup": {
+    "at": "2026-10-31T05:53:47.415825+00:00",
+    "backup_id": "20261031T055341-88c1d386",
+    "bytes": 232604,
+    "cipher_sha256": "e75a3514578c727f0461c43196dce9ba09b32cec41fe80b9fc7b2566215df684",
+    "config_sha256": "f6a9d3c2c2edcf8e91baf397c003bbe946dd1618667d5b34a37446ef4a417e32",
+    "daemon_id": "688776cb-ff13-40df-8004-e47e9ee843a6",
+    "data_digest": "0afb191b93154492320be8e54cba58e1bb185822bc312917024e5188eacb9620",
+    "data_digest_schema": "public-json-sha256/v1",
+    "env_sha256": "b9708f2d2c7bb20a00ce676ebe191c92341c0a10635819f302a54656e06aa485",
+    "financial_digest": "3d90eca7241614ef3f0c9ff4991ac692eb8227f9513cbe00cb14d5600fb98564",
+    "helper_files": {
+      "local-deploy-stack.py": "3756af494233c75d1e73a698429ac60d1accd9561cdac427024abf7a724ead01",
+      "local-deploy-state.py": "e9596a284d3ebecab4528f60b266831b644c065fa475ea65cf3a84a0cb02da3e",
+      "local-deploy-vps.py": "942ef7af122910273ea06949f1fa8aed7fe33de011dd83f196888306181cb1c4"
+    },
+    "image_configs": {
+      "clearapi-edge:nginx-8541484afbc9": {
+        "bytes": 63135215,
+        "config_id": "sha256:5253dc86cc93ac6249902934655c6f7c959d8caa45a8c2ecc0b95953834d8ee8",
+        "engine_id": "sha256:8541484afbc9c8a5a8a99b379568ebbc957f658583ec9448fc43104229c03cf8",
+        "repo_digests": [
+          "clearapi-edge@sha256:8541484afbc9c8a5a8a99b379568ebbc957f658583ec9448fc43104229c03cf8",
+          "nginx@sha256:8541484afbc9c8a5a8a99b379568ebbc957f658583ec9448fc43104229c03cf8"
+        ]
+      },
+      "clearapi-local:92edfc345d9b9526379ed25363bb79abf9839874": {
+        "bytes": 156209783,
+        "config_id": "sha256:a70bf2ccf6da4442666175236754d14bdf2ded5e92c4ffbfcf5756fdeada848c",
+        "engine_id": "sha256:1f8c11550fce8c05d501b47314472e4d1b4790b800500423d5d07992b1793607",
+        "repo_digests": [
+          "clearapi-local@sha256:1f8c11550fce8c05d501b47314472e4d1b4790b800500423d5d07992b1793607"
+        ]
+      },
+      "clearapi-sub2api-postgres:17.11-266d3c257594": {
+        "bytes": 117214490,
+        "config_id": "sha256:ab20e934b27ba3ff927c1b4c9ff8cf6c32f315f743efe68dd3441182a87fb085",
+        "engine_id": "sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+        "repo_digests": [
+          "clearapi-sub2api-postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b",
+          "postgres@sha256:266d3c257594e195b309ae9d1805e54c788f1d7b375f56bf6c367aac6c917e7b"
+        ]
+      },
+      "clearapi-sub2api-redis:7.4.11-858f009f9709": {
+        "bytes": 16260342,
+        "config_id": "sha256:f84b0c4678011602b9b98c227a4dcd5468bf8b088b02fdd4165cb7758bad8058",
+        "engine_id": "sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+        "repo_digests": [
+          "clearapi-sub2api-redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499",
+          "redis@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499"
+        ]
+      },
+      "clearapi-sub2api:d851a384": {
+        "bytes": 46640454,
+        "config_id": "sha256:62cb3769069c6a9c3c7fa708defd71229fe2befe396fc7cda32720ec69631f82",
+        "engine_id": "sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a",
+        "repo_digests": [
+          "clearapi/sub2api-isolated@sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a",
+          "clearapi-sub2api@sha256:bd3c64a8b3cf74d3ddd19e25d10ba4a7888f3fe69ce2a250500c358ed370220a"
+        ]
+      },
+      "postgres:17.6-alpine": {
+        "bytes": 110633742,
+        "config_id": "sha256:d741b376874687de90374fd34f55c6b2760e8f7bd7e4ae5cd47f50757fc08cf8",
+        "engine_id": "sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94",
+        "repo_digests": [
+          "postgres@sha256:ef257d85f76e48da1c64832459b59fcaba1a4dac97bf5d7450c77753542eee94"
+        ]
+      }
+    },
+    "release": "/opt/clearapi/stack/releases/ed0c3dba06d435852892483ca3647f635d3308f35536673bc62c1a2600a1f01d",
+    "result": "backup_complete_fenced",
+    "schema_digest": {
+      "clearapi": "a3d8ff2a5a7d0f08b708992596bc362e7231e4e1a18b2cd4f28bc38ef95edad4",
+      "sub2api": "0a579caab018e1fb413db84578f35c106558f34d7f958786dad545ccb18ee4fd"
+    },
+    "target_id": "clearapi-six-release-v2"
+  },
+  "logrotate_debug_force": "PASS",
+  "data_and_volumes_preserved": true
+}

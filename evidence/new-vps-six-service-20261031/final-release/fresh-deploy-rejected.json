@@ -1,0 +1,8 @@
+{
+  "result": "safe rejection",
+  "error": "running resource limits differ: edge",
+  "cause": "Compose mem_limit and memswap_limit are strings in config JSON; Docker inspect returns integer byte counts",
+  "fixed_commit": "8839580ed",
+  "data_removed": false,
+  "replacement_bundle_sha256": "ed0c3dba06d435852892483ca3647f635d3308f35536673bc62c1a2600a1f01d"
+}
