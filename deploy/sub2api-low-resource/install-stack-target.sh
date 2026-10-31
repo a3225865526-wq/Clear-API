@@ -31,6 +31,14 @@ install -o root -g root -m 600 "$envfile" /opt/clearapi/config/stack.env
 for name in token-key admin-password terms.txt privacy.txt; do
   install -o root -g root -m 600 "$secrets/$name" "/opt/clearapi/config/secrets/$name"
 done
+if python3 -c 'import json,sys;sys.exit(0 if json.load(open(sys.argv[1])).get("admin_access", False) is True else 1)' "$server"; then
+  mkdir -p /opt/clearapi/config/admin-tls
+  chmod 700 /opt/clearapi/config/admin-tls
+  install -o root -g root -m 600 "$secrets/admin-nginx.conf" /opt/clearapi/config/admin-nginx.conf
+  for name in fullchain.pem privkey.pem; do
+    install -o root -g root -m 600 "$secrets/admin-tls/$name" "/opt/clearapi/config/admin-tls/$name"
+  done
+fi
 for name in releases incoming backups receipts data/gateway data/logs sub2data/app; do
   mkdir -p "/opt/clearapi/stack/$name"
 done

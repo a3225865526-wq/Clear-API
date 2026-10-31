@@ -29,7 +29,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['build', 'verify', 'bundle'])
     parser.add_argument('directory', type=Path)
-    parser.add_argument('--gateway-commit', default='92edfc345d9b9526379ed25363bb79abf9839874')
+    parser.add_argument('--gateway-commit', default=json.loads((HERE / 'target.server.example.json').read_text())['gateway_commit'])
     parser.add_argument('--image-archive', type=Path)
     parser.add_argument('--image-archive-sha256')
     args = parser.parse_args()
