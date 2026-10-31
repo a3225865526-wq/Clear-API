@@ -217,7 +217,7 @@ describe('monitor administration', () => {
     })
     client.setQueryDefaults(['monitor-admin-catalog'], { staleTime: Infinity })
     const message =
-      'The upstream monitoring cost contract is missing, expired, invalid, or does not match the channel configuration.'
+      'Configure a valid upstream cost contract in this monitor’s execution settings.'
     vi.spyOn(api, 'put').mockRejectedValue({
       response: {
         status: 409,
