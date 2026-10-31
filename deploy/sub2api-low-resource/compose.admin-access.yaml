@@ -1,0 +1,15 @@
+# Optional override, applied only after rendering and validating the TLS config.
+# Keep the existing edge, databases and application lifecycle boundaries.
+services:
+  new-api:
+    environment:
+      SUB2API_ADMIN_URL: ${SUB2API_ADMIN_URL:?HTTPS admin origin required}
+  edge:
+    ports:
+      - 127.0.0.1:${SUB2API_ADMIN_TLS_PORT:-18443}:8443
+    volumes:
+      - ${SUB2API_ADMIN_NGINX_CONFIG:?rendered absolute config path required}:/etc/nginx/nginx.conf:ro
+      - ${SUB2API_ADMIN_TLS_DIR:?certificate directory required}:/etc/nginx/admin-tls:ro
+    depends_on:
+      sub2api:
+        condition: service_healthy

@@ -189,6 +189,7 @@ services:
     cpus: '0.50'
     pids_limit: 128
     environment:
+      SUB2API_ADMIN_URL: ${SUB2API_ADMIN_URL:-}
       SQL_DSN: postgres://clearapi:${GATEWAY_DB_PASSWORD:?required}@gateway-postgres:5432/clearapi?sslmode=disable
       SESSION_SECRET: ${GATEWAY_SESSION_SECRET:?preserve existing on migration}
       CRYPTO_SECRET: ${GATEWAY_CRYPTO_SECRET:?preserve existing on migration}

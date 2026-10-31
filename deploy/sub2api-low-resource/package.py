@@ -14,7 +14,7 @@ PACKAGE_FILES = {
     'package.py', 'backup.sh', 'logrotate.conf', 'OPERATIONS.md', 'MIGRATION.md',
     'target.server.example.json', 'target.windows.example.json', 'stack.sudoers.example',
     'install-stack-target.sh',
-    'SIX_SERVICE_RUNBOOK.md',
+    'SIX_SERVICE_RUNBOOK.md', 'compose.admin-access.yaml', 'render-admin-proxy.py',
 }
 HELPER_FILES = {'deploy-local.ps1', 'local-deploy-stack.ps1', 'local-deploy-vps.py',
                 'local-deploy-stack.py', 'local-deploy-state.py'}
@@ -29,9 +29,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['build', 'verify', 'bundle'])
     parser.add_argument('directory', type=Path)
+    parser.add_argument('--gateway-commit', default='92edfc345d9b9526379ed25363bb79abf9839874')
     parser.add_argument('--image-archive', type=Path)
     parser.add_argument('--image-archive-sha256')
     args = parser.parse_args()
+    if len(args.gateway_commit) != 40 or any(c not in '0123456789abcdef' for c in args.gateway_commit):
+        raise SystemExit('A full immutable gateway commit is required')
     target = args.directory.resolve()
     if args.action == 'build':
         repo = HERE.parents[1]
@@ -76,11 +79,11 @@ def main():
         (target / 'images.lock.json').write_text(json.dumps(lock, indent=2) + '\n')
         subprocess.run(['git', '-C', str(repo), 'archive', '--format=tar',
                         '-o', str(target / 'gateway-source.tar'),
-                        '92edfc345d9b9526379ed25363bb79abf9839874'], check=True)
+                        args.gateway_commit], check=True)
         operator_commit = subprocess.check_output(['git', '-C', str(repo), 'rev-parse', 'HEAD'], text=True).strip()
         (target / 'operator-source.json').write_text(json.dumps({
             'operator_commit': operator_commit,
-            'gateway_commit': '92edfc345d9b9526379ed25363bb79abf9839874',
+            'gateway_commit': args.gateway_commit,
             'sub2api_commit': 'd851a38477597157e78450d30af2d8504764d085',
             'helper_sha256': {name: sha(target / name) for name in sorted(HELPER_FILES)},
         }, indent=2) + '\n')

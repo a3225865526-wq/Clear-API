@@ -11,3 +11,34 @@
 7. 观察和回退：旧服务器/数据库/镜像/密钥备份保留且持续停写；检查钱包/商城/API Key/回调/任务去重、日志、备份和内外健康。新机未产生任何写入时可恢复旧入口；新机已写入时必须先停双方写入、迁回最新一致数据并核查回调/任务，再恢复旧站，不能直接切旧库倒退余额。恢复点、损失边界和未决请求由负责人批准。禁止down -v、清Redis、删除PG03历史或用旧快照覆盖新交易。
 
 本轮本地模拟使用独立合成Gateway PG17.6和Sub2API PG17.11，验证停写一致dump→独立恢复→全表行摘要和两轮重启账务不变；不是正式数据库大小、全部生产schema/index、支付回调或真实迁移验收。旧站历史已完成的恢复证据保留，切换仍需新鲜备份与实际恢复测试。
+
+
+## Commercial candidate: group state and admin origin
+
+Group enable/disable uses one existing `options` row per group, prefixed
+`GroupDisabled:`. Missing rows mean enabled. No schema rewrite, group renaming,
+binding deletion or historical accounting migration is required. Preserve these
+rows in backup and restore. Live admissions read the primary database; already
+admitted work retains its ordinary usage settlement.
+
+An older application ignores these new rows. Before rolling back to an older
+binary, fence ingress and keep affected groups blocked at the ingress boundary;
+do not reopen ingress until a compatible application enforces the same policy.
+An application rollback must not restore an old wallet snapshot over newer writes.
+
+`SUB2API_ADMIN_URL` is an optional independent HTTPS origin with no credentials,
+query or fragment. The ordinary six-service layout keeps loopback-only access.
+For the optional virtual host, set `SUB2API_ADMIN_HOST` and restrictive
+`SUB2API_ADMIN_ALLOW_CIDRS`, provide a separately managed TLS certificate, render
+`render-admin-proxy.py --output <new protected absolute file>`, and validate the
+result with `nginx -t` before applying `compose.admin-access.yaml`. To apply the override through the Windows helper, explicitly set
+`admin_access: true` in the pinned server target. Add exact SHA256 entries for
+`admin-nginx.conf`, `admin-tls/fullchain.pem`, and `admin-tls/privkey.pem` to
+`protected_inputs`. Keep these files root-owned with mode 0600, and the certificate
+directory root-owned and not group/world writable. Set the two file paths to
+`/opt/clearapi/config/admin-nginx.conf` and `/opt/clearapi/config/admin-tls`.
+The helper includes the override in every Compose operation and drift check,
+and includes its certificate material in encrypted backups. Default false keeps
+the original topology and ports.
+Public DNS/TLS and end-to-end protected admin access still require on-site
+acceptance. ClearAPI and Sub2API keep independent authentication and cookies.

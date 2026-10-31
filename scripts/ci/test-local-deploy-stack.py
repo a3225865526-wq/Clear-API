@@ -44,5 +44,16 @@ print(len(sys.stdin.buffer.read()))
         self.assertEqual(result.stdout.decode().splitlines(), ['0', str(len(payload))])
 
 
+    def test_admin_override_is_opt_in_and_used_for_all_compose_actions(self):
+        target = stack.StackTarget.__new__(stack.StackTarget)
+        target.c = {'target_id': 'isolated-stack'}
+        args = target.dc('/release', 'config', '--quiet')
+        self.assertNotIn(str(Path('/release') / 'compose.admin-access.yaml'), args)
+        target.c['admin_access'] = True
+        args = target.dc('/release', 'up', '-d')
+        self.assertEqual(args[-4:], ['-f', str(Path('/release') / 'compose.admin-access.yaml'), 'up', '-d'])
+        self.assertIn(str(Path('/release') / 'compose.admin-access.yaml'), target.dc('/release', 'stop'))
+
+
 if __name__ == '__main__':
     unittest.main()

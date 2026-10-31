@@ -2,6 +2,7 @@
   "schema": "clearapi.six-service-target/v1",
   "target_id": "clearapi-six-new",
   "isolated": false,
+  "admin_access": false,
   "daemon_id": "REPLACE_WITH_ACTUAL_NEW_DOCKER_ID",
   "arch": "amd64",
   "minimum_available_bytes": 536870912,

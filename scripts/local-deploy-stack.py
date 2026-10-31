@@ -52,6 +52,14 @@ class StackTarget:
         if not re.fullmatch(r'(?:[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64})', c['backup_recipient']):
             raise host.DeployError('backup encryption requires an exact owner key fingerprint')
         protected = {'stack.env', 'secrets/token-key', 'secrets/admin-password', 'secrets/terms.txt', 'secrets/privacy.txt'}
+        if type(c.get('admin_access', False)) is not bool:
+            raise host.DeployError('admin_access must be an explicit boolean')
+        if c.get('admin_access', False):
+            protected |= {'admin-nginx.conf', 'admin-tls/fullchain.pem', 'admin-tls/privkey.pem'}
+            certdir = CONFIG.parent / 'admin-tls'
+            if certdir.is_symlink() or not certdir.is_dir() or certdir.stat().st_uid != 0 or certdir.stat().st_mode & 0o022:
+                raise host.DeployError('unsafe admin TLS directory')
+
         if set(c['protected_inputs']) != protected:
             raise host.DeployError('incomplete protected runtime input identity')
         secrets = Path('/opt/clearapi/config/secrets')
@@ -86,8 +94,11 @@ class StackTarget:
         return Path((state or {}).get('env_file', '/opt/clearapi/config/stack.env'))
 
     def dc(self, release, *args, state=None):
-        return ['docker', 'compose', '-p', self.c['target_id'], '--env-file', str(self.envfile(state)),
-                '-f', str(Path(release) / 'compose.yaml'), *args]
+        command = ['docker', 'compose', '-p', self.c['target_id'], '--env-file', str(self.envfile(state)),
+                   '-f', str(Path(release) / 'compose.yaml')]
+        if self.c.get('admin_access', False):
+            command += ['-f', str(Path(release) / 'compose.admin-access.yaml')]
+        return command + list(args)
 
     def call(self, release, *args, state=None):
         # sudo may allocate a PTY even when SSH itself has no terminal. A batch
@@ -290,6 +301,13 @@ class StackTarget:
         with tarfile.open(release / 'gateway-source.tar') as source:
             if source.pax_headers.get('comment') != self.c['gateway_commit']:
                 raise self.h.DeployError('source commit mismatch')
+        if self.c.get('admin_access', False):
+            values = dict(line.split('=', 1) for line in self.envfile().read_text().splitlines()
+                          if line and not line.startswith('#') and '=' in line)
+            if (values.get('SUB2API_ADMIN_NGINX_CONFIG') != '/opt/clearapi/config/admin-nginx.conf'
+                    or values.get('SUB2API_ADMIN_TLS_DIR') != '/opt/clearapi/config/admin-tls'
+                    or not values.get('SUB2API_ADMIN_URL', '').startswith('https://')):
+                raise self.h.DeployError('admin access requires pinned configuration, certificates and HTTPS origin')
         config = self.effective(release, self.state())
         if config['services']['new-api']['environment'].get('CLEARAPI_PRODUCTION') != 'true':
             raise self.h.DeployError('candidate must retain the actual production readiness gate')
@@ -384,7 +402,10 @@ class StackTarget:
         plain = target / 'snapshot.tar'
         with tarfile.open(plain, 'w:') as bundle:
             bundle.add(target / 'plain', arcname='snapshot')
-            for name in ['stack.env', 'secrets', 'stack-target.json', 'stack-target.enabled']:
+            config_names = ['stack.env', 'secrets', 'stack-target.json', 'stack-target.enabled']
+            if self.c.get('admin_access', False):
+                config_names += ['admin-nginx.conf', 'admin-tls']
+            for name in config_names:
                 bundle.add(Path('/opt/clearapi/config') / name, arcname='config/' + name)
         encrypted = target / 'snapshot.tar.gpg'
         self.h.run('gpg', '--batch', '--yes', '--trust-model', 'always', '--recipient', self.c['backup_recipient'],
