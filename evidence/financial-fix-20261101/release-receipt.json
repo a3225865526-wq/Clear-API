@@ -1,0 +1,21 @@
+{
+  "application_commit": "14da5b6bf25270802a0acac03e05a09c931bb4a0",
+  "image": "clearapi-local:14da5b6bf25270802a0acac03e05a09c931bb4a0",
+  "engine_id": "sha256:f86cacb16b7ebff8e2748ecf5aa81c3dc308fc9f0254c6848b7c6296d0a8b2ae",
+  "config_id": "sha256:c2929206a8c08d23cd2994c188d36ac01bf57021c0e20fb11a002f7e55aa6167",
+  "image_archive_sha256": "e59a23d3d8c509aa24a7dc57242acc79fbb58e2ad79977736cff507e83a84534",
+  "reused_images": [
+    "clearapi-sub2api-postgres:17.11-266d3c257594",
+    "clearapi-sub2api-redis:7.4.11-858f009f9709",
+    "clearapi-sub2api:d851a384",
+    "postgres:17.6-alpine",
+    "clearapi-edge:nginx-8541484afbc9"
+  ],
+  "unchanged_five_configs_verified": true,
+  "sub2api_admin_access": false,
+  "new_vps_precheck": "pending: no verified target supplied",
+  "bundle_sha256": "bc0a58b4051abfc5b3a74d9c84568a69c97e681fe467622ff2e6a8aea13a10f3",
+  "bundle_bytes": 735078400,
+  "operator_commit": "82cf08b34984426a155506fc35578859223020d4",
+  "package_verified_files": 27
+}
