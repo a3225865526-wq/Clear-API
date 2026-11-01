@@ -23,6 +23,7 @@ import type { TimeGranularity } from '@/lib/time'
 // ============================================================================
 
 export interface QuotaDataItem {
+  usage_quality?: 'confirmed' | 'partial' | 'estimated' | 'unknown'
   id?: number
   user_id?: number
   username?: string

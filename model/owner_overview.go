@@ -10,9 +10,10 @@ import (
 
 type OwnerUsage struct {
 	ConsoleUsage
-	ActiveUsers int64 `json:"active_users"`
-	Errors      int64 `json:"errors"`
-	RefundQuota int64 `json:"refund_quota"`
+	ActiveUsers  int64 `json:"active_users"`
+	Errors       int64 `json:"errors"`
+	RefundQuota  int64 `json:"refund_quota"`
+	ReleaseQuota int64 `json:"release_quota"`
 }
 
 type OwnerDay struct {
@@ -80,7 +81,7 @@ func ownerDayExpression(kind common.DatabaseType) string {
 	}
 }
 
-const ownerUsageSelect = "COALESCE(SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END),0) AS requests, COALESCE(SUM(CASE WHEN type = 5 THEN 1 ELSE 0 END),0) AS errors, COUNT(DISTINCT CASE WHEN type = 2 THEN user_id END) AS active_users, COALESCE(SUM(CASE WHEN type = 2 THEN quota ELSE 0 END),0) AS quota, COALESCE(SUM(CASE WHEN type = 6 THEN quota ELSE 0 END),0) AS refund_quota, COALESCE(SUM(CASE WHEN type = 2 THEN prompt_tokens ELSE 0 END),0) AS input, COALESCE(SUM(CASE WHEN type = 2 THEN completion_tokens ELSE 0 END),0) AS output, AVG(CASE WHEN type = 2 THEN use_time END) AS average_seconds"
+const ownerUsageSelect = "COALESCE(SUM(CASE WHEN type = 2 THEN 1 ELSE 0 END),0) AS requests, COALESCE(SUM(CASE WHEN type = 5 THEN 1 ELSE 0 END),0) AS errors, COUNT(DISTINCT CASE WHEN type = 2 THEN user_id END) AS active_users, COALESCE(SUM(CASE WHEN type = 2 THEN quota ELSE 0 END),0) AS quota, COALESCE(SUM(CASE WHEN type = 6 AND (content IS NULL OR content <> 'Durable reservation refund') THEN quota ELSE 0 END),0) AS refund_quota, COALESCE(SUM(CASE WHEN type = 6 AND content = 'Durable reservation refund' THEN quota ELSE 0 END),0) AS release_quota, COALESCE(SUM(CASE WHEN type = 2 THEN prompt_tokens ELSE 0 END),0) AS input, COALESCE(SUM(CASE WHEN type = 2 THEN completion_tokens ELSE 0 END),0) AS output, AVG(CASE WHEN type = 2 THEN use_time END) AS average_seconds"
 
 // Only aggregate fields are read; there are no credential, log-content or
 // username reads. Primary and log databases may be separate, so this is not

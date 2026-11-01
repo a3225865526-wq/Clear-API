@@ -21,6 +21,7 @@ export type OverviewUsage = {
   errors: number
   active_users: number
   quota: number
+  release_quota?: number
   refund_quota: number
   input: number
   output: number

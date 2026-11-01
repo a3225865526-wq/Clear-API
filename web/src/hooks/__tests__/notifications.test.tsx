@@ -197,3 +197,39 @@ describe('notification placement and persistent reads', () => {
     )
   })
 })
+
+describe('notification viewport layout', () => {
+  it.each([1, 2, 3, 12])(
+    'keeps actions outside one scrollable panel with %i long notices',
+    async (count) => {
+      const onMarkRead = vi.fn()
+      render(
+        <NotificationPopover
+          open
+          onOpenChange={vi.fn()}
+          unreadCount={count}
+          activeTab='notice'
+          onTabChange={vi.fn()}
+          notice={'Long notice '.repeat(200)}
+          announcements={[]}
+          notificationAnnouncements={Array.from({ length: count }, (_, id) => ({
+            id,
+            content: 'Long announcement '.repeat(200),
+          }))}
+          onMarkRead={onMarkRead}
+          loading={false}
+        />
+      )
+      const panel = await screen.findByRole('tabpanel')
+      expect(panel).toHaveClass('overflow-y-auto', 'min-h-0')
+      expect(panel.querySelectorAll('[data-slot="scroll-area"]')).toHaveLength(
+        0
+      )
+      const button = screen.getByRole('button', { name: 'Mark as read' })
+      expect(panel).not.toContainElement(button)
+      expect(onMarkRead).not.toHaveBeenCalled()
+      await userEvent.setup().click(button)
+      expect(onMarkRead).toHaveBeenCalledOnce()
+    }
+  )
+})

@@ -1,0 +1,52 @@
+
+ RUN  v4.1.10 D:/AI/API/worktrees/clearapi-new-vps-six-service-helper-20261031/web
+
+ ❯ src/hooks/__tests__/notifications.test.tsx (7 tests | 4 failed) 1099ms
+     × keeps actions outside one scrollable panel with 1 long notices 56ms
+     × keeps actions outside one scrollable panel with 2 long notices 46ms
+     × keeps actions outside one scrollable panel with 3 long notices 53ms
+     × keeps actions outside one scrollable panel with 12 long notices 109ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/hooks/__tests__/notifications.test.tsx > notification viewport layout > keeps actions outside one scrollable panel with 1 long notices
+ FAIL  src/hooks/__tests__/notifications.test.tsx > notification viewport layout > keeps actions outside one scrollable panel with 2 long notices
+ FAIL  src/hooks/__tests__/notifications.test.tsx > notification viewport layout > keeps actions outside one scrollable panel with 3 long notices
+Error: expect(element).toHaveClass("overflow-y-auto min-h-0")
+
+Expected the element to have class:
+  overflow-y-auto min-h-0
+Received:
+  flex-1 text-sm outline-none mt-2
+ ❯ src/hooks/__tests__/notifications.test.tsx:210:19
+    208|       onMarkRead={onMarkRead} loading={false} />)
+    209|     const panel = await screen.findByRole('tabpanel')
+    210|     expect(panel).toHaveClass('overflow-y-auto', 'min-h-0')
+       |                   ^
+    211|     expect(panel.querySelectorAll('[data-slot="scroll-area"]')).toHave…
+    212|     const button = screen.getByRole('button', { name: 'Mark as read' })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  src/hooks/__tests__/notifications.test.tsx > notification viewport layout > keeps actions outside one scrollable panel with 12 long notices
+Error: expect(element).toHaveClass("overflow-y-auto min-h-0")
+
+Expected the element to have class:
+  overflow-y-auto min-h-0
+Received:
+  flex-1 text-sm outline-none mt-2
+ ❯ src/hooks/__tests__/notifications.test.tsx:210:19
+    208|       onMarkRead={onMarkRead} loading={false} />)
+    209|     const panel = await screen.findByRole('tabpanel')
+    210|     expect(panel).toHaveClass('overflow-y-auto', 'min-h-0')
+       |                   ^
+    211|     expect(panel.querySelectorAll('[data-slot="scroll-area"]')).toHave…
+    212|     const button = screen.getByRole('button', { name: 'Mark as read' })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 3 passed (7)
+   Start at  10:47:37
+   Duration  9.43s (transform 506ms, setup 1.54s, import 2.98s, tests 1.10s, environment 3.33s)

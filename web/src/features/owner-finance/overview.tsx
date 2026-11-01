@@ -92,6 +92,10 @@ export function OwnerOverview(props: { epoch: number; financeReady: boolean }) {
             locale,
           }),
         },
+        {
+          label: t('Preauthorization releases'),
+          value: formatQuotaWithCurrency(data.release_quota ?? 0, { locale }),
+        },
         { label: t('ops.errors'), value: number(data.errors) },
         { label: t('ops.averageSeconds'), value: number(data.average_seconds) },
         {

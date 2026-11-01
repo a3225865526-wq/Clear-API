@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { IconBadge } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getUserQuotaDates } from '@/features/dashboard/api'
@@ -59,7 +60,8 @@ function formatStatNumber(value: number, locale: Intl.LocalesArgument) {
 }
 
 export function LogStatCards(props: LogStatCardsProps) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const [usageData, setUsageData] = useState<QuotaDataItem[]>([])
   const statCardsConfig = useModelStatCardsConfig()
   const user = useAuthStore((state) => state.auth.user)
   const isAdmin = !!(user?.role && user.role >= 10)
@@ -96,6 +98,7 @@ export function LogStatCards(props: LogStatCardsProps) {
         if (abortController.signal.aborted) return
         const data = res?.data || []
         setStats(calculateDashboardStats(data))
+        setUsageData(data)
         onDataUpdate?.(data, false)
       })
       .catch(() => {
@@ -210,6 +213,45 @@ export function LogStatCards(props: LogStatCardsProps) {
           )
         })}
       </div>
+      {!loading && !error && (
+        <Alert>
+          <AlertDescription>
+            <p>
+              {t(
+                'Customer charges, not supplier costs. Unknown usage is not zero usage.'
+              )}
+            </p>
+            {(['confirmed', 'partial', 'estimated', 'unknown'] as const).map(
+              (quality) => {
+                const rows = usageData.filter(
+                  (row) => row.usage_quality === quality
+                )
+                return (
+                  <p key={quality}>
+                    {t(
+                      {
+                        confirmed: 'Confirmed usage',
+                        partial: 'Partial usage',
+                        estimated: 'Estimated usage',
+                        unknown: 'Unknown usage',
+                      }[quality]
+                    )}
+                    :{' '}
+                    {formatNumber(
+                      rows.reduce((sum, row) => sum + (row.count ?? 0), 0),
+                      toIntlLocale(i18n.resolvedLanguage || i18n.language)
+                    )}{' '}
+                    ·{' '}
+                    {formatQuota(
+                      rows.reduce((sum, row) => sum + (row.quota ?? 0), 0)
+                    )}
+                  </p>
+                )
+              }
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   )
 }

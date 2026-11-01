@@ -37,7 +37,6 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getAnnouncementColorClass } from '@/lib/colors'
@@ -207,9 +206,9 @@ function NoticeContent({
   }
 
   return (
-    <ScrollArea className='h-[min(52vh,28rem)] pr-3'>
+    <div className='min-w-0 [overflow-wrap:anywhere]'>
       <RichContent breaks content={notice} />
-    </ScrollArea>
+    </div>
   )
 }
 
@@ -242,7 +241,7 @@ function AnnouncementsContent({
   }
 
   return (
-    <ScrollArea className='h-[min(52vh,28rem)] pr-3'>
+    <div className='min-w-0 [overflow-wrap:anywhere]'>
       <div className='flex flex-col'>
         {announcements.map((item, idx) => {
           const announcementKey = getAnnouncementRenderKey(item)
@@ -286,7 +285,7 @@ function AnnouncementsContent({
           )
         })}
       </div>
-    </ScrollArea>
+    </div>
   )
 }
 
@@ -334,9 +333,9 @@ export function NotificationPopover({
       <PopoverContent
         align='end'
         sideOffset={8}
-        className='w-[min(26rem,calc(100vw-1rem))] gap-3 p-3'
+        className='max-h-[min(42rem,var(--available-height),calc(100dvh-1rem))] w-[min(26rem,calc(100vw-1rem))] gap-3 overflow-hidden p-3'
       >
-        <PopoverHeader className='gap-1 px-1'>
+        <PopoverHeader className='shrink-0 gap-1 px-1 [overflow-wrap:anywhere]'>
           <PopoverTitle>{t('System Announcements')}</PopoverTitle>
           <p className='text-muted-foreground text-xs'>
             {t('Latest platform updates and notices')}
@@ -344,10 +343,11 @@ export function NotificationPopover({
         </PopoverHeader>
 
         <Tabs
+          className='min-h-0 flex-1 overflow-hidden'
           value={activeTab}
           onValueChange={onTabChange as (value: string) => void}
         >
-          <TabsList className='grid w-full grid-cols-2'>
+          <TabsList className='grid w-full shrink-0 grid-cols-2'>
             <TabsTrigger value='notice' className='gap-1.5'>
               <Bell className='size-3.5' />
               {t('Notice')}
@@ -358,7 +358,10 @@ export function NotificationPopover({
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value='notice' className='mt-2'>
+          <TabsContent
+            value='notice'
+            className='mt-2 min-h-0 overflow-y-auto overscroll-contain [overflow-wrap:anywhere]'
+          >
             {notice && (
               <NoticeContent notice={notice} loading={loading} t={t} />
             )}
@@ -371,7 +374,10 @@ export function NotificationPopover({
             )}
           </TabsContent>
 
-          <TabsContent value='announcements' className='mt-2'>
+          <TabsContent
+            value='announcements'
+            className='mt-2 min-h-0 overflow-y-auto overscroll-contain [overflow-wrap:anywhere]'
+          >
             <AnnouncementsContent
               announcements={announcements}
               loading={loading}
@@ -380,7 +386,7 @@ export function NotificationPopover({
           </TabsContent>
         </Tabs>
 
-        <div className='flex justify-end gap-2'>
+        <div className='flex shrink-0 flex-wrap justify-end gap-2'>
           {onMarkRead && (
             <Button
               size='sm'
