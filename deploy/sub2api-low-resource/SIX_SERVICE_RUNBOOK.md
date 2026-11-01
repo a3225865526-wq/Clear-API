@@ -6,7 +6,7 @@
 
 ## 1. 材料与目标
 
-六服务固定为new-api、gateway-postgres、sub2api、sub2api-postgres、sub2api-redis、edge。Gateway源92edfc345d9b9526379ed25363bb79abf9839874；Sub2API源d851a38477597157e78450d30af2d8504764d085；PG分别17.6/17.11，Redis7.4.11。images.lock.json同时记录本机engine身份和离线tar内的经典config_id；不能将containerd manifest ID当经典config ID。Gateway源码tar的Git pax comment、文件SHA及OCI revision均核验，所有镜像必须linux/目标架构。固定前端已嵌入，不在VPS构建。
+六服务固定为new-api、gateway-postgres、sub2api、sub2api-postgres、sub2api-redis、edge。Gateway源14da5b6bf25270802a0acac03e05a09c931bb4a0；Sub2API源d851a38477597157e78450d30af2d8504764d085；PG分别17.6/17.11，Redis7.4.11。images.lock.json同时记录本机engine身份和离线tar内的经典config_id；不能将containerd manifest ID当经典config ID。Gateway源码tar的Git pax comment、文件SHA及OCI revision均核验，所有镜像必须linux/目标架构。固定前端已嵌入，不在VPS构建。
 
 生产目标需Docker/Compose、Python（需hashlib.file_digest和tarfile data过滤器）、OpenSSH、sudo/visudo、GPG、logrotate及标准Linux工具。版本兼容性在真实目标预检；本地已测版本见最终报告，不能推断所有发行版都已验。数据库和Redis不发布端口；edge/管理仅回环，公网TLS和来源链在新VPS另验。新目标目前只准备amd64离线镜像，不伪造arm64验证。
 

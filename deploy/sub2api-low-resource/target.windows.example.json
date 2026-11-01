@@ -10,5 +10,5 @@
   "bundlePath": "D:\\RELEASE\\six-service.tar",
   "bundleSha256": "REPLACE_WITH_EXACT_BUNDLE_SHA256",
   "remoteConfigSha256": "REPLACE_WITH_ROOT_APPROVED_CONFIG_SHA256",
-  "gatewayCommit": "92edfc345d9b9526379ed25363bb79abf9839874"
+  "gatewayCommit": "14da5b6bf25270802a0acac03e05a09c931bb4a0"
 }
