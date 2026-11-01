@@ -10,7 +10,7 @@ import tarfile
 HERE = Path(__file__).resolve().parent
 PACKAGE_FILES = {
     '.gitattributes', '.gitignore', 'compose.yaml', 'nginx.conf', 'images.lock.json',
-    'production.env.example', 'channel.disabled.plan.json', 'provider-plan.historical.json',
+    'production.env.example', 'channel.disabled.plan.json',
     'package.py', 'backup.sh', 'logrotate.conf', 'OPERATIONS.md', 'MIGRATION.md',
     'target.server.example.json', 'target.windows.example.json', 'stack.sudoers.example',
     'install-stack-target.sh',
